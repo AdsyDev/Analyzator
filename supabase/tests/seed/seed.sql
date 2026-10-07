@@ -59,11 +59,13 @@ insert into public.competitor_set_members (tenant_id, brand_id, competitor_set_i
 select tenant_id, brand_id, id, 'Competitor ' || n, 'competitor' || n || '.test'
 from public.competitor_sets, generate_series(1, 3) as n;
 
-insert into public.source_connections (id, tenant_id, brand_id, provider, external_account_id, secret_ref) values
-  ('50000000-0000-0000-0000-000000000010', '10000000-0000-0000-0000-000000000001', null,                                   'seomonitor', 'acc-t1',  'SEOMONITOR_API_TOKEN'),
-  ('50000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', 'ga4',        'prop-1a', 'GA4_CREDENTIALS'),
-  ('50000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000012', 'ga4',        'prop-1b', 'GA4_CREDENTIALS'),
-  ('50000000-0000-0000-0000-000000000021', '10000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000021', 'ga4',        'prop-2a', 'GA4_CREDENTIALS');
+insert into public.source_connections (id, tenant_id, brand_id, provider, external_account_id) values
+  ('50000000-0000-0000-0000-000000000010', '10000000-0000-0000-0000-000000000001', null,                                   'seomonitor', 'acc-t1'),
+  ('50000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', 'ga4',        'prop-1a'),
+  ('50000000-0000-0000-0000-000000000012', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000012', 'ga4',        'prop-1b'),
+  ('50000000-0000-0000-0000-000000000021', '10000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000021', 'ga4',        'prop-2a'),
+  ('50000000-0000-0000-0000-000000000031', '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', 'clarity',    'clarity-1a'),
+  ('50000000-0000-0000-0000-000000000032', '10000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000021', 'clarity',    'clarity-2a');
 
 insert into public.sync_runs (tenant_id, brand_id, source_connection_id, source, period_start, period_end, status, rows_written, started_at, finished_at) values
   ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', '50000000-0000-0000-0000-000000000011', 'ga4', '2026-09-28', '2026-10-04', 'succeeded', 70, now(), now()),
@@ -97,4 +99,14 @@ begin
 end;
 $$;
 
-grant execute on all functions in schema tests to authenticated, anon;
+create or replace function tests.authenticate_as_service_role() returns void
+language plpgsql
+as $$
+begin
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  perform set_config('role', 'service_role', true);
+end;
+$$;
+
+grant usage on schema tests to service_role;
+grant execute on all functions in schema tests to authenticated, anon, service_role;

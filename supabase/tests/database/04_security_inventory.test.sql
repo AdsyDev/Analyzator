@@ -66,6 +66,15 @@ select is_empty(
                            'competitor_set_id', 'created_at') $$,
   'A7: tenant_id, user_id, id și coloanele de autor nu sunt actualizabile'
 );
+-- Referința Vault și starea credențialului se scriu doar prin set_source_token / record_source_validation.
+select is_empty(
+  $$ select privilege_type || ' ' || column_name from information_schema.column_privileges
+     where table_schema = 'public' and table_name = 'source_connections' and grantee = 'authenticated'
+       and privilege_type in ('INSERT', 'UPDATE')
+       and (column_name in ('vault_secret_id', 'credential_updated_by') or column_name like 'credential_%'
+            or column_name like 'last_validat%') $$,
+  'A7: authenticated nu poate scrie vault_secret_id sau starea credențialului'
+);
 -- brand_id e actualizabil doar pe source_connections (FK compus îl ține în același tenant).
 select results_eq(
   $$ select table_name::text collate "C" from information_schema.column_privileges
@@ -91,10 +100,35 @@ select is_empty(
 );
 
 -- A10. Funcții SECURITY DEFINER --------------------------------------------------------
+-- Excepție aprobată (7 oct 2026, docs/security-tests.md): funcțiile server din public, doar pentru service_role.
+-- O funcție nouă în public trebuie adăugată explicit în lista de mai jos, după revizuire.
+create temporary table allowed_public_functions (name text primary key) on commit drop;
+insert into allowed_public_functions values
+  ('get_source_token'), ('record_source_validation'), ('set_source_token');
+
 select is_empty(
   $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname in ('public', 'graphql_public') and p.prosecdef $$,
-  'A10: nicio funcție SECURITY DEFINER în schemele expuse prin API'
+     where n.nspname = 'public' and p.proname not in (select name from allowed_public_functions) $$,
+  'A10/A11: nicio funcție în public în afara listei aprobate'
+);
+select is_empty(
+  $$ select p.proname || ' → ' || r from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     cross join unnest(array['anon', 'authenticated']) r
+     where n.nspname in ('public', 'graphql_public') and p.prosecdef
+       and has_function_privilege(r, p.oid, 'execute') $$,
+  'A10: nicio funcție SECURITY DEFINER din schemele expuse nu e executabilă de anon/authenticated'
+);
+select is_empty(
+  $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and exists (select 1 from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a where a.grantee = 0 and a.privilege_type = 'EXECUTE') $$,
+  'A10: nicio funcție din public nu are EXECUTE pentru PUBLIC'
+);
+select results_eq(
+  $$ select p.proname::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and has_function_privilege('service_role', p.oid, 'execute') order by 1 $$,
+  $$ values ('get_source_token'::text collate "C"), ('record_source_validation'), ('set_source_token') $$,
+  'A10: funcțiile aprobate sunt executabile de service_role'
 );
 select is_empty(
   $$ select n.nspname || '.' || p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -108,8 +142,9 @@ select is_empty(
   $$ select n.nspname || '.' || p.proname || ' → ' || pg_get_function_result(p.oid)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname in ('public', 'private') and p.prosecdef
-       and pg_get_function_result(p.oid) not in ('boolean', 'trigger', 'void') $$,
-  'A10: nicio funcție SECURITY DEFINER nu returnează date (doar boolean/trigger)'
+       and pg_get_function_result(p.oid) not in ('boolean', 'trigger', 'void')
+       and not (n.nspname = 'public' and p.proname in (select name from allowed_public_functions)) $$,
+  'A10: nicio funcție SECURITY DEFINER nu returnează date, în afara celor aprobate (doar service_role)'
 );
 -- Funcțiile care primesc un user_id arbitrar nu sunt executabile de clienți.
 select ok(not has_function_privilege('authenticated', 'private.user_has_brand_role(uuid, uuid, public.membership_role[])', 'execute'),
@@ -133,11 +168,12 @@ select results_eq(
   'A10: doar cele 4 funcții de autorizare sunt executabile de authenticated'
 );
 
--- A11. Fără funcții în public (RPC) — orice RPC nou trebuie adăugat aici după revizuire --
+-- A11. RPC în public: doar lista aprobată (verificat mai sus), niciuna executabilă de clienți --
 select is_empty(
-  $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'public' $$,
-  'A11: nicio funcție RPC în public'
+  $$ select p.proname || ' → ' || r from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     cross join unnest(array['anon', 'authenticated']) r
+     where n.nspname = 'public' and has_function_privilege(r, p.oid, 'execute') $$,
+  'A11: nicio funcție din public executabilă de anon sau authenticated'
 );
 
 -- A12. Storage: niciun bucket public; politicile pe objects nu sunt permisive ----------
