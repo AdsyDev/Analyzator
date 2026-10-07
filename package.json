@@ -7,6 +7,7 @@
     "typecheck": "npm --prefix apps/web run typecheck",
     "test": "npm --prefix apps/web run test",
     "test:db": "supabase test db supabase/tests/database",
-    "db:reset": "supabase db reset"
+    "db:reset": "supabase db reset",
+    "test:security": "scripts/test-security.sh"
   }
 }
