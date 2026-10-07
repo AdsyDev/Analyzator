@@ -10,6 +10,47 @@ Autentificare: `Authorization: Bearer {token}` (un token per proiect, doar serve
 - Worker-ul citește conexiunile active cu service role. Le sare pe cele `missing` sau `invalid` și citește tokenul cu `get_source_token` doar după verificarea bugetului.
 - Proba (`npm run probe:clarity`) citește în continuare `CLARITY_PROJECTS` din `.env.local`, până există UI-ul.
 
+## Stocare: `clarity_daily`
+
+- **Ziua stocată (`date`) = ziua anterioară rulării, în Europe/Bucharest.** Exemplu: o rulare la 22:05 UTC pe 7 oct (01:05 pe 8 oct la București) scrie `date = 2026-10-07`.
+- **Fereastra reală a datelor = cele 24 de ore care se încheie la `collected_at`**, în UTC (`numOfDays=1`; `window_days` × 24 h în general). Ziua stocată e o aproximare a zilei calendaristice: cu rularea programată la 22:05 UTC, fereastra acoperă 01:05–01:05 ora României vara (decalaj de o oră) și 00:05–00:05 iarna. La 25 octombrie (zi de 25 de ore), o oră din ziua calendaristică nu e acoperită.
+- `window_days` = 2 sau 3 marchează un agregat de recuperare (`numOfDays` 2–3), nu o zi reală. View-ul de observații îl exclude.
+- Cheie unică: `(tenant_id, brand_id, date, dimension, dimension_value)`; upsert idempotent (`on_conflict`). O a doua rulare în aceeași zi suprascrie rândurile cu fereastra ei de 24 h: cu același payload, aceleași valori și niciun duplicat. Rândurile unei dimensiuni care lipsesc din a doua rulare rămân din prima.
+- Dimensiuni: `all` (fără `dimension1`), `device` (`Device`), `source` (`Source`), `page` (`URL`). `dimension_value` = valoarea cheii cu numele dimensiunii; valoare lipsă → `(unknown)` (notă în log); valoare repetată în același bloc → se păstrează primul rând, fără adunare.
+- Proveniență pe fiecare rând: `source_id` (conexiunea), `sync_run_id`, `collected_at`, `collection_method = 'api'`, `payload_hash` (SHA-256 al corpului brut), `window_days`, `schema_version = 'docs-2025-12-05'`.
+- RLS: citire pentru oricine are acces la brand (inclusiv client); scriere doar de worker (service role), cu verificarea tenantului înainte și după upsert.
+- **O metrică absentă din payload rămâne NULL, nu 0.**
+
+### Maparea câmpurilor (parser: `connectors/clarity/parse.ts`, Zod)
+
+| metricName | Câmp | Coloană | Sursa mapării |
+|---|---|---|---|
+| `Traffic` | `totalSessionCount` (string) | `sessions` | documentație (exemplu) |
+| `Traffic` | `totalBotSessionCount` (string) | `bot_sessions` | documentație (exemplu) |
+| `Traffic` | `distantUserCount` (string) | `distinct_users` | documentație (exemplu) |
+| `Traffic` | `PagesPerSessionPercentage` (număr, de forma 1.0931) | `pages_per_session` | documentație (exemplu) |
+| `Scroll Depth`, `Engagement Time`, `Dead Click Count`, `Rage Click Count`, `Quickback Click`, `Excessive Scroll`, `Script Error Count`, `Error Click Count` | **nedocumentate** | `scroll_depth`, `engagement_time`, `dead_click_count`, `rage_click_count`, `quickback_click`, `excessive_scroll`, `script_error_count`, `error_click_count` | **neconfirmat**: rămân NULL până la un payload real |
+| `Popular Pages`, `Browser`, `Device`, `OS`, `Country/Region`, `Page Title`, `Referrer URL` | — | — | blocuri de defalcare, ignorate explicit (notă în log) |
+
+Parserul e tolerant: câmpurile și blocurile necunoscute nu opresc parsarea. Ele se loghează (`console.warn` și `sync_runs.errors`, coduri `parser_unknown_field`, `parser_unconfirmed_field`, `parser_unknown_block`, `parser_unknown_block_key`) fără să schimbe statusul run-ului. După prima rulare reală, notele `parser_unconfirmed_field` dau numele exacte ale câmpurilor: se completează `FIELD_MAP`, apoi contractul și registrul (definițiile Clarity ies din `draft`). O formă de bază invalidă (nu e listă de `{ metricName, information[] }`) pierde dimensiunea respectivă (`invalid_payload`), fără să scrie nimic.
+
+### Observații pentru metrics.compute
+
+View-ul `public.clarity_metric_observations` (`security_invoker`, RLS din `clarity_daily`) transformă rândurile `dimension = 'all'` și `window_days = 1` în observații pentru definițiile draft din registru:
+
+| metric_key | value | weight |
+|---|---|---|
+| `clarity_rage_click_sessions` | `rage_click_count` | — |
+| `clarity_dead_click_sessions` | `dead_click_count` | — |
+| `clarity_quickback_sessions` | `quickback_click` | — |
+| `clarity_scroll_depth` | `scroll_depth` | `sessions` |
+
+Cât timp coloanele sunt NULL, `metrics.compute` întoarce `unavailable` (`no_confirmed_data`, plus `definition_draft`), nu 0. Zilele confirmate = zilele cu `value` nenul.
+
+### Rulare programată
+
+`.github/workflows/clarity-daily.yml`: zilnic la 22:05 UTC, **dezactivat** până la `CONNECTOR_CLARITY_ENABLED = true` (GitHub Variables). `workflow_dispatch` e activ oricând. Vezi `docs/runbook.md`.
+
 ## Bugetul zilnic
 
 - 10 apeluri per proiect (token) pe zi, contorizate în `provider_api_calls` pentru colectare **și** pentru „Testează conexiunea".
@@ -41,7 +82,7 @@ La buget epuizat se pierd dimensiunile de la coada listei; run-ul devine `partia
 
 Fixtures se generează cu `npm run probe:clarity`: 4 apeluri per proiect, fără retry.
 
-> **Status: de completat manual după rularea probei.** Valorile de mai jos nu sunt presupuse; se trec doar ce apare în fixtures.
+> **Status (8 oct 2026):** conectorul e construit pe forma din documentație, cu fixtures în `tests/fixtures/clarity/docs-derived/` marcate „derivat din documentație, neconfirmat". Secțiunile de mai jos se completează după prima probă reală (`npm run probe:clarity`), doar cu ce apare în fixtures reale.
 
 ## Observații înainte de probă
 
@@ -49,7 +90,9 @@ Fixtures se generează cu `npm run probe:clarity`: 4 apeluri per proiect, fără
 
 ## Decizii deschise
 
-- **Fereastra de 24 h față de ziua calendaristică.** `numOfDays=1` înseamnă ultimele 24 de ore de la apel, în UTC. Ziua înregistrată (ziua anterioară în Europe/Bucharest) coincide cu fereastra doar dacă apelul se face la 00:00 ora României; la 25 octombrie ziua are 25 de ore. De decis: ora rulării și cum se marchează în date că valoarea e o fereastră de 24 h aproximativă.
+- ~~Fereastra de 24 h față de ziua calendaristică~~ — **decis 8 oct 2026:** ziua stocată = ziua anterioară rulării în Europe/Bucharest; fereastra reală = 24 h până la `collected_at` (vezi „Stocare"). Rulare programată la 22:05 UTC.
+- **Numele câmpurilor pentru metricile non-Traffic** nu sunt documentate; se confirmă la prima rulare reală din notele parserului.
+- **`PagesPerSessionPercentage`:** numele sugerează procent, dar exemplul (1.0931, 2.2609) arată pagini per sesiune. De confirmat pe payload real.
 - **Limita de 1.000 de rânduri pentru `URL`** poate trunchia paginile pe un site mare. De verificat în fixture dacă `page` are exact 1.000 de rânduri.
 
 ## Rulare

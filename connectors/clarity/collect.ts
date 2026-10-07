@@ -1,22 +1,19 @@
 // Conectorul zilnic Clarity. Rulare: npm run collect:clarity
 // Configurarea vine din source_connections (provider = 'clarity'); tokenurile din Vault.
 //
-// STATUS: parserul și scrierea în clarity_daily nu sunt implementate (așteaptă proba și migrația din
-// Promptul 4). Până atunci scriptul se oprește ÎNAINTE de a citi tokenuri sau de a apela Clarity.
+// Parserul urmează forma din documentația Microsoft (neconfirmată pe un payload real): vezi
+// docs/contracts/clarity.md. Ziua stocată = ziua anterioară rulării în Europe/Bucharest.
 
 import { loadActiveConnections } from '../shared/connections.ts'
 import { SupabaseRest, supabaseConfigFromEnv } from '../shared/supabase-rest.ts'
-import { collectConnection, type ClarityParser, type ClarityWriter } from './collect-core.ts'
-
-// Se înlocuiesc după probă cu implementările reale (interfețele din collect-core.ts).
-const parser: ClarityParser<never> | null = null
-const writer: ClarityWriter<never> | null = null
+import { collectConnection } from './collect-core.ts'
+import { clarityParser } from './parse.ts'
+import { clarityWriter } from './write.ts'
 
 async function main(): Promise<void> {
-  if (!parser || !writer) {
-    throw new Error('Parserul și scrierea în clarity_daily nu sunt implementate încă (după probă). Nu apelez Clarity.')
-  }
   const db = new SupabaseRest(supabaseConfigFromEnv(process.env))
+  const parser = clarityParser
+  const writer = clarityWriter(db)
   const { connections, skipped } = await loadActiveConnections(db, 'clarity')
   for (const s of skipped) console.log(`sărit ${s.id}: ${s.reason}`)
 

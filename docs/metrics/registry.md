@@ -76,6 +76,8 @@ Numărul de keywords urmărite cu rank 1–3 la ultima observație. Keywords fă
 Ca mai sus, pentru rank 1–10.
 
 ### clarity_rage_click_sessions
+_Sursa observațiilor pentru toate metricile Clarity: view-ul `clarity_metric_observations` (vezi `docs/contracts/clarity.md`)._
+
 Sesiunile Clarity cu rage clicks; suma zilelor. **Draft:** forma payloadului (număr de sesiuni sau procent) se confirmă pe fixtures reale (`docs/contracts/clarity.md`). Valorile Clarity acoperă ferestre de 24 h în UTC, nu zile calendaristice.
 
 ### clarity_dead_click_sessions

@@ -1,0 +1,27 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-data-export-api (actualizată 2025-12-05, citită 2026-10-08)",
+  "_request": "numOfDays=1&dimension1=Device",
+  "_note": "Cheia dimensiunii are numele dimensiunii, ca „OS” în exemplul documentației. Valorile (Mobile, PC) sunt sintetice.",
+  "payload": [
+    {
+      "metricName": "Traffic",
+      "information": [
+        {
+          "totalSessionCount": "700",
+          "totalBotSessionCount": "90",
+          "distantUserCount": "560",
+          "PagesPerSessionPercentage": 1.8,
+          "Device": "Mobile"
+        },
+        {
+          "totalSessionCount": "500",
+          "totalBotSessionCount": "60",
+          "distantUserCount": "420",
+          "PagesPerSessionPercentage": 2.5,
+          "Device": "PC"
+        }
+      ]
+    }
+  ]
+}

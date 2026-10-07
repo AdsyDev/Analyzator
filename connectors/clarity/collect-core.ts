@@ -2,6 +2,7 @@
 // Parserul și scrierea în clarity_daily sunt injectate: se implementează după probă,
 // pe baza fixtures din tests/fixtures/clarity/.
 
+import { createHash } from 'node:crypto'
 import { CallBudget, fetchWithRetry, type FetchLike, type Sleep } from '../shared/http-budget.ts'
 import { previousCalendarDayInBucharest } from '../shared/dates.ts'
 import { finishSyncRun, startSyncRun, type SyncRunError, type SyncRunResult } from '../shared/sync-runs.ts'
@@ -37,11 +38,28 @@ export function clarityUrl(call: ClarityCall): string {
   return `${CLARITY_ENDPOINT}?${params.toString()}`
 }
 
-export type ParseContext = { tenant_id: string; brand_id: string; date: string; call: ClarityCall }
+export type ParseContext = {
+  tenant_id: string
+  brand_id: string
+  /** Ziua stocată: ziua anterioară rulării în Europe/Bucharest. */
+  date: string
+  call: ClarityCall
+  /** Proveniență: conexiunea, run-ul, momentul răspunsului (sfârșitul ferestrei de 24 h), hash-ul corpului brut. */
+  source_id: string
+  sync_run_id: string
+  collected_at: string
+  payload_hash: string
+  window_days: 1 | 2 | 3
+}
 
-/** Primește payload-ul brut (JSON parsat) și întoarce rândurile pentru clarity_daily. */
+/** Ce a întâlnit parserul fără să știe ce înseamnă (câmpuri sau blocuri necunoscute, valori invalide). */
+export type ParseNote = { code: string; message: string; metric_name?: string; field?: string }
+
+export type ParseResult<TRow> = { rows: TRow[]; notes: ParseNote[] }
+
+/** Primește payload-ul brut (JSON parsat) și întoarce rândurile pentru clarity_daily. Aruncă la formă invalidă. */
 export interface ClarityParser<TRow> {
-  parse(payload: unknown, context: ParseContext): TRow[]
+  parse(payload: unknown, context: ParseContext): ParseResult<TRow>
 }
 
 /** Upsert idempotent pe (tenant_id, brand_id, date, dimension, dimension_value); întoarce rândurile scrise. */
@@ -173,7 +191,29 @@ export async function collectConnection<TRow>(
         continue
       }
 
-      const rows = deps.parser.parse(payload, { ...scope, date, call })
+      let parsed: ParseResult<TRow>
+      try {
+        parsed = deps.parser.parse(payload, {
+          ...scope,
+          date,
+          call,
+          source_id: connection.id,
+          sync_run_id: handle.id,
+          collected_at: now().toISOString(),
+          payload_hash: createHash('sha256').update(result.body).digest('hex'),
+          window_days: 1,
+        })
+      } catch (err) {
+        notCollected.push(call.key)
+        errors.push({ code: 'invalid_payload', dimension: call.key, status: result.status, message: (err as Error).message })
+        continue
+      }
+      for (const note of parsed.notes) {
+        // Câmpurile necunoscute se loghează (și ajung în sync_runs), fără să schimbe statusul run-ului.
+        console.warn(`clarity ${connection.id} ${call.key}: ${note.code} ${note.message}`)
+        errors.push({ code: `parser_${note.code}`, dimension: call.key, status: null, message: note.message })
+      }
+      const rows = parsed.rows
       if (rows.length === 0) {
         emptyPayloads++
         errors.push({ code: 'empty_payload', dimension: call.key, status: result.status, message: 'Payload fără rânduri.' })

@@ -24,6 +24,7 @@
     "connectors/**/*.ts",
     "supabase/functions/**/*.ts",
     "scripts/**/*.ts",
-    "analytics/**/*.ts"
+    "analytics/**/*.ts",
+    "tests/integration/**/*.ts"
   ]
 }

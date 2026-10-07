@@ -64,4 +64,5 @@ Scriptul cere parola și tokenul fără ecou. Cu `--validate` face și un apel d
 
 - `npm run test`: conectori, funcția server, web
 - `npm run test:security`: reset local, pgTAP și atacuri prin API și pe Edge Function (vezi `docs/security-tests.md`)
+- `npm run test:integration`: reset local, apoi pipeline-ul Clarity pe fixtures docs-derived (worker → `clarity_daily` → view → `metrics.compute`)
 - `npm run test:guards`: mutații care slăbesc protecțiile; fiecare trebuie prinsă de teste

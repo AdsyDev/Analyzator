@@ -71,6 +71,30 @@ export class FakeDb implements Db {
     return hit.map((r) => ({ ...r }) as T)
   }
 
+  /** Upsert ca în Postgres: cheie unică pe onConflict; același rând de două ori în același apel → eroare. */
+  async upsert<T extends Row>(table: string, rows: Row[], onConflict: string[]): Promise<T[]> {
+    this.log.push({ op: 'upsert', table, row: { count: rows.length, onConflict } })
+    const stored = (this.tables[table] ??= [])
+    const keyOf = (r: Row) => onConflict.map((c) => String(r[c])).join('|')
+    const batchKeys = new Set<string>()
+    const out: Row[] = []
+    for (const row of rows) {
+      const key = keyOf(row)
+      if (batchKeys.has(key)) throw new Error('ON CONFLICT DO UPDATE command cannot affect row a second time')
+      batchKeys.add(key)
+      const existing = stored.find((r) => keyOf(r) === key)
+      if (existing) {
+        Object.assign(existing, row)
+        out.push({ ...existing })
+      } else {
+        const created = { id: ++this.#seq, ...row }
+        stored.push(created)
+        out.push({ ...created })
+      }
+    }
+    return out as unknown as T[]
+  }
+
   async rpc<T>(fn: string, args: Row): Promise<T> {
     this.log.push({ op: 'rpc', table: fn, row: args })
     const impl = this.rpcs[fn]

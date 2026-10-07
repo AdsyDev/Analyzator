@@ -1,0 +1,27 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-data-export-api (actualizată 2025-12-05, citită 2026-10-08)",
+  "_request": "numOfDays=1&dimension1=URL",
+  "_note": "Cheia dimensiunii „URL”; valorile sunt sintetice. Răspunsul real e limitat la 1.000 de rânduri.",
+  "payload": [
+    {
+      "metricName": "Traffic",
+      "information": [
+        {
+          "totalSessionCount": "400",
+          "totalBotSessionCount": "40",
+          "distantUserCount": "350",
+          "PagesPerSessionPercentage": 1.5,
+          "URL": "https://brand.test/"
+        },
+        {
+          "totalSessionCount": "300",
+          "totalBotSessionCount": "10",
+          "distantUserCount": "260",
+          "PagesPerSessionPercentage": 2.9,
+          "URL": "https://brand.test/produse"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-data-export-api (actualizată 2025-12-05, citită 2026-10-08)",
+  "_request": "numOfDays=1&dimension1=Source",
+  "_note": "Cheia dimensiunii „Source”; valorile sunt sintetice.",
+  "payload": [
+    {
+      "metricName": "Traffic",
+      "information": [
+        {
+          "totalSessionCount": "640",
+          "totalBotSessionCount": "20",
+          "distantUserCount": "530",
+          "PagesPerSessionPercentage": 2.4,
+          "Source": "google"
+        },
+        {
+          "totalSessionCount": "560",
+          "totalBotSessionCount": "130",
+          "distantUserCount": "450",
+          "PagesPerSessionPercentage": 1.7,
+          "Source": "(direct)"
+        }
+      ]
+    }
+  ]
+}

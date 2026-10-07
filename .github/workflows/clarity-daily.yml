@@ -1,0 +1,76 @@
+# Colectarea zilnică Clarity (Data Export API) pentru toate conexiunile active din source_connections.
+#
+# Programare: zilnic la 22:05 UTC = 01:05 ora României vara (EEST), 00:05 iarna (EET). Rularea stochează ziua
+# anterioară în Europe/Bucharest; fereastra reală e de 24 h până la momentul apelului (docs/contracts/clarity.md).
+#
+# Rularea programată e DEZACTIVATĂ până când variabila de repository/environment CONNECTOR_CLARITY_ENABLED = "true"
+# (Settings → Secrets and variables → Actions → Variables). workflow_dispatch funcționează oricând.
+#
+# Secrete necesare în environment-ul GitHub ales (implicit „staging"):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+# Tokenurile Clarity NU sunt aici: stau în Supabase Vault și se citesc la rulare prin get_source_token.
+
+name: clarity-daily
+
+on:
+  schedule:
+    - cron: '5 22 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment GitHub cu secretele Supabase'
+        type: choice
+        options: [staging]
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  # O singură colectare odată: bugetul Clarity e de 10 apeluri pe zi per proiect.
+  group: clarity-daily
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: github.event_name == 'workflow_dispatch' || vars.CONNECTOR_CLARITY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dependențe
+        run: npm ci
+
+      - name: Teste conector (fără rețea)
+        run: node --experimental-strip-types --test 'connectors/clarity/**/*.test.ts' 'connectors/shared/**/*.test.ts'
+
+      - name: Colectare Clarity
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Lipsesc secretele SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY în environment-ul ${{ inputs.environment || 'staging' }}."
+            exit 1
+          fi
+          node --experimental-strip-types connectors/clarity/collect.ts | tee collect.log
+
+      - name: Rezumat
+        if: always()
+        run: |
+          {
+            echo "### Clarity: $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo
+            echo '```'
+            [ -f collect.log ] && cat collect.log || echo "fără output"
+            echo '```'
+            echo
+            echo "Detalii: sync_runs (source = clarity) și provider_api_calls în Supabase."
+          } >> "$GITHUB_STEP_SUMMARY"

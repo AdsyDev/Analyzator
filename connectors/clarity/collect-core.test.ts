@@ -18,7 +18,10 @@ const TOKEN = 'secret-token'
 
 type StubRow = { dimension: string }
 const stubParser: ClarityParser<StubRow> = {
-  parse: (payload, ctx) => (Array.isArray(payload) && payload.length ? [{ dimension: ctx.call.key }] : []),
+  parse: (payload, ctx) => ({
+    rows: Array.isArray(payload) && payload.length ? [{ dimension: ctx.call.key }] : [],
+    notes: [],
+  }),
 }
 function stubWriter() {
   const written: StubRow[] = []

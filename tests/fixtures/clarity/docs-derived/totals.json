@@ -1,0 +1,19 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-data-export-api (actualizată 2025-12-05, citită 2026-10-08)",
+  "_request": "numOfDays=1",
+  "_note": "Forma blocului Traffic e cea din exemplul documentației; fără dimensiune, presupunem un singur rând fără cheie de dimensiune. Valorile sunt sintetice.",
+  "payload": [
+    {
+      "metricName": "Traffic",
+      "information": [
+        {
+          "totalSessionCount": "1200",
+          "totalBotSessionCount": "150",
+          "distantUserCount": "980",
+          "PagesPerSessionPercentage": 2.1
+        }
+      ]
+    }
+  ]
+}

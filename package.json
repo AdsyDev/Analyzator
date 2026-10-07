@@ -17,10 +17,14 @@
     "test:guards": "scripts/test-guard-mutations.sh",
     "dev:preview": "npm --prefix apps/web run dev:preview",
     "build:staging": "npm --prefix apps/web run build:staging",
-    "build:preview": "npm --prefix apps/web run build:preview"
+    "build:preview": "npm --prefix apps/web run build:preview",
+    "test:integration": "scripts/test-integration.sh"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
   }
 }

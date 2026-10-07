@@ -71,6 +71,7 @@ Funcțiile de calcul al metricilor sunt pure: primesc definiția și observații
 | Funcții RPC în `public` | niciuna | A11, B3 |
 | SECURITY DEFINER | În `private`: 4 de autorizare (boolean, răspund doar pentru `auth.uid()`), `user_has_brand_role` și `user_can_import` (user_id explicit, neexecutabile de clienți), triggere (`audit_row`, `delete_source_secret`). În `public`: 3 funcții server pentru credențiale, doar `service_role` (vezi excepția E1) | A10, A11, A14, B3, B8, V1–V3 |
 | Vault | Tokenurile surselor; secret `source_connection:<id>` per conexiune | V1–V9, B8 |
+| Clarity | `clarity_daily` (RLS pe brand, scriere doar service role) și view `clarity_metric_observations` (`security_invoker`) | A1–A8; RLS prin REST în `tests/integration/clarity-pipeline.test.ts` |
 | Registrul de metrici | `metric_definitions` (16 definiții, fără `tenant_id`, E2), view `metric_definitions_current` (`security_invoker`), schema `metrics` cu funcții pure (E3) | A1–A8, A15, 06 |
 | Bucket-uri storage | niciunul | A12, B6 (gardă) |
 | Realtime | nicio publicare | A13 |
