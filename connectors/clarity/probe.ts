@@ -3,8 +3,11 @@
 // Rulare: npm run probe:clarity
 // CLARITY_PROJECTS='[{"brand_slug":"brand-a","token":"…"}]' (în .env.local, niciodată în repo)
 //
-// Buget Clarity: 10 apeluri/zi per proiect. Scriptul face EXACT 2 apeluri per proiect, fără retry,
+// Buget Clarity: 10 apeluri/zi per proiect. Scriptul face EXACT 4 apeluri per proiect, fără retry,
 // și refuză să ruleze dacă fixtures există deja (folosește --force pentru a le suprascrie).
+// Numele dimensiunilor sunt cele din documentația Microsoft (Clarity Data Export API, actualizată 2025-12-05):
+// Browser, Device, Country/Region, OS, Source, Medium, Campaign, Channel, URL.
+// Un nume respins (400) se raportează; nu se încearcă alternative.
 
 import { mkdir, writeFile, access } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -14,11 +17,14 @@ const OUT_DIR = join(import.meta.dirname, '..', '..', 'tests', 'fixtures', 'clar
 
 type Project = { brand_slug: string; token: string }
 
-type Probe = { suffix: 'totals' | 'device'; query: string }
+type Probe = { suffix: 'totals' | 'device' | 'source' | 'page'; query: string }
 
+// Ordinea = prioritatea.
 const PROBES: Probe[] = [
   { suffix: 'totals', query: 'numOfDays=1' },
   { suffix: 'device', query: 'numOfDays=1&dimension1=Device' },
+  { suffix: 'source', query: 'numOfDays=1&dimension1=Source' },
+  { suffix: 'page', query: 'numOfDays=1&dimension1=URL' },
 ]
 
 function parseProjects(raw: string | undefined): Project[] {
@@ -49,6 +55,9 @@ function parseProjects(raw: string | undefined): Project[] {
 
 function describeStatus(status: number, retryAfter: string | null): string {
   if (status >= 200 && status < 300) return 'OK'
+  if (status === 400) {
+    return 'Parametri invalizi (400): numele dimensiunii nu e acceptat. Nu încerc alternative; verifică documentația.'
+  }
   if (status === 401) return 'Token invalid sau expirat (401). Generează un token nou în Clarity: Settings → Data Export.'
   if (status === 403) {
     return 'Acces refuzat (403). Tokenul e invalid, nu aparține acestui proiect sau exportul nu e activat. ' +

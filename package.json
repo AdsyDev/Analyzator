@@ -5,11 +5,17 @@
   "scripts": {
     "dev": "npm --prefix apps/web run dev",
     "build": "npm --prefix apps/web run build",
-    "typecheck": "npm --prefix apps/web run typecheck",
-    "test": "npm --prefix apps/web run test",
+    "typecheck": "tsc -p tsconfig.json && npm --prefix apps/web run typecheck",
+    "test": "npm run test:connectors && npm --prefix apps/web run test",
     "test:db": "supabase test db supabase/tests/database",
     "db:reset": "supabase db reset",
     "test:security": "scripts/test-security.sh",
-    "probe:clarity": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/clarity/probe.ts"
+    "probe:clarity": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/clarity/probe.ts",
+    "test:connectors": "node --experimental-strip-types --test 'connectors/**/*.test.ts'",
+    "collect:clarity": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/clarity/collect.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^7.0.2"
   }
 }
