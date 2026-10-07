@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div role="button" tabindex="0" aria-label="{{ aria }}" onClick="{{ open }}" onKeyDown="{{ onKey }}" style="position:relative; height:100%; box-sizing:border-box; display:flex; flex-direction:column; gap:12px; padding:16px 16px 12px; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:var(--sh-1); cursor:pointer; outline:none; transition:box-shadow 220ms ease, transform 220ms cubic-bezier(0.23,1,0.32,1), border-color 220ms ease" style-hover="box-shadow:var(--sh-2); transform:translateY(-2px); border-color:var(--border-strong)" style-focus="box-shadow:0 0 0 3px var(--ring)">
+  <div style="display:flex; align-items:center; gap:6px; min-height:20px">
+    <span style="font:600 13px/1.3 'Onest',sans-serif; color:var(--text-2)">{{ label }}</span>
+    <span style="position:relative; display:inline-flex" onMouseEnter="{{ tipIn }}" onMouseLeave="{{ tipOut }}">
+      <button type="button" aria-label="Ce înseamnă indicatorul" onClick="{{ tipToggle }}" onFocus="{{ tipIn }}" onBlur="{{ tipOut }}" style="width:18px; height:18px; border-radius:50%; border:1px solid var(--border-strong); background:transparent; color:var(--text-2); font:600 10px/1 'Onest',sans-serif; display:grid; place-items:center; cursor:help; padding:0">?</button>
+      <sc-if value="{{ tipOpen }}">
+        <span role="tooltip" style="position:absolute; top:26px; left:-14px; z-index:30; width:256px; padding:10px 12px; border-radius:12px; background:var(--glass-strong); backdrop-filter:blur(24px) saturate(160%); -webkit-backdrop-filter:blur(24px) saturate(160%); border:1px solid var(--glass-border); box-shadow:var(--sh-pop); font:400 12.5px/1.5 'Onest',sans-serif; color:var(--text); cursor:default; text-wrap:pretty">{{ def }}</span>
+      </sc-if>
+    </span>
+    <span style="flex:1"></span>
+    <i class="ph ph-arrow-up-right" aria-hidden="true" style="font-size:14px; color:var(--text-3)"></i>
+  </div>
+  <sc-if value="{{ isLoading }}">
+    <div aria-label="Se încarcă" style="display:flex; flex-direction:column; gap:10px; flex:1">
+      <div style="width:52%; height:32px; border-radius:6px; background:var(--skeleton)"></div>
+      <div style="width:38%; height:12px; border-radius:4px; background:var(--skeleton)"></div>
+      <div style="width:100%; height:34px; border-radius:6px; background:var(--skeleton)"></div>
+    </div>
+  </sc-if>
+  <sc-if value="{{ isUnavailable }}">
+    <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:6px; padding:4px 0">
+      <div style="display:flex; align-items:center; gap:8px"><i class="ph ph-plugs" style="font-size:18px; color:var(--text-2)"></i><span style="font:600 15px/1.3 'Sora',sans-serif; color:var(--text)">Sursă neconectată</span></div>
+      <span style="font:400 13px/1.45 'Onest',sans-serif; color:var(--text-2); text-wrap:pretty">{{ note }}</span>
+    </div>
+  </sc-if>
+  <sc-if value="{{ hasValue }}" hint-placeholder-val="{{ true }}">
+    <div style="display:flex; flex-direction:column; gap:6px">
+      <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap">
+        <span style="font:650 34px/1 'Sora',sans-serif; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; color:var(--text)">{{ value }}</span>
+        <span style="display:inline-flex; align-items:center; gap:2px; font:600 13px/1 'Onest',sans-serif; font-variant-numeric:tabular-nums; white-space:nowrap; color:{{ deltaColor }}"><i class="{{ deltaIcon }}" style="font-size:12px"></i>{{ delta }}</span>
+      </div>
+      <span style="font:400 12px/1.3 'Onest',sans-serif; color:var(--text-2)">{{ compareLabel }}</span>
+    </div>
+    <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true" style="width:100%; height:34px; display:block; overflow:visible">
+      <path d="{{ area }}" style="fill:var(--accent); opacity:0.08"></path>
+      <path d="{{ spark }}" vector-effect="non-scaling-stroke" style="fill:none; stroke:var(--accent); stroke-width:1.75; stroke-linejoin:round; stroke-linecap:round"></path>
+    </svg>
+    <sc-if value="{{ partialNote }}"><div style="display:flex; gap:6px; align-items:flex-start; font:400 12px/1.4 'Onest',sans-serif; color:var(--warn-text)"><i class="ph ph-warning" style="font-size:13px; margin-top:1px"></i><span>{{ partialNote }}</span></div></sc-if>
+    <sc-if value="{{ staleNote }}"><div style="display:flex; gap:6px; align-items:flex-start; font:400 12px/1.4 'Onest',sans-serif; color:var(--text-2)"><i class="ph ph-clock" style="font-size:13px; margin-top:1px"></i><span>{{ staleNote }}</span></div></sc-if>
+  </sc-if>
+  <div style="margin-top:auto; padding-top:10px; border-top:1px solid var(--border); display:flex; align-items:center; gap:8px; font:400 11.5px/1.2 'Onest',sans-serif; color:var(--text-2); white-space:nowrap; min-width:0">
+    <span style="font-weight:600; color:var(--text); flex:none">{{ source }}</span>
+    <span style="overflow:hidden; text-overflow:ellipsis; min-width:0">Date până la <span style="font:400 11px/1 'JetBrains Mono',monospace">{{ until }}</span></span>
+    <span style="flex:1"></span>
+    <sc-if value="{{ hasBadge }}" hint-placeholder-val="{{ true }}"><dc-import name="CoverageBadge" state="{{ cov }}" pct="{{ pct }}" hint-size="72px,20px"></dc-import></sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:300,&quot;height&quot;:200},&quot;kpi&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;{label,def,value,delta,dir,higherIsBetter,spark,area,source,until,state,pct,note,compareLabel,onOpen}&quot;}}">
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { tip: false }; }
+  renderVals() {
+    const k = this.props.kpi || {};
+    const s = k.state || 'normal';
+    const up = k.dir === 'up', down = k.dir === 'down';
+    const good = (up && k.higherIsBetter !== false) || (down && k.higherIsBetter === false);
+    const go = () => k.onOpen && k.onOpen();
+    return {
+      label: k.label, def: k.def, value: k.value, delta: k.delta, source: k.source, until: k.until, pct: k.pct,
+      compareLabel: k.compareLabel, spark: k.spark || '', area: k.area || '', note: k.note,
+      isLoading: s === 'loading', isUnavailable: s === 'unavailable', hasValue: s !== 'loading' && s !== 'unavailable',
+      hasBadge: s !== 'loading',
+      cov: { normal: 'complete', partial: 'partial', stale: 'stale', unavailable: 'unavailable', loading: 'complete' }[s],
+      partialNote: s === 'partial' ? k.note : null, staleNote: s === 'stale' ? k.note : null,
+      deltaColor: k.dir === 'flat' || !k.dir ? 'var(--text-2)' : good ? 'var(--pos-text)' : 'var(--neg-text)',
+      deltaIcon: 'ph-bold ' + (up ? 'ph-arrow-up-right' : down ? 'ph-arrow-down-right' : 'ph-minus'),
+      tipOpen: this.state.tip,
+      tipIn: () => this.setState({ tip: true }),
+      tipOut: () => this.setState({ tip: false }),
+      tipToggle: (e) => { e.stopPropagation(); this.setState(st => ({ tip: !st.tip })); },
+      open: go,
+      onKey: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } },
+      aria: 'Deschide dovezile pentru ' + (k.label || '')
+    };
+  }
+}
+</script>
+</body>
+</html>

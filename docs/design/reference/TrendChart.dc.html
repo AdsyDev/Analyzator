@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="display:flex; flex-direction:column; gap:14px; width:100%">
+  <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:10px" role="group" aria-label="Serii afișate">
+    <sc-for list="{{ legend }}" as="l" hint-placeholder-count="3">
+      <button type="button" onClick="{{ l.toggle }}" aria-pressed="{{ l.on }}" style="display:inline-flex; align-items:center; gap:8px; height:28px; padding:0 10px; border-radius:10px; border:1px solid var(--border); background:{{ l.bg }}; color:{{ l.fg }}; font:500 12.5px/1 'Onest',sans-serif; white-space:nowrap; cursor:pointer; transition:background-color 160ms ease, color 160ms ease, transform 120ms ease" style-active="transform:scale(0.97)"><span style="width:16px; height:0; border-top:2px {{ l.line }} {{ l.color }}; opacity:{{ l.op }}"></span>{{ l.name }}</button>
+    </sc-for>
+    <span style="flex:1"></span>
+    <sc-if value="{{ note }}"><span style="font:400 12px/1.4 'Onest',sans-serif; color:var(--text-2); flex-basis:100%">{{ note }}</span></sc-if>
+  </div>
+  <div style="position:relative; padding-left:44px">
+    <div onMouseMove="{{ onMove }}" onMouseLeave="{{ onLeave }}" style="position:relative; height:{{ hpx }}; cursor:crosshair">
+      <sc-for list="{{ grid }}" as="g"><div style="position:absolute; left:0; right:0; top:{{ g.top }}; border-top:1px solid var(--grid)"></div><span style="position:absolute; left:-44px; width:36px; text-align:right; top:{{ g.top }}; transform:translateY(-50%); font:400 11px/1 'JetBrains Mono',monospace; color:var(--text-3)">{{ g.label }}</span></sc-for>
+      <sc-for list="{{ gaps }}" as="gp"><div style="position:absolute; top:0; bottom:0; left:{{ gp.left }}; width:{{ gp.width }}; background:repeating-linear-gradient(135deg, var(--gap-a) 0 6px, transparent 6px 12px); border-radius:4px"><sc-if value="{{ gp.wide }}"><span style="position:absolute; top:6px; left:50%; transform:translateX(-50%); white-space:nowrap; font:500 11px/1 'Onest',sans-serif; color:var(--text-2); background:var(--surface); padding:3px 6px; border-radius:6px; border:1px solid var(--border)">Fără date</span></sc-if></div></sc-for>
+      <svg viewBox="{{ vb }}" preserveAspectRatio="none" aria-hidden="true" style="position:absolute; inset:0; width:100%; height:100%; overflow:visible">
+        <sc-for list="{{ paths }}" as="p"><path d="{{ p.d }}" vector-effect="non-scaling-stroke" style="fill:none; stroke:{{ p.color }}; stroke-width:{{ p.sw }}; stroke-dasharray:{{ p.dash }}; stroke-linejoin:round; stroke-linecap:round"></path></sc-for>
+      </svg>
+      <sc-if value="{{ hasHover }}">
+        <div style="position:absolute; top:0; bottom:0; left:{{ hoverLeft }}; border-left:1px dashed var(--border-strong); pointer-events:none"></div>
+        <sc-for list="{{ dots }}" as="dt"><span style="position:absolute; left:{{ dt.left }}; top:{{ dt.top }}; width:8px; height:8px; margin:-4px 0 0 -4px; border-radius:50%; background:var(--surface); border:2px solid {{ dt.color }}; pointer-events:none"></span></sc-for>
+        <div role="tooltip" style="position:absolute; top:8px; left:{{ hoverLeft }}; transform:{{ tipTf }}; min-width:196px; padding:10px 12px; border-radius:12px; background:var(--glass-strong); backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%); border:1px solid var(--glass-border); box-shadow:var(--sh-pop); pointer-events:none; display:flex; flex-direction:column; gap:7px; z-index:5">
+          <span style="font:500 11.5px/1 'JetBrains Mono',monospace; color:var(--text-2)">{{ hoverLabel }}</span>
+          <sc-for list="{{ tipRows }}" as="tr"><div style="display:flex; align-items:center; gap:8px; font:400 12.5px/1.2 'Onest',sans-serif; color:var(--text)"><span style="width:10px; height:0; border-top:2px {{ tr.line }} {{ tr.color }}"></span><span style="flex:1; white-space:nowrap">{{ tr.name }}</span><span style="font-weight:600; font-variant-numeric:tabular-nums; color:{{ tr.vc }}">{{ tr.v }}</span></div></sc-for>
+        </div>
+      </sc-if>
+    </div>
+    <div style="position:relative; height:22px; margin-top:6px">
+      <sc-for list="{{ ticks }}" as="t"><span style="position:absolute; top:4px; left:{{ t.left }}; transform:{{ t.tf }}; font:400 11px/1 'JetBrains Mono',monospace; color:var(--text-3); white-space:nowrap">{{ t.l }}</span></sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:900,&quot;height&quot;:340},&quot;series&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;{key,name,color,dash,values:(number|null)[]}[]&quot;},&quot;labels&quot;:{&quot;editor&quot;:null,&quot;tsType&quot;:&quot;string[]&quot;},&quot;height&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:240,&quot;tsType&quot;:&quot;number&quot;},&quot;fmt&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;int&quot;,&quot;pct&quot;,&quot;idx&quot;],&quot;default&quot;:&quot;int&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;note&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  constructor(p) { super(p); this.state = { hidden: {}, hi: null }; }
+  renderVals() {
+    const series = this.props.series || [], labels = this.props.labels || [];
+    const H = this.props.height || 240, fmt = this.props.fmt || 'int', n = Math.max(labels.length, 1);
+    const ro = (v, d) => v.toLocaleString('ro-RO', { minimumFractionDigits: d, maximumFractionDigits: d });
+    const F = v => v == null ? 'Fără date' : fmt === 'pct' ? ro(v, 1) + '%' : fmt === 'idx' ? ro(v, 1) : ro(Math.round(v), 0);
+    const FA = v => fmt === 'pct' ? ro(v, 0) + '%' : fmt === 'idx' ? ro(v, 0) : v >= 1000 ? ro(v / 1000, 1) + 'k' : ro(Math.round(v), 0);
+    const hid = this.state.hidden;
+    const vis = series.filter(s => !hid[s.key]);
+    const all = []; vis.forEach(s => s.values.forEach(v => { if (v != null) all.push(v); }));
+    let mn = all.length ? Math.min(...all) : 0, mx = all.length ? Math.max(...all) : 1;
+    const pad = (mx - mn) * 0.15 || 1; mn -= pad; mx += pad; if (fmt !== 'idx' && mn < 0) mn = 0;
+    const X = i => n > 1 ? i / (n - 1) * 1000 : 500, Y = v => H - (v - mn) / (mx - mn) * H, xp = i => n > 1 ? i / (n - 1) * 100 : 50;
+    const path = vals => { let d = '', pen = false; vals.forEach((v, i) => { if (v == null) { pen = false; return; } d += (pen ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1) + ' '; pen = true; }); return d; };
+    const paths = vis.map((s, j) => ({ d: path(s.values), color: s.color, dash: s.dash ? '5 5' : 'none', sw: j === 0 ? 2 : 1.5 })).reverse();
+    const grid = [0, 1, 2, 3].map(k => { const v = mn + (mx - mn) * (k / 3); return { top: Y(v).toFixed(1) + 'px', label: FA(v) }; });
+    const gaps = []; const first = series[0];
+    if (first && !hid[first.key]) {
+      const half = n > 1 ? 50 / (n - 1) : 50; let s = -1;
+      first.values.forEach((v, i) => {
+        if (v == null && s < 0) s = i;
+        if (s >= 0 && (v != null || i === n - 1)) { const e = v == null ? i : i - 1; const L = Math.max(0, xp(s) - half), R = Math.min(100, xp(e) + half); gaps.push({ left: L + '%', width: (R - L) + '%', wide: R - L > 9 }); s = -1; }
+      });
+    }
+    const tIdx = [...new Set([0, Math.round((n - 1) * 0.25), Math.round((n - 1) * 0.5), Math.round((n - 1) * 0.75), n - 1])];
+    const ticks = tIdx.map((i, j) => ({ l: labels[i], left: xp(i) + '%', tf: j === 0 ? 'none' : j === tIdx.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)' }));
+    const hi = this.state.hi; const hasHover = hi != null && hi < n;
+    return {
+      legend: series.map(s => { const on = !hid[s.key]; return { name: s.name, color: s.color, line: s.dash ? 'dashed' : 'solid', on, bg: on ? 'var(--surface)' : 'transparent', fg: on ? 'var(--text)' : 'var(--text-3)', op: on ? 1 : 0.4, toggle: () => this.setState(st => ({ hidden: { ...st.hidden, [s.key]: !st.hidden[s.key] } })) }; }),
+      note: this.props.note, hpx: H + 'px', vb: '0 0 1000 ' + H, paths, grid, gaps, ticks, hasHover,
+      hoverLeft: hasHover ? xp(hi) + '%' : '0%', hoverLabel: hasHover ? labels[hi] : '',
+      tipTf: hasHover && xp(hi) > 60 ? 'translateX(calc(-100% - 12px))' : 'translateX(12px)',
+      dots: hasHover ? vis.filter(s => s.values[hi] != null).map(s => ({ left: xp(hi) + '%', top: (Y(s.values[hi]) / H * 100) + '%', color: s.color })) : [],
+      tipRows: hasHover ? vis.map(s => ({ name: s.name, color: s.color, line: s.dash ? 'dashed' : 'solid', v: F(s.values[hi]), vc: s.values[hi] == null ? 'var(--text-3)' : 'var(--text)' })) : [],
+      onMove: (e) => { const r = e.currentTarget.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width; const i = Math.max(0, Math.min(n - 1, Math.round(x * (n - 1)))); if (i !== this.state.hi) this.setState({ hi: i }); },
+      onLeave: () => this.setState({ hi: null })
+    };
+  }
+}
+</script>
+</body>
+</html>

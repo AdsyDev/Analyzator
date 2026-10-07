@@ -11,9 +11,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "isolatedModules": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["vite/client"]
+    "types": ["vite/client", "node", "@testing-library/jest-dom/vitest"]
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite.config.ts", "vite.preview-guard.ts"]
 }

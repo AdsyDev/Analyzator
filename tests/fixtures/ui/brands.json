@@ -1,0 +1,38 @@
+{
+  "_marker": "analyzator-design-preview-fixture",
+  "tenant_id": "tenant-stada-preview",
+  "brands": [
+    { "id": "brand-urinal", "name": "Urinal", "category": "Sănătate urinară", "domain": "urinal.example" },
+    { "id": "brand-minimartieni", "name": "Minimartieni", "category": "Vitamine pentru copii", "domain": "minimartieni.example" },
+    { "id": "brand-proenzi", "name": "Proenzi", "category": "Articulații și mobilitate", "domain": "proenzi.example" }
+  ],
+  "competitor_sets": {
+    "brand-urinal": {
+      "version": 3,
+      "effective_from": "2026-09-01",
+      "competitors": [
+        { "id": "c-uronova", "name": "Uronova", "label": "C1" },
+        { "id": "c-cisticare", "name": "Cisticare", "label": "C2" },
+        { "id": "c-vitamerin", "name": "Vitamerin", "label": "C3" }
+      ]
+    },
+    "brand-minimartieni": {
+      "version": 2,
+      "effective_from": "2026-08-15",
+      "competitors": [
+        { "id": "c-kidvit", "name": "Kidvitto", "label": "C1" },
+        { "id": "c-junior", "name": "Junivita", "label": "C2" },
+        { "id": "c-multikid", "name": "Multikinder", "label": "C3" }
+      ]
+    },
+    "brand-proenzi": {
+      "version": 1,
+      "effective_from": "2026-09-15",
+      "competitors": [
+        { "id": "c-flexi", "name": "Flexiplus", "label": "C1" },
+        { "id": "c-artro", "name": "Artrovia", "label": "C2" },
+        { "id": "c-mobil", "name": "Mobilen", "label": "C3" }
+      ]
+    }
+  }
+}

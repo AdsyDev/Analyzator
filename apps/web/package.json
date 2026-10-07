@@ -8,17 +8,30 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "build:staging": "tsc --noEmit && vite build --mode staging",
+    "dev:preview": "VITE_DESIGN_PREVIEW=true vite",
+    "build:preview": "VITE_DESIGN_PREVIEW=true tsc --noEmit && VITE_DESIGN_PREVIEW=true vite build --mode design-preview"
   },
   "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/onest": "^5.3.1",
+    "@fontsource/sora": "^5.3.0",
+    "@phosphor-icons/react": "^2.1.10",
+    "@supabase/supabase-js": "^2.117.3",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.1.2",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.3",

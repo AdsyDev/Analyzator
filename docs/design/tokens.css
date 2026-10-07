@@ -1,0 +1,127 @@
+/* Analyzator design tokens. Sursa: docs/design/reference/Analyzator.dc.html (blocurile :root).
+   Light este implicit; dark se activează cu data-az-theme="dark" pe <html>.
+   Regula de aur: sticla (--glass*, backdrop-filter) doar pe sidebar, topbar, drawere, modale, popovere.
+   Suprafețele cu date folosesc --surface (solid). */
+
+:root {
+  --bg:#F6F8FB;
+  --au1:rgba(15,163,163,0.16);
+  --au2:rgba(124,111,222,0.13);
+  --au3:rgba(15,163,163,0.07);
+  --glass:rgba(255,255,255,0.65);
+  --glass-strong:rgba(255,255,255,0.86);
+  --glass-thick:rgba(250,252,254,0.8);
+  --glass-border:rgba(255,255,255,0.8);
+  --surface:#FFFFFF;
+  --surface-2:#F4F7FA;
+  --border:#E4E9F0;
+  --border-strong:#D3DBE5;
+  --text:#16202B;
+  --text-2:#5C6B7E;
+  --text-3:#7F8C9C;
+  --accent:#0FA3A3;
+  --accent-text:#0A7A7B;
+  --accent-soft:rgba(15,163,163,0.10);
+  --accent-btn:#0A7F7F;
+  --on-accent:#FFFFFF;
+  --lav:#7C6FDE;
+  --lav-text:#5B4EC2;
+  --lav-soft:rgba(124,111,222,0.12);
+  --pos:#1E9E6A;
+  --pos-text:#167A52;
+  --pos-soft:rgba(30,158,106,0.11);
+  --neg:#D94F55;
+  --neg-text:#B53A40;
+  --neg-soft:rgba(217,79,85,0.10);
+  --warn:#DB8A1F;
+  --warn-text:#955A0B;
+  --warn-soft:rgba(219,138,31,0.13);
+  --neutral-soft:rgba(92,107,126,0.10);
+  --pv:#9E3A40;
+  --pv-soft:rgba(158,58,64,0.08);
+  --pv-btn:#9E3A40;
+  --c1:#8C9AAB;
+  --c2:#AAB5C2;
+  --c3:#C6CED8;
+  --s3:#5E87AE;
+  --s4:#B8955E;
+  --grid:#EDF1F5;
+  --gap-a:rgba(92,107,126,0.08);
+  --skeleton:#EEF2F6;
+  --ring:rgba(15,163,163,0.35);
+  --scrim:rgba(22,32,43,0.14);
+  --nav-active:rgba(255,255,255,0.92);
+  --nav-hover:rgba(255,255,255,0.55);
+  --heat:15,163,163;
+  --sh-1:0 1px 2px rgba(31,52,77,0.04),0 2px 8px rgba(31,52,77,0.04);
+  --sh-2:0 2px 4px rgba(31,52,77,0.05),0 14px 32px rgba(31,52,77,0.10);
+  --sh-glass:inset 0 1px 0 rgba(255,255,255,0.6),0 8px 32px rgba(31,52,77,0.07);
+  --sh-pop:inset 0 1px 0 rgba(255,255,255,0.7),0 12px 40px rgba(31,52,77,0.16);
+  --sh-drawer:inset 0 1px 0 rgba(255,255,255,0.7),0 24px 80px rgba(31,52,77,0.24);
+}
+
+:root[data-az-theme="dark"] {
+  --bg:#0C1118;
+  --au1:rgba(15,163,163,0.10);
+  --au2:rgba(124,111,222,0.08);
+  --au3:rgba(15,163,163,0.04);
+  --glass:rgba(18,24,33,0.6);
+  --glass-strong:rgba(20,27,37,0.88);
+  --glass-thick:rgba(16,22,30,0.76);
+  --glass-border:rgba(255,255,255,0.08);
+  --surface:#141B24;
+  --surface-2:#18212C;
+  --border:#233040;
+  --border-strong:#2F3E51;
+  --text:#E9EEF4;
+  --text-2:#93A1B3;
+  --text-3:#728196;
+  --accent:#22B8B6;
+  --accent-text:#4FD3D0;
+  --accent-soft:rgba(34,184,182,0.14);
+  --accent-btn:#22B8B6;
+  --on-accent:#061A1A;
+  --lav:#958AF0;
+  --lav-text:#B0A7F6;
+  --lav-soft:rgba(149,138,240,0.16);
+  --pos:#35BC86;
+  --pos-text:#55D3A0;
+  --pos-soft:rgba(53,188,134,0.14);
+  --neg:#EC6B71;
+  --neg-text:#F48D92;
+  --neg-soft:rgba(236,107,113,0.14);
+  --warn:#EBA03E;
+  --warn-text:#F2B662;
+  --warn-soft:rgba(235,160,62,0.15);
+  --neutral-soft:rgba(147,161,179,0.14);
+  --pv:#EB9499;
+  --pv-soft:rgba(235,148,153,0.10);
+  --pv-btn:#C9545A;
+  --c1:#7A8899;
+  --c2:#5F6D7F;
+  --c3:#4B5869;
+  --s3:#7FA6CC;
+  --s4:#C9A772;
+  --grid:#1C2532;
+  --gap-a:rgba(147,161,179,0.07);
+  --skeleton:#1C2633;
+  --ring:rgba(34,184,182,0.45);
+  --scrim:rgba(5,8,12,0.40);
+  --nav-active:rgba(255,255,255,0.075);
+  --nav-hover:rgba(255,255,255,0.04);
+  --heat:34,184,182;
+  --sh-1:0 1px 2px rgba(0,0,0,0.30);
+  --sh-2:0 2px 4px rgba(0,0,0,0.3),0 14px 32px rgba(0,0,0,0.38);
+  --sh-glass:inset 0 1px 0 rgba(255,255,255,0.05),0 8px 32px rgba(0,0,0,0.35);
+  --sh-pop:inset 0 1px 0 rgba(255,255,255,0.06),0 12px 40px rgba(0,0,0,0.5);
+  --sh-drawer:inset 0 1px 0 rgba(255,255,255,0.06),0 24px 80px rgba(0,0,0,0.6);
+}
+
+/* Tipografie, spacing, radius (valori observate în design) */
+:root {
+  --f-display: 'Sora', system-ui, sans-serif;
+  --f-body: 'Onest', system-ui, sans-serif;
+  --f-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --r-sm: 6px; --r-md: 10px; --r-lg: 12px; --r-xl: 16px; --r-pill: 999px;
+  --glass-blur: blur(24px) saturate(150%);
+}
