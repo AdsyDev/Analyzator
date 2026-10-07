@@ -1,6 +1,7 @@
 {
   "name": "analyzator",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "npm --prefix apps/web run dev",
     "build": "npm --prefix apps/web run build",
@@ -8,6 +9,7 @@
     "test": "npm --prefix apps/web run test",
     "test:db": "supabase test db supabase/tests/database",
     "db:reset": "supabase db reset",
-    "test:security": "scripts/test-security.sh"
+    "test:security": "scripts/test-security.sh",
+    "probe:clarity": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/clarity/probe.ts"
   }
 }
