@@ -23,6 +23,7 @@
   "include": [
     "connectors/**/*.ts",
     "supabase/functions/**/*.ts",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "analytics/**/*.ts"
   ]
 }

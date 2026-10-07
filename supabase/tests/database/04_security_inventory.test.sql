@@ -187,6 +187,43 @@ select is_empty(
 select ok(not exists (select 1 from pg_publication where puballtables),
   'A13: nicio publicație FOR ALL TABLES');
 
+-- A15. Schema metrics: doar funcții pure (aprobat 7 oct 2026, docs/security-tests.md) ---------
+-- IMMUTABLE sau STABLE, SECURITY INVOKER, search_path fixat gol, fără referințe la tabele.
+select is_empty(
+  $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'metrics' and p.provolatile not in ('i', 's') $$,
+  'A15: funcțiile din metrics sunt IMMUTABLE sau STABLE'
+);
+select is_empty(
+  $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'metrics' and p.prosecdef $$,
+  'A15: nicio funcție SECURITY DEFINER în metrics'
+);
+select is_empty(
+  $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'metrics'
+       and not coalesce('search_path=""' = any (p.proconfig), false) $$,
+  'A15: funcțiile din metrics au search_path = '''''
+);
+-- Cu search_path gol, orice tabel trebuie calificat cu schema; un nume calificat care nu e apel de funcție
+-- (nu e urmat de „(") este o referință la o relație. Catalogul pg_* e verificat separat.
+select is_empty(
+  $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'metrics'
+       and (p.prosrc ~* '\m(public|private|vault|auth|storage|extensions|graphql|graphql_public|realtime|net|cron|pgsodium|supabase_functions|supabase_migrations|tests|metrics|information_schema|pg_catalog)\.[a-z_][a-z0-9_]*\M(?!\s*\()'
+            or p.prosrc ~* '\mpg_[a-z_]+\M(?!\s*\()') $$,
+  'A15: funcțiile din metrics nu referă tabele sau view-uri'
+);
+select is_empty(
+  $$ select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'metrics' $$,
+  'A15: schema metrics nu conține tabele, view-uri sau secvențe'
+);
+select is_empty(
+  $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'metrics' and has_function_privilege('anon', p.oid, 'execute') $$,
+  'A15: anon nu execută funcțiile din metrics'
+);
+
 -- A14. Ca utilizator: funcțiile de autorizare nu dezvăluie existența brandurilor străine --
 select tests.authenticate_as('30000000-0000-0000-0000-000000000002');
 select is(private.has_brand_access('20000000-0000-0000-0000-000000000021'),

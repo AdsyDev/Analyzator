@@ -11,7 +11,7 @@
     "db:reset": "supabase db reset",
     "test:security": "scripts/test-security.sh",
     "probe:clarity": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/clarity/probe.ts",
-    "test:connectors": "node --experimental-strip-types --test 'connectors/**/*.test.ts' 'supabase/functions/**/*.test.ts'",
+    "test:connectors": "node --experimental-strip-types --test 'connectors/**/*.test.ts' 'supabase/functions/**/*.test.ts' 'analytics/**/*.test.ts'",
     "collect:clarity": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/clarity/collect.ts",
     "set-source-token": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/set-source-token.ts",
     "test:guards": "scripts/test-guard-mutations.sh"

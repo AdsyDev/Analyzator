@@ -86,6 +86,46 @@ mutate "M8 EXECUTE pentru anon pe o funcție aprobată (record_source_validation
 grant execute on function public.record_source_validation(uuid, boolean, text) to anon;
 SQL
 
+mutate "M9 funcție în metrics care citește un tabel" 04_security_inventory.test.sql <<'SQL'
+create function metrics.leak_count() returns bigint language sql stable set search_path = ''
+as $$ select count(*) from public.brands $$;
+SQL
+
+mutate "M10 funcție SECURITY DEFINER în metrics" 04_security_inventory.test.sql <<'SQL'
+create function metrics.definer_probe() returns integer language sql immutable security definer set search_path = ''
+as $$ select 1 $$;
+SQL
+
+mutate "M11 metrics.ratio întoarce 0 la numitor zero" 06_metric_registry.test.sql <<'SQL'
+create or replace function metrics.ratio(p_numerator numeric, p_denominator numeric, p_multiplier numeric default 1)
+returns numeric language sql immutable set search_path = '' as $$
+  select case when p_denominator = 0 then 0 else coalesce(p_multiplier, 1) * p_numerator / p_denominator end;
+$$;
+SQL
+
+mutate "M12 variația relativă pe bază zero devine infinit" 06_metric_registry.test.sql <<'SQL'
+create or replace function metrics.change(p_value numeric, p_comparison numeric, p_unit text)
+returns jsonb language sql immutable set search_path = '' as $$
+  select jsonb_build_object(
+    'absolute_change', p_value - p_comparison,
+    'absolute_change_unit', case when p_unit = 'percent' then 'pp' else p_unit end,
+    'relative_change', case when p_comparison = 0 then 'Infinity'::numeric else 100 * (p_value - p_comparison) / abs(p_comparison) end,
+    'base_zero', false);
+$$;
+SQL
+
+mutate "M13 rank absent tratat ca poziția 100" 06_metric_registry.test.sql <<'SQL'
+create or replace function metrics.rank_summary(p_ranks jsonb)
+returns jsonb language sql immutable set search_path = '' as $$
+  select jsonb_build_object(
+    'tracked', count(*), 'ranked', count(*), 'unranked', 0,
+    'top3', count(*) filter (where coalesce((r ->> 'rank')::numeric, 100) <= 3),
+    'top10', count(*) filter (where coalesce((r ->> 'rank')::numeric, 100) <= 10),
+    'average_rank', avg(coalesce((r ->> 'rank')::numeric, 100)))
+  from jsonb_array_elements(p_ranks) r;
+$$;
+SQL
+
 echo
 echo "Mutații: $total, neprinse: $failures"
 [ "$failures" -eq 0 ]

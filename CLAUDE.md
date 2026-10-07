@@ -16,6 +16,8 @@ Platformă de analiză pentru clienții AdSymphony (pilot: trei branduri STADA).
 
 ## Convenții
 
+- `tenant_id` pe toate entitățile de business, `brand_id` pe cele de brand, cu FK compuse `(tenant_id, brand_id)`. **Excepție explicită:** `metric_definitions` (registrul de metrici al produsului, același pentru toți clienții) nu are `tenant_id`; personalizarea per client va sta în `dashboard_configs`. Vezi `docs/security-tests.md`, E2.
+- Formulele metricilor stau în schema `metrics` (funcții pure, fără acces la tabele), iar definițiile în `metric_definitions` și `docs/metrics/registry.md`. Contractul răspunsului: `docs/contracts/metric-response.md`.
 - Un singur șablon pentru toate brandurile; personalizarea e configurare, nu cod.
 - Importul CSV folosește aceleași tabele și contracte ca viitorii conectori.
 - Importurile sunt idempotente (upsert pe cheie naturală), scrise în `sync_runs`, și rulează în afara browserului.

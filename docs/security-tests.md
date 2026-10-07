@@ -51,6 +51,17 @@ Condiții, verificate de teste:
 - `set_source_token` verifică în corp că actorul e `agency_admin` activ în tenantul conexiunii (V4).
 - `get_source_token` verifică faptul că secretul are numele `source_connection:<id>` al conexiunii cerute; o referință mutată spre secretul altei conexiuni e refuzată (V8).
 
+### E2. `metric_definitions` fără `tenant_id` (aprobată 7 oct 2026)
+
+Registrul de metrici e al produsului, nu al unui client: aceleași definiții pentru toți tenanții. Personalizarea per client va sta în `dashboard_configs`.
+- Citire: orice utilizator cu sesiune (`(select auth.uid()) is not null`), nu `anon` (06: A1, A2).
+- Scriere: doar prin migrație. Politicile pentru INSERT, UPDATE și DELETE sunt `false`, iar un trigger refuză UPDATE și DELETE chiar și pentru owner: versiunile sunt imutabile (06: D2).
+- Registrul nu conține date de client.
+
+### E3. Schema `metrics` executabilă de `authenticated` (aprobată 7 oct 2026)
+
+Funcțiile de calcul al metricilor sunt pure: primesc definiția și observațiile ca `jsonb` și nu citesc tabele. De aceea `authenticated` le poate executa fără risc de acces la date. Garda A15 cere: IMMUTABLE sau STABLE, fără SECURITY DEFINER, `search_path` gol, nicio referință la tabele sau view-uri, nicio relație în schemă, fără EXECUTE pentru `anon`. Schema nu e expusă prin API (`PGRST_DB_SCHEMAS = public,graphql_public`).
+
 ## Inventar la 7 oct 2026
 
 | Tip | Ce există | Acoperit de |
@@ -60,6 +71,7 @@ Condiții, verificate de teste:
 | Funcții RPC în `public` | niciuna | A11, B3 |
 | SECURITY DEFINER | În `private`: 4 de autorizare (boolean, răspund doar pentru `auth.uid()`), `user_has_brand_role` și `user_can_import` (user_id explicit, neexecutabile de clienți), triggere (`audit_row`, `delete_source_secret`). În `public`: 3 funcții server pentru credențiale, doar `service_role` (vezi excepția E1) | A10, A11, A14, B3, B8, V1–V3 |
 | Vault | Tokenurile surselor; secret `source_connection:<id>` per conexiune | V1–V9, B8 |
+| Registrul de metrici | `metric_definitions` (16 definiții, fără `tenant_id`, E2), view `metric_definitions_current` (`security_invoker`), schema `metrics` cu funcții pure (E3) | A1–A8, A15, 06 |
 | Bucket-uri storage | niciunul | A12, B6 (gardă) |
 | Realtime | nicio publicare | A13 |
 | GraphQL | `pg_graphql` nu e instalat local | B7 (tolerant: ori eroare, ori doar date permise) |
@@ -83,12 +95,14 @@ Condiții, verificate de teste:
 | A12 | Niciun bucket public |
 | A13 | Niciun tabel în `supabase_realtime`, nicio publicație FOR ALL TABLES |
 | A14 | Fără oracol: un brand străin existent și unul inexistent dau același răspuns; `user_has_brand_role` și TRUNCATE sunt refuzate ca `authenticated` |
+| A15 | Schema `metrics`: doar funcții IMMUTABLE sau STABLE, SECURITY INVOKER, `search_path` gol, fără referințe la tabele sau view-uri, fără relații în schemă, fără EXECUTE pentru `anon` (E3) |
 
 ## Scenarii SQL (pgTAP, `01`–`03`)
 
 - **01:** izolare brand și tenant pentru strategist T1, strategist T2 și admin T2; scrieri pe brand străin; FK compuse; timezone invalid.
 - **02:** client fără `brand_access` (0 rânduri); client cu acces (fără date de agenție, fără auto-acordare, fără escaladare de rol); account nu scrie direct în `import_batches`; `user_can_import`; anon.
 - **03:** revocare `brand_access`, revocare membership, arhivarea tenantului; auditul cu actor; `audit_events` imutabil; RLS peste tot.
+- **06 (registrul de metrici):** regulile R1–R13 din ANZ07 (numitor zero, not_connected, zero real, rate din totaluri, interval report, medii ponderate, puncte procentuale, bază zero, perioada de comparație, MTD/YTD, rank absent, cele trei stări AI, eșantion), plus stale, ordinea statusurilor, contractul exact, imutabilitatea registrului și accesul (A1, A2). Datele sunt sintetice, doar în fișierul de test.
 - **05 (Vault):**
   - V1: utilizatorii nu citesc `vault.*` și nu execută funcțiile de credențiale.
   - V2: nu pot scrie `vault_secret_id` sau `credential_status`.
@@ -160,7 +174,7 @@ Setări locale relevante: `log_statement = ddl`, `log_min_duration_statement = -
 
 ## M. Mutații (`scripts/test-guard-mutations.sh`, `npm run test:guards`)
 
-Ultima rulare: 7 oct 2026, 8/8 mutații prinse.
+Ultima rulare: 7 oct 2026, 13/13 mutații prinse.
 
 | ID | Mutație | Prinsă de | Teste picate |
 |---|---|---|---|
@@ -172,6 +186,11 @@ Ultima rulare: 7 oct 2026, 8/8 mutații prinse.
 | M6 | RLS dezactivat pe `provider_api_calls` | 04 (A1) | 1 |
 | M7 | Politică `using (true)` pe `provider_api_calls` | 04 (A3) | 1 |
 | M8 | EXECUTE pentru `anon` pe `record_source_validation` (funcție aprobată) | 04 (A10, A11) | 2 |
+| M9 | Funcție în `metrics` care citește `public.brands` | 04 (A15) | 2 |
+| M10 | Funcție SECURITY DEFINER în `metrics` | 04 (A15) | 2 |
+| M11 | `metrics.ratio` întoarce 0 la numitor zero | 06 (R1, R13) | 6 |
+| M12 | Variația relativă pe bază zero devine infinit | 06 (R8) | 3 |
+| M13 | Rank absent tratat ca poziția 100 | 06 (R11) | 4 |
 
 ## Neverificat (7 oct 2026)
 
