@@ -11,12 +11,19 @@ supabase start
 npm run test:security
 ```
 
-Scriptul (`scripts/test-security.sh`) face trei pași:
+Scriptul (`scripts/test-security.sh`) face patru pași:
 1. `supabase db reset`: migrații și seed-ul de test (`supabase/tests/seed/seed.sql`);
 2. pgTAP (`supabase/tests/database/*.test.sql`);
-3. atacuri prin API (`tests/security/api-isolation.test.mjs`, `node --test`), cu JWT-uri semnate local pentru utilizatorii din seed.
+3. pornește `supabase functions serve source-credentials` în fundal (oprit la final);
+4. atacuri prin API și pe Edge Function (`tests/security/*.test.mjs`, `node --test --test-concurrency=1`), cu JWT-uri semnate local pentru utilizatorii din seed. Fișierele rulează **secvențial**, pentru că modifică aceeași bază (revocări, tokenuri, contoare); rulate în paralel, dau eșecuri false.
 
-**Verificarea testelor.** Înainte de lansare, slăbește temporar `private.has_brand_role` (să întoarcă `true`) și confirmă că suitele pică; apoi `supabase db reset`. Ultima verificare (7 oct 2026): 10 teste API și majoritatea testelor pgTAP de izolare au picat, cum era de așteptat.
+**Verificarea gărzilor prin mutații:**
+
+```bash
+npm run test:guards
+```
+
+`scripts/test-guard-mutations.sh` aplică pe rând câte o mutație care slăbește o protecție, rulează testul pgTAP care ar trebui s-o prindă și iese cu eroare dacă testul trece. La final resetează baza locală. Vezi secțiunea M.
 
 ## Date de test
 
@@ -124,7 +131,53 @@ Verificat cap-coadă pe Supabase local (7 oct 2026), cu `scripts/set-source-toke
 
 **Rerulare:** `supabase functions serve source-credentials`, apoi pașii din README (secțiunea „Tokenul unei surse").
 
+## D. Atacuri pe Edge Function prin HTTP real (`tests/security/edge-credentials.test.mjs`)
+
+Obiective: tokenul în clar nu poate fi obținut, iar bugetul de apeluri al altui brand nu poate fi consumat. Rulează cu `npm run test:security`.
+
+| ID | Vector | Rezultat așteptat |
+|---|---|---|
+| D1 | Fără Authorization; cheia anon sau service role ca Bearer; JWT semnat cu alt secret; `alg: none`; JWT expirat (toate cu `sub` = admin T1), pe `set_token` și `validate` | 401; contorul și tokenul 1A neschimbate |
+| D2 | JWT valid de **agency_admin din T2** pe conexiunea din T1: `set_token`, `validate`, claims injectate (`tenant_id`, `app_metadata.role`) | 404 (nu confirmă existența); tokenul 1A neschimbat; bugetul 1A neconsumat; tokenul nu apare |
+| D3 | strategist, account și client din T1; admin T1 cu membership revocat | 403 (revocat: 403/404); fără efecte |
+| D4 | `connection_id` cu filtre PostgREST (`&tenant_id=neq.x`, listă, `not.is.null`, gol); token de 9.000 de caractere; acțiuni inexistente (`get_token`, `read`, `export`, `status`); GET/PUT/DELETE cu `Origin` străin | 400 / 422 (token existent neschimbat) / 400 (nu există cale de citire) / 405 |
+| D5 | Validare proprie a adminului T1 | Răspunsul nu conține tokenul; +1 apel pe 1A, 0 pe 2A |
+| D5 | Contorul 1A la 10/10 | `budget_exhausted`, niciun apel la Clarity, contorul rămâne 10 |
+| D5 | Validare 2A cu 1A la 10/10 | Bugetele sunt independente: 2A reușește |
+
+**CORS.** Local, gateway-ul (Kong) adaugă `Access-Control-Allow-Origin: *` pe toate răspunsurile funcțiilor. Handler-ul nu setează CORS cât timp `ANALYZATOR_APP_ORIGIN` lipsește. Nu e o vulnerabilitate: autentificarea se face cu Bearer (fără cookie-uri), iar `Allow-Credentials` nu e trimis, deci o pagină străină nu poate acționa în numele utilizatorului. Testul D4 verifică faptul că originea străină nu e reflectată și că `Allow-Credentials` lipsește. Pe staging trebuie verificat ce face gateway-ul hosted.
+
+## Scurgerea tokenului pe căi laterale (verificat manual, 7 oct 2026, local)
+
+Am setat un token cu valoare unică prin `rpc/set_source_token` (service role), l-am citit cu `rpc/get_source_token` și am provocat o eroare cu tokenul în parametri (token prea lung, HTTP 400). Tokenul **nu** apare în:
+- `extensions.pg_stat_statements` (PostgREST trimite parametri legați; `pg_stat_statements.track = top`);
+- `pg_stat_activity`;
+- logurile containerelor Postgres, PostgREST și Kong;
+- `audit_events` și `source_connections`;
+- `vault.secrets.secret` (criptat).
+
+Setări locale relevante: `log_statement = ddl`, `log_min_duration_statement = -1`, `log_parameter_max_length = -1`, `log_parameter_max_length_on_error = 0`. `anon` și `authenticated` au SELECT pe `extensions.pg_stat_statements`, dar schema nu e expusă prin API (`PGRST_DB_SCHEMAS = public,graphql_public`). Vezi S8.
+
+## M. Mutații (`scripts/test-guard-mutations.sh`, `npm run test:guards`)
+
+Ultima rulare: 7 oct 2026, 8/8 mutații prinse.
+
+| ID | Mutație | Prinsă de | Teste picate |
+|---|---|---|---|
+| M1 | Funcție nelistată în `public` (chiar fără EXECUTE pentru clienți) | 04 (A10/A11, lista aprobată) | 2 |
+| M2 | EXECUTE pe `get_source_token` pentru `authenticated` | 04 (A10, A11) | 2 |
+| M3 | `private.assert_service_role` fără verificare | 05 (V3) | 4 |
+| M4 | `private.has_brand_role` întoarce mereu `true` | 01 | 14 |
+| M5 | `get_source_token` fără verificarea numelui secretului | 05 (V8) | 1 |
+| M6 | RLS dezactivat pe `provider_api_calls` | 04 (A1) | 1 |
+| M7 | Politică `using (true)` pe `provider_api_calls` | 04 (A3) | 1 |
+| M8 | EXECUTE pentru `anon` pe `record_source_validation` (funcție aprobată) | 04 (A10, A11) | 2 |
+
 ## Neverificat (7 oct 2026)
+
+- **Gateway-ul hosted:** CORS și limita de mărime a corpului pentru Edge Functions sunt verificate doar local.
+- **Scriptul `set-source-token.ts` cu login real pe staging:** testat doar local (vezi S5).
+- **MFA pentru `agency_admin`** (spec cap. 28): nu e configurat; scriptul folosește login cu parolă.
 
 - **Vault și logurile pe staging (hosted):** Drepturile lui `postgres` pe `vault.*` și absența tokenului din logurile Postgres sunt verificate doar local. Pe staging: repetă testul cap-coadă și caută tokenul de test în Logs Explorer.
 - **Două validări simultane** pot trece amândouă de verificarea bugetului (fără blocare). Impactul e de cel mult un apel peste buget; acceptat pentru pilot.
@@ -147,6 +200,10 @@ Verificat cap-coadă pe Supabase local (7 oct 2026), cu `scripts/set-source-toke
 | S2 | Scăzută | Un strategist poate adăuga competitori într-o versiune veche a setului (istoricul nu e înghețat). | Trigger pe `competitor_set_members`: insert permis doar în cea mai recentă versiune, sau coloană `published_at` după care setul e înghețat. |
 | S3 | Scăzută | Admin T1 poate insera membership pentru orice UUID; eroarea FK spune dacă UUID-ul există în `auth.users` (oracol de existență, dar UUID-urile nu se pot ghici). Poate adăuga și un utilizator din T2 fără acordul lui (fără acces la datele T2). | Membership-urile se creează doar prin funcția server de invitație (service role); scoatem INSERT pe `memberships` pentru `authenticated`. |
 | S4 | Medie (operațională) | Revocarea nu închide sesiunea. | Funcția server de revocare apelează `auth.admin.signOut(user, 'global')` după update; JWT expiry scurt (≤ 1 h). |
+| S5 | Medie | `scripts/set-source-token.ts` acceptă orice `SUPABASE_URL`, inclusiv `http://` pe o adresă non-locală. Parola contului și tokenul ar circula necriptate. Verificat: scriptul nu are nicio verificare de schemă. | Refuz dacă URL-ul nu e `https://`, cu excepția `127.0.0.1` / `localhost`. |
+| S6 | Scăzută | Ștergerea unei conexiuni șterge în cascadă rândurile ei din `provider_api_calls`. Verificat: contorul trece de la 10 la 0. Un `agency_admin` care șterge și recreează conexiunea în aceeași zi poate trece de 10 validări (Clarity va răspunde 429), iar istoricul apelurilor se pierde. Impact doar în propriul tenant. | FK `on delete restrict` sau `set null` cu păstrarea `external_account_id` pe rândul de contor; bugetul se calculează pe proiect, nu pe ID-ul conexiunii. |
+| S7 | Scăzută | Contorul e pe conexiune, nu pe proiectul Clarity. `unique (tenant_id, provider, external_account_id)` împiedică duplicatele doar în același tenant. Verificat: același `external_account_id` e acceptat în doi tenanți, deci două conexiuni cu același token ar avea bugete separate de câte 10. Nu permite accesul la datele altui tenant (fiecare are nevoie de token). | Contorizare pe `(provider, external_account_id)` sau unicitate globală pe `(provider, external_account_id)` pentru furnizorii cu buget per proiect. |
+| S8 | Informativă | Local, `log_parameter_max_length = -1` (parametrii se loghează integral **dacă** o instrucțiune e logată), iar `anon` și `authenticated` au SELECT pe `extensions.pg_stat_statements` (neexpus prin API). Azi tokenul nu ajunge în loguri, dar o schimbare de `log_statement` sau `log_min_duration_statement` pe staging l-ar putea scrie. | Pe staging și production: verifică setările de log în dashboard și caută tokenul de test în Logs Explorer după testul cap-coadă; `revoke select on extensions.pg_stat_statements from anon, authenticated` dacă nu e folosit. |
 
 ## Constatări rezolvate
 
