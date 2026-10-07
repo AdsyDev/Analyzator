@@ -6,7 +6,7 @@ import type {
   MetricStatus,
   MetricUnit,
   MetricWarning,
-  MetricsEnvelope,
+  MetricsBundle,
   QueryContext,
   TrendSeries,
 } from '../../contracts'
@@ -166,7 +166,7 @@ function build(ctx: QueryContext, key: string): BuiltMetric {
 }
 
 /** Răspunsul `data` + `meta`, în forma `metrics.build_response`, trecut prin parserul real al contractului. */
-export function fixtureMetrics(ctx: QueryContext, keys: readonly string[], now: Date): MetricsEnvelope {
+export function fixtureMetrics(ctx: QueryContext, keys: readonly string[], now: Date): MetricsBundle {
   const built = keys.map((k) => build(ctx, k))
   const cmp = comparisonRange(ctx.period, ctx.comparison)
   const asOf = built.map((b) => b.item.data_as_of).filter((d): d is string => typeof d === 'string').sort()[0] ?? null

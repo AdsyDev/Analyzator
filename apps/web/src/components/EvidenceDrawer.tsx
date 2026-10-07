@@ -1,5 +1,5 @@
 import { CopyIcon } from '@phosphor-icons/react'
-import type { Evidence, MetricDefinition, MetricResponse, ProviderResult } from '../contracts'
+import type { Evidence, MetricDefinition, MetricItem, ProviderResult } from '../contracts'
 import { formatDate, formatDateTime, formatRange } from '../lib/format'
 import { coveragePercent, metricView } from '../lib/metricView'
 import { sourceName } from '../lib/sources'
@@ -14,7 +14,7 @@ export interface EvidenceDrawerProps {
   /** Pagina din care s-a deschis (de ex. „Overview"). */
   page: string
   label: string
-  metric: MetricResponse | null
+  metric: MetricItem | null
   definition: MetricDefinition | null
   period: { from: string; to: string }
   /** `null` cât timp se încarcă dovada. */

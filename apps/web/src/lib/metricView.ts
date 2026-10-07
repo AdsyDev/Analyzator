@@ -1,4 +1,4 @@
-import type { MetricDirection, MetricResponse, MetricStatus } from '../contracts'
+import type { MetricDirection, MetricItem, MetricStatus } from '../contracts'
 import { formatAbsoluteChange, formatMetricValue, formatRelativeChange } from './format'
 import { notesFor, reasonFor } from './warnings'
 
@@ -62,11 +62,11 @@ const EMPTY_TITLES: Partial<Record<MetricStatus, string>> = {
 const dirOf = (n: number): DeltaDirection => (n > 0 ? 'up' : n < 0 ? 'down' : 'flat')
 
 /**
- * Transformă un `MetricResponse` în text pentru afișare. Doar formatare: nu calculează și nu
+ * Transformă un `MetricItem` în text pentru afișare. Doar formatare: nu calculează și nu
  * deduce câmpuri lipsă (regula 4 și 8). Absența valorii se decide după `value`, nu după status:
  * `partial` poate avea `value: null`.
  */
-export function metricView(m: MetricResponse): MetricView {
+export function metricView(m: MetricItem): MetricView {
   const notes = notesFor(m)
   if (m.value === null) {
     return {

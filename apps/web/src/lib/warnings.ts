@@ -1,8 +1,8 @@
-import type { MetricResponse, MetricWarning } from '../contracts'
+import type { MetricItem, MetricWarning } from '../contracts'
 import { formatDate } from './format'
 import { sourceName } from './sources'
 
-const has = (m: MetricResponse, code: string) => m.warnings.some((w) => w.code === code)
+const has = (m: MetricItem, code: string) => m.warnings.some((w) => w.code === code)
 const pct = (c: number | null) => (c === null ? null : Math.round(c * 100))
 
 /**
@@ -10,7 +10,7 @@ const pct = (c: number | null) => (c === null ? null : Math.round(c * 100))
  * textul se produce aici, din status, acoperire și coduri. Nu inventează cauze: fără cod cunoscut,
  * spune doar ce se știe.
  */
-export function reasonFor(m: MetricResponse): string | null {
+export function reasonFor(m: MetricItem): string | null {
   switch (m.status) {
     case 'ok':
       return null
@@ -56,7 +56,7 @@ const NOTE_TEXT: Record<string, (w: MetricWarning) => string | null> = {
 }
 
 /** Note secundare (avertismente care nu sunt motivul principal). Coduri necunoscute se ignoră. */
-export function notesFor(m: MetricResponse): string[] {
+export function notesFor(m: MetricItem): string[] {
   const out: string[] = []
   for (const w of m.warnings) {
     // Condiția care a devenit status e deja în motivul principal.

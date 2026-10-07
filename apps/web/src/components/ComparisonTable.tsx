@@ -1,5 +1,5 @@
 import { StarIcon } from '@phosphor-icons/react'
-import type { IsoDate, MetricDirection, MetricResponse } from '../contracts'
+import type { IsoDate, MetricDirection, MetricItem } from '../contracts'
 import { cn } from '../lib/cn'
 import { formatDate, formatMetricValue } from '../lib/format'
 import { CoverageBadge } from './CoverageBadge'
@@ -20,7 +20,7 @@ export interface ComparisonRow {
   label: string
   /** Din registru. `neutral` = fără direcție bună: nu se marchează cea mai bună valoare. */
   direction?: MetricDirection
-  cells: Record<string, MetricResponse>
+  cells: Record<string, MetricItem>
 }
 
 export interface ComparisonGroup {

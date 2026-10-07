@@ -1,5 +1,5 @@
 import { ArrowDownRightIcon, ArrowUpRightIcon, ClockIcon, MinusIcon, PlugsIcon, WarningCircleIcon, WarningIcon } from '@phosphor-icons/react'
-import type { MetricDirection, MetricResponse, TrendPoint } from '../contracts'
+import type { MetricDirection, MetricItem, TrendPoint } from '../contracts'
 import { formatDate } from '../lib/format'
 import { cn } from '../lib/cn'
 import { coveragePercent, isGoodChange, metricView, type DeltaDirection } from '../lib/metricView'
@@ -14,7 +14,7 @@ export interface KpiCardProps {
   /** Tooltipul „Ce înseamnă", din registrul de metrici. */
   definition: string
   /** `null` cât timp se încarcă. */
-  metric: MetricResponse | null
+  metric: MetricItem | null
   loading?: boolean
   /** Mesajul unei erori de încărcare; diferit de lipsa sursei. */
   error?: string | null

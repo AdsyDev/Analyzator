@@ -81,7 +81,7 @@ const defs = parseDefinitions([
 
 describe('parseMetricsEnvelope', () => {
   it('mapează câmpurile numerice neschimbate, fără conversii de unități', () => {
-    const { data } = parseMetricsEnvelope(payload(), defs)
+    const { items: data } = parseMetricsEnvelope(payload(), defs)
     const s = data[0]!
     expect(s.value).toBe(1240)
     expect(s.relative_change).toBeCloseTo(12.727272) // procente, nu fracție
@@ -90,7 +90,7 @@ describe('parseMetricsEnvelope', () => {
   })
 
   it('numeric ca text devine număr; null rămâne null (nu 0)', () => {
-    const { data } = parseMetricsEnvelope(payload(), defs)
+    const { items: data } = parseMetricsEnvelope(payload(), defs)
     const c = data[1]!
     expect(c.numerator).toBe(0)
     expect(c.value).toBeNull()
@@ -99,18 +99,17 @@ describe('parseMetricsEnvelope', () => {
     expect(data[2]!.coverage).toBeNull()
   })
 
-  it('completează sursa din registru și versiunea din meta', () => {
-    const { data } = parseMetricsEnvelope(payload(), defs)
+  it('completează sursa din registru (contractul nu o are pe metrică)', () => {
+    const { items: data } = parseMetricsEnvelope(payload(), defs)
     expect(data.map((m) => m.source)).toEqual(['ga4', 'gsc', 'clarity'])
-    expect(data.map((m) => m.metric_definition_version)).toEqual([1, 1, 1])
   })
 
   it('fără definiții, sursa rămâne null, nu se ghicește', () => {
-    expect(parseMetricsEnvelope(payload()).data.every((m) => m.source === null)).toBe(true)
+    expect(parseMetricsEnvelope(payload()).items.every((m) => m.source === null)).toBe(true)
   })
 
   it('alipește avertismentele din meta pe fiecare metrică, după metric_key', () => {
-    const { data } = parseMetricsEnvelope(payload(), defs)
+    const { items: data } = parseMetricsEnvelope(payload(), defs)
     expect(data[0]!.warnings.map((w) => w.code)).toEqual(['incomplete_period'])
     expect(data[1]!.warnings.map((w) => w.code)).toEqual(['zero_not_confirmed', 'stale', 'excluded_rows'])
     expect(data[1]!.warnings[2]!.detail).toEqual({ reason: 'missing_weight', count: 2 })
@@ -118,11 +117,11 @@ describe('parseMetricsEnvelope', () => {
   })
 
   it('păstrează meta și cheia dovezii', () => {
-    const { data, meta } = parseMetricsEnvelope(payload(), defs)
-    expect(meta.data_as_of).toBe('2026-10-03')
-    expect(meta.coverage).toBe(0.5)
-    expect(meta.sources).toEqual(['clarity', 'ga4', 'gsc'])
-    expect(meta.warnings).toHaveLength(4)
+    const { items: data, meta } = parseMetricsEnvelope(payload(), defs)
+    expect(meta!.data_as_of).toBe('2026-10-03')
+    expect(meta!.coverage).toBe(0.5)
+    expect(meta!.sources).toEqual(['clarity', 'ga4', 'gsc'])
+    expect(meta!.warnings).toHaveLength(4)
     expect(data[0]!.evidence_query).toEqual(eq('ga4_sessions'))
   })
 
@@ -166,7 +165,7 @@ describe('parseMetricsEnvelope', () => {
   it('lista goală de metrici e validă', () => {
     const p = payload()
     p.data = []
-    expect(parseMetricsEnvelope(p, defs).data).toEqual([])
+    expect(parseMetricsEnvelope(p, defs).items).toEqual([])
   })
 })
 

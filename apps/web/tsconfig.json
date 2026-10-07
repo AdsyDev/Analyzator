@@ -12,6 +12,8 @@
     "noUncheckedIndexedAccess": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "paths": { "@analytics/*": ["../../analytics/*"] },
     "skipLibCheck": true,
     "noEmit": true,
     "types": ["vite/client", "node", "@testing-library/jest-dom/vitest"]

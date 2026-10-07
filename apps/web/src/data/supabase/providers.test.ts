@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { METRIC_STATUSES as CONTRACT_STATUSES } from '@analytics/contracts/metric-response'
 import { METRIC_STATUSES, STATUSES_WITHOUT_VALUE, isAgencyRole, type QueryContext } from '../../contracts'
 import { createSupabaseProviders } from './providers'
 
@@ -10,8 +11,9 @@ const ctx: QueryContext = {
 }
 
 describe('contractul MetricResponse', () => {
-  it('are cele opt statusuri din spec cap. 26 și din metrics.compute', () => {
-    expect([...METRIC_STATUSES]).toEqual(['ok', 'partial', 'stale', 'insufficient_sample', 'base_zero', 'cannot_compute', 'unavailable', 'not_connected'])
+  it('statusurile sunt cele din contractul oficial (analytics/contracts), în aceeași ordine de gravitate', () => {
+    expect([...METRIC_STATUSES]).toEqual([...CONTRACT_STATUSES])
+    expect([...METRIC_STATUSES]).toEqual(['not_connected', 'unavailable', 'cannot_compute', 'insufficient_sample', 'stale', 'partial', 'base_zero', 'ok'])
   })
 
   it('doar cannot_compute, unavailable și not_connected garantează value null; partial poate avea null (zero neconfirmat)', () => {
@@ -30,30 +32,30 @@ describe('rolurile', () => {
 describe('providerul supabase (gol)', () => {
   const p = createSupabaseProviders()
 
-  it('întoarce un înveliș data+meta cu not_connected și value null, nu zero, în ordinea cerută', async () => {
-    const { data, meta } = await p.metrics.metrics(ctx, ['ai_mention_rate', 'ga4_sessions'])
-    expect(data.map((m) => m.metric_key)).toEqual(['ai_mention_rate', 'ga4_sessions'])
-    for (const m of data) {
+  it('întoarce metrici not_connected cu value null, nu zero, în ordinea cerută, fără meta inventat', async () => {
+    const { items, meta } = await p.metrics.metrics(ctx, ['ai_mention_rate', 'ga4_sessions'])
+    expect(items.map((m) => m.metric_key)).toEqual(['ai_mention_rate', 'ga4_sessions'])
+    for (const m of items) {
       expect(m.status).toBe('not_connected')
       expect(m.value).toBeNull()
       expect(m.absolute_change).toBeNull()
       expect(m.relative_change).toBeNull()
       expect(m.coverage).toBeNull()
+      expect(m.source).toBeNull()
+      expect(m.warnings).toEqual([])
     }
-    expect(meta.brand_id).toBe('brand-1')
-    expect(meta.period).toEqual({ start: '2026-09-08', end: '2026-10-05' })
-    expect(meta.comparison_period).toEqual({ start: '2026-08-11', end: '2026-09-07' })
-    expect(meta.data_as_of).toBeNull()
+    // Nu există răspuns de server, deci nici `tenant_id` sau `generated_at` fabricate.
+    expect(meta).toBeNull()
   })
 
   it('cheia dovezii poartă brandul și intervalele cerute', async () => {
-    const { data } = await p.metrics.metrics(ctx, ['ga4_sessions'])
-    expect(data[0]?.evidence_query).toMatchObject({ metric_key: 'ga4_sessions', brand_id: 'brand-1', period: { start: '2026-09-08', end: '2026-10-05' } })
+    const { items } = await p.metrics.metrics(ctx, ['ga4_sessions'])
+    expect(items[0]?.evidence_query).toMatchObject({ metric_key: 'ga4_sessions', brand_id: 'brand-1', period: { start: '2026-09-08', end: '2026-10-05' }, comparison_period: { start: '2026-08-11', end: '2026-09-07' } })
   })
 
-  it('comparația MTD din envelope urmează regula serverului', async () => {
-    const { meta } = await p.metrics.metrics({ ...ctx, period: { preset: 'month', from: '2026-10-01', to: '2026-10-05' } }, ['ga4_sessions'])
-    expect(meta.comparison_period).toEqual({ start: '2026-09-01', end: '2026-09-05' })
+  it('cheia dovezii pentru „Luna curentă" folosește comparația MTD, ca la server', async () => {
+    const { items } = await p.metrics.metrics({ ...ctx, period: { preset: 'month', from: '2026-10-01', to: '2026-10-05' } }, ['ga4_sessions'])
+    expect(items[0]?.evidence_query.comparison_period).toEqual({ start: '2026-09-01', end: '2026-09-05' })
   })
 
   it('seriile nu conțin puncte inventate', async () => {

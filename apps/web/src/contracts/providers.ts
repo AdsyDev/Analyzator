@@ -2,7 +2,7 @@ import type { Brand, CompetitorSet } from './brand'
 import type { BrandId, ProviderResult } from './common'
 import type { Insight } from './insight'
 import type { Mention, MentionQuery, Page, PvFlag, PvItemRef, PvSnapshot, SentimentDistribution } from './mention'
-import type { Evidence, EvidenceQuery, MetricDefinition, MetricsEnvelope, TrendSeries } from './metric'
+import type { Evidence, EvidenceQuery, MetricDefinition, MetricsBundle, TrendSeries } from './metric'
 import type { QueryContext } from './period'
 import type { SourceConnection, SourceStatusInfo, SyncRun } from './source'
 
@@ -14,8 +14,8 @@ import type { SourceConnection, SourceStatusInfo, SyncRun } from './source'
 export interface MetricsProvider {
   /** Definițiile din registrul de metrici (tooltip, formulă). */
   definitions(keys: readonly string[]): Promise<ProviderResult<MetricDefinition[]>>
-  /** Învelișul `data` + `meta` (spec cap. 26): un `MetricResponse` per cheie cerută, în aceeași ordine; o metrică fără sursă primește `not_connected`. */
-  metrics(ctx: QueryContext, keys: readonly string[]): Promise<MetricsEnvelope>
+  /** Un `MetricItem` per cheie cerută, în aceeași ordine; o metrică fără sursă primește `not_connected`. */
+  metrics(ctx: QueryContext, keys: readonly string[]): Promise<MetricsBundle>
   trends(ctx: QueryContext, keys: readonly string[]): Promise<TrendSeries[]>
   evidence(brandId: BrandId, evidenceQuery: EvidenceQuery): Promise<ProviderResult<Evidence>>
 }

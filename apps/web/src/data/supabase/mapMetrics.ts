@@ -5,11 +5,11 @@ import {
   type MetricDefinition,
   type MetricDirection,
   type MetricLifecycle,
-  type MetricResponse,
+  type MetricItem,
   type MetricStatus,
   type MetricUnit,
   type MetricWarning,
-  type MetricsEnvelope,
+  type MetricsBundle,
   type MetricsMeta,
   type ServerPeriod,
 } from '../../contracts'
@@ -61,7 +61,7 @@ function evidenceQuery(v: unknown, path: string): EvidenceQuery {
   return {
     metric_key: str(o.metric_key, `${path}.metric_key`),
     version,
-    brand_id: str(o.brand_id, `${path}.brand_id`),
+    brand_id: strOrNull(o.brand_id, `${path}.brand_id`),
     period: period(o.period, `${path}.period`),
     comparison_period: period(o.comparison_period, `${path}.comparison_period`),
   }
@@ -84,11 +84,12 @@ function list(v: unknown, path: string): unknown[] {
 }
 
 /**
- * Transformă răspunsul `metrics.build_response` (`{ data, meta }`) în `MetricsEnvelope`.
- * Câmpurile pe care serverul nu le pune pe metrică se completează astfel: `source` din registru,
- * `metric_definition_version` din `meta`, `warnings` din `meta.warnings` după `metric_key`.
+ * Transformă răspunsul `metrics.build_response` (`{ data, meta }`, vezi `docs/contracts/metric-response.md`)
+ * în `MetricsBundle`. Câmpurile contractului trec neschimbate. Contractul nu are pe metrică următoarele,
+ * deci se alipesc aici (diferențe de rezolvat separat): `source` din registru (`primary_source`) și
+ * `warnings` din `meta.warnings`, după `metric_key`.
  */
-export function parseMetricsEnvelope(json: unknown, definitions: readonly MetricDefinition[] = []): MetricsEnvelope {
+export function parseMetricsEnvelope(json: unknown, definitions: readonly MetricDefinition[] = []): MetricsBundle {
   const root = obj(json, 'răspuns')
   const meta = obj(root.meta, 'meta')
   const sourceByKey = new Map(definitions.map((d) => [d.metric_key, d.source]))
@@ -96,7 +97,7 @@ export function parseMetricsEnvelope(json: unknown, definitions: readonly Metric
   const warnings = list(meta.warnings ?? [], 'meta.warnings').map((w, i) => warning(w, `meta.warnings[${i}]`))
   const versions = obj(meta.metric_definition_version ?? {}, 'meta.metric_definition_version')
 
-  const data = list(root.data, 'data').map<MetricResponse>((item, i) => {
+  const items = list(root.data, 'data').map<MetricItem>((item, i) => {
     const path = `data[${i}]`
     const o = obj(item, path)
     const key = str(o.metric_key, `${path}.metric_key`)
@@ -106,7 +107,6 @@ export function parseMetricsEnvelope(json: unknown, definitions: readonly Metric
     }
     const status: MetricStatus = oneOf(o.status, METRIC_STATUSES, `${path}.status`)
     const unit: MetricUnit = oneOf(o.unit, METRIC_UNITS, `${path}.unit`)
-    const version = numOrNull(versions[key], `meta.metric_definition_version.${key}`)
     return {
       metric_key: key,
       value: numOrNull(o.value, `${path}.value`),
@@ -121,13 +121,12 @@ export function parseMetricsEnvelope(json: unknown, definitions: readonly Metric
       coverage,
       evidence_query: evidenceQuery(o.evidence_query, `${path}.evidence_query`),
       source: sourceByKey.get(key) ?? null,
-      metric_definition_version: version,
       warnings: warnings.filter((w) => w.metric_key === key),
     }
   })
 
   const parsedMeta: MetricsMeta = {
-    tenant_id: strOrNull(meta.tenant_id, 'meta.tenant_id'),
+    tenant_id: str(meta.tenant_id, 'meta.tenant_id'),
     brand_id: str(meta.brand_id, 'meta.brand_id'),
     period: period(meta.period, 'meta.period'),
     comparison_period: period(meta.comparison_period, 'meta.comparison_period'),
@@ -135,13 +134,13 @@ export function parseMetricsEnvelope(json: unknown, definitions: readonly Metric
     generated_at: str(meta.generated_at, 'meta.generated_at'),
     sources: list(meta.sources ?? [], 'meta.sources').map((s, i) => str(s, `meta.sources[${i}]`)),
     coverage: numOrNull(meta.coverage, 'meta.coverage'),
-    cohort_version: numOrNull(meta.cohort_version, 'meta.cohort_version'),
+    cohort_version: strOrNull(meta.cohort_version, 'meta.cohort_version'),
     metric_definition_version: Object.fromEntries(
       Object.entries(versions).map(([k, v]) => [k, numOrNull(v, `meta.metric_definition_version.${k}`) ?? 0]),
     ),
     warnings,
   }
-  return { data, meta: parsedMeta }
+  return { items, meta: parsedMeta }
 }
 
 const DIRECTIONS = ['higher_is_better', 'lower_is_better', 'neutral'] as const satisfies readonly MetricDirection[]

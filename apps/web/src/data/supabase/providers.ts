@@ -4,7 +4,7 @@ import {
   type DataProviders,
   type InsightsProvider,
   type MentionsProvider,
-  type MetricResponse,
+  type MetricItem,
   type MetricsProvider,
   type QueryContext,
   type SourcesProvider,
@@ -14,7 +14,7 @@ import { comparisonRange } from '../../lib/period'
 const NO_SOURCE = 'Sursa nu este conectată pentru acest brand. Nu afișăm valori estimate până la conectare.'
 
 /** Răspuns pentru o metrică fără sursă: `value` e null, nu 0 (regula 8). Unitatea e necunoscută până la registru. */
-export function notConnectedMetric(ctx: QueryContext, metricKey: string): MetricResponse {
+export function notConnectedMetric(ctx: QueryContext, metricKey: string): MetricItem {
   const cmp = comparisonRange(ctx.period, ctx.comparison)
   return {
     metric_key: metricKey,
@@ -36,32 +36,14 @@ export function notConnectedMetric(ctx: QueryContext, metricKey: string): Metric
       comparison_period: { start: cmp.from, end: cmp.to },
     },
     source: null,
-    metric_definition_version: null,
     warnings: [],
   }
 }
 
 const metrics: MetricsProvider = {
   definitions: async () => notConnected('Registrul de metrici nu este încă conectat.'),
-  metrics: async (ctx, keys) => {
-    const cmp = comparisonRange(ctx.period, ctx.comparison)
-    return {
-      data: keys.map((key) => notConnectedMetric(ctx, key)),
-      meta: {
-        tenant_id: null,
-        brand_id: ctx.brandId,
-        period: { start: ctx.period.from, end: ctx.period.to },
-        comparison_period: { start: cmp.from, end: cmp.to },
-        data_as_of: null,
-        generated_at: new Date().toISOString(),
-        sources: [],
-        coverage: null,
-        cohort_version: null,
-        metric_definition_version: {},
-        warnings: [],
-      },
-    }
-  },
+  // Fără răspuns de server nu există `meta`: UI-ul nu fabrică `tenant_id` sau data generării.
+  metrics: async (ctx, keys) => ({ items: keys.map((key) => notConnectedMetric(ctx, key)), meta: null }),
   trends: async (_ctx, keys) =>
     keys.map((key) => ({
       metric_key: key,
