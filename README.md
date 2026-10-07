@@ -18,3 +18,15 @@ npm run dev
 - `npm run build` — verificare de tipuri și build
 - `npm run typecheck`
 - `npm run test`
+
+## Baza de date (local)
+
+Necesită Docker (OrbStack) și Supabase CLI.
+
+```bash
+supabase start
+npm run db:reset   # migrații + seed de test (supabase/tests/seed)
+npm run test:db    # teste pgTAP de izolare (RLS)
+```
+
+Seed-ul de test rulează doar local. Migrațiile ajung pe staging prin CI.

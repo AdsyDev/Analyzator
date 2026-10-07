@@ -5,6 +5,8 @@
     "dev": "npm --prefix apps/web run dev",
     "build": "npm --prefix apps/web run build",
     "typecheck": "npm --prefix apps/web run typecheck",
-    "test": "npm --prefix apps/web run test"
+    "test": "npm --prefix apps/web run test",
+    "test:db": "supabase test db supabase/tests/database",
+    "db:reset": "supabase db reset"
   }
 }
