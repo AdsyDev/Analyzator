@@ -33,6 +33,8 @@ function matches(row: Row, query: string): boolean {
       if (String(row[col]) !== expr.slice(3)) return false
     } else if (expr.startsWith('in.(')) {
       if (!expr.slice(4, -1).split(',').includes(String(row[col]))) return false
+    } else if (expr === 'not.is.null') {
+      if (row[col] === null || row[col] === undefined) return false
     } else {
       throw new Error(`FakeDb: filtru nesuportat ${part}`)
     }
@@ -42,6 +44,7 @@ function matches(row: Row, query: string): boolean {
 
 export class FakeDb implements Db {
   readonly tables: Record<string, Row[]>
+  readonly rpcs: Record<string, (args: Row) => unknown> = {}
   readonly log: Array<{ op: string; table: string; query?: string; row?: Row }> = []
   #seq = 0
 
@@ -66,5 +69,12 @@ export class FakeDb implements Db {
     const hit = (this.tables[table] ?? []).filter((r) => matches(r, query))
     for (const r of hit) Object.assign(r, patch)
     return hit.map((r) => ({ ...r }) as T)
+  }
+
+  async rpc<T>(fn: string, args: Row): Promise<T> {
+    this.log.push({ op: 'rpc', table: fn, row: args })
+    const impl = this.rpcs[fn]
+    if (!impl) throw new Error(`FakeDb: rpc ${fn} nedefinit`)
+    return impl(args) as T
   }
 }

@@ -2,6 +2,20 @@
 
 Endpoint: `GET https://www.clarity.ms/export-data/api/v1/project-live-insights`
 Autentificare: `Authorization: Bearer {token}` (un token per proiect, doar server-side).
+
+## Configurare
+
+- O conexiune per brand în `source_connections`: `provider = 'clarity'`, `tenant_id`, `brand_id`, `external_account_id` = ID-ul proiectului Clarity, `status`.
+- Tokenul e în **Supabase Vault** (secret `source_connection:<id>`). Se setează din Administrare → Surse (după ce există ecranul), iar până atunci cu `npm run set-source-token`. Ambele trec prin Edge Function `source-credentials`. Frontend-ul vede doar `credential_status` (`missing` / `unverified` / `valid` / `invalid`).
+- Worker-ul citește conexiunile active cu service role. Le sare pe cele `missing` sau `invalid` și citește tokenul cu `get_source_token` doar după verificarea bugetului.
+- Proba (`npm run probe:clarity`) citește în continuare `CLARITY_PROJECTS` din `.env.local`, până există UI-ul.
+
+## Bugetul zilnic
+
+- 10 apeluri per proiect (token) pe zi, contorizate în `provider_api_calls` pentru colectare **și** pentru „Testează conexiunea".
+- **Ziua de buget e UTC.** Momentul la care Clarity resetează limita **nu e documentat**; resetarea la 00:00 UTC e o presupunere. **De verificat în prima săptămână de rulare:** ora primului 429 și ora la care apelurile reușesc din nou.
+- Worker-ul pornește cu 10 minus apelurile de azi și **nu pornește sub 4** (run `failed`, cod `insufficient_budget`, nicio cerere trimisă).
+- Retry-urile intră în buget. La buget epuizat se pierd dimensiunile de la coada listei (paginile primele).
 Sursa: [Clarity Data Export API](https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-data-export-api), pagină actualizată 2025-12-05, citită 2026-10-07.
 
 ## Din documentație (verificat 2026-10-07)

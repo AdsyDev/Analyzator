@@ -9,6 +9,7 @@ export interface Db {
   select<T extends Row>(table: string, query: string): Promise<T[]>
   insert<T extends Row>(table: string, row: Row): Promise<T[]>
   update<T extends Row>(table: string, query: string, patch: Row): Promise<T[]>
+  rpc<T>(fn: string, args: Row): Promise<T>
 }
 
 export class DbError extends Error {
@@ -41,7 +42,7 @@ export class SupabaseRest implements Db {
     this.#fetch = config.fetch ?? globalThis.fetch
   }
 
-  async #request<T>(method: string, path: string, body?: unknown): Promise<T[]> {
+  async #request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const res = await this.#fetch(`${this.#url}/rest/v1/${path}`, {
       method,
       headers: {
@@ -63,19 +64,24 @@ export class SupabaseRest implements Db {
       }
       throw new DbError(`${method} ${path.split('?')[0]}: HTTP ${res.status} ${detail}`, res.status)
     }
-    return text ? (JSON.parse(text) as T[]) : []
+    return (text ? JSON.parse(text) : null) as T
   }
 
-  select<T extends Row>(table: string, query: string): Promise<T[]> {
-    return this.#request<T>('GET', `${table}?${query}`)
+  async select<T extends Row>(table: string, query: string): Promise<T[]> {
+    return (await this.#request<T[] | null>('GET', `${table}?${query}`)) ?? []
   }
 
-  insert<T extends Row>(table: string, row: Row): Promise<T[]> {
-    return this.#request<T>('POST', table, row)
+  async insert<T extends Row>(table: string, row: Row): Promise<T[]> {
+    return (await this.#request<T[] | null>('POST', table, row)) ?? []
   }
 
-  update<T extends Row>(table: string, query: string, patch: Row): Promise<T[]> {
-    return this.#request<T>('PATCH', `${table}?${query}`, patch)
+  async update<T extends Row>(table: string, query: string, patch: Row): Promise<T[]> {
+    return (await this.#request<T[] | null>('PATCH', `${table}?${query}`, patch)) ?? []
+  }
+
+  /** Funcții SQL din public executabile doar de service_role (lista aprobată în teste). */
+  rpc<T>(fn: string, args: Row): Promise<T> {
+    return this.#request<T>('POST', `rpc/${fn}`, args)
   }
 }
 

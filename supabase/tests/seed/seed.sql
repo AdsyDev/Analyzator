@@ -2,10 +2,14 @@
 -- Doi tenanți de test, câte două branduri, utilizatori cu roluri diferite.
 
 -- Utilizatori -------------------------------------------------------------------
+-- Câmpurile de token sunt '' (nu NULL): altfel GoTrue nu poate citi utilizatorul (login, update parolă).
 insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-                        raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+                        raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+                        confirmation_token, recovery_token, email_change, email_change_token_new,
+                        email_change_token_current, phone_change, phone_change_token, reauthentication_token)
 select '00000000-0000-0000-0000-000000000000', id, 'authenticated', 'authenticated', email, '',
-       now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()
+       now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(),
+       '', '', '', '', '', '', '', ''
 from (values
   ('30000000-0000-0000-0000-000000000001'::uuid, 'admin.t1@test.local'),
   ('30000000-0000-0000-0000-000000000002'::uuid, 'strategist.t1@test.local'),
@@ -15,6 +19,10 @@ from (values
   ('30000000-0000-0000-0000-000000000011'::uuid, 'admin.t2@test.local'),
   ('30000000-0000-0000-0000-000000000012'::uuid, 'strategist.t2@test.local')
 ) as u (id, email);
+
+insert into auth.identities (provider_id, user_id, identity_data, provider, created_at, updated_at)
+select id::text, id, jsonb_build_object('sub', id::text, 'email', email, 'email_verified', true), 'email', now(), now()
+from auth.users where email like '%@test.local';
 
 -- Tenanți și branduri -----------------------------------------------------------
 insert into public.tenants (id, slug, name) values

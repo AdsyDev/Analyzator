@@ -34,8 +34,10 @@ const U = {
 }
 const TABLES = [
   'tenants', 'brands', 'memberships', 'brand_access', 'competitor_sets', 'competitor_set_members',
-  'source_connections', 'sync_runs', 'import_batches', 'audit_events',
+  'source_connections', 'sync_runs', 'import_batches', 'audit_events', 'provider_api_calls',
 ]
+const CLARITY_1A = '50000000-0000-0000-0000-000000000031'
+const CLARITY_2A = '50000000-0000-0000-0000-000000000032'
 
 const b64 = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url')
 
@@ -366,5 +368,79 @@ describe('B7. GraphQL', () => {
     } else {
       assert.ok(res.status >= 400 || res.json?.errors, `răspuns neașteptat: ${res.status}`)
     }
+  })
+})
+
+describe('B8. Credențiale în Vault prin API', () => {
+  const TOKEN_1A = `tok-1a-${Date.now()}`
+
+  before(async () => {
+    const res = await asService('rpc/set_source_token', {
+      method: 'POST', body: { p_actor_user_id: U.admin1, p_connection_id: CLARITY_1A, p_token: TOKEN_1A },
+    })
+    assert.equal(res.status, 200, `setare token (service role): ${res.status}`)
+  })
+
+  test('funcțiile de credențiale nu pot fi apelate cu JWT de utilizator (nici de admin)', async () => {
+    const token = userToken(U.admin1)
+    const calls = [
+      ['get_source_token', { p_connection_id: CLARITY_1A }],
+      ['set_source_token', { p_actor_user_id: U.admin1, p_connection_id: CLARITY_1A, p_token: 'x' }],
+      ['record_source_validation', { p_connection_id: CLARITY_1A, p_ok: true }],
+    ]
+    for (const [fn, body] of calls) {
+      const res = await rest(`rpc/${fn}`, { token, method: 'POST', body })
+      assert.ok([401, 403].includes(res.status), `${fn}: ${res.status}`)
+      assert.doesNotMatch(JSON.stringify(res.json), new RegExp(TOKEN_1A))
+    }
+    const anon = await rest('rpc/get_source_token', { method: 'POST', body: { p_connection_id: CLARITY_1A } })
+    assert.ok([401, 403].includes(anon.status), `anon: ${anon.status}`)
+  })
+
+  test('service role citește tokenul (control pozitiv)', async () => {
+    const res = await asService('rpc/get_source_token', { method: 'POST', body: { p_connection_id: CLARITY_1A } })
+    assert.equal(res.json, TOKEN_1A)
+  })
+
+  test('adminul vede starea conexiunii, nu tokenul; select=* nu îl conține', async () => {
+    const { json } = await rest(`source_connections?select=*&id=eq.${CLARITY_1A}`, { token: userToken(U.admin1) })
+    assert.equal(json.length, 1)
+    assert.equal(json[0].credential_status, 'unverified')
+    assert.doesNotMatch(JSON.stringify(json), new RegExp(TOKEN_1A))
+  })
+
+  test('schema vault nu e accesibilă prin API', async () => {
+    const res = await rest('decrypted_secrets?select=*', { token: userToken(U.admin1), headers: { 'Accept-Profile': 'vault' } })
+    assert.equal(res.status, 406)
+  })
+
+  test('adminul nu poate scrie referința Vault sau starea prin REST', async () => {
+    const token = userToken(U.admin1)
+    const patch = await rest(`source_connections?id=eq.${CLARITY_1A}`, {
+      token, method: 'PATCH', body: { credential_status: 'valid' }, headers: representation,
+    })
+    assert.ok([401, 403].includes(patch.status), `PATCH credential_status: ${patch.status}`)
+    const insert = await rest('source_connections', {
+      token, method: 'POST',
+      body: { tenant_id: T1, brand_id: B1B, provider: 'clarity', external_account_id: 'atac', vault_secret_id: B1A },
+    })
+    assert.ok([401, 403].includes(insert.status), `POST vault_secret_id: ${insert.status}`)
+  })
+
+  test('admin T2 nu vede conexiunea și contorul din T1; clientul nu vede contorul', async () => {
+    const t2 = await rest(`source_connections?select=id&id=eq.${CLARITY_1A}`, { token: userToken(U.admin2) })
+    assert.deepEqual(t2.json, [])
+    const calls = await rest('provider_api_calls?select=*', { token: userToken(U.client1) })
+    assert.deepEqual(calls.json, [])
+    const write = await rest('provider_api_calls', {
+      token: userToken(U.admin1), method: 'POST',
+      body: { tenant_id: T1, brand_id: B1A, source_connection_id: CLARITY_1A, call_date_utc: '2026-10-07', purpose: 'collect', calls: 1 },
+    })
+    assert.ok([401, 403].includes(write.status), `POST provider_api_calls: ${write.status}`)
+  })
+
+  test('conexiunea T2 rămâne fără token', async () => {
+    const res = await asService('rpc/get_source_token', { method: 'POST', body: { p_connection_id: CLARITY_2A } })
+    assert.ok(res.status >= 400)
   })
 })

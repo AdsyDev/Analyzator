@@ -30,3 +30,18 @@ npm run test:db    # teste pgTAP de izolare (RLS)
 ```
 
 Seed-ul de test rulează doar local. Migrațiile ajung pe staging prin CI.
+
+## Tokenul unei surse (până există ecranul Administrare → Surse)
+
+Tokenul ajunge în Supabase Vault prin Edge Function `source-credentials`, ca `agency_admin`:
+
+```bash
+npm run set-source-token -- --connection <uuid> --email <admin@agentie.ro>
+```
+
+Scriptul cere parola și tokenul fără ecou. Cu `--validate` face și un apel de test, care consumă 1 din cele 10 apeluri zilnice Clarity. Local, funcția se pornește cu `supabase functions serve source-credentials`.
+
+## Teste
+
+- `npm run test`: conectori, funcția server, web
+- `npm run test:security`: reset local, pgTAP și atacuri prin API (vezi `docs/security-tests.md`)

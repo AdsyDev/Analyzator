@@ -218,8 +218,9 @@ web3 = 30
 # secret = ""
 
 [auth.email]
-# Allow/disallow new user signups via email to your project.
-enable_signup = false
+# ATENȚIE: această setare activează/dezactivează COMPLET login-ul cu email (GOTRUE_EXTERNAL_EMAIL_ENABLED).
+# Rămâne true. Înregistrarea publică e blocată de [auth] enable_signup = false (signup doar pe invitație).
+enable_signup = true
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true

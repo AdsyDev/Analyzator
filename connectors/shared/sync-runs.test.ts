@@ -71,6 +71,7 @@ describe('sync_runs', () => {
       select: async () => [],
       insert: async <T extends Row>(_t: string, row: Row) => [{ ...row, id: '00000000-0000-4000-8000-000000000001', brand_id: B2 } as unknown as T],
       update: async () => [],
+      rpc: async () => { throw new Error('nefolosit') },
     }
     await assert.rejects(startSyncRun(lying, scope), /altui tenant sau brand/)
   })

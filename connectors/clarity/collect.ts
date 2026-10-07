@@ -1,12 +1,12 @@
 // Conectorul zilnic Clarity. Rulare: npm run collect:clarity
+// Configurarea vine din source_connections (provider = 'clarity'); tokenurile din Vault.
 //
 // STATUS: parserul și scrierea în clarity_daily nu sunt implementate (așteaptă proba și migrația din
-// Promptul 4). Până atunci scriptul se oprește ÎNAINTE de orice apel la Clarity, ca să nu consume bugetul.
+// Promptul 4). Până atunci scriptul se oprește ÎNAINTE de a citi tokenuri sau de a apela Clarity.
 
-import { resolveBrands } from '../shared/resolve.ts'
+import { loadActiveConnections } from '../shared/connections.ts'
 import { SupabaseRest, supabaseConfigFromEnv } from '../shared/supabase-rest.ts'
-import { parseClarityProjects } from './config.ts'
-import { collectProject, type ClarityParser, type ClarityWriter } from './collect-core.ts'
+import { collectConnection, type ClarityParser, type ClarityWriter } from './collect-core.ts'
 
 // Se înlocuiesc după probă cu implementările reale (interfețele din collect-core.ts).
 const parser: ClarityParser<never> | null = null
@@ -16,19 +16,24 @@ async function main(): Promise<void> {
   if (!parser || !writer) {
     throw new Error('Parserul și scrierea în clarity_daily nu sunt implementate încă (după probă). Nu apelez Clarity.')
   }
-  const projects = parseClarityProjects(process.env.CLARITY_PROJECTS)
   const db = new SupabaseRest(supabaseConfigFromEnv(process.env))
-  const resolved = await resolveBrands(db, projects)
+  const { connections, skipped } = await loadActiveConnections(db, 'clarity')
+  for (const s of skipped) console.log(`sărit ${s.id}: ${s.reason}`)
 
   let failed = 0
-  for (const project of resolved) {
-    const outcome = await collectProject({ db, parser, writer }, project)
-    console.log(
-      `${project.tenant_slug}/${project.brand_slug} ${outcome.date}: ${outcome.status}, ` +
-        `${outcome.rows_written} rânduri, ${outcome.attempt_count} apeluri` +
-        (outcome.not_collected.length ? `, necolectat: ${outcome.not_collected.join(', ')}` : ''),
-    )
-    if (outcome.status === 'failed') failed++
+  for (const connection of connections) {
+    try {
+      const o = await collectConnection({ db, parser, writer }, connection)
+      console.log(
+        `${connection.id} (${connection.external_account_id}) ${o.date}: ${o.status}, ${o.rows_written} rânduri, ` +
+          `${o.attempt_count} apeluri (înainte azi: ${o.calls_before_run})` +
+          (o.not_collected.length ? `, necolectat: ${o.not_collected.join(', ')}` : ''),
+      )
+      if (o.status === 'failed') failed++
+    } catch (err) {
+      failed++
+      console.error(`${connection.id}: ${(err as Error).message}`)
+    }
   }
   if (failed) process.exitCode = 1
 }

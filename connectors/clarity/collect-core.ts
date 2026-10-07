@@ -6,8 +6,14 @@ import { CallBudget, fetchWithRetry, type FetchLike, type Sleep } from '../share
 import { previousCalendarDayInBucharest } from '../shared/dates.ts'
 import { finishSyncRun, startSyncRun, type SyncRunError, type SyncRunResult } from '../shared/sync-runs.ts'
 import type { Db } from '../shared/supabase-rest.ts'
-import type { ResolvedBrand } from '../shared/resolve.ts'
-import { CLARITY_DAILY_BUDGET, CLARITY_ENDPOINT, type ClarityProject } from './config.ts'
+import {
+  getSourceToken,
+  providerCallsToday,
+  recordProviderCalls,
+  utcDay,
+  type SourceConnection,
+} from '../shared/connections.ts'
+import { CLARITY_DAILY_BUDGET, CLARITY_ENDPOINT, CLARITY_MIN_BUDGET_TO_START } from './config.ts'
 
 export type ClarityDimensionKey = 'all' | 'device' | 'source' | 'page'
 
@@ -50,30 +56,77 @@ export type CollectDeps<TRow> = {
   fetch?: FetchLike
   sleep?: Sleep
   now?: () => Date
-  budgetLimit?: number
+  /** Bugetul zilnic al furnizorului (implicit 10); se scad apelurile deja făcute azi (UTC). */
+  dailyLimit?: number
+  /** Sub acest buget rămas, rularea nu pornește (implicit 4 = un apel per dimensiune). */
+  minBudgetToStart?: number
 }
 
 export type CollectOutcome = SyncRunResult & {
   sync_run_id: string
   date: string
+  calls_before_run: number
   collected: ClarityDimensionKey[]
   not_collected: ClarityDimensionKey[]
 }
 
-export async function collectProject<TRow>(
+export async function collectConnection<TRow>(
   deps: CollectDeps<TRow>,
-  project: ClarityProject & ResolvedBrand,
+  connection: SourceConnection,
 ): Promise<CollectOutcome> {
+  if (connection.provider !== 'clarity') throw new Error(`Conexiunea ${connection.id} nu e Clarity.`)
   const now = deps.now ?? (() => new Date())
   const date = previousCalendarDayInBucharest(now())
-  const scope = { tenant_id: project.tenant_id, brand_id: project.brand_id }
+  const dayUtc = utcDay(now())
+  const scope = { tenant_id: connection.tenant_id, brand_id: connection.brand_id }
   const handle = await startSyncRun(
     deps.db,
-    { ...scope, source: 'clarity', period_start: date, period_end: date },
+    { ...scope, source: 'clarity', source_connection_id: connection.id, period_start: date, period_end: date },
     now,
   )
 
-  const budget = new CallBudget(deps.budgetLimit ?? CLARITY_DAILY_BUDGET)
+  const dailyLimit = deps.dailyLimit ?? CLARITY_DAILY_BUDGET
+  const minToStart = deps.minBudgetToStart ?? CLARITY_MIN_BUDGET_TO_START
+  const callsBefore = await providerCallsToday(deps.db, connection.id, dayUtc)
+  const remaining = Math.max(0, dailyLimit - callsBefore)
+
+  // Sub pragul minim nu pornim: o rulare care pierde din start dimensiuni nu merită bugetul.
+  if (remaining < minToStart) {
+    const result: SyncRunResult = {
+      status: 'failed',
+      rows_written: 0,
+      attempt_count: 0,
+      errors: [{
+        code: 'insufficient_budget',
+        status: null,
+        message: `Buget rămas azi (UTC ${dayUtc}): ${remaining}/${dailyLimit}, sub minimul de ${minToStart}. Nicio cerere trimisă.`,
+      }],
+    }
+    await finishSyncRun(deps.db, handle, result, now)
+    return {
+      ...result,
+      sync_run_id: handle.id,
+      date,
+      calls_before_run: callsBefore,
+      collected: [],
+      not_collected: CLARITY_CALLS.map((c) => c.key),
+    }
+  }
+
+  let token: string
+  try {
+    token = await getSourceToken(deps.db, connection.id)
+  } catch (err) {
+    const result: SyncRunResult = {
+      status: 'failed',
+      rows_written: 0,
+      attempt_count: 0,
+      errors: [{ code: 'token_unavailable', status: null, message: (err as Error).message }],
+    }
+    await finishSyncRun(deps.db, handle, result, now)
+    return { ...result, sync_run_id: handle.id, date, calls_before_run: callsBefore, collected: [], not_collected: CLARITY_CALLS.map((c) => c.key) }
+  }
+  const budget = new CallBudget(remaining)
   const errors: SyncRunError[] = []
   const collected: ClarityDimensionKey[] = []
   const notCollected: ClarityDimensionKey[] = []
@@ -85,7 +138,7 @@ export async function collectProject<TRow>(
     for (const [index, call] of CLARITY_CALLS.entries()) {
       const result = await fetchWithRetry(
         clarityUrl(call),
-        { headers: { Authorization: `Bearer ${project.token}` } },
+        { headers: { Authorization: `Bearer ${token}` } },
         { budget, fetch: deps.fetch, sleep: deps.sleep },
       )
 
@@ -149,7 +202,19 @@ export async function collectProject<TRow>(
         ? 'succeeded'
         : 'partial'
 
+  try {
+    await recordProviderCalls(deps.db, {
+      ...scope,
+      source_connection_id: connection.id,
+      call_date_utc: dayUtc,
+      purpose: 'collect',
+      calls: budget.used,
+      sync_run_id: handle.id,
+    })
+  } catch (err) {
+    errors.push({ code: 'call_count_not_recorded', status: null, message: (err as Error).message })
+  }
   const result: SyncRunResult = { status, rows_written: rowsWritten, attempt_count: budget.used, errors }
   await finishSyncRun(deps.db, handle, result, now)
-  return { ...result, sync_run_id: handle.id, date, collected, not_collected: notCollected }
+  return { ...result, sync_run_id: handle.id, date, calls_before_run: callsBefore, collected, not_collected: notCollected }
 }

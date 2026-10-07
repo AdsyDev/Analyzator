@@ -25,6 +25,25 @@ Scriptul (`scripts/test-security.sh`) face trei pași:
 | T1 `1000…0001` | 1A `2000…0011`, 1B `2000…0012` | admin T1 · strategist T1 (acces 1A) · account T1 (acces 1B) · client T1 (acces 1A) · client fără acces |
 | T2 `1000…0002` | 2A `2000…0021`, 2B `2000…0022` | admin T2 · strategist T2 (acces 2A) |
 
+## Excepții aprobate
+
+### E1. Funcții server în `public` (aprobată 7 oct 2026)
+
+Garda inițială interzicea orice funcție în `public` și orice SECURITY DEFINER care returnează date. Excepție pentru credențialele din Vault:
+
+| Funcție | Returnează | Cine o apelează |
+|---|---|---|
+| `set_source_token(actor, connection, token)` | starea (`unverified`) | Edge Function `source-credentials` |
+| `get_source_token(connection)` | **tokenul decriptat** | worker-ul, Edge Function (validare) |
+| `record_source_validation(connection, ok, error)` | starea | Edge Function, worker |
+
+Condiții, verificate de teste:
+- `anon`, `authenticated` și `PUBLIC` nu au EXECUTE (A10, A11, V1, B8).
+- Fiecare funcție din `public` e într-o listă explicită în `04_security_inventory.test.sql`. O funcție nelistată pică testul.
+- Corpul fiecărei funcții verifică singur că apelantul e `service_role` (claim JWT **și** rolul de bază de date), nu se bazează doar pe GRANT (V3, plus verificare prin mutație).
+- `set_source_token` verifică în corp că actorul e `agency_admin` activ în tenantul conexiunii (V4).
+- `get_source_token` verifică faptul că secretul are numele `source_connection:<id>` al conexiunii cerute; o referință mutată spre secretul altei conexiuni e refuzată (V8).
+
 ## Inventar la 7 oct 2026
 
 | Tip | Ce există | Acoperit de |
@@ -32,7 +51,8 @@ Scriptul (`scripts/test-security.sh`) face trei pași:
 | Tabele | 10 în `public`, toate cu RLS | A1–A7, B1, B2, 01–03 |
 | View-uri / materialized views | niciunul | A8, A9 (gardă pentru viitor) |
 | Funcții RPC în `public` | niciuna | A11, B3 |
-| SECURITY DEFINER | 6 în `private`: 4 de autorizare (boolean, răspund doar pentru `auth.uid()`), `user_has_brand_role` și `user_can_import` (user_id explicit, neexecutabile de clienți), `audit_row` (trigger) | A10, A14, B3 |
+| SECURITY DEFINER | În `private`: 4 de autorizare (boolean, răspund doar pentru `auth.uid()`), `user_has_brand_role` și `user_can_import` (user_id explicit, neexecutabile de clienți), triggere (`audit_row`, `delete_source_secret`). În `public`: 3 funcții server pentru credențiale, doar `service_role` (vezi excepția E1) | A10, A11, A14, B3, B8, V1–V3 |
+| Vault | Tokenurile surselor; secret `source_connection:<id>` per conexiune | V1–V9, B8 |
 | Bucket-uri storage | niciunul | A12, B6 (gardă) |
 | Realtime | nicio publicare | A13 |
 | GraphQL | `pg_graphql` nu e instalat local | B7 (tolerant: ori eroare, ori doar date permise) |
@@ -62,6 +82,17 @@ Scriptul (`scripts/test-security.sh`) face trei pași:
 - **01:** izolare brand și tenant pentru strategist T1, strategist T2 și admin T2; scrieri pe brand străin; FK compuse; timezone invalid.
 - **02:** client fără `brand_access` (0 rânduri); client cu acces (fără date de agenție, fără auto-acordare, fără escaladare de rol); account nu scrie direct în `import_batches`; `user_can_import`; anon.
 - **03:** revocare `brand_access`, revocare membership, arhivarea tenantului; auditul cu actor; `audit_events` imutabil; RLS peste tot.
+- **05 (Vault):**
+  - V1: utilizatorii nu citesc `vault.*` și nu execută funcțiile de credențiale.
+  - V2: nu pot scrie `vault_secret_id` sau `credential_status`.
+  - V3: corpul funcțiilor refuză un apelant care nu e `service_role`, inclusiv un claim falsificat.
+  - V4: doar `agency_admin` al tenantului setează sau rotește tokenul.
+  - V5: auditul `credential_set` / `credential_rotated` cu actor; tokenul nu apare în afara Vault.
+  - V6: adminul vede starea, nu tokenul.
+  - V7: validare.
+  - V8: secretul trebuie să aparțină conexiunii.
+  - V9: ștergerea conexiunii șterge secretul.
+  - V10: `provider_api_calls` e append-only, izolat pe brand și scris doar de service role.
 
 ## B. Atacuri prin API (`tests/security/api-isolation.test.mjs`)
 
@@ -74,8 +105,30 @@ Scriptul (`scripts/test-security.sh`) face trei pași:
 | B5 | Revocare `brand_access` (de admin, prin API) și revocare membership, cu **același JWT** | 0 rânduri la următorul request |
 | B6 | Listare și creare bucket; GET / sign pe căi ghicite `imports/<tenant>/<brand>/<fișier>` | listă goală sau ≥ 400 |
 | B7 | GraphQL `brandsCollection` | doar 1A, sau eroare |
+| B8 | RPC pe funcțiile de credențiale cu JWT de admin sau fără sesiune; `select=*` pe `source_connections`; `Accept-Profile: vault`; PATCH `credential_status`; POST cu `vault_secret_id`; contorul de apeluri pentru client și admin T2 | 401/403/406, tokenul nu apare; control pozitiv cu service role |
+
+## C. Funcția server `source-credentials`
+
+Teste unitare (`supabase/functions/source-credentials/handler.test.ts`, `npm run test:connectors`):
+- fără JWT, JWT invalid sau cheie service/anon folosită ca Bearer: 401;
+- strategist: 403; utilizator fără rol în tenantul conexiunii: 404 (nu confirmă existența);
+- răspunsul nu conține niciodată tokenul;
+- validarea: un singur apel, contorizat înainte de a fi făcut; 401/403 → `invalid`; 429 și 5xx nu schimbă starea; la 10/10 nu se apelează furnizorul.
+
+Verificat cap-coadă pe Supabase local (7 oct 2026), cu `scripts/set-source-token.ts`, login real și un token Clarity fals:
+- strategist și admin din alt tenant refuzați;
+- admin: setare, validare (403 de la Clarity → `invalid`), rotire;
+- audit `credential_set` / `credential_validated` / `credential_rotated` cu actorul;
+- `provider_api_calls` = 1;
+- tokenul nu apare în `audit_events` și nici în logurile funcției, Postgres sau PostgREST.
+
+**Rerulare:** `supabase functions serve source-credentials`, apoi pașii din README (secțiunea „Tokenul unei surse").
 
 ## Neverificat (7 oct 2026)
+
+- **Vault și logurile pe staging (hosted):** Drepturile lui `postgres` pe `vault.*` și absența tokenului din logurile Postgres sunt verificate doar local. Pe staging: repetă testul cap-coadă și caută tokenul de test în Logs Explorer.
+- **Două validări simultane** pot trece amândouă de verificarea bugetului (fără blocare). Impactul e de cel mult un apel peste buget; acceptat pentru pilot.
+- **Apeluri pierdute la contorizare:** dacă worker-ul cade după apelurile la Clarity și înainte de `provider_api_calls`, acele apeluri nu sunt contorizate.
 
 - **Exporturi și linkuri semnate:** nu există încă. La implementare: export generat server-side, cu verificare `has_brand_access` pentru utilizatorul cerut, link cu expirare scurtă, testat cu ID schimbat.
 - **Cache:** nu există. Cheia de cache trebuie să includă tenant, brand, rol, filtre și versiunea datasetului (spec cap. 26). Test: doi utilizatori, același URL, branduri diferite.
@@ -94,3 +147,10 @@ Scriptul (`scripts/test-security.sh`) face trei pași:
 | S2 | Scăzută | Un strategist poate adăuga competitori într-o versiune veche a setului (istoricul nu e înghețat). | Trigger pe `competitor_set_members`: insert permis doar în cea mai recentă versiune, sau coloană `published_at` după care setul e înghețat. |
 | S3 | Scăzută | Admin T1 poate insera membership pentru orice UUID; eroarea FK spune dacă UUID-ul există în `auth.users` (oracol de existență, dar UUID-urile nu se pot ghici). Poate adăuga și un utilizator din T2 fără acordul lui (fără acces la datele T2). | Membership-urile se creează doar prin funcția server de invitație (service role); scoatem INSERT pe `memberships` pentru `authenticated`. |
 | S4 | Medie (operațională) | Revocarea nu închide sesiunea. | Funcția server de revocare apelează `auth.admin.signOut(user, 'global')` după update; JWT expiry scurt (≤ 1 h). |
+
+## Constatări rezolvate
+
+| # | Data | Constatare | Rezolvare |
+|---|---|---|---|
+| R1 | 7 oct 2026 | `[auth.email] enable_signup = false` din `config.toml` (Prompt 1) dezactiva **complet** login-ul cu email, nu doar înregistrarea publică. Descoperit la testul cap-coadă. | `[auth.email] enable_signup = true`; înregistrarea publică rămâne blocată de `[auth] enable_signup = false` (verificat: `signup_disabled`). |
+| R2 | 7 oct 2026 | Funcția trigger nouă `private.prevent_update` primea EXECUTE pentru PUBLIC (revocarea din Prompt 1 acoperea doar funcțiile existente). Prinsă de garda A10. | `revoke` explicit în migrație. |
