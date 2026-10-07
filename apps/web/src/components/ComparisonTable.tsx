@@ -15,12 +15,20 @@ export interface ComparisonColumn {
   kind: 'brand' | 'competitor'
 }
 
+/**
+ * O celulă: o metrică din provider sau un motiv explicit pentru care nu există date (de ex. competitorii nu au
+ * sursă). Motivul nu e o stare de metrică: nu se fabrică un `MetricItem` pentru ce nu a venit de la server.
+ */
+export type ComparisonCell = MetricItem | { unavailable: string }
+
+const isMetric = (c: ComparisonCell | undefined): c is MetricItem => !!c && 'status' in c
+
 export interface ComparisonRow {
   key: string
   label: string
   /** Din registru. `neutral` = fără direcție bună: nu se marchează cea mai bună valoare. */
   direction?: MetricDirection
-  cells: Record<string, MetricItem>
+  cells: Record<string, ComparisonCell>
 }
 
 export interface ComparisonGroup {
@@ -50,7 +58,7 @@ interface ComparisonTableProps {
  */
 function bestKey(row: ComparisonRow, columns: ComparisonColumn[]): string | null {
   const cells = columns.map((c) => [c.key, row.cells[c.key]] as const)
-  if (cells.length < 2 || cells.some(([, m]) => !m || m.status !== 'ok' || m.value === null)) return null
+  if (cells.length < 2 || cells.some(([, m]) => !isMetric(m) || m.status !== 'ok' || m.value === null)) return null
   const direction = row.direction ?? 'higher_is_better'
   if (direction === 'neutral') return null
   const higher = direction === 'higher_is_better'
@@ -58,7 +66,7 @@ function bestKey(row: ComparisonRow, columns: ComparisonColumn[]): string | null
   let bestVal = 0
   let tie = false
   for (const [key, m] of cells) {
-    const v = m?.value
+    const v = isMetric(m) ? m.value : null
     if (v == null) continue
     if (best === null || (higher ? v > bestVal : v < bestVal)) {
       best = key
@@ -79,7 +87,7 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
     for (const r of g.rows) {
       for (const c of columns) {
         const m = r.cells[c.key]
-        const reason = m && m.value === null ? reasonFor(m) : null
+        const reason = m === undefined ? null : isMetric(m) ? (m.value === null ? reasonFor(m) : null) : m.unavailable
         if (reason && !reasons.includes(reason)) reasons.push(reason)
       }
     }
@@ -136,12 +144,13 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
                     <th scope="row" className="px-4 py-2.5 text-left font-medium text-text">{r.label}</th>
                     {columns.map((c) => {
                       const m = r.cells[c.key]
-                      const hasValue = !!m && m.value !== null
-                      const reason = m && !hasValue ? reasonFor(m) : null
+                      const metric = isMetric(m) ? m : null
+                      const shown = metric && metric.value !== null ? { item: metric, value: metric.value } : null
+                      const reason = m === undefined ? null : 'unavailable' in m ? m.unavailable : shown ? null : reasonFor(m)
                       const isBest = best === c.key
                       return (
                         <td key={c.key} className={cn('px-4 py-2.5 text-right tabular-nums', isBest && 'font-semibold text-accent-text')}>
-                          {hasValue ? (
+                          {shown ? (
                             <span className="inline-flex items-center justify-end gap-1.5">
                               {isBest && (
                                 <>
@@ -149,8 +158,8 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
                                   <span className="sr-only">Cea mai bună valoare:</span>
                                 </>
                               )}
-                              {formatMetricValue(m.value, m.unit)}
-                              {m.status !== 'ok' && <CoverageBadge state={coverageStateFor(m.status)} pct={coveragePercent(m.coverage)} />}
+                              {formatMetricValue(shown.value, shown.item.unit)}
+                              {shown.item.status !== 'ok' && <CoverageBadge state={coverageStateFor(shown.item.status)} pct={coveragePercent(shown.item.coverage)} />}
                             </span>
                           ) : (
                             <span title={reason ?? undefined} className="text-text-3">

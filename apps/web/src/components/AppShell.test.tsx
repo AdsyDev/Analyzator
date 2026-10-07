@@ -117,6 +117,18 @@ describe('AppShell', () => {
     expect(props.onBrandChange).toHaveBeenCalledWith('b2')
   })
 
+  it('meniul de brand are linkul „Clienți și site-uri" doar pentru agency_admin', async () => {
+    setup()
+    await userEvent.click(screen.getByRole('button', { name: 'Spațiu de brand' }))
+    expect(within(screen.getByRole('menu', { name: 'Spațiu de brand' })).getByRole('link', { name: 'Clienți și site-uri' })).toHaveAttribute('href', '/admin/clients')
+  })
+
+  it('clientul nu primește linkul „Clienți și site-uri" în meniul de brand', async () => {
+    setup({ user: client })
+    await userEvent.click(screen.getByRole('button', { name: 'Spațiu de brand' }))
+    expect(within(screen.getByRole('menu', { name: 'Spațiu de brand' })).queryByRole('link')).toBeNull()
+  })
+
   it('branduri neconectate: spune asta, fără meniu', () => {
     setup({ brands: notConnected('Nu există acces configurat.') })
     expect(screen.getByText('Niciun spațiu de brand disponibil')).toHaveAttribute('title', 'Nu există acces configurat.')

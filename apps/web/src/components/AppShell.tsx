@@ -244,6 +244,14 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
               value={brandId ?? ''}
               options={brandList.map((b) => ({ value: b.id, label: b.name, hint: b.category ?? undefined }))}
               onSelect={onBrandChange}
+              footer={
+                adminItems.some((i) => i.segment === 'clients') ? (
+                  <NavLink to={adminPath('clients')} className="mt-1 flex items-center gap-2 border-t border-border px-3 pb-1.5 pt-2.5 text-[13px] font-medium text-accent-text hover:underline">
+                    <BuildingsIcon size={15} aria-hidden="true" />
+                    Clienți și site-uri
+                  </NavLink>
+                ) : undefined
+              }
               triggerClassName="h-9 rounded-[10px] px-2.5 text-[13.5px] font-semibold hover:bg-neutral-soft"
               trigger={
                 <>

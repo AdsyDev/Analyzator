@@ -8,7 +8,8 @@ export function RequireAuth() {
   if (state.status === 'loading') {
     return <div role="status" aria-label="Se verifică sesiunea" className="grid min-h-screen place-items-center text-[13px] text-text-2">Se verifică sesiunea…</div>
   }
-  if (state.status === 'signed_out') {
+  // Fără sesiune sau cu parola încă nealeasă (invitație/resetare): spre ecranul de autentificare.
+  if (state.status === 'signed_out' || state.status === 'password_setup') {
     return <Navigate to="/login" replace state={{ from: { pathname: location.pathname, search: location.search } }} />
   }
   return <Outlet />

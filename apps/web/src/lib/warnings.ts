@@ -1,4 +1,4 @@
-import type { MetricItem, MetricWarning } from '../contracts'
+import type { MetricItem, MetricStatus, MetricWarning } from '../contracts'
 import { formatDate } from './format'
 import { sourceName } from './sources'
 
@@ -68,4 +68,12 @@ export function notesFor(m: MetricItem): string[] {
     if (text && !out.includes(text)) out.push(text)
   }
   return out
+}
+
+/**
+ * Motivul pentru o serie fără puncte. Doar `not_connected` are un text propriu: celelalte stări goale nu
+ * au cauză cunoscută la nivel de serie, deci nu inventăm una.
+ */
+export function trendReason(status: MetricStatus): string | null {
+  return status === 'not_connected' ? 'Sursa nu este conectată pentru acest brand. Nu afișăm valori estimate până la conectare.' : null
 }

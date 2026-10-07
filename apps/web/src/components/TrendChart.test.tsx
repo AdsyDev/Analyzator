@@ -53,6 +53,13 @@ describe('TrendChart', () => {
     expect(screen.queryByRole('tooltip')).toBeNull()
   })
 
+  it('golul seriei principale rămâne hașurat chiar dacă seria de comparație are date în acele zile', () => {
+    const primary: ChartSeries = { key: 'p', name: 'Clicks', color: 'var(--accent)', values: [10, null, null, 20, 30] }
+    const comparison: ChartSeries = { key: 'c', name: 'Comparație', color: 'var(--c1)', dashed: true, values: [8, 9, 10, 11, 12] }
+    render(<TrendChart title="Trafic" series={[primary, comparison]} labels={labels} />)
+    expect(screen.getAllByTestId('chart-gap')).toHaveLength(1)
+  })
+
   it('legenda ascunde și arată seriile', async () => {
     render(<TrendChart title="Trafic" series={series} labels={labels} />)
     const btn = screen.getByRole('button', { name: 'Sessions' })

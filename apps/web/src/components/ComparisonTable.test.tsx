@@ -102,4 +102,23 @@ describe('ComparisonTable', () => {
     expect(within(row).getByText('0')).toBeInTheDocument()
     expect(within(row).queryByText('N/A')).toBeNull()
   })
+
+  it('celulă cu motiv explicit (fără metrică): N/A cu motivul, nu o stare fabricată', () => {
+    const why = 'Datele competitorilor nu sunt încă disponibile.'
+    const g: ComparisonGroup[] = [{ name: 'AI', rows: [{ key: 'm', label: 'Mention Rate', cells: { brand: ok(30), c1: { unavailable: why }, c2: { unavailable: why } } }] }]
+    render(<ComparisonTable caption="c" columns={columns} groups={g} />)
+    const row = screen.getByRole('row', { name: /Mention Rate/ })
+    expect(within(row).getAllByText(/N\/A/)).toHaveLength(2)
+    expect(within(row).queryByText('Cea mai bună valoare:')).toBeNull()
+    expect(screen.getAllByText(`N/A: ${why}`)).toHaveLength(1)
+    expect(within(row).getByText('30 %')).toBeInTheDocument()
+  })
+
+  it('o celulă lipsă din rând nu strică tabelul și nu produce un câștigător', () => {
+    const g: ComparisonGroup[] = [{ name: 'AI', rows: [{ key: 'm', label: 'Mention Rate', cells: { brand: ok(30), c1: ok(10) } }] }]
+    render(<ComparisonTable caption="c" columns={columns} groups={g} />)
+    const row = screen.getByRole('row', { name: /Mention Rate/ })
+    expect(within(row).queryByText('Cea mai bună valoare:')).toBeNull()
+    expect(within(row).getAllByText('N/A')).toHaveLength(1)
+  })
 })

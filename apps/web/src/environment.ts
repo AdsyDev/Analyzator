@@ -1,4 +1,4 @@
-import { createSupabaseAuth } from './auth/supabaseAuth'
+import { createAuthSource, createUnconfiguredAuth } from './auth/createAuthSource'
 import type { AuthSource } from './auth/types'
 import type { DataProviders } from './contracts'
 import { createSupabaseProviders } from './data/supabase/providers'
@@ -8,14 +8,29 @@ export interface AppEnvironment {
   auth: AuthSource
 }
 
+async function createRealAuth(): Promise<AuthSource> {
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY
+  if (!url || !key) return createUnconfiguredAuth()
+  const { createBrowserSupabase } = await import('./data/supabase/client')
+  const { backend, link } = createBrowserSupabase(url, key)
+  return createAuthSource(backend, {
+    initialLink: link.kind,
+    initialNotice: link.notice,
+    redirectTo: `${window.location.origin}/login`,
+    // După alegerea parolei, tokenurile rămân în hash: le ștergem din URL.
+    onLinkConsumed: () => window.history.replaceState(null, '', window.location.pathname + window.location.search),
+  })
+}
+
 /**
  * Singurul punct în care se aleg providerii de date și sursa sesiunii. `__DESIGN_PREVIEW__` e
  * constantă la build (vite.config.ts): fără flag, ramura și importul dinamic dispar din bundle, deci
  * fixtures și utilizatorul fictiv nu ajung în producție sau staging.
  */
-export function createEnvironment(): Promise<AppEnvironment> {
+export async function createEnvironment(): Promise<AppEnvironment> {
   if (__DESIGN_PREVIEW__) {
     return import('./preview/environment').then((m) => m.createPreviewEnvironment())
   }
-  return Promise.resolve({ providers: createSupabaseProviders(), auth: createSupabaseAuth() })
+  return { providers: createSupabaseProviders(), auth: await createRealAuth() }
 }

@@ -116,3 +116,32 @@ EvidenceDrawer (sticlă): pagină, indicator, definiție, valoare, variație, su
 - Gărzile din UI sunt comoditate: autoritatea e RLS pe server. Un user client care cunoaște adresa unei pagini de administrare nu o poate folosi, fiindcă datele ei nu sunt expuse lui.
 - În previzualizare, utilizatorul e fictiv, cu rol comutabil din meniul contului („Vezi interfața ca"); la comutare, ecranele se reîncarcă cu datele noului rol.
 - „Conectează <sursă>" (Paid, Social) apare doar pentru `agency_admin` și duce la Surse. Pentru ceilalți nu există acțiune: nu există încă un canal real de cerere a conectării, iar designul arăta un toast care ar fi pretins o trimitere inexistentă.
+
+---
+
+# Diferențe față de design (UI-2: login, shell, Overview)
+
+Ce s-a implementat diferit de designul din `docs/design/reference/` și de ce. Nu sunt decizii de design noi: sunt lipsuri de date, de contract sau de canal.
+
+## Login
+
+| Design | Implementat | Motiv |
+|---|---|---|
+| „Link valabil 30 de minute" la resetare | „Valabil o perioadă limitată" | `supabase/config.toml` are `otp_expiry = 3600`; nu afirmăm o durată pe care serverul nu o garantează. |
+| Card cu inițiatorul invitației, rol și branduri | Doar emailul invitației, readonly | Supabase nu transmite aceste date prin linkul de invitație; nu există un contract pentru ele. |
+| Buton „Activează-ți contul" pe ecranul de autentificare | Text „Folosește linkul din emailul de invitație" | Invitația se acceptă din linkul din email, nu dintr-un formular public (fără signup). În previzualizare există „Vezi activarea invitației". |
+| Email de suport și linkuri Confidențialitate / Termeni | Emailul apare doar dacă `VITE_SUPPORT_EMAIL` e setat; fără linkuri | Nu există adresa confirmată și nici paginile; nu afișăm linkuri moarte. |
+| Card cu sticlă | Card solid | Regula de aur: sticla doar pe sidebar, topbar, drawere, modale, popovere. |
+| Indicator de putere a parolei | Orientativ; cerința minimă e 8 caractere | Serverul acceptă 6 (`minimum_password_length`); configurarea recomandă 8 sau mai mult. |
+
+## Overview
+
+| Design / spec cap. 12 | Implementat | Motiv |
+|---|---|---|
+| „Evoluții prioritare" (max 3 schimbări semnificative) | Lipsește | Nu există sursă de semnale, nici praguri configurate; calculul „semnificativ" nu are voie să stea în UI (regula 4). Cere un contract server. |
+| „AI Mention Rate pe engine selectat", „key events selectate" | Fără selectoare | Contractul nu are dimensiune de engine și nici selecție de key events. |
+| Un grafic cu serii indexate (prima zi = 100) | O serie pe rând, cu unitatea ei, plus comparația punctată | Indexarea e o transformare calculată în UI; spec cere „fiecare cu unitatea proprie". |
+| Oportunități cu „de ce" și prioritate | Titlu, responsabil, termen, status, „Deschide dovezile" | `InsightAction` din contract nu are motiv sau prioritate. Dovezile vin din analiza părinte. |
+| Comparație cu C1-C3 pe AI, SEO, social, listening | Brandul are valori unde există; competitorii sunt N/A cu motiv | Nu există o sursă de date pentru competitori (metrici sau API). Fără rând de social: nicio cheie în registru. |
+| Cardurile `ai_mention_rate`, `paid_spend`, `listening_mentions` cu valori | `not_connected`, fără definiție | Cheile nu sunt în `metric_definitions`; tooltipul spune că definiția nu e încă în registru. |
+| Etichete scrise de designer | `name_ro` din registru când există definiția | Registrul e sursa textelor; eticheta slotului din spec e doar rezerva. |

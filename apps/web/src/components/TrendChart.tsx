@@ -95,12 +95,14 @@ export function TrendChart({ title, series, labels, height = 240, format = 'int'
     return d.trim()
   }
 
-  // Goluri: zilele în care nicio serie vizibilă nu are date. Hașurate, cu textul „Fără date".
+  // Goluri: zilele fără date ale seriei principale (prima vizibilă), hașurate. Seria de comparație e secundară
+  // și nu ascunde golul principalei; fiecare serie își întrerupe oricum linia la `null`.
   const gaps: Array<{ left: number; width: number }> = []
   const half = n > 1 ? 50 / (n - 1) : 50
+  const primary = visible[0]
   let start = -1
   for (let i = 0; i < n; i++) {
-    const empty = visible.every((s) => s.values[i] === null || s.values[i] === undefined)
+    const empty = !primary || primary.values[i] === null || primary.values[i] === undefined
     if (empty && start < 0) start = i
     if (start >= 0 && (!empty || i === n - 1)) {
       const end = empty ? i : i - 1

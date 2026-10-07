@@ -6,7 +6,7 @@ import { App } from '../App'
 import type { AuthSource } from '../auth/types'
 import { failed, notConnected, ready, type Brand, type DataProviders, type Role } from '../contracts'
 import { createFixtureProviders } from '../data/fixtures/createFixtureProviders'
-import { createSupabaseAuth } from '../auth/supabaseAuth'
+import { createUnconfiguredAuth } from '../auth/createAuthSource'
 import { createSupabaseProviders } from '../data/supabase/providers'
 import type { AppEnvironment } from '../environment'
 import { createPreviewAuth } from '../preview/previewAuth'
@@ -46,7 +46,7 @@ describe('autentificare', () => {
   it('fără sesiune, orice rută protejată duce la /login, fără shell și fără cereri de date', async () => {
     const { providers } = setup('/brands/brand-urinal/overview?period=7d', { role: 'signed_out' })
     const spy = vi.spyOn(providers.sources, 'statuses')
-    expect(await screen.findByRole('heading', { name: 'Autentificare' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Bine ai revenit' })).toBeInTheDocument()
     expect(where()).toBe('/login')
     expect(screen.queryByRole('navigation', { name: 'Module' })).toBeNull()
     expect(spy).not.toHaveBeenCalled()
@@ -71,14 +71,14 @@ describe('autentificare', () => {
   })
 
   it('fără preview (producție), login-ul nu oferă intrare fictivă', async () => {
-    const auth = createSupabaseAuth()
+    const auth = createUnconfiguredAuth()
     render(
       <MemoryRouter initialEntries={['/brands/x/overview']}>
         <App env={{ providers: createSupabaseProviders(), auth }} />
         <Where />
       </MemoryRouter>,
     )
-    expect(await screen.findByText(/nu este încă disponibilă în această versiune/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Bine ai revenit' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Intră ca/ })).toBeNull()
   })
 
@@ -167,9 +167,9 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
   })
 
   it('modul cu surse conectate: spune adevărul despre ecran, fără „În curând"', async () => {
-    setup('/brands/brand-urinal/overview')
+    setup('/brands/brand-urinal/seo')
     expect(await screen.findByRole('heading', { name: 'Acest ecran nu este încă disponibil' })).toBeInTheDocument()
-    expect(screen.getByText(/sunt conectate pentru Urinal, dar ecranul Overview nu a fost livrat/)).toBeInTheDocument()
+    expect(screen.getByText(/sunt conectate pentru Urinal, dar ecranul SEO și Search nu a fost livrat/)).toBeInTheDocument()
     expect(screen.queryByText(/în curând/i)).toBeNull()
   })
 
