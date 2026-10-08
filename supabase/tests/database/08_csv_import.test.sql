@@ -68,7 +68,7 @@ select throws_ok(
 
 -- View-uri + metrics.compute -----------------------------------------------------------------------------------------
 create function pg_temp.def(p_key text) returns jsonb language sql as $$
-  select to_jsonb(d) from public.metric_definitions d where d.metric_key = p_key and d.version = 1
+  select to_jsonb(d) from public.metric_definitions_current d where d.metric_key = p_key
 $$;
 create function pg_temp.compute(p_key text, p_obs jsonb, p_confirmed int, p_start date, p_end date) returns jsonb language sql as $$
   select metrics.compute(jsonb_build_object(
@@ -79,9 +79,16 @@ create function pg_temp.compute(p_key text, p_obs jsonb, p_confirmed int, p_star
   )) -> 'metric'
 $$;
 
-select is((select count(*)::int from public.metric_definitions where metric_key ~ '^(google|meta|tiktok)_ads_(spend|impressions|clicks|conversions|cpc|cpa)$' or metric_key = 'mentions_count'),
-  19, 'M0: 18 de metrici paid (3 platforme × 6) + mentions_count în registru');
-select is((select lifecycle from public.metric_definitions where metric_key = 'meta_ads_spend'), 'draft', 'M0: costul e draft (unitatea monetară lipsește din contract)');
+select is((select count(*)::int from public.metric_definitions_current where metric_key ~ '^(google|meta|tiktok)_ads_(spend|impressions|clicks|conversions|cpc|cpa)$' or metric_key = 'mentions_count'),
+  19, 'M0: 18 de metrici paid (3 platforme × 6) + mentions_count în registru (versiunea curentă)');
+select results_eq(
+  $$ select unit::text collate "C", lifecycle::text collate "C", version from public.metric_definitions_current where metric_key in ('meta_ads_spend', 'meta_ads_cpc', 'meta_ads_cpa') order by metric_key $$,
+  $$ values ('currency'::text collate "C", 'active'::text collate "C", 2), ('currency', 'active', 2), ('currency', 'active', 2) $$,
+  'M0: costul, CPC și CPA sunt acum currency, active, versiunea 2');
+select results_eq(
+  $$ select unit::text collate "C", lifecycle::text collate "C" from public.metric_definitions where metric_key = 'meta_ads_spend' and version = 1 $$,
+  $$ values ('count'::text collate "C", 'draft'::text collate "C") $$, 'M0: versiunea 1 rămâne ca istoric (imutabilă)');
+select is((select count(*)::int from public.metric_definitions_current where unit = 'currency'), 9, 'M0: exact 9 metrici monetare (cost, CPC, CPA × 3 platforme)');
 
 select is(
   (select jsonb_agg(jsonb_build_object('date', date, 'value', value) order by date) from public.paid_metric_observations where metric_key = 'meta_ads_spend'),
@@ -90,13 +97,13 @@ select is(
 );
 select is(
   (pg_temp.compute('meta_ads_cpc',
-     (select jsonb_agg(jsonb_build_object('date', date, 'numerator', numerator, 'denominator', denominator)) from public.paid_metric_observations where metric_key = 'meta_ads_cpc' and date < '2026-10-07'),
+     (select jsonb_agg(jsonb_build_object('date', date, 'numerator', numerator, 'denominator', denominator, 'currency', currency)) from public.paid_metric_observations where metric_key = 'meta_ads_cpc' and date < '2026-10-07'),
      2, '2026-10-05', '2026-10-06') ->> 'value')::numeric,
   0.02::numeric, 'M2: CPC = Σcost / Σclicks = 20 / 1000, nu media ratelor (0,1 și 0,0111)'
 );
 select is(
   (pg_temp.compute('meta_ads_spend',
-     (select jsonb_agg(jsonb_build_object('date', date, 'value', value)) from public.paid_metric_observations where metric_key = 'meta_ads_spend'),
+     (select jsonb_agg(jsonb_build_object('date', date, 'value', value, 'currency', currency)) from public.paid_metric_observations where metric_key = 'meta_ads_spend'),
      2, '2026-10-05', '2026-10-07') ->> 'value')::numeric,
   20::numeric, 'M3: costul exclude ziua NULL și însumează 10 + 10'
 );
@@ -114,6 +121,82 @@ select is(
   (select count(distinct currency)::int from public.paid_metric_observations where date = '2026-10-08' and metric_key = 'meta_ads_spend'),
   2, 'M4: view-ul păstrează moneda per grup'
 );
+
+-- Moneda în răspuns (contractul v2): currency din lotul de import; fără monedă sau cu monede diferite → indisponibil.
+create function pg_temp.obs(p_key text, p_start date, p_end date) returns jsonb language sql as $$
+  select coalesce(jsonb_agg(jsonb_build_object('date', date, 'value', value, 'currency', currency) order by date), '[]')
+  from public.paid_metric_observations where metric_key = p_key and date between p_start and p_end
+$$;
+
+select is(
+  pg_temp.compute('meta_ads_spend', pg_temp.obs('meta_ads_spend', '2026-10-05', '2026-10-06'), 2, '2026-10-05', '2026-10-06') ->> 'currency',
+  'RON', 'M7: răspunsul poartă moneda lotului (currency = RON)');
+select is(
+  pg_temp.compute('meta_ads_spend', pg_temp.obs('meta_ads_spend', '2026-10-05', '2026-10-06'), 2, '2026-10-05', '2026-10-06') ->> 'unit',
+  'currency', 'M7: unit = currency');
+select is(
+  (pg_temp.compute('meta_ads_cpc',
+     (select jsonb_agg(jsonb_build_object('date', date, 'numerator', numerator, 'denominator', denominator, 'currency', currency)) from public.paid_metric_observations where metric_key = 'meta_ads_cpc' and date < '2026-10-07'),
+     2, '2026-10-05', '2026-10-06')) ->> 'currency',
+  'RON', 'M7: și CPC (rată) poartă moneda');
+select is(
+  pg_temp.compute('meta_ads_spend', '[{"date": "2026-10-05", "value": 10}]', 1, '2026-10-05', '2026-10-05') ->> 'status',
+  'unavailable', 'M7: valoare fără monedă în observații → unavailable (nu o sumă fără monedă)');
+select is(
+  pg_temp.compute('meta_ads_spend', '[{"date": "2026-10-05", "value": 10}]', 1, '2026-10-05', '2026-10-05') ->> 'value',
+  null, 'M7: și value rămâne null, nu 10');
+select is(
+  pg_temp.compute('meta_ads_spend', '[{"date": "2026-10-05", "value": 10, "currency": "RON"}, {"date": "2026-10-06", "value": 10, "currency": "EUR"}]', 2, '2026-10-05', '2026-10-06') ->> 'status',
+  'unavailable', 'M7: RON într-o zi și EUR în alta (perioadă cu monede diferite) → unavailable, nu 20');
+select is(
+  pg_temp.compute('meta_ads_spend', '[{"date": "2026-10-05", "value": 10, "currency": "RON"}, {"date": "2026-10-06", "value": 10, "currency": "EUR"}]', 2, '2026-10-05', '2026-10-06') ->> 'currency',
+  null, 'M7: iar moneda e null când nu se poate stabili');
+select ok(
+  exists (select 1 from jsonb_array_elements(metrics.compute(jsonb_build_object(
+    'definition', pg_temp.def('meta_ads_spend'), 'brand_id', '20000000-0000-0000-0000-000000000011', 'as_of_date', '2026-10-20',
+    'period', '{"start": "2026-10-05", "end": "2026-10-06", "kind": "custom"}'::jsonb, 'connection', '{"connected": true, "query_ok": true}'::jsonb,
+    'current', jsonb_build_object('observations', '[{"date": "2026-10-05", "value": 10, "currency": "RON"}, {"date": "2026-10-06", "value": 10, "currency": "EUR"}]'::jsonb, 'confirmed_days', 2, 'data_as_of', '2026-10-06')
+  )) -> 'warnings') w where w ->> 'code' = 'mixed_currency'),
+  'M7: avertisment mixed_currency');
+-- comparația în altă monedă se ignoră
+select is(
+  (pg_temp.compute('meta_ads_spend', '[{"date": "2026-10-05", "value": 10, "currency": "RON"}]', 1, '2026-10-05', '2026-10-05')) ->> 'comparison_value',
+  null, 'M7: fără observații de comparație, comparison_value rămâne null');
+select is(
+  (metrics.compute(jsonb_build_object(
+    'definition', pg_temp.def('meta_ads_spend'), 'brand_id', '20000000-0000-0000-0000-000000000011', 'as_of_date', '2026-10-20',
+    'period', '{"start": "2026-10-05", "end": "2026-10-05", "kind": "custom"}'::jsonb, 'connection', '{"connected": true, "query_ok": true}'::jsonb,
+    'current', jsonb_build_object('observations', '[{"date": "2026-10-05", "value": 10, "currency": "RON"}]'::jsonb, 'confirmed_days', 1, 'data_as_of', '2026-10-05'),
+    'comparison', jsonb_build_object('observations', '[{"date": "2026-10-04", "value": 99, "currency": "EUR"}]'::jsonb, 'confirmed_days', 1, 'data_as_of', '2026-10-04')
+  )) -> 'metric' ->> 'comparison_value'),
+  null, 'M7: comparația în altă monedă (EUR față de RON) nu se folosește');
+select is(
+  (metrics.compute(jsonb_build_object(
+    'definition', pg_temp.def('meta_ads_spend'), 'brand_id', '20000000-0000-0000-0000-000000000011', 'as_of_date', '2026-10-20',
+    'period', '{"start": "2026-10-05", "end": "2026-10-05", "kind": "custom"}'::jsonb, 'connection', '{"connected": true, "query_ok": true}'::jsonb,
+    'current', jsonb_build_object('observations', '[{"date": "2026-10-05", "value": 10, "currency": "RON"}]'::jsonb, 'confirmed_days', 1, 'data_as_of', '2026-10-05'),
+    'comparison', jsonb_build_object('observations', '[{"date": "2026-10-04", "value": 8, "currency": "RON"}]'::jsonb, 'confirmed_days', 1, 'data_as_of', '2026-10-04')
+  )) -> 'metric' ->> 'absolute_change')::numeric,
+  2::numeric, 'M7: aceeași monedă: comparația se folosește (10 − 8 = 2)');
+select is(
+  (metrics.compute(jsonb_build_object(
+    'definition', pg_temp.def('meta_ads_spend'), 'brand_id', '20000000-0000-0000-0000-000000000012', 'as_of_date', '2026-10-20',
+    'period', '{"start": "2026-10-05", "end": "2026-10-05", "kind": "custom"}'::jsonb, 'connection', '{"connected": false, "query_ok": false}'::jsonb,
+    'current', '{}'::jsonb)) -> 'metric') ->> 'currency',
+  null, 'M7: fără conexiune: currency null (nu o monedă inventată)');
+select is(
+  (pg_temp.compute('meta_ads_impressions', '[{"date": "2026-10-05", "value": 5}]', 1, '2026-10-05', '2026-10-05')) ->> 'currency',
+  null, 'M7: unitățile nemonetare au currency null');
+
+-- Instantaneul de la publicare (B7) primește moneda observațiilor paid.
+select is(
+  (select obs -> 0 ->> 'currency' from private.metric_observations('paid_metric_observations', 'sum', '10000000-0000-0000-0000-000000000001',
+     '20000000-0000-0000-0000-000000000011', 'meta_ads_spend', '2026-10-05', '2026-10-06', null)),
+  'RON', 'M8: private.metric_observations include moneda observațiilor paid');
+select is(
+  (select obs -> 0 ->> 'currency' from private.metric_observations('search_metric_observations', 'sum', '10000000-0000-0000-0000-000000000001',
+     '20000000-0000-0000-0000-000000000011', 'gsc_clicks', '2026-10-05', '2026-10-06', null)),
+  null, 'M8: sursele nemonetare nu primesc câmp currency');
 
 -- Mențiuni: pe zi în Europe/Bucharest; sentiment ca distribuție.
 select is(

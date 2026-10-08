@@ -1,5 +1,7 @@
 # Contract: răspunsul unei metrici
 
+**Versiunea 2** (8 oct 2026). Adaugă unitatea `currency` și câmpul `currency`. Istoric: v1 (7 oct 2026) avea unitățile `count`, `percent`, `seconds`, `position`, `score` și nu avea câmpul `currency`. Vezi „Istoricul versiunilor”.
+
 Sursa de adevăr: `docs/product/spec.md` cap. 26, cu deciziile din 7 oct 2026 (B2). Implementare: `metrics.compute` și `metrics.build_response` (migrația `20261007140000_metric_registry.sql`). Tipul TypeScript: `analytics/contracts/metric-response.ts`. Un test compară lista de câmpuri de mai jos cu tipul TS, iar testul pgTAP `06_metric_registry` o compară cu ieșirea SQL.
 
 Un răspuns are forma `{ data, meta }`. `data` e o listă de metrici; fiecare are `metric_key` plus câmpurile de mai jos.
@@ -9,7 +11,8 @@ Un răspuns are forma `{ data, meta }`. `data` e o listă de metrici; fiecare ar
 | Câmp | Tip | Semnificație |
 |---|---|---|
 | `value` | număr sau null | Valoarea pe perioadă. Null când nu se poate afișa o valoare: fără conexiune, eroare, numitor zero, zero neconfirmat. Null nu înseamnă 0. |
-| `unit` | `count`, `percent`, `seconds`, `position`, `score` | Unitatea din registru. Procentele sunt deja ×100 (2 = 2%). |
+| `unit` | `count`, `percent`, `seconds`, `position`, `score`, `currency` | Unitatea din registru. Procentele sunt deja ×100 (2 = 2%). `currency` = sumă de bani; moneda e în câmpul `currency`. |
+| `currency` | cod ISO 4217 sau null | Moneda lotului de import (de exemplu `RON`). **Obligatoriu (non-null) când `unit = currency` și `value` nu e null**; null pentru orice altă unitate. Dacă moneda nu se poate stabili (observații fără monedă) sau perioada are monede diferite, metrica e `unavailable`, cu `value` null. |
 | `numerator` | număr sau null | Pentru rate și medii ponderate: numărătorul agregat (de exemplu, clicks). |
 | `denominator` | număr sau null | Numitorul agregat (de exemplu, impressions sau sesiuni). |
 | `comparison_value` | număr sau null | Aceeași metrică pe perioada de comparație. |
@@ -56,9 +59,20 @@ Ordinea = gravitatea; se alege prima condiție îndeplinită.
 |---|---|---|
 | `unavailable`, `cannot_compute`, `insufficient_sample`, `stale`, `partial`, `base_zero` | warning | Condiții secundare (statusul principal e altul) |
 | `query_failed` | warning | Interogarea sursei a eșuat |
+| `mixed_currency`, `currency_missing` | warning | (v2) Motivul unei valori null la `unit = currency`: monede diferite în perioadă, respectiv observații fără monedă |
+| `comparison_currency_mismatch` | warning | (v2) Perioada de comparație are altă monedă (sau mai multe): comparația se ignoră |
 | `no_confirmed_data`, `interval_report_missing`, `no_observation`, `duplicate_observations`, `zero_denominator`, `zero_not_confirmed` | warning | Motivul unei valori null |
 | `excluded_rows` | warning | `detail = { reason, count }`, de exemplu `missing_weight`, `outside_period`, `interval_mismatch` |
 | `comparison_unavailable`, `comparison_partial` | warning | Comparația nu e calculabilă sau e parțială |
 | `incomplete_period` | info | MTD, YTD sau perioadă care include ziua curentă; `detail = "perioadă incompletă"` |
 | `aggregation_label` | info | Eticheta agregării din registru (de exemplu „medie în perioadă") |
 | `definition_draft` | info | Definiție neconfirmată pe date reale; `detail` = motivul |
+
+## Istoricul versiunilor
+
+| Versiune | Data | Schimbare |
+|---|---|---|
+| 1 | 7 oct 2026 | Câmpurile din spec cap. 26 (plus `data_as_of` și `coverage` pe metrică), 8 statusuri, unitățile `count`, `percent`, `seconds`, `position`, `score` |
+| 2 | 8 oct 2026 | Unitatea `currency` și câmpul `currency` (ISO 4217; null pentru unitățile nemonetare; obligatoriu pentru `unit = currency` cu `value` non-null). Costul, CPC și CPA (Google Ads, Meta Ads, TikTok Ads) trec de pe `count` provizoriu pe `currency` (versiunea 2 a definițiilor). `metrics.compute` emite mereu câmpul `currency`. |
+
+**În `analytics/contracts/metric-response.ts`** versiunea 2 este aditivă: `METRIC_FIELDS`, `MetricUnit` și `MetricResponse` rămân cele ale versiunii 1, iar versiunea 2 are `METRIC_FIELDS_V2`, `METRIC_UNITS_V2`, `MetricUnitV2`, `MetricResponseV2` și `metricInvariantViolations`. Motiv: `apps/web` verifică la compilare lista de câmpuri și caracterul exhaustiv al unităților; până când sesiunea UI trece pe v2 (și mută numele canonice pe v2), schimbarea numelor existente ar rupe compilarea lui `apps/web`. SQL-ul emite deja forma v2 (câmpul `currency` în plus nu deranjează consumatorii v1).

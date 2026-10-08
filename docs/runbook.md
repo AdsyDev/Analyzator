@@ -85,7 +85,7 @@ _De completat._
 - Un fișier respins: `import_batches.detected.errors` (antet / format) și `import_batch_rows` (`status = rejected`, `reason`).
 - Fișier identic după import → 409. Un reimport al aceleiași perioade, dintr-un fișier diferit, înlocuiește rândurile cu aceeași cheie.
 - Lot rămas în `validating` (proces întrerupt): se reia cu `confirm`; dacă a rămas blocat, `update import_batches set status = 'validated' where id = …` (service role), apoi reconfirmă.
-- Cost / CPC / CPA sunt `draft` până când contractul `MetricResponse` primește unitatea monetară (vezi `docs/decisions.md`, B6-9).
+- Cost / CPC / CPA au `unit = currency` din versiunea 2 a contractului `MetricResponse`; moneda vine din lotul de import (vezi `docs/decisions.md`, C-2 … C-5).
 
 
 ## Analize și farmacovigilență

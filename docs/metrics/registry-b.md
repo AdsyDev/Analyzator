@@ -10,27 +10,36 @@ Surse: import CSV asistat (paid, social, listening), cu aceleași tabele și con
 
 | metric_key | Versiune | Nume | Sursă | Unitate | Agregare | Pondere | Toleranță stale (zile) | Stare |
 |---|---|---|---|---|---|---|---|---|
-| `google_ads_spend` | 1 | Cost Google Ads | Google Ads | count | sum | — | 14 | draft |
+| `google_ads_spend` | 1 | Cost Google Ads | Google Ads | count | sum | — | 14 | draft (înlocuită de v2) |
 | `google_ads_impressions` | 1 | Impressions Google Ads | Google Ads | count | sum | — | 14 | active |
 | `google_ads_clicks` | 1 | Clicks Google Ads | Google Ads | count | sum | — | 14 | active |
 | `google_ads_conversions` | 1 | Conversii Google Ads | Google Ads | count | sum | — | 14 | active |
-| `google_ads_cpc` | 1 | CPC Google Ads | Google Ads | count | ratio | — | 14 | draft |
-| `google_ads_cpa` | 1 | CPA Google Ads | Google Ads | count | ratio | — | 14 | draft |
-| `meta_ads_spend` | 1 | Cost Meta Ads | Meta Ads | count | sum | — | 14 | draft |
+| `google_ads_cpc` | 1 | CPC Google Ads | Google Ads | count | ratio | — | 14 | draft (înlocuită de v2) |
+| `google_ads_cpa` | 1 | CPA Google Ads | Google Ads | count | ratio | — | 14 | draft (înlocuită de v2) |
+| `meta_ads_spend` | 1 | Cost Meta Ads | Meta Ads | count | sum | — | 14 | draft (înlocuită de v2) |
 | `meta_ads_impressions` | 1 | Impressions Meta Ads | Meta Ads | count | sum | — | 14 | active |
 | `meta_ads_clicks` | 1 | Clicks Meta Ads | Meta Ads | count | sum | — | 14 | active |
 | `meta_ads_conversions` | 1 | Conversii Meta Ads | Meta Ads | count | sum | — | 14 | active |
-| `meta_ads_cpc` | 1 | CPC Meta Ads | Meta Ads | count | ratio | — | 14 | draft |
-| `meta_ads_cpa` | 1 | CPA Meta Ads | Meta Ads | count | ratio | — | 14 | draft |
-| `tiktok_ads_spend` | 1 | Cost TikTok Ads | TikTok Ads | count | sum | — | 14 | draft |
+| `meta_ads_cpc` | 1 | CPC Meta Ads | Meta Ads | count | ratio | — | 14 | draft (înlocuită de v2) |
+| `meta_ads_cpa` | 1 | CPA Meta Ads | Meta Ads | count | ratio | — | 14 | draft (înlocuită de v2) |
+| `tiktok_ads_spend` | 1 | Cost TikTok Ads | TikTok Ads | count | sum | — | 14 | draft (înlocuită de v2) |
 | `tiktok_ads_impressions` | 1 | Impressions TikTok Ads | TikTok Ads | count | sum | — | 14 | active |
 | `tiktok_ads_clicks` | 1 | Clicks TikTok Ads | TikTok Ads | count | sum | — | 14 | active |
 | `tiktok_ads_conversions` | 1 | Conversii TikTok Ads | TikTok Ads | count | sum | — | 14 | active |
-| `tiktok_ads_cpc` | 1 | CPC TikTok Ads | TikTok Ads | count | ratio | — | 14 | draft |
-| `tiktok_ads_cpa` | 1 | CPA TikTok Ads | TikTok Ads | count | ratio | — | 14 | draft |
+| `tiktok_ads_cpc` | 1 | CPC TikTok Ads | TikTok Ads | count | ratio | — | 14 | draft (înlocuită de v2) |
+| `tiktok_ads_cpa` | 1 | CPA TikTok Ads | TikTok Ads | count | ratio | — | 14 | draft (înlocuită de v2) |
 | `mentions_count` | 1 | Mențiuni (Planable Listening) | Planable Listening | count | sum | — | 14 | active |
+| `google_ads_spend` | 2 | Cost Google Ads | Google Ads | currency | sum | — | 14 | active |
+| `google_ads_cpc` | 2 | CPC Google Ads | Google Ads | currency | ratio | — | 14 | active |
+| `google_ads_cpa` | 2 | CPA Google Ads | Google Ads | currency | ratio | — | 14 | active |
+| `meta_ads_spend` | 2 | Cost Meta Ads | Meta Ads | currency | sum | — | 14 | active |
+| `meta_ads_cpc` | 2 | CPC Meta Ads | Meta Ads | currency | ratio | — | 14 | active |
+| `meta_ads_cpa` | 2 | CPA Meta Ads | Meta Ads | currency | ratio | — | 14 | active |
+| `tiktok_ads_spend` | 2 | Cost TikTok Ads | TikTok Ads | currency | sum | — | 14 | active |
+| `tiktok_ads_cpc` | 2 | CPC TikTok Ads | TikTok Ads | currency | ratio | — | 14 | active |
+| `tiktok_ads_cpa` | 2 | CPA TikTok Ads | TikTok Ads | currency | ratio | — | 14 | active |
 
-Toate au `valid_from = 2026-10-01` și `min_sample = null`. Metricile monetare (cost, CPC, CPA) sunt `draft`: contractul `MetricResponse` nu are încă unitatea `currency`; până atunci `unit = count`, iar moneda se citește din lotul de import (`currency` în view).
+Versiunile 1 au `valid_from = 2026-10-01` și `min_sample = null`. **Versiunea 2** (cost, CPC, CPA; `valid_from = 2026-10-08`) trece pe `unit = currency`, `active`, odată cu versiunea 2 a contractului `MetricResponse`: răspunsul poartă câmpul `currency` (moneda lotului de import, ISO 4217). Versiunile 1 rămân (imutabile) ca istoric; `metric_definitions_current` o alege pe cea mai mare. Monede diferite în aceeași perioadă nu se însumează: metrica devine `unavailable` (`mixed_currency`); comparația în altă monedă se ignoră (`comparison_currency_mismatch`).
 
 Observațiile paid se grupează pe zi, monedă, configurație de atribuire și tip de click: dacă pentru aceeași zi există mai multe grupuri (monede sau atribuiri diferite), metrica devine indisponibilă (`duplicate_observations`), nu o sumă de lucruri incomparabile. Rândurile cu defalcare (`breakdown_signature <> 'none'`) nu intră în totaluri.
 
@@ -41,7 +50,7 @@ _Observații: view-urile `paid_metric_observations` / `mentions_metric_observati
 
 Costul Google Ads în perioadă, în moneda declarată la import; suma zilelor. Nu se însumează între monede.
 
-**Draft:** Unitatea monetară nu există în contractul MetricResponse (unit = count provizoriu); moneda vine din lotul de import și din view.
+**Versiunea 2 (8 oct 2026):** `unit = currency`; moneda vine din lotul de import și apare în `currency` (ISO 4217) în răspuns. Versiunea 1 (`unit = count`, draft) rămâne ca istoric.
 
 ### google_ads_impressions
 _Observații: view-urile `paid_metric_observations` / `mentions_metric_observations`; vezi `docs/contracts/csv-*.md`._
@@ -63,21 +72,21 @@ _Observații: view-urile `paid_metric_observations` / `mentions_metric_observati
 
 Cost / clicks pe totalurile perioadei (Google Ads), în moneda declarată; nu media ratelor zilnice.
 
-**Draft:** Unitatea monetară nu există în contractul MetricResponse (unit = count provizoriu); moneda vine din lotul de import și din view.
+**Versiunea 2 (8 oct 2026):** `unit = currency`; moneda vine din lotul de import și apare în `currency` (ISO 4217) în răspuns. Versiunea 1 (`unit = count`, draft) rămâne ca istoric.
 
 ### google_ads_cpa
 _Observații: view-urile `paid_metric_observations` / `mentions_metric_observations`; vezi `docs/contracts/csv-*.md`._
 
 Cost / conversii pe totalurile perioadei (Google Ads), pentru aceeași acțiune și configurație de atribuire; în moneda declarată.
 
-**Draft:** Unitatea monetară nu există în contractul MetricResponse (unit = count provizoriu); moneda vine din lotul de import și din view.
+**Versiunea 2 (8 oct 2026):** `unit = currency`; moneda vine din lotul de import și apare în `currency` (ISO 4217) în răspuns. Versiunea 1 (`unit = count`, draft) rămâne ca istoric.
 
 ### meta_ads_spend
 _Observații: view-urile `paid_metric_observations` / `mentions_metric_observations`; vezi `docs/contracts/csv-*.md`._
 
 Costul Meta Ads în perioadă, în moneda declarată la import; suma zilelor. Nu se însumează între monede.
 
-**Draft:** Unitatea monetară nu există în contractul MetricResponse (unit = count provizoriu); moneda vine din lotul de import și din view.
+**Versiunea 2 (8 oct 2026):** `unit = currency`; moneda vine din lotul de import și apare în `currency` (ISO 4217) în răspuns. Versiunea 1 (`unit = count`, draft) rămâne ca istoric.
 
 ### meta_ads_impressions
 _Observații: view-urile `paid_metric_observations` / `mentions_metric_observations`; vezi `docs/contracts/csv-*.md`._
@@ -99,21 +108,21 @@ _Observații: view-urile `paid_metric_observations` / `mentions_metric_observati
 
 Cost / clicks pe totalurile perioadei (Meta Ads), în moneda declarată; nu media ratelor zilnice.
 
-**Draft:** Unitatea monetară nu există în contractul MetricResponse (unit = count provizoriu); moneda vine din lotul de import și din view.
+**Versiunea 2 (8 oct 2026):** `unit = currency`; moneda vine din lotul de import și apare în `currency` (ISO 4217) în răspuns. Versiunea 1 (`unit = count`, draft) rămâne ca istoric.
 
 ### meta_ads_cpa
 _Observații: view-urile `paid_metric_observations` / `mentions_metric_observations`; vezi `docs/contracts/csv-*.md`._
 
 Cost / conversii pe totalurile perioadei (Meta Ads), pentru aceeași acțiune și configurație de atribuire; în moneda declarată.
 
-**Draft:** Unitatea monetară nu există în contractul MetricResponse (unit = count provizoriu); moneda vine din lotul de import și din view.
+**Versiunea 2 (8 oct 2026):** `unit = currency`; moneda vine din lotul de import și apare în `currency` (ISO 4217) în răspuns. Versiunea 1 (`unit = count`, draft) rămâne ca istoric.
 
 ### tiktok_ads_spend
 _Observații: view-urile `paid_metric_observations` / `mentions_metric_observations`; vezi `docs/contracts/csv-*.md`._
 
 Costul TikTok Ads în perioadă, în moneda declarată la import; suma zilelor. Nu se însumează între monede.
 
-**Draft:** Unitatea monetară nu există în contractul MetricResponse (unit = count provizoriu); moneda vine din lotul de import și din view.
+**Versiunea 2 (8 oct 2026):** `unit = currency`; moneda vine din lotul de import și apare în `currency` (ISO 4217) în răspuns. Versiunea 1 (`unit = count`, draft) rămâne ca istoric.
 
 ### tiktok_ads_impressions
 _Observații: view-urile `paid_metric_observations` / `mentions_metric_observations`; vezi `docs/contracts/csv-*.md`._
@@ -135,14 +144,14 @@ _Observații: view-urile `paid_metric_observations` / `mentions_metric_observati
 
 Cost / clicks pe totalurile perioadei (TikTok Ads), în moneda declarată; nu media ratelor zilnice.
 
-**Draft:** Unitatea monetară nu există în contractul MetricResponse (unit = count provizoriu); moneda vine din lotul de import și din view.
+**Versiunea 2 (8 oct 2026):** `unit = currency`; moneda vine din lotul de import și apare în `currency` (ISO 4217) în răspuns. Versiunea 1 (`unit = count`, draft) rămâne ca istoric.
 
 ### tiktok_ads_cpa
 _Observații: view-urile `paid_metric_observations` / `mentions_metric_observations`; vezi `docs/contracts/csv-*.md`._
 
 Cost / conversii pe totalurile perioadei (TikTok Ads), pentru aceeași acțiune și configurație de atribuire; în moneda declarată.
 
-**Draft:** Unitatea monetară nu există în contractul MetricResponse (unit = count provizoriu); moneda vine din lotul de import și din view.
+**Versiunea 2 (8 oct 2026):** `unit = currency`; moneda vine din lotul de import și apare în `currency` (ISO 4217) în răspuns. Versiunea 1 (`unit = count`, draft) rămâne ca istoric.
 
 ### mentions_count
 _Observații: view-urile `paid_metric_observations` / `mentions_metric_observations`; vezi `docs/contracts/csv-*.md`._

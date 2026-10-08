@@ -5,7 +5,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { METRIC_FIELDS, METRIC_STATUSES, META_FIELDS } from './metric-response.ts'
+import { METRIC_CONTRACT_VERSION, METRIC_FIELDS, METRIC_FIELDS_V2, METRIC_STATUSES, METRIC_UNITS_V2, META_FIELDS } from './metric-response.ts'
 
 const root = join(import.meta.dirname, '..', '..')
 const read = (path: string) => readFileSync(join(root, path), 'utf8')
@@ -25,8 +25,23 @@ function firstCodeColumn(markdown: string): string[] {
 describe('contractul MetricResponse', () => {
   const doc = read('docs/contracts/metric-response.md')
 
-  test('câmpurile metricii din doc = METRIC_FIELDS', () => {
-    assert.deepEqual(firstCodeColumn(section(doc, 'Câmpurile metricii')), [...METRIC_FIELDS])
+  test('câmpurile metricii din doc (versiunea 2) = METRIC_FIELDS_V2', () => {
+    assert.deepEqual(firstCodeColumn(section(doc, 'Câmpurile metricii')), [...METRIC_FIELDS_V2])
+  })
+
+  test('versiunea 2 = versiunea 1 plus câmpul currency', () => {
+    assert.deepEqual([...METRIC_FIELDS_V2].filter((f) => !(METRIC_FIELDS as readonly string[]).includes(f)), ['currency'])
+    assert.deepEqual([...METRIC_FIELDS].filter((f) => !(METRIC_FIELDS_V2 as readonly string[]).includes(f)), [])
+  })
+
+  test('unitățile din doc = METRIC_UNITS_V2', () => {
+    const row = section(doc, 'Câmpurile metricii').split('\n').find((l) => l.startsWith('| `unit` |'))!
+    const units = [...row.split('|')[2]!.matchAll(/`([a-z]+)`/g)].map((m) => m[1])
+    assert.deepEqual(units, [...METRIC_UNITS_V2])
+  })
+
+  test('versiunea contractului din doc = METRIC_CONTRACT_VERSION', () => {
+    assert.match(doc, new RegExp(`\\*\\*Versiunea ${METRIC_CONTRACT_VERSION}\\*\\*`))
   })
 
   test('statusurile din doc = METRIC_STATUSES, în aceeași ordine', () => {

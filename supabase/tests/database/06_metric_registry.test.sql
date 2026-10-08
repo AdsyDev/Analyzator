@@ -450,14 +450,14 @@ select is(
 
 select is(
   (select array_agg(k order by k) from jsonb_object_keys(pg_temp.run(pg_temp.def('gsc_ctr'), '[]') -> 'metric') k),
-  array['absolute_change', 'comparison_value', 'coverage', 'data_as_of', 'denominator', 'evidence_query',
+  array['absolute_change', 'comparison_value', 'coverage', 'currency', 'data_as_of', 'denominator', 'evidence_query',
         'numerator', 'relative_change', 'status', 'unit', 'value'],
-  'C1: metrica are exact câmpurile contractului'
+  'C1: metrica are exact câmpurile contractului (versiunea 2, cu currency)'
 );
 select is(
   (select array_agg(k order by k) from jsonb_object_keys(pg_temp.run(pg_temp.def('gsc_ctr'), '[]',
      '{"connection": {"connected": false}}') -> 'metric') k),
-  array['absolute_change', 'comparison_value', 'coverage', 'data_as_of', 'denominator', 'evidence_query',
+  array['absolute_change', 'comparison_value', 'coverage', 'currency', 'data_as_of', 'denominator', 'evidence_query',
         'numerator', 'relative_change', 'status', 'unit', 'value'],
   'C1: aceleași câmpuri și pentru not_connected'
 );
