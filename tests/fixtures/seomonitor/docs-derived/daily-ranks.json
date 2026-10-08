@@ -1,0 +1,76 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://api-docs.seomonitor.com/api-23256188.md (citită 2026-10-08)",
+  "_request": "GET /rank-tracker/v3.0/keywords/daily-ranks?campaign_id=102933&start_date=2026-10-05&end_date=2026-10-06&group_id=6001&limit=1000&offset=0",
+  "_note": "Schema oficială descrie rădăcina ca obiect (un keyword); exemplul e un obiect. Aici listă de obiecte. Documentația nu spune ce întoarce un keyword care nu se clasează: rank null/lipsă → NULL (not_ranked); 100 (= poziția maximă urmărită) → NULL (at_tracking_limit), valoarea originală păstrată.",
+  "payload": [
+    {
+      "keyword_id": 1001,
+      "keyword": "brand1a pret",
+      "ranking_data": {
+        "desktop": [
+          {
+            "date": "2026-10-05",
+            "rank": 4
+          },
+          {
+            "date": "2026-10-06",
+            "rank": 3
+          }
+        ],
+        "mobile": [
+          {
+            "date": "2026-10-05",
+            "rank": 5
+          },
+          {
+            "date": "2026-10-06",
+            "rank": 5
+          }
+        ]
+      }
+    },
+    {
+      "keyword_id": 1002,
+      "keyword": "brand1a farmacie",
+      "ranking_data": {
+        "desktop": [
+          {
+            "date": "2026-10-05",
+            "rank": 12
+          },
+          {
+            "date": "2026-10-06",
+            "rank": 9
+          }
+        ],
+        "mobile": [
+          {
+            "date": "2026-10-05",
+            "rank": null
+          },
+          {
+            "date": "2026-10-06"
+          }
+        ]
+      }
+    },
+    {
+      "keyword_id": 1003,
+      "keyword": "cumpar brand1a",
+      "ranking_data": {
+        "desktop": [
+          {
+            "date": "2026-10-05",
+            "rank": 100
+          },
+          {
+            "date": "2026-10-06",
+            "rank": 100
+          }
+        ],
+        "mobile": []
+      }
+    }
+  ]
+}

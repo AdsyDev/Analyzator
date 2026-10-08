@@ -58,6 +58,8 @@ export type SyncRunResult = {
   rows_written: number
   attempt_count: number
   errors: SyncRunError[]
+  /** reportCoverage: { dataset: { expected_days, covered_days, coverage } }. */
+  coverage?: Record<string, { expected_days: number; covered_days: number; coverage: number }>
 }
 
 /** Durata = finished_at − started_at (schema nu are coloană separată pentru durată). */
@@ -78,6 +80,7 @@ export async function finishSyncRun(
       rows_written: result.rows_written,
       attempt_count: result.attempt_count,
       errors: result.errors,
+      ...(result.coverage ? { coverage: result.coverage } : {}),
       finished_at: now().toISOString(),
     },
   )

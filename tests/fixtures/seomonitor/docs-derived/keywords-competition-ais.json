@@ -1,0 +1,28 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://api-docs.seomonitor.com/api-23256185.md (citită 2026-10-08)",
+  "_request": "GET /rank-tracker/v3.0/keywords/competition/ais?campaign_id=102933&…&ai_search_llm=openai",
+  "_note": "Schema oficială: rădăcina obiect (un keyword) cu competitors[]. Aici listă. Fără dată per observație: se înregistrează la end_date, window_days = lungimea intervalului.",
+  "payload": [
+    {
+      "keyword_id": 1001,
+      "keyword": "brand1a pret",
+      "competitors": [
+        {
+          "domain": "competitor.test",
+          "rank": 5,
+          "rank_trend": 2,
+          "any_brand_present": true,
+          "competitor_brand_present": true
+        },
+        {
+          "domain": "altcompetitor.test",
+          "rank": null,
+          "rank_trend": null,
+          "any_brand_present": true,
+          "competitor_brand_present": false
+        }
+      ]
+    }
+  ]
+}

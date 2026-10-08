@@ -1,0 +1,76 @@
+# Colectarea săptămânală SEOmonitor (API 3.0) pentru toate conexiunile active din source_connections.
+#
+# Programare: marți la 04:00 UTC = 06:00 ora României vara (EEST), 05:00 iarna (EET). Cron-ul GitHub e în UTC și nu
+# urmează ora de vară: vezi nota DST din docs/runbook.md. Reimportă ultimele 35 de zile (până ieri, Europe/Bucharest).
+#
+# Rularea programată e DEZACTIVATĂ până când variabila CONNECTOR_SEOMONITOR_ENABLED = "true"
+# (Settings → Secrets and variables → Actions → Variables). workflow_dispatch funcționează oricând.
+#
+# Secrete în environment-ul GitHub ales (implicit „staging"): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+# Tokenurile SEOmonitor NU sunt aici: stau în Supabase Vault și se citesc la rulare prin get_source_token.
+
+name: seomonitor-weekly
+
+on:
+  schedule:
+    - cron: '0 4 * * 2'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment GitHub cu secretele Supabase'
+        type: choice
+        options: [staging]
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  # O singură colectare odată: bugetul SEOmonitor (10.000 cereri/zi, 10/secundă) e comun per cont.
+  group: seomonitor-weekly
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: github.event_name == 'workflow_dispatch' || vars.CONNECTOR_SEOMONITOR_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    # Retry-urile pot aștepta 1 + 5 + 15 minute pe o cerere; lăsăm loc pentru câteva astfel de cazuri.
+    timeout-minutes: 180
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dependențe
+        run: npm ci
+
+      - name: Teste conector (fără rețea)
+        run: node --experimental-strip-types --test 'connectors/seomonitor/**/*.test.ts' 'connectors/shared/**/*.test.ts'
+
+      - name: Colectare SEOmonitor
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Lipsesc secretele SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY în environment-ul ${{ inputs.environment || 'staging' }}."
+            exit 1
+          fi
+          node --experimental-strip-types connectors/seomonitor/collect.ts | tee collect.log
+
+      - name: Rezumat
+        if: always()
+        run: |
+          {
+            echo "### SEOmonitor: $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo
+            echo '```'
+            [ -f collect.log ] && cat collect.log || echo "fără output"
+            echo '```'
+            echo
+            echo "Detalii: sync_runs (source = seomonitor, coverage), seomonitor_mapping_queue și provider_api_calls."
+          } >> "$GITHUB_STEP_SUMMARY"

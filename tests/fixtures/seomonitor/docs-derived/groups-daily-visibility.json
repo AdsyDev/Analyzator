@@ -1,0 +1,34 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://api-docs.seomonitor.com/api-23256191.md (citită 2026-10-08)",
+  "_request": "GET /rank-tracker/v3.0/groups/daily-visibility?campaign_id=102933&start_date=2026-10-05&end_date=2026-10-06&group_id=6001",
+  "_note": "Schema oficială descrie rădăcina ca obiect (o zi); aici listă de zile. Unitatea visibility NECONFIRMATĂ (exemplul oficial: 0.53; la campanii: 53.3). 0 = zero real; null = lipsă.",
+  "payload": [
+    {
+      "date": "2026-10-05",
+      "visibility": {
+        "desktop": 0.53,
+        "mobile": 0.51
+      },
+      "avg_rank": {
+        "desktop": 11.2,
+        "mobile": 12.3
+      },
+      "ai_search": {
+        "brand_presence_visibility": "18.5059",
+        "source_citation_visibility": "35.8322"
+      }
+    },
+    {
+      "date": "2026-10-06",
+      "visibility": {
+        "desktop": 0,
+        "mobile": null
+      },
+      "avg_rank": {
+        "desktop": 11.0,
+        "mobile": null
+      }
+    }
+  ]
+}

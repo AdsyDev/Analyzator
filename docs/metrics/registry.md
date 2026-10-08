@@ -64,7 +64,9 @@ Afișări în Google Search; suma zilelor.
 Poziția medie GSC, ponderată cu impressions (cum agregă GSC). Nu e rankul SEOmonitor; se afișează cu numele complet. O valoare mai mică e mai bună.
 
 ### seomonitor_visibility
-Visibility raportată de SEOmonitor: linie de observații și **medie în perioadă**, ponderată cu zilele acoperite de fiecare observație (o observație săptămânală valorează 7 zile). Nu se însumează. Eticheta „medie în perioadă" ajunge în răspuns (`meta.warnings`, `aggregation_label`). **Draft:** unitatea (procent sau scor) se confirmă pe payloadul SEOmonitor.
+_Sursa observațiilor SEOmonitor: view-ul `seomonitor_metric_observations` (vezi `docs/contracts/seomonitor.md`); dispozitivul se alege la citire._
+
+Visibility raportată de SEOmonitor: linie de observații și **medie în perioadă**, ponderată cu zilele acoperite de fiecare observație (o observație săptămânală valorează 7 zile). Nu se însumează. Eticheta „medie în perioadă" ajunge în răspuns (`meta.warnings`, `aggregation_label`). **Draft:** unitatea (procent sau scor) se confirmă pe payloadul SEOmonitor. Documentația e contradictorie: 0.53 la visibility pe grupuri, 53.3 la campanii.
 
 ### seomonitor_visibility_latest
 Ultima valoare de visibility până la sfârșitul perioadei; folosită pe cardul KPI. Eticheta: „ultima observație". **Draft**, din același motiv.

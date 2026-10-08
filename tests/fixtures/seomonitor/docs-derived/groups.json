@@ -1,0 +1,38 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://api-docs.seomonitor.com/api-23256182.md (citită 2026-10-08)",
+  "_request": "GET /rank-tracker/v3.0/groups?campaign_id=102933",
+  "_note": "Structură imbricată (folder → subgroups) ca în schema oficială; ID-urile și numele sunt sintetice. Documentația nu spune ce ID are folderul Brand în listă; brandul se determină prin group_id=-1 (Brand folder).",
+  "payload": [
+    {
+      "group_id": 5001,
+      "name": "Brand",
+      "type": "folder",
+      "subgroups": [
+        {
+          "group_id": 5002,
+          "name": "Brand core",
+          "type": "group"
+        }
+      ]
+    },
+    {
+      "group_id": 6001,
+      "name": "Categorie produs",
+      "type": "group",
+      "subgroups": []
+    },
+    {
+      "group_id": 7001,
+      "name": "Comun mai multor branduri",
+      "type": "group",
+      "subgroups": []
+    },
+    {
+      "group_id": 8001,
+      "name": "Grup nou, nemapat",
+      "type": "smart",
+      "subgroups": []
+    }
+  ]
+}

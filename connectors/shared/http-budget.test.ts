@@ -135,3 +135,40 @@ describe('fetchWithRetry', () => {
     assert.equal(f.calls.length, 0)
   })
 })
+
+describe('fetchWithRetry cu program explicit (SEOmonitor: 1, 5, 15 minute)', () => {
+  const delaysMs = [60_000, 300_000, 900_000]
+
+  test('patru încercări, așteptări 1/5/15 minute cu jitter, apoi eșec', async () => {
+    const f = fakeFetch([{ status: 503 }, { status: 503 }, { status: 502 }, { status: 500 }, { status: 200 }])
+    const s = noSleep()
+    const r = await fetchWithRetry(URL_, {}, {
+      budget: new CallBudget(10), fetch: f.fetch, sleep: s.sleep, now: () => 0,
+      delaysMs, maxDelayMs: 20 * 60_000, jitter: (ms) => ms * 1.1,
+    })
+    assert.equal(!r.ok && r.kind, 'server_error')
+    assert.equal(f.calls.length, 4)
+    assert.deepEqual(s.delays, [66_000, 330_000, 990_000])
+  })
+
+  test('Retry-After are prioritate față de program și nu primește jitter', async () => {
+    const f = fakeFetch([{ status: 429, headers: { 'Retry-After': '30' } }, { status: 200, body: '[]' }])
+    const s = noSleep()
+    await fetchWithRetry(URL_, {}, {
+      budget: new CallBudget(10), fetch: f.fetch, sleep: s.sleep, now: () => 0,
+      delaysMs, maxDelayMs: 20 * 60_000, jitter: (ms) => ms * 2,
+    })
+    assert.deepEqual(s.delays, [30_000])
+  })
+
+  for (const status of [401, 403]) {
+    test(`${status}: fără retry nici cu program explicit`, async () => {
+      const f = fakeFetch([{ status }, { status: 200 }])
+      const s = noSleep()
+      const r = await fetchWithRetry(URL_, {}, { budget: new CallBudget(10), fetch: f.fetch, sleep: s.sleep, delaysMs })
+      assert.equal(!r.ok && r.kind, 'access_denied')
+      assert.equal(f.calls.length, 1)
+      assert.deepEqual(s.delays, [])
+    })
+  }
+})

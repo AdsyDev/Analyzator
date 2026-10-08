@@ -55,6 +55,13 @@ export type RetryOptions = {
   baseDelayMs?: number
   /** Un Retry-After mai mare decât atât oprește retry-ul în loc să aștepte. */
   maxDelayMs?: number
+  /**
+   * Programul explicit de așteptare între încercări (de ex. 1, 5, 15 minute). Dacă e dat, maxAttempts devine
+   * delaysMs.length + 1. Retry-After, când există, are prioritate.
+   */
+  delaysMs?: number[]
+  /** Jitter aplicat întârzierilor din program (nu și lui Retry-After); întoarce întârzierea finală. */
+  jitter?: (delayMs: number) => number
   fetch?: FetchLike
   sleep?: Sleep
   now?: () => number
@@ -89,7 +96,9 @@ function failureFor(status: number): { kind: HttpFailureKind; message: string } 
 export async function fetchWithRetry(url: string, init: RequestInit, options: RetryOptions): Promise<HttpResult> {
   const {
     budget,
-    maxAttempts = 3,
+    delaysMs,
+    jitter = (ms: number) => ms,
+    maxAttempts = delaysMs ? delaysMs.length + 1 : 3,
     baseDelayMs = 1000,
     maxDelayMs = 60_000,
     fetch: doFetch = globalThis.fetch,
@@ -131,7 +140,8 @@ export async function fetchWithRetry(url: string, init: RequestInit, options: Re
 
     if (attempts >= maxAttempts) break
 
-    const delay = retryAfterMs ?? baseDelayMs * 2 ** (attempts - 1)
+    const scheduled = delaysMs ? delaysMs[attempts - 1] ?? delaysMs[delaysMs.length - 1]! : baseDelayMs * 2 ** (attempts - 1)
+    const delay = retryAfterMs ?? Math.max(0, Math.round(jitter(scheduled)))
     if (delay > maxDelayMs) {
       return {
         ok: false,

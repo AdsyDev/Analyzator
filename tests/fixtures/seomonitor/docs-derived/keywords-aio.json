@@ -1,0 +1,40 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://api-docs.seomonitor.com/api-23257517.md (citită 2026-10-08)",
+  "_request": "GET /rank-tracker/v3.0/keywords/aio?campaign_id=102933&…&group_id=6001&content_format=markdown&include_raw_content=true&limit=1000&offset=0",
+  "_note": "Câmpurile din schema oficială. rank = 100 înseamnă „not present” (documentat), deci se stochează NULL cu valoarea originală păstrată. Paginare: limit numără keywords scanate; se avansează cu limit până la o pagină goală.",
+  "payload": [
+    {
+      "keyword_id": "1001",
+      "keyword": "brand1a pret",
+      "sge_widget_data": {
+        "desktop": {
+          "2026-10-05": {
+            "date": "2026-10-05",
+            "links": [
+              "https://www.brand1a.test/produs"
+            ],
+            "brand_presence": true,
+            "brand_presence_any": true,
+            "rank": 3,
+            "content": "Răspuns AIO **desktop**.",
+            "raw_content": "<p>Răspuns AIO desktop.</p>"
+          }
+        },
+        "mobile": {
+          "2026-10-05": {
+            "date": "2026-10-05",
+            "links": [
+              "https://competitor.test/z"
+            ],
+            "brand_presence": false,
+            "brand_presence_any": true,
+            "rank": 100,
+            "content": "Răspuns AIO mobile.",
+            "raw_content": "<p>Răspuns AIO mobile.</p>"
+          }
+        }
+      }
+    }
+  ]
+}

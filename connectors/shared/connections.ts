@@ -24,6 +24,9 @@ type ConnectionRow = {
 
 export type SkippedConnection = { id: string; reason: string }
 
+/** Conexiune la nivel de client (un cont de furnizor pentru mai multe branduri), de ex. SEOmonitor. */
+export type TenantConnection = Omit<SourceConnection, 'brand_id'> & { brand_id: string | null }
+
 /**
  * Conexiunile de colectat pentru un furnizor: active, cu brand și cu token.
  * Cele fără token sau cu token invalid sunt întoarse separat, ca să fie raportate.
@@ -31,19 +34,31 @@ export type SkippedConnection = { id: string; reason: string }
 export async function loadActiveConnections(
   db: Db,
   provider: string,
-): Promise<{ connections: SourceConnection[]; skipped: SkippedConnection[] }> {
+  options?: { requireBrand?: true },
+): Promise<{ connections: SourceConnection[]; skipped: SkippedConnection[] }>
+export async function loadActiveConnections(
+  db: Db,
+  provider: string,
+  options: { requireBrand: false },
+): Promise<{ connections: TenantConnection[]; skipped: SkippedConnection[] }>
+export async function loadActiveConnections(
+  db: Db,
+  provider: string,
+  options: { requireBrand?: boolean } = { requireBrand: true },
+): Promise<{ connections: TenantConnection[]; skipped: SkippedConnection[] }> {
+  const requireBrand = options.requireBrand !== false
   if (!/^[a-z0-9_]+$/.test(provider)) throw new Error(`provider invalid: ${provider}`)
   const rows = await db.select<ConnectionRow>(
     'source_connections',
     `select=id,tenant_id,brand_id,provider,external_account_id,status,credential_status&provider=eq.${provider}&status=eq.active`,
   )
-  const connections: SourceConnection[] = []
+  const connections: TenantConnection[] = []
   const skipped: SkippedConnection[] = []
   for (const row of rows) {
     if (row.provider !== provider || row.status !== 'active') {
       throw new Error(`Conexiunea ${row.id} nu corespunde filtrului; opresc rularea.`)
     }
-    if (!row.brand_id) {
+    if (!row.brand_id && requireBrand) {
       skipped.push({ id: row.id, reason: 'fără brand (colectarea e per brand)' })
     } else if (row.credential_status === 'missing') {
       skipped.push({ id: row.id, reason: 'fără token configurat' })
@@ -84,7 +99,8 @@ export async function recordProviderCalls(
   db: Db,
   entry: {
     tenant_id: string
-    brand_id: string
+    /** null pentru conexiunile la nivel de client (de ex. SEOmonitor). */
+    brand_id: string | null
     source_connection_id: string
     call_date_utc: string
     purpose: 'collect' | 'validate'

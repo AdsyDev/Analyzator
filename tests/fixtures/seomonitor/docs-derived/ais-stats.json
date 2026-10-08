@@ -1,0 +1,47 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://api-docs.seomonitor.com/api-43153088.md (citită 2026-10-08)",
+  "_request": "GET /rank-tracker/v3.0/ais/stats?campaign_id=102933&start_date=…&end_date=…&group_id=6001",
+  "_note": "Fără gpt_provider: toate motoarele activate (documentat). Lista engines decide ce motoare se colectează: un motor neactivat întoarce gol sau zero, nu eroare.",
+  "payload": {
+    "engines": [
+      {
+        "engine": "openai",
+        "provider_id": 1,
+        "display_name": "ChatGPT",
+        "enabled": true,
+        "active": true,
+        "last_crawl_date": "2026-10-05",
+        "has_data": true
+      },
+      {
+        "engine": "gemini",
+        "provider_id": 2,
+        "display_name": "Gemini",
+        "enabled": false,
+        "active": false,
+        "last_crawl_date": null,
+        "has_data": false
+      }
+    ],
+    "engines_enabled_count": 1,
+    "stats": {
+      "openai": {
+        "presence_rate": 1.11,
+        "presence_trend": -6.5,
+        "source_citations": 3.05,
+        "source_citations_trend": -0.49,
+        "avg_position": 5,
+        "avg_position_trend": 1.2,
+        "sentiment": {
+          "positive": 80,
+          "neutral": 20,
+          "negative": 0
+        },
+        "missing_data": false,
+        "missing_data_reason": null,
+        "calculated_from": "2026-08-27"
+      }
+    }
+  }
+}

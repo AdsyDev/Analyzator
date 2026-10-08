@@ -1,0 +1,28 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://api-docs.seomonitor.com/api-23256190.md (citită 2026-10-08)",
+  "_request": "GET /rank-tracker/v3.0/keywords/daily-ranks/ais?campaign_id=102933&…&ai_search_llm=openai",
+  "_note": "Ranguri AI Search săptămânale (window_days = 7). keyword_id e string în schema oficială.",
+  "payload": [
+    {
+      "keyword_id": "1001",
+      "keyword": "brand1a pret",
+      "ranking_data": [
+        {
+          "date": "2026-09-28",
+          "rank": 5,
+          "any_brand_present": true,
+          "my_brand_present": true,
+          "sentiment_of_my_brand": "positive"
+        },
+        {
+          "date": "2026-10-05",
+          "rank": null,
+          "any_brand_present": true,
+          "my_brand_present": false,
+          "sentiment_of_my_brand": null
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://api-docs.seomonitor.com/api-23256157.md (citită 2026-10-08)",
+  "_request": "GET /dashboard/v3.0/campaigns/tracked?company_id=20077&limit=100&offset=0",
+  "_note": "Forma din schema și exemplul oficial; valorile sunt sintetice. visibility.*.latest: unitate neconfirmată (exemplul oficial are 53.3).",
+  "payload": [
+    {
+      "campaign_info": {
+        "id": 102933,
+        "name": "brand1a.test",
+        "company": "Agenție test",
+        "company_id": 20077,
+        "date_created": "2021-12-17",
+        "keywords_count": 4,
+        "campaign_currency": "RON",
+        "analytics_currency": "RON",
+        "domain": "https://www.brand1a.test",
+        "location": "Romania",
+        "mrr": 0,
+        "max_tracked_position_desktop": 100,
+        "max_tracked_position_mobile": 100,
+        "primary_device": "desktop",
+        "workspace": {
+          "id": 1,
+          "name": "Default"
+        }
+      },
+      "visibility": {
+        "desktop": {
+          "latest": 53.3,
+          "trend_7days": -0.5,
+          "trend_30days": 1.2
+        },
+        "mobile": {
+          "latest": 52.3,
+          "trend_7days": -0.7,
+          "trend_30days": 1.3
+        },
+        "blended": {
+          "latest": 52.8,
+          "trend_7days": -0.6,
+          "trend_30days": 1.25
+        }
+      },
+      "multiple_locations": [],
+      "health_status": "average",
+      "objective_status": {
+        "status": "on_track",
+        "actual_sessions": 10,
+        "estimated_sessions": 10,
+        "performance": 1,
+        "start_month": "Nov, 2025",
+        "end_month": "Nov, 2026"
+      },
+      "reporting_status": "pending",
+      "account_manager": "Test"
+    }
+  ]
+}

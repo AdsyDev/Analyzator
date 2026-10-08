@@ -1,0 +1,63 @@
+{
+  "_header": "derivat din documentație, neconfirmat",
+  "_source": "https://api-docs.seomonitor.com/api-23256180.md (citită 2026-10-08)",
+  "_request": "GET /rank-tracker/v3.0/keywords?campaign_id=102933&start_date=…&end_date=…&group_id=-1&limit=1000&offset=0",
+  "_note": "group_id = -1 înseamnă Brand folder (documentat). Keywords listate aici sunt branded.",
+  "payload": [
+    {
+      "keyword_id": 1001,
+      "keyword": "brand1a pret",
+      "main_keyword_id": "",
+      "search_intent": "commercial",
+      "labels": "",
+      "groups": "5002",
+      "serp_data": {
+        "desktop": [],
+        "mobile": [],
+        "percentage_clicks": "77"
+      },
+      "search_data": {
+        "search_volume": 1900,
+        "year_over_year": 1.1,
+        "monthly_searches": [
+          {
+            "month": "September",
+            "year": 2026,
+            "search_volume": 1900
+          }
+        ]
+      },
+      "ranking_data": {
+        "desktop": {
+          "rank": 4,
+          "trend": 0,
+          "trend_impact": 0,
+          "best_rank": {
+            "rank": 4,
+            "date": "2026-09-01"
+          }
+        },
+        "mobile": {
+          "rank": 5,
+          "trend": 0,
+          "trend_impact": 0,
+          "best_rank": {
+            "rank": 5,
+            "date": "2026-09-01"
+          }
+        }
+      },
+      "landing_pages": {
+        "desktop": {
+          "current": "https://www.brand1a.test/produs",
+          "desired": ""
+        },
+        "mobile": {
+          "current": "https://www.brand1a.test/produs",
+          "desired": ""
+        }
+      },
+      "last_updated": "2026-10-07"
+    }
+  ]
+}

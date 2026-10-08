@@ -18,7 +18,8 @@
     "dev:preview": "npm --prefix apps/web run dev:preview",
     "build:staging": "npm --prefix apps/web run build:staging",
     "build:preview": "npm --prefix apps/web run build:preview",
-    "test:integration": "scripts/test-integration.sh"
+    "test:integration": "scripts/test-integration.sh",
+    "collect:seomonitor": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/seomonitor/collect.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
