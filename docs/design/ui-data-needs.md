@@ -147,6 +147,23 @@ Doar citire. Nu există tabele pentru analize și acțiuni în `supabase/migrati
 
 | Metodă | Tabele | Note |
 |---|---|---|
-| `competitorVersions(brandId)` | `competitor_sets` + `competitor_set_members` | Doar citire. Versiunea în vigoare = cea mai mare `effective_from <= azi`. Crearea unei versiuni cere două insert-uri; fără funcție atomică ar putea lăsa un set fără membri (imutabil), deci nu o expunem din UI. |
+| `competitorVersions(brandId)` | `competitor_sets` + `competitor_set_members` | Citire. Versiunea în vigoare = cea mai mare `effective_from <= azi`. **Scriere disponibilă server-side** (UI încă nelegat): vezi „Versiune nouă” mai jos. |
 | `aliases(brandId)` | — | Nu există tabel: `not_connected` cu motiv. |
 | `seomonitorMappings()` | `seomonitor_group_mappings` | Doar citire; ultima versiune în vigoare per (campanie, grup). **Depinde de migrația `20261008120000_seomonitor.sql`, încă necomisă în repo la data scrierii.** |
+
+**Versiune nouă a setului de competitori — funcția `create_competitor_set_version`** (migrația `20261009000100_competitor_set_version_fn.sql`; contractul complet și erorile în `docs/security-tests.md`, E4).
+
+```ts
+const { data, error } = await supabase.rpc('create_competitor_set_version', {
+  p_brand_id: brandId,                 // uuid
+  p_effective_from: '2026-11-01',      // ISO, ≥ azi (Europe/Bucharest), unică per brand
+  p_note: 'Intră Competitor X',        // text | null, max 1000
+  p_members: [{ name: 'Alfa', domain: 'alfa.ro', color: '#A1B2C3' }], // 1–10; domain și color opționale
+})
+// data: [{ competitor_set_id, version, effective_from, member_count }]
+```
+
+- Tranzacție unică: set + membri + audit, sau nimic. Rolul (agency_admin sau strategist cu acces la brand) este verificat în funcție și de RLS; UI-ul poate ascunde formularul pentru ceilalți, dar nu se bazează pe asta.
+- `error.message` este în română și se poate afișa direct; `error.code`: `42501` (drept), `22023` (validare, mesaje „Membrul N: …”), `23505` (dată deja folosită).
+- Domeniul se stochează normalizat (fără schemă și cale); formularul poate afișa valoarea normalizată din citirea ulterioară.
+- Formularul „Versiune nouă” cu previzualizarea diferențelor față de versiunea curentă rămâne un task separat în `apps/web`.
