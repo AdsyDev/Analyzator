@@ -1,0 +1,119 @@
+{
+  "_header": "derivat din documentație, neconfirmat (nu e un payload real; forma urmează documentația GA4 Data API v1beta / Search Console API, citite 2026-10-08)",
+  "_request": "POST properties/123456789:runReport {dimensions:[date,eventName], metrics:[keyEvents]}",
+  "payload": {
+    "dimensionHeaders": [
+      {
+        "name": "date"
+      },
+      {
+        "name": "eventName"
+      }
+    ],
+    "metricHeaders": [
+      {
+        "name": "keyEvents",
+        "type": "TYPE_INTEGER"
+      }
+    ],
+    "rows": [
+      {
+        "dimensionValues": [
+          {
+            "value": "20261005"
+          },
+          {
+            "value": "generate_lead"
+          }
+        ],
+        "metricValues": [
+          {
+            "value": "5"
+          }
+        ]
+      },
+      {
+        "dimensionValues": [
+          {
+            "value": "20261005"
+          },
+          {
+            "value": "contact"
+          }
+        ],
+        "metricValues": [
+          {
+            "value": "3"
+          }
+        ]
+      },
+      {
+        "dimensionValues": [
+          {
+            "value": "20261006"
+          },
+          {
+            "value": "generate_lead"
+          }
+        ],
+        "metricValues": [
+          {
+            "value": "8"
+          }
+        ]
+      },
+      {
+        "dimensionValues": [
+          {
+            "value": "20261006"
+          },
+          {
+            "value": "contact"
+          }
+        ],
+        "metricValues": [
+          {
+            "value": "4"
+          }
+        ]
+      },
+      {
+        "dimensionValues": [
+          {
+            "value": "20261007"
+          },
+          {
+            "value": "generate_lead"
+          }
+        ],
+        "metricValues": [
+          {
+            "value": "6"
+          }
+        ]
+      },
+      {
+        "dimensionValues": [
+          {
+            "value": "20261007"
+          },
+          {
+            "value": "contact"
+          }
+        ],
+        "metricValues": [
+          {
+            "value": "2"
+          }
+        ]
+      }
+    ],
+    "rowCount": 6,
+    "metadata": {
+      "dataLossFromOtherRow": false,
+      "currencyCode": "RON",
+      "timeZone": "Europe/Bucharest",
+      "subjectToThresholding": false
+    }
+  }
+}

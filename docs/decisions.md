@@ -1,0 +1,23 @@
+# Decizii luate în rularea neasistată
+
+Fiecare intrare: data, task-ul, opțiunile și alegerea. Alegerea urmează varianta conservatoare din `CLAUDE.md`
+(fără date demo, fără secrete, `tenant_id` peste tot, `null` distinct de zero). Deciziile de produs rămân ale echipei:
+orice intrare de aici poate fi schimbată printr-o migrație sau o modificare de cod nouă.
+
+## B5 — GA4 și Search Console (2026-10-08)
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| B5-1 | Unde stă service account-ul și cum îl găsește conectorul | (a) JSON copiat pe fiecare conexiune de brand; (b) o conexiune la nivel de tenant; (c) coloană nouă de legătură pe `source_connections` | **(b)** Conexiune `google_service_account` cu `brand_id` NULL, un singur JSON per tenant în Vault. Conexiunile `ga4` și `gsc` (per brand) păstrează doar `property_id` / `site_url` și nu au token propriu. Conectorul leagă prin `tenant_id`. Nu modifică `get_source_token` (funcție din garda de securitate E1) și nu cere coloane noi. |
+| B5-2 | Ce înseamnă `not_connected` | (a) un `sync_runs` cu status special; (b) rezultat fără nicio scriere | **(b)** Enum-ul `sync_status` nu are `not_connected`. Conectorul întoarce `not_connected` cu motivul, fără `sync_run`, fără cereri, fără excepție. Statusul surselor din B8 se calculează din `source_connections` și `sync_runs`. |
+| B5-3 | `activeUsers` din raportul pe zile | (a) îl omit din `web_daily`; (b) îl păstrez în coloană explicit nesumabilă | **(b)** `web_daily.active_users_not_additive`, fără nicio apariție în view-urile de observații. Metrica `ga4_active_users` vine doar din `web_active_users_interval`. |
+| B5-4 | Sursa lui `ga4_key_events` | (a) `web_daily.key_events`; (b) `web_key_events` | **(b)** Totalul zilei pe `eventName` nu depinde de dimensiunile de landing page (unde `keyEvents` poate fi incompatibil). `web_daily.key_events` rămâne pentru defalcare. |
+| B5-5 | Zi fără rânduri în răspuns | (a) zero; (b) neconfirmată | **(b)** GA4 omite rândurile cu toate metricile 0 (`keepEmptyRows: false`) și GSC omite zilele fără date. Acoperirea (`sync_runs.coverage`) numără zilele cu rânduri; un zero real nu se afirmă fără acoperire confirmată. De revăzut după primele rulări reale. |
+| B5-6 | Combinații incompatibile (`checkCompatibility`) | (a) oprește tot; (b) elimină metricile incompatibile; (c) ignoră | **(b)** pentru metrici (rămân NULL, eroare `ga4_incompatible_metrics`); raportul se sare dacă o **dimensiune** e incompatibilă (`ga4_incompatible_dimensions`). Run-ul devine `partial`. |
+| B5-7 | Intervalele pentru utilizatori activi | (a) doar săptămâna; (b) presetările din spec cap. 9 + comparațiile | **(b)** Ultima săptămână completă (luni–duminică), ultimele 4 și 13 săptămâni, luna calendaristică precedentă, plus perioada anterioară de aceeași lungime pentru fiecare. Un interval personalizat rămâne `unavailable` (regula `interval_report_only`). |
+| B5-8 | Fusuri orare | — | GA4: fusul de pe conexiune (cel al proprietății), verificat cu `metadata.timeZone` din răspuns; o diferență e eroare `timezone_mismatch`, iar rândurile păstrează fusul din răspuns. GSC: întotdeauna `America/Los_Angeles` (documentația: datele sunt în PT). |
+| B5-9 | Search Console: stare date și volum | — | `dataState = final` (fără zilele incomplete). `search_queries` e separat de totaluri (GSC exclude interogările anonimizate). Plafon de 40 de pagini × 25.000 de rânduri la query × page; peste el, `gsc_truncated` și run `partial`. |
+| B5-10 | Reconcilierea | — | GA4: totalul sursei = raport fără dimensiuni pe fereastra de 35 de zile; GSC: raport doar pe `date`. „Totalul nostru” = suma rândurilor scrise în rularea curentă. Toleranță 1% (GA4) și 0,5% (GSC); peste toleranță, eroarea `reconciliation_mismatch` și run `partial`. Intervalul, fusul sau proprietatea diferite dau `incomparable`. |
+| B5-11 | `provider_api_calls` pentru Google | — | Se înregistrează apelurile, pentru observabilitate. Google nu are un buget zilnic de apeluri ca Clarity, deci nu se aplică nicio limită. |
+| B5-12 | Biblioteci | — | `@google-analytics/data` (GA4), `@googleapis/searchconsole` și `google-auth-library` (autentificare). Clienții sunt interfețe injectate, deci testele nu au nevoie de acces real. |
+| B5-13 | Neconfirmat în documentație | — | Numele metricilor și dimensiunilor GA4 (`keyEvents`, `sessionSourceMedium` etc.) sunt cele din cerință; pagina de schemă GA4 a fost trunchiată la citire și nu le-am putut verifica una câte una. Documentația nu spune în ce fus e dimensiunea `date` (confirmat doar pentru `hour`/`minute`); presupunem fusul proprietății. Fixtures poartă header-ul „derivat din documentație, neconfirmat”. |

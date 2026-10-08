@@ -40,18 +40,26 @@ Toate au `valid_from = 2026-10-01` și `min_sample = null`: nivelul A nu are în
 ## Detalii
 
 ### ga4_sessions
+_Observații: view-ul `web_metric_observations` (din `web_daily`); vezi `docs/contracts/google.md`._
+
 Numărul de sesiuni GA4 în perioadă; suma zilelor.
 
 ### ga4_active_users
+_Observații: view-ul `web_active_users_observations` (din `web_active_users_interval`, un raport per interval); vezi `docs/contracts/google.md`._
+
 Utilizatori activi GA4 din raportul pe **intervalul întreg**. Zilele nu se însumează: același utilizator activ în mai multe zile ar fi numărat de mai multe ori. Fără raport pe interval, `unavailable`.
 
 ### ga4_engaged_sessions
 Sesiunile GA4 cu implicare (engaged sessions); suma zilelor.
 
 ### ga4_key_events
+_Observații: view-ul `web_metric_observations` (din `web_key_events`, suma pe `eventName`); vezi `docs/contracts/google.md`._
+
 Key events GA4; suma zilelor. Se afișează separat de conversiile platformelor de ads (spec 2.6).
 
 ### gsc_clicks
+_Observații: view-ul `search_metric_observations` (din `search_daily`, suma device-urilor); vezi `docs/contracts/google.md`._
+
 Clicks din Google Search (Search Console); suma zilelor.
 
 ### gsc_impressions

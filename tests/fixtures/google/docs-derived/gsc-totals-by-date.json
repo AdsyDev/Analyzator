@@ -1,0 +1,36 @@
+{
+  "_header": "derivat din documentație, neconfirmat (nu e un payload real; forma urmează documentația GA4 Data API v1beta / Search Console API, citite 2026-10-08)",
+  "_request": "POST …/searchAnalytics/query {dimensions:['date']} (totaluri pe zi, fără query)",
+  "payload": {
+    "rows": [
+      {
+        "keys": [
+          "2026-10-05"
+        ],
+        "clicks": 120,
+        "impressions": 3500,
+        "ctr": 0.034286,
+        "position": 8.9
+      },
+      {
+        "keys": [
+          "2026-10-06"
+        ],
+        "clicks": 140,
+        "impressions": 3900,
+        "ctr": 0.035897,
+        "position": 8.7
+      },
+      {
+        "keys": [
+          "2026-10-07"
+        ],
+        "clicks": 130,
+        "impressions": 3700,
+        "ctr": 0.035135,
+        "position": 8.9
+      }
+    ],
+    "responseAggregationType": "byProperty"
+  }
+}

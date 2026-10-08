@@ -378,3 +378,56 @@ describe('B8. Credențiale în Vault prin API', () => {
     assert.ok(res.status >= 400, `status ${res.status}`)
   })
 })
+
+describe('B9. GA4 și Search Console prin API', () => {
+  const T1_SRC = '50000000-0000-0000-0000-000000000011'
+  const T2_SRC = '50000000-0000-0000-0000-000000000021'
+  const common = (tenant, brand, source) => ({
+    tenant_id: tenant, brand_id: brand, source_id: source, collected_at: new Date().toISOString(),
+    payload_hash: 'f'.repeat(64), source_timezone: 'America/Los_Angeles', data_state: 'final', schema_version: 'test',
+  })
+
+  before(async () => {
+    for (const [t, b, src, clicks] of [[T1, B1A, T1_SRC, 11], [T1, B1B, T1_SRC, 22], [T2, B2A, T2_SRC, 33]]) {
+      const res = await asService('search_daily', {
+        method: 'POST', body: { ...common(t, b, src), date: '2026-10-05', device: 'DESKTOP', clicks, impressions: 100, position: 3 },
+      })
+      assert.equal(res.status, 201, `insert search_daily: ${res.status} ${JSON.stringify(res.json)}`)
+    }
+  })
+
+  test('strategist T1 (acces 1A) vede doar rândul lui 1A; control pozitiv', async () => {
+    const { json } = await rest('search_daily?select=brand_id,clicks', { token: userToken(U.strat1) })
+    assert.deepEqual(json, [{ brand_id: B1A, clicks: 11 }])
+  })
+
+  test('client fără brand_access și admin T2 nu văd rândurile din T1; clientul cu acces vede 1A', async () => {
+    assert.deepEqual((await rest('search_daily?select=clicks', { token: userToken(U.clientNone) })).json, [])
+    const t2 = await rest('search_daily?select=brand_id', { token: userToken(U.admin2) })
+    assert.deepEqual(t2.json.map((r) => r.brand_id).sort(), [B2A])
+    const c = await rest('search_daily?select=clicks', { token: userToken(U.client1) })
+    assert.deepEqual(c.json, [{ clicks: 11 }])
+  })
+
+  test('view-urile de observații respectă accesul (security_invoker)', async () => {
+    const mine = await rest('search_metric_observations?select=brand_id,metric_key&metric_key=eq.gsc_clicks', { token: userToken(U.strat1) })
+    assert.deepEqual(mine.json, [{ brand_id: B1A, metric_key: 'gsc_clicks' }])
+    const none = await rest('search_metric_observations?select=brand_id', { token: userToken(U.clientNone) })
+    assert.deepEqual(none.json, [])
+  })
+
+  test('scrierea e refuzată pentru orice utilizator, inclusiv admin', async () => {
+    for (const user of [U.admin1, U.strat1, U.client1]) {
+      const res = await rest('search_daily', {
+        method: 'POST', token: userToken(user), body: { ...common(T1, B1A, T1_SRC), date: '2026-10-06', device: 'MOBILE', clicks: 1 },
+      })
+      assert.ok([401, 403].includes(res.status), `POST: ${res.status}`)
+      const patch = await rest(`search_daily?brand_id=eq.${B1A}`, {
+        method: 'PATCH', token: userToken(user), body: { clicks: 999 }, headers: representation,
+      })
+      assert.ok([401, 403].includes(patch.status) || (patch.status === 200 && patch.json.length === 0), `PATCH: ${patch.status}`)
+    }
+    const check = await asService(`search_daily?brand_id=eq.${B1A}&select=clicks`)
+    assert.deepEqual(check.json, [{ clicks: 11 }])
+  })
+})

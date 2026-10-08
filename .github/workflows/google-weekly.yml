@@ -1,0 +1,85 @@
+# Colectarea săptămânală GA4 (Data API) și Search Console (Search Analytics) pentru toate conexiunile active.
+#
+# Programare: marți la 04:00 UTC = 06:00 ora României vara (EEST), 05:00 iarna (EET). Cron-ul GitHub e în UTC și nu
+# urmează ora de vară: vezi nota DST din docs/runbook.md. Reimportă ultimele 35 de zile (până ieri).
+#
+# Rularea programată e DEZACTIVATĂ până când variabila CONNECTOR_GOOGLE_ENABLED = "true"
+# (Settings → Secrets and variables → Actions → Variables). workflow_dispatch funcționează oricând.
+#
+# Secrete în environment-ul GitHub ales (implicit „staging"): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+# Service account-ul Google NU e aici: stă în Supabase Vault (source_connections, provider google_service_account)
+# și se citește la rulare prin get_source_token.
+
+name: google-weekly
+
+on:
+  schedule:
+    - cron: '0 4 * * 2'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment GitHub cu secretele Supabase'
+        type: choice
+        options: [staging]
+        default: staging
+      only:
+        description: 'Doar o sursă (gol = ambele)'
+        type: choice
+        options: ['', ga4, gsc]
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: google-weekly
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: github.event_name == 'workflow_dispatch' || vars.CONNECTOR_GOOGLE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dependențe
+        run: npm ci
+
+      - name: Teste conector (fără rețea)
+        run: node --experimental-strip-types --test 'connectors/google/**/*.test.ts' 'connectors/shared/**/*.test.ts'
+
+      - name: Colectare Google
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Lipsesc secretele SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY în environment-ul ${{ inputs.environment || 'staging' }}."
+            exit 1
+          fi
+          ONLY="${{ inputs.only }}"
+          if [ -n "$ONLY" ]; then
+            node --experimental-strip-types connectors/google/collect.ts --only "$ONLY" | tee collect.log
+          else
+            node --experimental-strip-types connectors/google/collect.ts | tee collect.log
+          fi
+
+      - name: Rezumat
+        if: always()
+        run: |
+          {
+            echo "### Google (GA4 + GSC): $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo
+            echo '```'
+            [ -f collect.log ] && cat collect.log || echo "fără output"
+            echo '```'
+            echo
+            echo "Detalii: sync_runs (source = ga4 / gsc, coverage, errors), source_reconciliations și provider_api_calls."
+          } >> "$GITHUB_STEP_SUMMARY"

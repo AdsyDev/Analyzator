@@ -1,0 +1,58 @@
+{
+  "_header": "derivat din documentație, neconfirmat (nu e un payload real; forma urmează documentația GA4 Data API v1beta / Search Console API, citite 2026-10-08)",
+  "_request": "POST properties/123456789:checkCompatibility (varianta ipotetică: keyEvents incompatibil cu dimensiunile de sesiune)",
+  "payload": {
+    "dimensionCompatibilities": [
+      {
+        "dimensionMetadata": {
+          "apiName": "date"
+        },
+        "compatibility": "COMPATIBLE"
+      },
+      {
+        "dimensionMetadata": {
+          "apiName": "sessionDefaultChannelGroup"
+        },
+        "compatibility": "COMPATIBLE"
+      },
+      {
+        "dimensionMetadata": {
+          "apiName": "sessionSourceMedium"
+        },
+        "compatibility": "COMPATIBLE"
+      },
+      {
+        "dimensionMetadata": {
+          "apiName": "landingPagePlusQueryString"
+        },
+        "compatibility": "COMPATIBLE"
+      }
+    ],
+    "metricCompatibilities": [
+      {
+        "metricMetadata": {
+          "apiName": "sessions"
+        },
+        "compatibility": "COMPATIBLE"
+      },
+      {
+        "metricMetadata": {
+          "apiName": "activeUsers"
+        },
+        "compatibility": "COMPATIBLE"
+      },
+      {
+        "metricMetadata": {
+          "apiName": "engagedSessions"
+        },
+        "compatibility": "COMPATIBLE"
+      },
+      {
+        "metricMetadata": {
+          "apiName": "keyEvents"
+        },
+        "compatibility": "INCOMPATIBLE"
+      }
+    ]
+  }
+}

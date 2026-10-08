@@ -1,0 +1,69 @@
+{
+  "_header": "derivat din documentație, neconfirmat (nu e un payload real; forma urmează documentația GA4 Data API v1beta / Search Console API, citite 2026-10-08)",
+  "_request": "POST webmasters/v3/sites/sc-domain:example.ro/searchAnalytics/query {startDate:'2026-09-03',endDate:'2026-10-07',dimensions:['date','device'],rowLimit:25000,startRow:0,dataState:'final',type:'web'}",
+  "payload": {
+    "rows": [
+      {
+        "keys": [
+          "2026-10-05",
+          "DESKTOP"
+        ],
+        "clicks": 40,
+        "impressions": 1000,
+        "ctr": 0.04,
+        "position": 8.5
+      },
+      {
+        "keys": [
+          "2026-10-05",
+          "MOBILE"
+        ],
+        "clicks": 80,
+        "impressions": 2500,
+        "ctr": 0.032,
+        "position": 9.1
+      },
+      {
+        "keys": [
+          "2026-10-06",
+          "DESKTOP"
+        ],
+        "clicks": 50,
+        "impressions": 1200,
+        "ctr": 0.041667,
+        "position": 8.2
+      },
+      {
+        "keys": [
+          "2026-10-06",
+          "MOBILE"
+        ],
+        "clicks": 90,
+        "impressions": 2700,
+        "ctr": 0.033333,
+        "position": 9.0
+      },
+      {
+        "keys": [
+          "2026-10-07",
+          "DESKTOP"
+        ],
+        "clicks": 45,
+        "impressions": 1100,
+        "ctr": 0.040909,
+        "position": 8.4
+      },
+      {
+        "keys": [
+          "2026-10-07",
+          "MOBILE"
+        ],
+        "clicks": 85,
+        "impressions": 2600,
+        "ctr": 0.032692,
+        "position": 9.2
+      }
+    ],
+    "responseAggregationType": "byProperty"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "_header": "derivat din documentație, neconfirmat (nu e un payload real; forma urmează documentația GA4 Data API v1beta / Search Console API, citite 2026-10-08)",
+  "_request": "POST …/searchAnalytics/query {dimensions:['date','query','page','device'],rowLimit:3,startRow:0} (rowLimit redus pentru testul de paginare)",
+  "payload": {
+    "rows": [
+      {
+        "keys": [
+          "2026-10-05",
+          "urinal remediu",
+          "https://example.ro/produse/urinal",
+          "MOBILE"
+        ],
+        "clicks": 12,
+        "impressions": 300,
+        "ctr": 0.04,
+        "position": 4.2
+      },
+      {
+        "keys": [
+          "2026-10-05",
+          "infecție urinară",
+          "https://example.ro/blog/infectii",
+          "DESKTOP"
+        ],
+        "clicks": 7,
+        "impressions": 420,
+        "ctr": 0.016667,
+        "position": 6.8
+      },
+      {
+        "keys": [
+          "2026-10-06",
+          "urinal prospect",
+          "https://example.ro/produse/urinal",
+          "DESKTOP"
+        ],
+        "clicks": 5,
+        "impressions": 150,
+        "ctr": 0.033333,
+        "position": 3.1
+      }
+    ],
+    "responseAggregationType": "byPage"
+  }
+}

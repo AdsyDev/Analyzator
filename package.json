@@ -19,13 +19,17 @@
     "build:staging": "npm --prefix apps/web run build:staging",
     "build:preview": "npm --prefix apps/web run build:preview",
     "test:integration": "scripts/test-integration.sh",
-    "collect:seomonitor": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/seomonitor/collect.ts"
+    "collect:seomonitor": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/seomonitor/collect.ts",
+    "collect:google": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/google/collect.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
     "typescript": "^7.0.2"
   },
   "dependencies": {
+    "@google-analytics/data": "^7.2.1",
+    "@googleapis/searchconsole": "^11.0.1",
+    "google-auth-library": "^11.2.0",
     "zod": "^4.6.5"
   }
 }

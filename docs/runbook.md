@@ -65,3 +65,13 @@ _De completat._ 401 → verifică tokenul; 403 → verifică permisiunile; făr�
 
 ## Backup și restaurare
 _De completat._
+
+
+## GA4 și Search Console
+
+- Configurare și reguli: `docs/contracts/google.md`. Service account-ul (un JSON per tenant) se setează cu `npm run set-source-token -- --connection <uuid-conexiune-google_service_account> --email <admin>`; conexiunile `ga4` și `gsc` (per brand) conțin doar property ID / site_url.
+- Rulare: marți 04:00 UTC prin `.github/workflows/google-weekly.yml` (dezactivat până la `CONNECTOR_GOOGLE_ENABLED = true`), sau manual: `npm run collect:google [-- --only ga4|gsc]`.
+- Verificare după rulare: `sync_runs` (source `ga4` / `gsc`: `status`, `errors`, `coverage`), `source_reconciliations` (`mismatch` = diferență peste toleranță; `incomparable` = interval, fus sau proprietate diferite).
+- `not_connected` în log = lipsește credentialul Google al tenantului, sau a fost marcat invalid. Nu e o eroare a rulării.
+- `access_denied` pe un brand = service account-ul nu are acces la proprietatea respectivă (adaugă-l în GA4 / Search Console).
+- `ga4_incompatible_*` = combinație de dimensiuni și metrici respinsă de `checkCompatibility`; metrica rămâne NULL, nu 0.

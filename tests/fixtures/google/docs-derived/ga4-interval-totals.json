@@ -1,0 +1,44 @@
+{
+  "_header": "derivat din documentație, neconfirmat (nu e un payload real; forma urmează documentația GA4 Data API v1beta / Search Console API, citite 2026-10-08)",
+  "_request": "POST properties/123456789:runReport {dimensions:[], metrics:[sessions,engagedSessions,keyEvents]} (fără dimensiunea date: totalul intervalului)",
+  "payload": {
+    "dimensionHeaders": [],
+    "metricHeaders": [
+      {
+        "name": "sessions",
+        "type": "TYPE_INTEGER"
+      },
+      {
+        "name": "engagedSessions",
+        "type": "TYPE_INTEGER"
+      },
+      {
+        "name": "keyEvents",
+        "type": "TYPE_INTEGER"
+      }
+    ],
+    "rows": [
+      {
+        "dimensionValues": [],
+        "metricValues": [
+          {
+            "value": "535"
+          },
+          {
+            "value": "363"
+          },
+          {
+            "value": "28"
+          }
+        ]
+      }
+    ],
+    "rowCount": 1,
+    "metadata": {
+      "dataLossFromOtherRow": false,
+      "currencyCode": "RON",
+      "timeZone": "Europe/Bucharest",
+      "subjectToThresholding": false
+    }
+  }
+}
