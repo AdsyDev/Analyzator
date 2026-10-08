@@ -196,3 +196,16 @@ Ce s-a implementat diferit de designul din `docs/design/reference/` și de ce. N
 | Filtre Listening | Doar sentiment și sursă | Restul nu au cerință în spec cap. 18. |
 | Sentiment pe fiecare mențiune | „Revizuit de <nume>" sau „Nerevizuit" | Un sentiment neverificat nu se afișează ca neutru. |
 | Jurnal PV | Doar `agency_admin` | Spec cap. 28; la alte roluri nu se face nicio cerere. |
+
+## Diferențe față de design (UI-6, seria 1)
+
+| Design | Implementat | Motiv |
+|---|---|---|
+| Analize: editare de status și de acțiuni | Doar citire | Nu există tabele și nici scriere pentru analize; nu simulăm salvări. |
+| Acțiuni: „termen depășit" | Doar data termenului | Marcajul ar fi o regulă calculată în UI; poate veni de la server. |
+| Surse: stare „Învechit" pe date reale | Nederivată | Nu există o politică de prospețime aprobată. Apare doar în previzualizare. |
+| Surse: „Conectează" pe Import CSV | Mesaj: importul de fișiere nu e disponibil încă | Logica de import nu face parte din UI-6. |
+| Surse: test de conexiune pentru toate sursele | Doar Clarity | Funcția server validează doar Clarity (`DAILY_LIMIT`). Celelalte spun că testarea nu e disponibilă. |
+| „Configurat de <persoană>" | „utilizator <id scurt>" | Numele utilizatorilor nu sunt citibile din client (nu există profil în schemă). |
+| Filtrul de status al analizelor | Stare locală (taburi), nu în URL | E o vedere, nu perioadă sau filtru de date. |
+| Brandurile reale în topbar | Citite din `brands` | Fără categorie (nu există în schemă). |

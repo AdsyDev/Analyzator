@@ -167,10 +167,10 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
     expect(screen.queryByRole('button', { name: /Importă|Conectează|Cere conectarea/ })).toBeNull()
   })
 
-  it('un modul neconstruit (Analize și acțiuni) spune adevărul despre ecran, fără „În curând"', async () => {
-    setup('/brands/brand-urinal/insights')
+  it('un ecran de Administrare neconstruit (Clienți și site-uri) spune adevărul, fără „În curând"', async () => {
+    setup('/admin/clients')
     expect(await screen.findByRole('heading', { name: 'Acest ecran nu este încă disponibil' })).toBeInTheDocument()
-    expect(screen.getByText(/Ecranul Analize și acțiuni nu a fost livrat în această versiune/)).toBeInTheDocument()
+    expect(screen.getByText(/Ecranul Clienți și site-uri nu a fost livrat în această versiune/)).toBeInTheDocument()
     expect(screen.queryByText(/în curând/i)).toBeNull()
   })
 
@@ -188,17 +188,18 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
     }
   })
 
-  it('starea surselor în încărcare are schelet, iar eroarea are „Reîncearcă"', async () => {
-    let attempts = 0
-    setup('/brands/brand-urinal/insights', {
+  it('starea surselor din Administrare are eroare cu „Reîncearcă"', async () => {
+    let broken = true
+    setup('/admin/sources', {
       providers: (auth) => {
         const base = createFixtureProviders({ now: () => NOW, getRole: () => auth.preview?.role ?? 'agency_admin' })
-        return { ...base, sources: { ...base.sources, statuses: async (id) => (++attempts === 1 ? failed('Serverul nu a răspuns.') : base.sources.statuses(id)) } }
+        return { ...base, sources: { ...base.sources, statuses: async (id) => (broken ? failed('Serverul nu a răspuns.') : base.sources.statuses(id)) } }
       },
     })
     expect(await screen.findByText('Serverul nu a răspuns.')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Reîncearcă' }))
-    expect(await screen.findByRole('heading', { name: 'Acest ecran nu este încă disponibil' })).toBeInTheDocument()
+    broken = false
+    await userEvent.click(screen.getAllByRole('button', { name: 'Reîncearcă' })[0]!)
+    expect(await screen.findByRole('article', { name: 'SEOmonitor' })).toBeInTheDocument()
   })
 })
 

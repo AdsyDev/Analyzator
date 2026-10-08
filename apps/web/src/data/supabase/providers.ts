@@ -15,6 +15,9 @@ import {
   type QueryContext,
   type SourcesProvider,
 } from '../../contracts'
+import type { DataClient } from './dataClient'
+import { createSupabaseBrands } from './brandsProvider'
+import { createSupabaseSources } from './sourcesProvider'
 import { comparisonRange } from '../../lib/period'
 
 const NO_SOURCE = 'Sursa nu este conectată pentru acest brand. Nu afișăm valori estimate până la conectare.'
@@ -77,6 +80,9 @@ const sources: SourcesProvider = {
   statuses: async () => notConnected('Starea surselor nu este încă disponibilă pentru acest brand.'),
   connections: async () => notConnected('Conexiunile surselor nu sunt încă disponibile pentru acest brand.'),
   syncRuns: async () => notConnected('Istoricul sincronizărilor nu este încă disponibil pentru acest brand.'),
+  createConnection: async () => notConnected('Conexiunile surselor nu sunt încă disponibile.'),
+  setToken: async () => notConnected('Setarea tokenului nu este încă disponibilă.'),
+  validate: async () => notConnected('Testarea conexiunii nu este încă disponibilă.'),
 }
 
 const brands: BrandsProvider = {
@@ -134,10 +140,30 @@ const competition: CompetitionProvider = {
   gaps: async () => notConnected('Datele despre competitori nu sunt încă disponibile pentru acest brand.'),
 }
 
+export interface SupabaseProvidersDeps {
+  client: DataClient
+  now?: () => Date
+}
+
 /**
- * Implementarea reală. Rămâne goală: fiecare provider se completează ecran cu ecran, pe măsură ce
- * tabelele și conectorii livrează date (UI-6 pentru Administrare, apoi restul modulelor).
+ * Implementarea reală. Administrarea (surse, spații de brand) citește prin sesiunea utilizatorului; restul
+ * modulelor rămân `not_connected` până când tabelele și conectorii livrează date, ecran cu ecran.
+ * Fără `deps` (de exemplu în teste sau fără configurare Supabase) tot ce e administrativ e `not_connected`.
  */
-export function createSupabaseProviders(): DataProviders {
-  return { kind: 'supabase', metrics, insights, mentions, sources, brands, ai, search, traffic, paid, social, competition }
+export function createSupabaseProviders(deps?: SupabaseProvidersDeps): DataProviders {
+  const now = deps?.now
+  return {
+    kind: 'supabase',
+    metrics,
+    insights,
+    mentions,
+    sources: deps ? createSupabaseSources(deps.client, now) : sources,
+    brands: deps ? createSupabaseBrands(deps.client, now) : brands,
+    ai,
+    search,
+    traffic,
+    paid,
+    social,
+    competition,
+  }
 }

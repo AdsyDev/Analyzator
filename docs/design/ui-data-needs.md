@@ -109,3 +109,23 @@ KPI-urile `listening_mentions`, `listening_sov`, `listening_negative_share` nu s
 | `gaps(ctx)` | `CompetitionGap[]` | Subiecte AI și căutări SEO în care apare un competitor și brandul lipsește sau e mai slab. |
 
 Filtre Listening în URL: `sentiment`, `source`.
+
+## Administrare → Surse și Analize (UI-6, seria 1)
+
+### Surse — `SourcesProvider` (implementare reală, prin sesiunea utilizatorului / RLS)
+
+| Metodă | Citește | Note |
+|---|---|---|
+| `connections(brandId)` | `source_connections` (coloanele publice) + `provider_api_calls` (ziua UTC curentă) | `calls_today` = suma pe conexiune. Fără `vault_secret_id`. |
+| `syncRuns(brandId)` | `sync_runs`, ultimele 50 | `provider` = `sync_runs.source` (poate fi o sursă fără etichetă). `rows` e null cât timp jobul e în coadă. Mesajul de eroare = primul `code`/`message` din `errors`. |
+| `statuses(brandId)` | derivat din conexiuni, `sync_runs`, `import_batches` | Vezi regulile de mai jos. |
+| `createConnection` | insert în `source_connections` | `tenant_id` se ia din brand. Duplicat (23505) și lipsa dreptului (42501) au mesaje proprii. |
+| `setToken`, `validate` | Edge Function `source-credentials` | Tokenul pleacă doar în corpul cererii și nu apare în rezultat. Erorile funcției (`{ error }`) se afișează ca atare. |
+
+Reguli de derivare a stării (clasificare, nu metrică): fără conexiune → `not_connected`; token `invalid` → `error`; ultima sincronizare `failed` → `error` (cu ultimele date reușite păstrate); `partial` → `partial`; reușită → `connected`; conexiune fără nicio sincronizare cu date → `not_connected` (tokenul singur nu înseamnă date). `data_as_of` = `period_end` al ultimei rulări cu date, `imported_at` = `finished_at`. `stale` nu se derivă: **nu există o politică de prospețime aprobată**. Import CSV: `connected` dacă există un `import_batches` cu status `imported`.
+
+`BrandsProvider.list` și `competitorSet` sunt acum reale (`brands`, `competitor_sets` + `competitor_set_members`; versiunea efectivă = cea mai mare `effective_from <= azi`, Europe/Bucharest).
+
+### Analize și acțiuni — `InsightsProvider`
+
+Doar citire. Nu există tabele pentru analize și acțiuni în `supabase/migrations`, deci providerul `supabase` rămâne `not_connected`. Ecranul funcționează pe fixtures în previzualizare. Server: clientul primește doar `published` (RLS); acțiunile vin împreună cu analiza lor.

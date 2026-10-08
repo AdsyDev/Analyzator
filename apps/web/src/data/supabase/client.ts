@@ -96,6 +96,8 @@ export function createSupabaseBackend(client: SupabaseClient, storage: { setReme
 export interface SupabaseAuthSetup {
   backend: AuthBackend
   link: UrlLink
+  /** Același client folosește și stratul de date: sesiunea utilizatorului trece prin RLS. */
+  client: SupabaseClient
 }
 
 /** Cheia `anon` e publică prin design (RLS protejează datele); nu există secrete în frontend. */
@@ -105,5 +107,5 @@ export function createBrowserSupabase(url: string, anonKey: string, win: Window 
   const client = createClient(url, anonKey, {
     auth: { storage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' },
   })
-  return { backend: createSupabaseBackend(client, storage), link }
+  return { backend: createSupabaseBackend(client, storage), link, client }
 }

@@ -9,7 +9,7 @@ import type { QueryContext } from './period'
 import type { PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from './paid'
 import type { ContentGap, LandingPage, SearchFilters, SearchKeyword } from './search'
 import type { SocialCalendarItem, SocialCompetitor, SocialFilters, SocialGroups, SocialPost, SocialSummary } from './social'
-import type { SourceConnection, SourceStatusInfo, SyncRun } from './source'
+import type { NewConnection, SourceConnection, SourceStatusInfo, SyncRun, TokenSaved, ValidationOutcome } from './source'
 import type { AiReferrals, ClarityDevices, Device, TrackingQuality, TrafficChannels } from './traffic'
 
 /**
@@ -48,6 +48,12 @@ export interface SourcesProvider {
   /** Doar agenția (agency_admin pentru credențiale). */
   connections(brandId: BrandId): Promise<ProviderResult<SourceConnection[]>>
   syncRuns(brandId: BrandId): Promise<ProviderResult<SyncRun[]>>
+  /** Doar `agency_admin` (RLS). Creează conexiunea; tokenul se setează apoi cu `setToken`. */
+  createConnection(brandId: BrandId, input: NewConnection): Promise<ProviderResult<SourceConnection>>
+  /** Funcția server `source-credentials`, `set_token`. Tokenul nu se păstrează și nu se loghează. */
+  setToken(connectionId: string, token: string): Promise<ProviderResult<TokenSaved>>
+  /** Funcția server `source-credentials`, `validate`. Consumă 1 din bugetul zilnic de apeluri. */
+  validate(connectionId: string): Promise<ProviderResult<ValidationOutcome>>
 }
 
 export interface BrandsProvider {

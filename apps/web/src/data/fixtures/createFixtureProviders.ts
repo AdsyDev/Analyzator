@@ -252,6 +252,9 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
   const connectionsFile = sourcesFile.connections as Record<string, Array<{ id: string; provider: string; external_account_id: string; display_name: string | null; credential_status: string; last_validated_days_ago: number | null; last_validation_error: string | null; credential_updated_by: string | null; credential_updated_days_ago: number | null; calls_today: number }>>
   const runsFile = sourcesFile.sync_runs as Record<string, Array<{ id: string; provider: string; days_ago: number; duration_s: number; rows: number; status: string; error: string | null }>>
 
+  const createdConnections: SourceConnection[] = []
+  const connectionPatch = new Map<string, Partial<SourceConnection>>()
+
   const sources: SourcesProvider = {
     statuses: async (brandId) => {
       const denied = guard<never>(brandId)
@@ -271,22 +274,22 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
       const denied = guard<never>(brandId)
       if (denied) return denied
       if (!isAgencyRole(getRole())) return failed('Conexiunile și credențialele sunt vizibile doar echipei AdSymphony.')
-      return ready(
-        (connectionsFile[brandId] ?? []).map<SourceConnection>((c) => ({
-          id: c.id,
-          brand_id: brandId,
-          provider: c.provider as SourceProviderId,
-          external_account_id: c.external_account_id,
-          display_name: c.display_name,
-          credential_status: c.credential_status as CredentialStatus,
-          last_validated_at: c.last_validated_days_ago === null ? null : instantDaysAgo(c.last_validated_days_ago, 7),
-          last_validation_error: c.last_validation_error,
-          credential_updated_by: c.credential_updated_by,
-          credential_updated_at: c.credential_updated_days_ago === null ? null : instantDaysAgo(c.credential_updated_days_ago, 11),
-          calls_today: c.calls_today,
-          daily_call_budget: 10,
-        })),
-      )
+      const fromFile = (connectionsFile[brandId] ?? []).map<SourceConnection>((c) => ({
+        id: c.id,
+        brand_id: brandId,
+        provider: c.provider as SourceProviderId,
+        external_account_id: c.external_account_id,
+        display_name: c.display_name,
+        credential_status: c.credential_status as CredentialStatus,
+        last_validated_at: c.last_validated_days_ago === null ? null : instantDaysAgo(c.last_validated_days_ago, 7),
+        last_validation_error: c.last_validation_error,
+        credential_updated_by: c.credential_updated_by,
+        credential_updated_at: c.credential_updated_days_ago === null ? null : instantDaysAgo(c.credential_updated_days_ago, 11),
+        calls_today: c.calls_today,
+        daily_call_budget: 10,
+      }))
+      const added = createdConnections.filter((c) => c.brand_id === brandId)
+      return ready([...fromFile, ...added].map((c) => ({ ...c, ...(connectionPatch.get(c.id) ?? {}) })))
     },
     syncRuns: async (brandId) => {
       const denied = guard<never>(brandId)
@@ -308,6 +311,49 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
           }
         }),
       )
+    },
+    // Simulare în memorie, doar pentru previzualizare: nimic nu pleacă spre un server.
+    createConnection: async (brandId, input) => {
+      const denied = guard<never>(brandId)
+      if (denied) return denied
+      if (getRole() !== 'agency_admin') return failed('Doar administratorii agenției pot adăuga conexiuni.')
+      const conn: SourceConnection = {
+        id: `00000000-0000-4000-8000-${String(100000000000 + createdConnections.length).slice(-12)}`,
+        brand_id: brandId,
+        provider: input.provider,
+        external_account_id: input.external_account_id,
+        display_name: input.display_name,
+        credential_status: 'missing',
+        last_validated_at: null,
+        last_validation_error: null,
+        credential_updated_by: null,
+        credential_updated_at: null,
+        calls_today: 0,
+        daily_call_budget: 10,
+      }
+      createdConnections.push(conn)
+      return ready(conn)
+    },
+    setToken: async (connectionId, token) => {
+      if (getRole() !== 'agency_admin') return failed('Doar administratorii agenției pot seta tokenuri.')
+      if (token.trim() === '') return failed('Token gol sau prea lung.')
+      connectionPatch.set(connectionId, { ...(connectionPatch.get(connectionId) ?? {}), credential_status: 'unverified', last_validation_error: null })
+      return ready({ connection_id: connectionId, credential_status: 'unverified' as CredentialStatus })
+    },
+    validate: async (connectionId) => {
+      if (getRole() !== 'agency_admin') return failed('Doar administratorii agenției pot testa conexiuni.')
+      const all = [...Object.values(connectionsFile).flat().map((c) => ({ id: c.id, calls: c.calls_today, status: c.credential_status })), ...createdConnections.map((c) => ({ id: c.id, calls: c.calls_today, status: c.credential_status }))]
+      const base = all.find((c) => c.id === connectionId)
+      if (!base) return failed('Conexiune inexistentă sau inactivă.')
+      const patch = connectionPatch.get(connectionId) ?? {}
+      const status = (patch.credential_status ?? base.status) as CredentialStatus
+      const used = patch.calls_today ?? base.calls
+      if (status === 'missing') return failed('Conexiunea nu are token.')
+      if (used >= 10) {
+        return ready({ connection_id: connectionId, credential_status: status, calls_today: used, daily_limit: 10, outcome: 'budget_exhausted' as const, message: 'Bugetul zilnic de 10 apeluri e consumat. Testarea nu a fost rulată.' })
+      }
+      connectionPatch.set(connectionId, { ...patch, credential_status: 'valid', calls_today: used + 1, last_validated_at: now().toISOString(), last_validation_error: null })
+      return ready({ connection_id: connectionId, credential_status: 'valid' as CredentialStatus, calls_today: used + 1, daily_limit: 10, outcome: 'valid' as const, message: 'Conexiunea funcționează.' })
     },
   }
 

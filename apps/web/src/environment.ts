@@ -8,19 +8,25 @@ export interface AppEnvironment {
   auth: AuthSource
 }
 
-async function createRealAuth(): Promise<AuthSource> {
+interface RealSetup {
+  auth: AuthSource
+  providers: DataProviders
+}
+
+async function createRealSetup(): Promise<RealSetup> {
   const url = import.meta.env.VITE_SUPABASE_URL
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY
-  if (!url || !key) return createUnconfiguredAuth()
+  if (!url || !key) return { auth: createUnconfiguredAuth(), providers: createSupabaseProviders() }
   const { createBrowserSupabase } = await import('./data/supabase/client')
-  const { backend, link } = createBrowserSupabase(url, key)
-  return createAuthSource(backend, {
+  const { backend, link, client } = createBrowserSupabase(url, key)
+  const auth = createAuthSource(backend, {
     initialLink: link.kind,
     initialNotice: link.notice,
     redirectTo: `${window.location.origin}/login`,
     // După alegerea parolei, tokenurile rămân în hash: le ștergem din URL.
     onLinkConsumed: () => window.history.replaceState(null, '', window.location.pathname + window.location.search),
   })
+  return { auth, providers: createSupabaseProviders({ client }) }
 }
 
 /**
@@ -32,5 +38,5 @@ export async function createEnvironment(): Promise<AppEnvironment> {
   if (__DESIGN_PREVIEW__) {
     return import('./preview/environment').then((m) => m.createPreviewEnvironment())
   }
-  return { providers: createSupabaseProviders(), auth: await createRealAuth() }
+  return createRealSetup()
 }

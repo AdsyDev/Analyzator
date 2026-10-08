@@ -16,3 +16,18 @@ export const PROVIDER_LABELS: Record<SourceProviderId, { name: string; mono: str
 export function sourceName(key: string): string {
   return (PROVIDER_LABELS as Record<string, { name: string } | undefined>)[key]?.name ?? key
 }
+
+/** Ce aduce fiecare sursă, în română; folosit în pagina de status și în Administrare → Surse. */
+export const PROVIDER_DESCRIPTIONS: Record<SourceProviderId, string> = {
+  seomonitor: 'Vizibilitate SEO, poziții în Google și prezența în răspunsurile AI.',
+  ga4: 'Sesiuni, utilizatori și evenimente cheie din site.',
+  gsc: 'Clickuri, afișări, CTR și poziție medie din Google Search.',
+  clarity: 'Comportament pe site: rage clicks, dead clicks, quick backs, scroll depth.',
+  planable: 'Postările sociale ale brandului și performanța lor.',
+  google_ads: 'Cheltuieli și performanță din Google Ads.',
+  meta_ads: 'Cheltuieli și performanță din Meta Ads.',
+  csv_import: 'Date importate din fișiere CSV (Paid Media și Social).',
+}
+
+/** Sursele din grila Administrare → Surse, în ordinea din spec. */
+export const ADMIN_SOURCE_GRID = ['seomonitor', 'ga4', 'gsc', 'clarity', 'planable', 'csv_import'] as const satisfies readonly SourceProviderId[]

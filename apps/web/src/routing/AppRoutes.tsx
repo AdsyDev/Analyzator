@@ -3,8 +3,10 @@ import { canAccessAdmin, adminItemsFor, brandPath } from '../lib/navigation'
 import { AppLayout, useLayout } from './AppLayout'
 import { LoginPage } from './LoginPage'
 import { ADMIN_MODULES, BRAND_MODULES } from './modules'
-import { AdminPlaceholder, ModulePlaceholder, NotFoundPage } from './pages'
+import { AdminPlaceholder, NotFoundPage } from './pages'
 import { RequireAuth } from './RequireAuth'
+import { SourcesPage } from '../screens/admin/SourcesPage'
+import { InsightsPage } from '../screens/insights/InsightsPage'
 import { AiPage } from '../screens/ai/AiPage'
 import { CompetitionPage } from '../screens/competition/CompetitionPage'
 import { ListeningPage } from '../screens/listening/ListeningPage'
@@ -27,7 +29,7 @@ function BrandIndexRedirect() {
 
 function BrandModulePage() {
   const { segment } = useParams()
-  const { brand, user } = useLayout()
+  const { brand } = useLayout()
   const module = segment ? BRAND_MODULES[segment] : undefined
   if (!module || !brand) return <NotFoundPage />
   // Ecranele construite înlocuiesc placeholder-ul; restul (UI-3…UI-6) rămân pe starea reală a surselor.
@@ -39,7 +41,8 @@ function BrandModulePage() {
   if (module.segment === 'social') return <SocialPage />
   if (module.segment === 'listening') return <ListeningPage />
   if (module.segment === 'competition') return <CompetitionPage />
-  return <ModulePlaceholder module={module} brand={brand} role={user.role} />
+  if (module.segment === 'insights') return <InsightsPage />
+  return <NotFoundPage />
 }
 
 /**
@@ -52,6 +55,7 @@ function AdminModulePage() {
   const module = segment ? ADMIN_MODULES[segment] : undefined
   // Fără acces la Administrare (sau la această pagină): redirect, fără să confirmi dacă pagina există.
   if (adminItemsFor(user.role).length === 0 || (module && !canAccessAdmin(user.role, module.segment))) return <Navigate to="/" replace />
+  if (module?.segment === 'sources') return <SourcesPage />
   return module ? <AdminPlaceholder module={module} /> : <NotFoundPage />
 }
 

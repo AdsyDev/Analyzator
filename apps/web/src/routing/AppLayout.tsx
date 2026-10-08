@@ -20,6 +20,8 @@ export interface LayoutContext {
   brands: Brand[]
   /** Brandul din URL, doar dacă e permis; altfel null (nu se face nicio cerere pentru el). */
   brand: Brand | null
+  /** Spațiul ales în topbar (și în afara modulelor de brand, de ex. în Administrare); null dacă utilizatorul nu are niciunul. */
+  activeBrand: Brand | null
   /** Contextul interogării din URL; null în afara modulelor de brand. */
   ctx: QueryContext | null
   homeBrandId: string | null
@@ -137,7 +139,7 @@ export function AppLayout() {
   } else if (urlBrandId && !urlBrand) {
     content = <NoAccessPage homeBrandId={homeBrandId} />
   } else {
-    const context: LayoutContext = { user, brands, brand: urlBrand, ctx, homeBrandId, changeFilters: change }
+    const context: LayoutContext = { user, brands, brand: urlBrand, activeBrand: shellBrand, ctx, homeBrandId, changeFilters: change }
     // `key` pe rol: la comutarea rolului în previzualizare, ecranele se reîncarcă cu datele noului rol.
     content = <Outlet key={user.role} context={context} />
   }

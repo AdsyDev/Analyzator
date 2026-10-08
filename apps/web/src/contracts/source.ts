@@ -52,7 +52,8 @@ export type SyncRunStatus = 'queued' | 'running' | 'partial' | 'succeeded' | 'fa
 export interface SyncRun {
   id: string
   brand_id: BrandId
-  provider: SourceProviderId
+  /** Cheia din `sync_runs.source`; poate fi o sursă încă fără etichetă în `PROVIDER_LABELS`. */
+  provider: string
   range_from: IsoDate
   range_to: IsoDate
   started_at: IsoDateTime
@@ -60,4 +61,28 @@ export interface SyncRun {
   rows: number | null
   status: SyncRunStatus
   error: string | null
+}
+
+/** Conexiune nouă (agency_admin). Tokenul se setează separat, prin funcția server. */
+export interface NewConnection {
+  provider: SourceProviderId
+  external_account_id: string
+  display_name: string | null
+}
+
+/** Răspunsul funcției server după setarea tokenului: doar starea, niciodată tokenul. */
+export interface TokenSaved {
+  connection_id: string
+  credential_status: CredentialStatus
+}
+
+export type ValidationOutcomeKind = 'valid' | 'invalid' | 'rate_limited' | 'provider_error' | 'budget_exhausted'
+
+export interface ValidationOutcome {
+  connection_id: string
+  credential_status: CredentialStatus
+  calls_today: number
+  daily_limit: number
+  outcome: ValidationOutcomeKind
+  message: string
 }

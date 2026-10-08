@@ -67,7 +67,7 @@ function Owner({ person }: { person: Person }) {
 }
 
 const OPEN_STATUSES: ReadonlySet<InsightAction['status']> = new Set(['open', 'in_progress'])
-const ACTION_LABEL: Record<InsightAction['status'], { label: string; tone: 'neutral' | 'accent' | 'pos' }> = {
+export const ACTION_LABEL: Record<InsightAction['status'], { label: string; tone: 'neutral' | 'accent' | 'pos' }> = {
   open: { label: 'Deschisă', tone: 'neutral' },
   in_progress: { label: 'În lucru', tone: 'accent' },
   done: { label: 'Finalizată', tone: 'pos' },
