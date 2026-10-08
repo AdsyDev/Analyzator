@@ -1,5 +1,5 @@
 import type { MetricDirection, MetricItem, MetricStatus } from '../contracts'
-import { formatAbsoluteChange, formatMetricValue, formatRelativeChange } from './format'
+import { changeDirection, formatAbsoluteChange, formatMetricValue, formatRelativeChange } from './format'
 import { notesFor, reasonFor } from './warnings'
 
 /** Starea badge-ului de acoperire (design: Complet, Parțial, Învechit, Indisponibil). */
@@ -59,7 +59,7 @@ const EMPTY_TITLES: Partial<Record<MetricStatus, string>> = {
   partial: 'Valoare neconfirmată',
 }
 
-const dirOf = (n: number): DeltaDirection => (n > 0 ? 'up' : n < 0 ? 'down' : 'flat')
+const dirOf = (n: number, digits: 0 | 1 = 1): DeltaDirection => changeDirection(n, digits)
 
 /**
  * Transformă un `MetricItem` în text pentru afișare. Doar formatare: nu calculează și nu
@@ -88,7 +88,7 @@ export function metricView(m: MetricItem): MetricView {
     // La rate, variația principală e în puncte procentuale; la `base_zero` nu există variație relativă.
     if (m.absolute_change !== null) {
       deltaText = formatAbsoluteChange(m.absolute_change, m.unit)
-      deltaDirection = dirOf(m.absolute_change)
+      deltaDirection = dirOf(m.absolute_change, m.unit === 'count' ? 0 : 1)
     }
   } else {
     deltaText = formatRelativeChange(m.relative_change)

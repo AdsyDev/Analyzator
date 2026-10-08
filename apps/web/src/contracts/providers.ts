@@ -5,8 +5,11 @@ import type { Insight } from './insight'
 import type { Mention, MentionQuery, Page, PvFlag, PvItemRef, PvSnapshot, SentimentDistribution } from './mention'
 import type { Evidence, EvidenceQuery, MetricDefinition, MetricsBundle, TrendSeries } from './metric'
 import type { QueryContext } from './period'
+import type { PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from './paid'
 import type { ContentGap, LandingPage, SearchFilters, SearchKeyword } from './search'
+import type { SocialCalendarItem, SocialCompetitor, SocialFilters, SocialGroups, SocialPost, SocialSummary } from './social'
 import type { SourceConnection, SourceStatusInfo, SyncRun } from './source'
+import type { AiReferrals, ClarityDevices, Device, TrackingQuality, TrafficChannels } from './traffic'
 
 /**
  * Stratul de date. Ecranele și componentele cer date doar prin aceste interfețe (spec cap. 26);
@@ -69,6 +72,35 @@ export interface SearchProvider {
   contentGaps(ctx: QueryContext): Promise<ProviderResult<ContentGap[]>>
 }
 
+/** Trafic și conversii (spec cap. 16). KPI-urile GA4 și Clarity ale brandului vin din registru prin `MetricsProvider`. */
+export interface TrafficProvider {
+  channels(ctx: QueryContext, device: Device | null): Promise<ProviderResult<TrafficChannels>>
+  aiReferrals(ctx: QueryContext): Promise<ProviderResult<AiReferrals>>
+  /** Clarity pe device, pentru metricile din registru (`clarity_*`); coloana „Toate" vine din registru. */
+  clarityDevices(ctx: QueryContext): Promise<ProviderResult<ClarityDevices>>
+  trackingQuality(ctx: QueryContext): Promise<ProviderResult<TrackingQuality>>
+}
+
+/**
+ * Paid Media (spec cap. 15), date din exporturi. `summary` este poarta paginii: `not_connected` înseamnă că nu
+ * există niciun import pentru brand, iar pagina arată „Sursă neconectată" cu acțiunea „Importă CSV".
+ */
+export interface PaidProvider {
+  summary(ctx: QueryContext, f: PaidFilters): Promise<ProviderResult<PaidSummary>>
+  budget(ctx: QueryContext): Promise<ProviderResult<PaidBudget>>
+  series(ctx: QueryContext, f: PaidFilters): Promise<ProviderResult<PaidSeries>>
+  rows(ctx: QueryContext, f: PaidFilters): Promise<ProviderResult<PaidRow[]>>
+}
+
+/** Social propriu (spec cap. 17), date din Planable. `summary` e poarta paginii, ca la `PaidProvider`. */
+export interface SocialProvider {
+  summary(ctx: QueryContext, f: SocialFilters): Promise<ProviderResult<SocialSummary>>
+  posts(ctx: QueryContext, f: SocialFilters): Promise<ProviderResult<SocialPost[]>>
+  groups(ctx: QueryContext, f: SocialFilters): Promise<ProviderResult<SocialGroups>>
+  calendar(ctx: QueryContext, f: SocialFilters): Promise<ProviderResult<SocialCalendarItem[]>>
+  competitors(ctx: QueryContext): Promise<ProviderResult<SocialCompetitor[]>>
+}
+
 export interface DataProviders {
   /** `supabase` pe implicit; `fixtures` doar cu VITE_DESIGN_PREVIEW la build. */
   readonly kind: 'supabase' | 'fixtures'
@@ -79,4 +111,7 @@ export interface DataProviders {
   brands: BrandsProvider
   ai: AiVisibilityProvider
   search: SearchProvider
+  traffic: TrafficProvider
+  paid: PaidProvider
+  social: SocialProvider
 }

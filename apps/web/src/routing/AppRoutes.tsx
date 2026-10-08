@@ -7,7 +7,10 @@ import { AdminPlaceholder, ModulePlaceholder, NotFoundPage } from './pages'
 import { RequireAuth } from './RequireAuth'
 import { AiPage } from '../screens/ai/AiPage'
 import { OverviewPage } from '../screens/overview/OverviewPage'
+import { PaidPage } from '../screens/paid/PaidPage'
 import { SeoPage } from '../screens/seo/SeoPage'
+import { SocialPage } from '../screens/social/SocialPage'
+import { TrafficPage } from '../screens/traffic/TrafficPage'
 
 /** `/`: spre Overview-ul ultimului brand permis (sau al primului). Fără brand permis, AppLayout arată mesajul. */
 function HomeRedirect() {
@@ -29,6 +32,9 @@ function BrandModulePage() {
   if (module.segment === 'overview') return <OverviewPage />
   if (module.segment === 'ai') return <AiPage />
   if (module.segment === 'seo') return <SeoPage />
+  if (module.segment === 'traffic') return <TrafficPage />
+  if (module.segment === 'paid') return <PaidPage />
+  if (module.segment === 'social') return <SocialPage />
   return <ModulePlaceholder module={module} brand={brand} role={user.role} />
 }
 

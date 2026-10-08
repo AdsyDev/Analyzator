@@ -1,0 +1,31 @@
+{
+  "_marker": "analyzator-design-preview-fixture",
+  "_note": "Date FICTIVE de social propriu (Planable), doar pentru brandul care are sursa conectată în previzualizare. Postările au text scurt, fără imagini.",
+  "brands": {
+    "brand-minimartieni": {
+      "imported_days_ago": 2,
+      "followers_end": 18420,
+      "followers_start": 18110,
+      "reach_interval": 61200,
+      "posts": [
+        { "days_ago": 2, "platform": "instagram", "format": "video", "topic": "Imunitate", "label": "Sezon rece", "excerpt": "3 obiceiuri simple pentru toamnă, împreună cu pediatrul nostru.", "reach": 4100, "interactions": 310 },
+        { "days_ago": 4, "platform": "facebook", "format": "image", "topic": "Jeleuri cu vitamine", "label": "Sezon rece", "excerpt": "Jeleurile Minimartieni: cum le includem în rutina de dimineață.", "reach": 5200, "interactions": 240 },
+        { "days_ago": 6, "platform": "instagram", "format": "carousel", "topic": "Poftă de mâncare", "label": null, "excerpt": "Ghid în 5 pași pentru mesele copilului mofturos.", "reach": 6900, "interactions": 560 },
+        { "days_ago": 9, "platform": "facebook", "format": "image", "topic": "Imunitate", "label": "Sezon rece", "excerpt": "Întrebarea săptămânii: ce vitamine alegem pentru grădiniță?", "reach": 3800, "interactions": 150 },
+        { "days_ago": 11, "platform": "instagram", "format": "story", "topic": "Jeleuri cu vitamine", "label": null, "excerpt": "Sondaj rapid: jeleuri cu portocală sau cu căpșuni?", "reach": 2300, "interactions": 90 },
+        { "days_ago": 14, "platform": "instagram", "format": "video", "topic": "Creștere și oase", "label": "Educațional", "excerpt": "De ce contează vitamina D, explicat în 40 de secunde.", "reach": 7400, "interactions": 690 },
+        { "days_ago": 16, "platform": "facebook", "format": "carousel", "topic": "Vitamine pe vârste", "label": "Educațional", "excerpt": "Ce vitamine, la ce vârstă: tabel de reținut.", "reach": 4700, "interactions": 380 },
+        { "days_ago": 19, "platform": "instagram", "format": "image", "topic": "Poftă de mâncare", "label": null, "excerpt": "Rețeta zilei: un mic dejun colorat pentru cei mici.", "reach": 3100, "interactions": 170 },
+        { "days_ago": 21, "platform": "facebook", "format": "video", "topic": "Creștere și oase", "label": "Educațional", "excerpt": "Calciu și mișcare: ce spun specialiștii.", "reach": 5600, "interactions": 330 },
+        { "days_ago": 24, "platform": "instagram", "format": "image", "topic": "Imunitate", "label": "Sezon rece", "excerpt": "Începe sezonul rece: lista de verificare a părinților.", "reach": null, "interactions": null },
+        { "days_ago": 26, "platform": "facebook", "format": "image", "topic": null, "label": null, "excerpt": "Mulțumim comunității pentru întrebările din această lună.", "reach": 2000, "interactions": 70 },
+        { "days_ago": 1, "platform": "instagram", "format": "image", "topic": "Vitamine pe vârste", "label": "Educațional", "excerpt": "Mâine publicăm ghidul vitaminelor pe vârste.", "reach": 600, "interactions": 24 }
+      ],
+      "competitors": [
+        { "label": "C1", "name": "Kidvitto", "posts_per_week": 4.5, "followers": 22300, "public_interactions_per_post": 410, "as_of_days_ago": 3 },
+        { "label": "C2", "name": "Junivita", "posts_per_week": 2.0, "followers": 9800, "public_interactions_per_post": 150, "as_of_days_ago": 3 },
+        { "label": "C3", "name": "Multikinder", "posts_per_week": null, "followers": null, "public_interactions_per_post": null, "as_of_days_ago": null }
+      ]
+    }
+  }
+}

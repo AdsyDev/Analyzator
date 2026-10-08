@@ -38,9 +38,22 @@ export function formatMetricValue(value: number | null, unit: MetricUnit): strin
   }
 }
 
+/** Zecimalele afișate pentru o variație absolută: numărătorile se afișează întregi, restul cu o zecimală. */
+const changeDigits = (unit: MetricUnit): 0 | 1 => (unit === 'count' ? 0 : 1)
+
+/**
+ * Direcția unei variații, după valoarea AȘA CUM SE AFIȘEAZĂ: o variație care rotunjită e zero nu are semn și
+ * nu primește săgeată în sus sau în jos („−0 p.p." cu săgeată ar contrazice textul).
+ */
+export function changeDirection(change: number, digits: 0 | 1 = 1): 'up' | 'down' | 'flat' {
+  const f = 10 ** digits
+  return Math.round(Math.abs(change) * f) === 0 ? 'flat' : change > 0 ? 'up' : 'down'
+}
+
 /** Variație absolută: pentru procente se exprimă în puncte procentuale, nu în procente (spec 2.3). */
 export function formatAbsoluteChange(change: number, unit: MetricUnit): string {
-  const sign = change > 0 ? '+' : change < 0 ? '−' : ''
+  const d = changeDirection(change, changeDigits(unit))
+  const sign = d === 'up' ? '+' : d === 'down' ? '−' : ''
   const abs = Math.abs(change)
   const body = unit === 'percent' ? `${ONE.format(abs)}${NBSP}p.p.` : (formatMetricValue(abs, unit) ?? '')
   return `${sign}${body}`
@@ -48,7 +61,8 @@ export function formatAbsoluteChange(change: number, unit: MetricUnit): string {
 
 /** `percent` vine din server în procente (12,7 = +12,7%). */
 export function formatRelativeChange(percent: number): string {
-  const sign = percent > 0 ? '+' : percent < 0 ? '−' : ''
+  const d = changeDirection(percent)
+  const sign = d === 'up' ? '+' : d === 'down' ? '−' : ''
   return `${sign}${ONE.format(Math.abs(percent))}${NBSP}%`
 }
 
@@ -95,4 +109,19 @@ export function formatRelative(iso: IsoDateTime, now: Date = new Date()): string
   const d = Math.floor(h / 24)
   if (d <= 30) return d === 1 ? 'acum o zi' : `acum ${d} zile`
   return formatDateTime(iso)
+}
+
+const CURRENCY = new Map<string, Intl.NumberFormat>()
+
+/**
+ * Bani cu moneda lângă valoare (spec cap. 22). Moneda vine din sursă; nu se convertește și nu se presupune.
+ * `null` nu devine niciodată „0".
+ */
+export function formatCurrency(value: number | null, currency: string, decimals: 0 | 2 = 0): string | null {
+  if (value === null) return null
+  const key = `${currency}:${decimals}`
+  let f = CURRENCY.get(key)
+  if (!f) CURRENCY.set(key, (f = new Intl.NumberFormat(LOCALE, { style: 'currency', currency, currencyDisplay: 'code', minimumFractionDigits: decimals, maximumFractionDigits: decimals })))
+  // Intl pune un spațiu fix între sumă și cod; îl păstrăm, ca „1.234 RON" să nu se rupă pe rânduri.
+  return f.format(value).replace(/\s/g, NBSP)
 }

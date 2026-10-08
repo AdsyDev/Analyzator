@@ -32,7 +32,10 @@ import {
 } from '../../contracts'
 import { addDays, comparisonRange, todayBucharest } from '../../lib/period'
 import { createAiFixtures } from './ai'
+import { createPaidFixtures } from './paid'
 import { createSearchFixtures } from './search'
+import { createSocialFixtures } from './social'
+import { createTrafficFixtures } from './traffic'
 import { FIXTURE_DEFINITIONS, fixtureEvidence, fixtureMetrics, fixtureTrends } from './metrics'
 
 export interface FixtureOptions {
@@ -122,6 +125,9 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
   const flags = new Map<string, PvFlag>()
   const aiFx = createAiFixtures({ allowed, flags, now })
   const search = createSearchFixtures(allowed)
+  const traffic = createTrafficFixtures({ allowed, now })
+  const paid = createPaidFixtures({ allowed, now })
+  const social = createSocialFixtures({ allowed, now })
   const flagKey = (item: PvItemRef) => `${item.kind}:${item.id}`
   const mentionsFor = (brandId: string): Mention[] =>
     mentionsFile.mentions
@@ -261,7 +267,7 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
     },
   }
 
-  return { kind: 'fixtures', metrics, insights, mentions, sources, brands, ai: aiFx.provider, search }
+  return { kind: 'fixtures', metrics, insights, mentions, sources, brands, ai: aiFx.provider, search, traffic, paid, social }
 }
 
 type ProviderGuard<T> = Extract<import('../../contracts').ProviderResult<T>, { kind: 'error' }>

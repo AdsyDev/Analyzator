@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { METRIC_STATUSES } from '../contracts'
 import { metric, warning } from '../test/factories'
-import { formatAbsoluteChange, formatMetricValue, formatRange, formatRelativeChange } from './format'
+import { changeDirection, formatAbsoluteChange, formatMetricValue, formatRange, formatRelativeChange } from './format'
 import { coveragePercent, coverageStateFor, isGoodChange, metricView } from './metricView'
 import { sparkPaths } from './spark'
 import { notesFor, reasonFor } from './warnings'
@@ -23,6 +23,20 @@ describe('formatare', () => {
     expect(formatAbsoluteChange(2.5, 'percent')).toBe('+2,5 p.p.')
     expect(formatAbsoluteChange(-1, 'percent')).toBe('−1 p.p.')
   })
+  it('o variație care rotunjită e zero nu are semn și nu are direcție (nu „−0 p.p." cu săgeată)', () => {
+    expect(formatAbsoluteChange(-0.04, 'percent')).toBe('0\u00a0p.p.')
+    expect(formatAbsoluteChange(0.04, 'percent')).toBe('0\u00a0p.p.')
+    expect(formatAbsoluteChange(-0.4, 'count')).toBe('0')
+    expect(formatRelativeChange(-0.04)).toBe('0\u00a0%')
+    expect(changeDirection(-0.04)).toBe('flat')
+    expect(changeDirection(-0.06)).toBe('down')
+    expect(changeDirection(0.4, 0)).toBe('flat')
+    expect(changeDirection(0.6, 0)).toBe('up')
+    const v = metricView(metric({ unit: 'percent', value: 30, absolute_change: -0.04, relative_change: -0.1 }))
+    expect(v.deltaDirection).toBe('flat')
+    expect(v.deltaText).toBe('0\u00a0p.p.')
+  })
+
   it('variația relativă vine în procente, nu fracție', () => {
     expect(formatRelativeChange(12.7)).toBe('+12,7 %')
     expect(formatRelativeChange(-3)).toBe('−3 %')

@@ -141,40 +141,41 @@ describe('rute de brand', () => {
 })
 
 describe('placeholder-uri cu texte reale (nu „în curând")', () => {
-  it('Paid Media: „Sursă neconectată" cu motivul din design', async () => {
+  it('Paid Media fără import: „Sursă neconectată", motivul din design și acțiunea „Importă CSV"', async () => {
     setup('/brands/brand-urinal/paid')
     expect(await screen.findByRole('heading', { name: 'Sursă neconectată' })).toBeInTheDocument()
-    expect(screen.getByText('Google Ads și Meta Ads nu sunt conectate pentru Urinal. Până la conectare nu afișăm cifre, nici estimate.')).toBeInTheDocument()
+    expect(screen.getByText(/Google Ads și Meta Ads nu sunt conectate pentru Urinal. Până la conectare nu afișăm cifre, nici estimate./)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Importă CSV' })).toBeInTheDocument()
   })
 
-  it('Social: motivul menționează Planable și Concurența', async () => {
-    setup('/brands/brand-minimartieni/social')
+  it('Social fără import: motivul menționează Planable și Concurența', async () => {
+    setup('/brands/brand-urinal/social')
     expect(await screen.findByText(/vin din Planable, care nu e încă conectat/)).toBeInTheDocument()
     expect(screen.getByText(/vezi Concurență/)).toBeInTheDocument()
   })
 
-  it('agency_admin primește „Conectează Google Ads" care duce la Surse', async () => {
+  it('agency_admin primește „Importă CSV", care duce la Surse (intrarea în flux)', async () => {
     setup('/brands/brand-urinal/paid')
-    await userEvent.click(await screen.findByRole('button', { name: 'Conectează Google Ads' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Importă CSV' }))
     await waitFor(() => expect(where()).toBe('/admin/sources'))
     expect(await screen.findByRole('heading', { level: 1, name: 'Surse' })).toBeInTheDocument()
   })
 
-  it.each(['strategist', 'client_viewer'] as const)('%s nu primește o acțiune de conectare (nu are acces la Surse)', async (role) => {
+  it.each(['strategist', 'client_viewer'] as const)('%s nu primește o acțiune de import (nu are acces la Surse)', async (role) => {
     setup('/brands/brand-urinal/paid', { role })
     await screen.findByRole('heading', { name: 'Sursă neconectată' })
-    expect(screen.queryByRole('button', { name: /Conectează|Cere conectarea/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Importă|Conectează|Cere conectarea/ })).toBeNull()
   })
 
-  it('modul cu surse conectate: spune adevărul despre ecran, fără „În curând"', async () => {
-    setup('/brands/brand-urinal/traffic')
+  it('un modul neconstruit (Listening) spune adevărul despre ecran, fără „În curând"', async () => {
+    setup('/brands/brand-urinal/listening')
     expect(await screen.findByRole('heading', { name: 'Acest ecran nu este încă disponibil' })).toBeInTheDocument()
-    expect(screen.getByText(/sunt conectate pentru Urinal, dar ecranul Trafic și conversii nu a fost livrat/)).toBeInTheDocument()
+    expect(screen.getByText(/Ecranul Listening nu a fost livrat în această versiune/)).toBeInTheDocument()
     expect(screen.queryByText(/în curând/i)).toBeNull()
   })
 
   it('niciun placeholder nu folosește „în curând" și niciun mesaj nu vorbește despre stack', async () => {
-    for (const segment of ['ai', 'seo', 'traffic', 'listening', 'competition', 'insights', 'paid', 'social']) {
+    for (const segment of ['listening', 'competition', 'insights', 'paid', 'social']) {
       const { unmount } = render(
         <MemoryRouter initialEntries={[`/brands/brand-urinal/${segment}`]}>
           <App env={{ ...mk() }} />
@@ -189,7 +190,7 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
 
   it('starea surselor în încărcare are schelet, iar eroarea are „Reîncearcă"', async () => {
     let attempts = 0
-    setup('/brands/brand-urinal/paid', {
+    setup('/brands/brand-urinal/listening', {
       providers: (auth) => {
         const base = createFixtureProviders({ now: () => NOW, getRole: () => auth.preview?.role ?? 'agency_admin' })
         return { ...base, sources: { ...base.sources, statuses: async (id) => (++attempts === 1 ? failed('Serverul nu a răspuns.') : base.sources.statuses(id)) } }
@@ -197,7 +198,7 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
     })
     expect(await screen.findByText('Serverul nu a răspuns.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Reîncearcă' }))
-    expect(await screen.findByRole('heading', { name: 'Sursă neconectată' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Acest ecran nu este încă disponibil' })).toBeInTheDocument()
   })
 })
 

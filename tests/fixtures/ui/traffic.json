@@ -1,0 +1,47 @@
+{
+  "_marker": "analyzator-design-preview-fixture",
+  "_note": "Date FICTIVE pentru Trafic și conversii. Sesiunile pe canal se calculează din ga4_sessions al brandului (aceeași perioadă), ca totalurile să se potrivească. Domeniile AI sunt domenii de referrer folosite la clasificare.",
+  "device_share": { "desktop": 0.36, "mobile": 0.58, "tablet": 0.06 },
+  "channels": [
+    { "channel": "Organic Search", "share": 0.38, "change_pct": 2.4, "engagement": 68.2, "ke_rate": 0.045 },
+    { "channel": "Direct", "share": 0.21, "change_pct": -1.1, "engagement": 61.5, "ke_rate": 0.03 },
+    { "channel": "Paid Search", "share": 0.14, "change_pct": 6.3, "engagement": 54.8, "ke_rate": 0.052 },
+    { "channel": "Referral", "share": 0.09, "change_pct": -3.8, "engagement": 58.1, "ke_rate": 0.028 },
+    { "channel": "Organic Social", "share": 0.08, "change_pct": 1.9, "engagement": 47.3, "ke_rate": 0.018 },
+    { "channel": "Email", "share": 0.059, "change_pct": -0.6, "engagement": 72.4, "ke_rate": 0.061 },
+    { "channel": "AI referrals", "share": 0.041, "change_pct": 31.2, "engagement": 66.0, "ke_rate": 0.047 }
+  ],
+  "ai_referrals": {
+    "rules_version": "v3",
+    "rules_effective_from": "2026-09-01",
+    "domains": [
+      { "domain": "chatgpt.com", "share": 0.52, "ke_rate": 0.05 },
+      { "domain": "perplexity.ai", "share": 0.21, "ke_rate": 0.044 },
+      { "domain": "gemini.google.com", "share": 0.17, "ke_rate": 0.039 },
+      { "domain": "copilot.microsoft.com", "share": 0.1, "ke_rate": 0.031 }
+    ]
+  },
+  "clarity_device_factors": {
+    "clarity_rage_click_sessions": { "desktop": 0.3, "mobile": 0.62, "tablet": 0.08 },
+    "clarity_dead_click_sessions": { "desktop": 0.34, "mobile": 0.58, "tablet": 0.08 },
+    "clarity_quickback_sessions": { "desktop": 0.28, "mobile": 0.66, "tablet": 0.06 },
+    "clarity_scroll_depth": { "desktop": 0.92, "mobile": 1.05, "tablet": 0.98 }
+  },
+  "checks": {
+    "brand-urinal": [
+      { "id": "missing_event", "title": "Eveniment lipsă: click către retailer", "note": "Evenimentul mapat pentru „Unde găsești” nu a mai fost primit de 6 zile. Cifrele de key events sunt incomplete pentru această acțiune.", "status": "problem" },
+      { "id": "naming", "title": "Nume de evenimente neschimbate", "note": "Nicio redenumire față de perioada de comparație.", "status": "ok" },
+      { "id": "spike", "title": "Creștere neobișnuită: AI referrals", "note": "Sesiunile din AI referrals au crescut de peste 30% față de comparație. Verifică dacă regulile de clasificare nu au prins trafic nou.", "status": "warning" },
+      { "id": "comparable", "title": "Perioadă comparabilă", "note": "Aceeași versiune a regulilor de canale în ambele perioade.", "status": "ok" }
+    ],
+    "brand-minimartieni": [
+      { "id": "missing_event", "title": "Evenimente mapate prezente", "note": "Toate evenimentele mapate au fost primite în ultimele 7 zile.", "status": "ok" },
+      { "id": "naming", "title": "Nume de evenimente schimbate", "note": "„contact_form” a fost redenumit „lead_contact” pe 28 sept. Valorile dinainte nu se compară direct.", "status": "warning" },
+      { "id": "comparable", "title": "Perioadă comparabilă", "note": "Aceeași versiune a regulilor de canale în ambele perioade.", "status": "ok" }
+    ],
+    "brand-proenzi": [
+      { "id": "mapping", "title": "Key events nemapate", "note": "Nu există încă evenimente mapate pentru acest site. Analyzator semnalează lipsa, nu produce retroactiv evenimente.", "status": "problem" },
+      { "id": "sampling", "title": "Sampling sau thresholding", "note": "API-ul nu a raportat metadate de sampling pentru acest interval.", "status": "unknown" }
+    ]
+  }
+}

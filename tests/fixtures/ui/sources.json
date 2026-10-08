@@ -2,62 +2,338 @@
   "_marker": "analyzator-design-preview-fixture",
   "statuses": {
     "brand-urinal": [
-      { "provider": "seomonitor", "state": "partial", "description": "Rank-uri, visibility și răspunsuri AI pe panelul urmărit.", "data_days_ago": 2, "imported_days_ago": 1, "note": "Proiectul de visibility nu e încă mapat pe acest brand." },
-      { "provider": "ga4", "state": "connected", "description": "Sesiuni, utilizatori și key events.", "data_days_ago": 1, "imported_days_ago": 0, "note": null },
-      { "provider": "gsc", "state": "stale", "description": "Clicks, impressions, CTR și poziție.", "data_days_ago": 5, "imported_days_ago": 4, "note": "Ultima sincronizare a eșuat; afișăm ultimele date importate." },
-      { "provider": "clarity", "state": "error", "description": "Rage clicks, dead clicks, quick backs și scroll depth.", "data_days_ago": 4, "imported_days_ago": 4, "note": "Tokenul API a expirat." },
-      { "provider": "planable", "state": "not_connected", "description": "Social propriu: postări, reach și engagement.", "data_days_ago": null, "imported_days_ago": null, "note": null },
-      { "provider": "google_ads", "state": "not_connected", "description": "Cost, clicks și conversii din Google Ads.", "data_days_ago": null, "imported_days_ago": null, "note": null },
-      { "provider": "meta_ads", "state": "not_connected", "description": "Cost, reach și rezultate din Meta Ads.", "data_days_ago": null, "imported_days_ago": null, "note": null },
-      { "provider": "csv_import", "state": "connected", "description": "Importuri CSV pentru modulele pe bază de import.", "data_days_ago": 9, "imported_days_ago": 9, "note": null }
+      {
+        "provider": "seomonitor",
+        "state": "partial",
+        "description": "Rank-uri, visibility și răspunsuri AI pe panelul urmărit.",
+        "data_days_ago": 2,
+        "imported_days_ago": 1,
+        "note": "Proiectul de visibility nu e încă mapat pe acest brand."
+      },
+      {
+        "provider": "ga4",
+        "state": "connected",
+        "description": "Sesiuni, utilizatori și key events.",
+        "data_days_ago": 1,
+        "imported_days_ago": 0,
+        "note": null
+      },
+      {
+        "provider": "gsc",
+        "state": "stale",
+        "description": "Clicks, impressions, CTR și poziție.",
+        "data_days_ago": 5,
+        "imported_days_ago": 4,
+        "note": "Ultima sincronizare a eșuat; afișăm ultimele date importate."
+      },
+      {
+        "provider": "clarity",
+        "state": "error",
+        "description": "Rage clicks, dead clicks, quick backs și scroll depth.",
+        "data_days_ago": 4,
+        "imported_days_ago": 4,
+        "note": "Tokenul API a expirat."
+      },
+      {
+        "provider": "planable",
+        "state": "not_connected",
+        "description": "Social propriu: postări, reach și engagement.",
+        "data_days_ago": null,
+        "imported_days_ago": null,
+        "note": null
+      },
+      {
+        "provider": "google_ads",
+        "state": "not_connected",
+        "description": "Cost, clicks și conversii din Google Ads.",
+        "data_days_ago": null,
+        "imported_days_ago": null,
+        "note": null
+      },
+      {
+        "provider": "meta_ads",
+        "state": "not_connected",
+        "description": "Cost, reach și rezultate din Meta Ads.",
+        "data_days_ago": null,
+        "imported_days_ago": null,
+        "note": null
+      },
+      {
+        "provider": "csv_import",
+        "state": "not_connected",
+        "description": "Importuri CSV pentru modulele pe bază de import.",
+        "data_days_ago": null,
+        "imported_days_ago": null,
+        "note": null
+      }
     ],
     "brand-minimartieni": [
-      { "provider": "seomonitor", "state": "connected", "description": "Rank-uri, visibility și răspunsuri AI pe panelul urmărit.", "data_days_ago": 1, "imported_days_ago": 0, "note": null },
-      { "provider": "ga4", "state": "connected", "description": "Sesiuni, utilizatori și key events.", "data_days_ago": 1, "imported_days_ago": 0, "note": null },
-      { "provider": "gsc", "state": "error", "description": "Clicks, impressions, CTR și poziție.", "data_days_ago": 3, "imported_days_ago": 3, "note": "Interogarea poziției medii a eșuat." },
-      { "provider": "clarity", "state": "connected", "description": "Rage clicks, dead clicks, quick backs și scroll depth.", "data_days_ago": 1, "imported_days_ago": 0, "note": null },
-      { "provider": "planable", "state": "not_connected", "description": "Social propriu: postări, reach și engagement.", "data_days_ago": null, "imported_days_ago": null, "note": null },
-      { "provider": "google_ads", "state": "not_connected", "description": "Cost, clicks și conversii din Google Ads.", "data_days_ago": null, "imported_days_ago": null, "note": null },
-      { "provider": "meta_ads", "state": "not_connected", "description": "Cost, reach și rezultate din Meta Ads.", "data_days_ago": null, "imported_days_ago": null, "note": null },
-      { "provider": "csv_import", "state": "not_connected", "description": "Importuri CSV pentru modulele pe bază de import.", "data_days_ago": null, "imported_days_ago": null, "note": null }
+      {
+        "provider": "seomonitor",
+        "state": "connected",
+        "description": "Rank-uri, visibility și răspunsuri AI pe panelul urmărit.",
+        "data_days_ago": 1,
+        "imported_days_ago": 0,
+        "note": null
+      },
+      {
+        "provider": "ga4",
+        "state": "connected",
+        "description": "Sesiuni, utilizatori și key events.",
+        "data_days_ago": 1,
+        "imported_days_ago": 0,
+        "note": null
+      },
+      {
+        "provider": "gsc",
+        "state": "error",
+        "description": "Clicks, impressions, CTR și poziție.",
+        "data_days_ago": 3,
+        "imported_days_ago": 3,
+        "note": "Interogarea poziției medii a eșuat."
+      },
+      {
+        "provider": "clarity",
+        "state": "connected",
+        "description": "Rage clicks, dead clicks, quick backs și scroll depth.",
+        "data_days_ago": 1,
+        "imported_days_ago": 0,
+        "note": null
+      },
+      {
+        "provider": "planable",
+        "state": "connected",
+        "description": "Social propriu: postări, reach și engagement.",
+        "data_days_ago": 3,
+        "imported_days_ago": 2,
+        "note": null
+      },
+      {
+        "provider": "google_ads",
+        "state": "not_connected",
+        "description": "Cost, clicks și conversii din Google Ads.",
+        "data_days_ago": null,
+        "imported_days_ago": null,
+        "note": null
+      },
+      {
+        "provider": "meta_ads",
+        "state": "not_connected",
+        "description": "Cost, reach și rezultate din Meta Ads.",
+        "data_days_ago": null,
+        "imported_days_ago": null,
+        "note": null
+      },
+      {
+        "provider": "csv_import",
+        "state": "connected",
+        "description": "Importuri CSV pentru modulele pe bază de import.",
+        "data_days_ago": 3,
+        "imported_days_ago": 2,
+        "note": null
+      }
     ],
     "brand-proenzi": [
-      { "provider": "seomonitor", "state": "partial", "description": "Rank-uri, visibility și răspunsuri AI pe panelul urmărit.", "data_days_ago": 6, "imported_days_ago": 5, "note": "Panelul AI are puține răspunsuri valide." },
-      { "provider": "ga4", "state": "connected", "description": "Sesiuni, utilizatori și key events.", "data_days_ago": 1, "imported_days_ago": 0, "note": null },
-      { "provider": "gsc", "state": "connected", "description": "Clicks, impressions, CTR și poziție.", "data_days_ago": 2, "imported_days_ago": 1, "note": null },
-      { "provider": "clarity", "state": "not_connected", "description": "Rage clicks, dead clicks, quick backs și scroll depth.", "data_days_ago": null, "imported_days_ago": null, "note": null },
-      { "provider": "planable", "state": "not_connected", "description": "Social propriu: postări, reach și engagement.", "data_days_ago": null, "imported_days_ago": null, "note": null },
-      { "provider": "google_ads", "state": "not_connected", "description": "Cost, clicks și conversii din Google Ads.", "data_days_ago": null, "imported_days_ago": null, "note": null },
-      { "provider": "meta_ads", "state": "not_connected", "description": "Cost, reach și rezultate din Meta Ads.", "data_days_ago": null, "imported_days_ago": null, "note": null },
-      { "provider": "csv_import", "state": "not_connected", "description": "Importuri CSV pentru modulele pe bază de import.", "data_days_ago": null, "imported_days_ago": null, "note": null }
+      {
+        "provider": "seomonitor",
+        "state": "partial",
+        "description": "Rank-uri, visibility și răspunsuri AI pe panelul urmărit.",
+        "data_days_ago": 6,
+        "imported_days_ago": 5,
+        "note": "Panelul AI are puține răspunsuri valide."
+      },
+      {
+        "provider": "ga4",
+        "state": "connected",
+        "description": "Sesiuni, utilizatori și key events.",
+        "data_days_ago": 1,
+        "imported_days_ago": 0,
+        "note": null
+      },
+      {
+        "provider": "gsc",
+        "state": "connected",
+        "description": "Clicks, impressions, CTR și poziție.",
+        "data_days_ago": 2,
+        "imported_days_ago": 1,
+        "note": null
+      },
+      {
+        "provider": "clarity",
+        "state": "not_connected",
+        "description": "Rage clicks, dead clicks, quick backs și scroll depth.",
+        "data_days_ago": null,
+        "imported_days_ago": null,
+        "note": null
+      },
+      {
+        "provider": "planable",
+        "state": "not_connected",
+        "description": "Social propriu: postări, reach și engagement.",
+        "data_days_ago": null,
+        "imported_days_ago": null,
+        "note": null
+      },
+      {
+        "provider": "google_ads",
+        "state": "not_connected",
+        "description": "Cost, clicks și conversii din Google Ads.",
+        "data_days_ago": null,
+        "imported_days_ago": null,
+        "note": null
+      },
+      {
+        "provider": "meta_ads",
+        "state": "not_connected",
+        "description": "Cost, reach și rezultate din Meta Ads.",
+        "data_days_ago": null,
+        "imported_days_ago": null,
+        "note": null
+      },
+      {
+        "provider": "csv_import",
+        "state": "not_connected",
+        "description": "Importuri CSV pentru modulele pe bază de import.",
+        "data_days_ago": null,
+        "imported_days_ago": null,
+        "note": null
+      }
     ]
   },
   "connections": {
     "brand-urinal": [
-      { "id": "conn-u-clarity", "provider": "clarity", "external_account_id": "proiect-urinal-ro", "display_name": "urinal.example", "credential_status": "invalid", "last_validated_days_ago": 4, "last_validation_error": "HTTP 401", "credential_updated_by": "Andrei Vasile", "credential_updated_days_ago": 40, "calls_today": 3 },
-      { "id": "conn-u-ga4", "provider": "ga4", "external_account_id": "properties/000000001", "display_name": "GA4 urinal.example", "credential_status": "valid", "last_validated_days_ago": 1, "last_validation_error": null, "credential_updated_by": "Ioana Popescu", "credential_updated_days_ago": 60, "calls_today": 0 }
+      {
+        "id": "conn-u-clarity",
+        "provider": "clarity",
+        "external_account_id": "proiect-urinal-ro",
+        "display_name": "urinal.example",
+        "credential_status": "invalid",
+        "last_validated_days_ago": 4,
+        "last_validation_error": "HTTP 401",
+        "credential_updated_by": "Andrei Vasile",
+        "credential_updated_days_ago": 40,
+        "calls_today": 3
+      },
+      {
+        "id": "conn-u-ga4",
+        "provider": "ga4",
+        "external_account_id": "properties/000000001",
+        "display_name": "GA4 urinal.example",
+        "credential_status": "valid",
+        "last_validated_days_ago": 1,
+        "last_validation_error": null,
+        "credential_updated_by": "Ioana Popescu",
+        "credential_updated_days_ago": 60,
+        "calls_today": 0
+      }
     ],
     "brand-minimartieni": [
-      { "id": "conn-m-clarity", "provider": "clarity", "external_account_id": "proiect-minimartieni", "display_name": "minimartieni.example", "credential_status": "valid", "last_validated_days_ago": 2, "last_validation_error": null, "credential_updated_by": "Andrei Vasile", "credential_updated_days_ago": 12, "calls_today": 10 }
+      {
+        "id": "conn-m-clarity",
+        "provider": "clarity",
+        "external_account_id": "proiect-minimartieni",
+        "display_name": "minimartieni.example",
+        "credential_status": "valid",
+        "last_validated_days_ago": 2,
+        "last_validation_error": null,
+        "credential_updated_by": "Andrei Vasile",
+        "credential_updated_days_ago": 12,
+        "calls_today": 10
+      }
     ],
     "brand-proenzi": [
-      { "id": "conn-p-clarity", "provider": "clarity", "external_account_id": "proiect-proenzi", "display_name": "proenzi.example", "credential_status": "unverified", "last_validated_days_ago": null, "last_validation_error": null, "credential_updated_by": "Andrei Vasile", "credential_updated_days_ago": 1, "calls_today": 0 }
+      {
+        "id": "conn-p-clarity",
+        "provider": "clarity",
+        "external_account_id": "proiect-proenzi",
+        "display_name": "proenzi.example",
+        "credential_status": "unverified",
+        "last_validated_days_ago": null,
+        "last_validation_error": null,
+        "credential_updated_by": "Andrei Vasile",
+        "credential_updated_days_ago": 1,
+        "calls_today": 0
+      }
     ]
   },
   "sync_runs": {
     "brand-urinal": [
-      { "id": "run-u-1", "provider": "ga4", "days_ago": 0, "duration_s": 94, "rows": 28, "status": "succeeded", "error": null },
-      { "id": "run-u-2", "provider": "gsc", "days_ago": 1, "duration_s": 12, "rows": 0, "status": "failed", "error": "HTTP 503" },
-      { "id": "run-u-3", "provider": "clarity", "days_ago": 4, "duration_s": 8, "rows": 0, "status": "failed", "error": "HTTP 401" },
-      { "id": "run-u-4", "provider": "seomonitor", "days_ago": 1, "duration_s": 210, "rows": 1320, "status": "partial", "error": "Proiect de visibility nemapat" },
-      { "id": "run-u-5", "provider": "csv_import", "days_ago": 9, "duration_s": 3, "rows": 40, "status": "succeeded", "error": null }
+      {
+        "id": "run-u-1",
+        "provider": "ga4",
+        "days_ago": 0,
+        "duration_s": 94,
+        "rows": 28,
+        "status": "succeeded",
+        "error": null
+      },
+      {
+        "id": "run-u-2",
+        "provider": "gsc",
+        "days_ago": 1,
+        "duration_s": 12,
+        "rows": 0,
+        "status": "failed",
+        "error": "HTTP 503"
+      },
+      {
+        "id": "run-u-3",
+        "provider": "clarity",
+        "days_ago": 4,
+        "duration_s": 8,
+        "rows": 0,
+        "status": "failed",
+        "error": "HTTP 401"
+      },
+      {
+        "id": "run-u-4",
+        "provider": "seomonitor",
+        "days_ago": 1,
+        "duration_s": 210,
+        "rows": 1320,
+        "status": "partial",
+        "error": "Proiect de visibility nemapat"
+      },
+      {
+        "id": "run-u-5",
+        "provider": "csv_import",
+        "days_ago": 9,
+        "duration_s": 3,
+        "rows": 40,
+        "status": "succeeded",
+        "error": null
+      }
     ],
     "brand-minimartieni": [
-      { "id": "run-m-1", "provider": "ga4", "days_ago": 0, "duration_s": 101, "rows": 28, "status": "succeeded", "error": null },
-      { "id": "run-m-2", "provider": "clarity", "days_ago": 0, "duration_s": 15, "rows": 4, "status": "succeeded", "error": null }
+      {
+        "id": "run-m-1",
+        "provider": "ga4",
+        "days_ago": 0,
+        "duration_s": 101,
+        "rows": 28,
+        "status": "succeeded",
+        "error": null
+      },
+      {
+        "id": "run-m-2",
+        "provider": "clarity",
+        "days_ago": 0,
+        "duration_s": 15,
+        "rows": 4,
+        "status": "succeeded",
+        "error": null
+      }
     ],
     "brand-proenzi": [
-      { "id": "run-p-1", "provider": "ga4", "days_ago": 0, "duration_s": 77, "rows": 28, "status": "succeeded", "error": null }
+      {
+        "id": "run-p-1",
+        "provider": "ga4",
+        "days_ago": 0,
+        "duration_s": 77,
+        "rows": 28,
+        "status": "succeeded",
+        "error": null
+      }
     ]
   }
 }

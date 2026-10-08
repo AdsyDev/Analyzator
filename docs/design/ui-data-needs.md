@@ -1,6 +1,6 @@
-# Seturi de date de care are nevoie interfața (UI-3)
+# Seturi de date de care are nevoie interfața (UI-3, UI-4)
 
-Ecranele **AI Visibility** și **SEO și Search** citesc, în afara metricilor din registru, liste și agregate pentru care **nu există încă un contract de server** (`docs/contracts/` are doar `metric-response.md` și `clarity.md`, iar tabelele `ai_answers`, `keywords`, `rank_observations` din spec cap. 25 nu sunt în baza de date). Tipurile din `apps/web/src/contracts/ai.ts` și `search.ts` sunt cerințele UI-ului, nu un contract: se aliniază la cel real când există, la fel cum s-a făcut cu `MetricResponse`.
+Ecranele **AI Visibility**, **SEO și Search**, **Trafic și conversii**, **Paid Media** și **Social** citesc, în afara metricilor din registru, liste și agregate pentru care **nu există încă un contract de server** (`docs/contracts/` are doar `metric-response.md` și `clarity.md`, iar tabelele `ai_answers`, `keywords`, `rank_observations` din spec cap. 25 nu sunt în baza de date). Tipurile din `apps/web/src/contracts/ai.ts`, `search.ts`, `traffic.ts`, `paid.ts` și `social.ts` sunt cerințele UI-ului, nu un contract: se aliniază la cel real când există, la fel cum s-a făcut cu `MetricResponse`.
 
 Interfețele sunt `AiVisibilityProvider` și `SearchProvider` (`contracts/providers.ts`). Providerul `supabase` întoarce `not_connected` cu motiv pentru toate; providerul `fixtures` (doar previzualizare) generează date fictive din `tests/fixtures/ui/ai.json` și `search.json`.
 
@@ -40,3 +40,49 @@ Filtrul ecranului: `kw` (`brand`, `nonbrand`), în URL. KPI-urile vin din regist
 ## Ce lipsește din registrul de metrici
 
 Cheile `ai_mention_rate`, `ai_recommendation_rate`, `ai_owned_citation_rate`, `ai_sov`, `ai_valid_answers` nu sunt în `metric_definitions`. Cardurile KPI ale paginii AI arată „Sursă neconectată", fără definiție inventată, până intră în registru (cu pragurile AI din spec: 50 de răspunsuri, acoperire minimă 80%).
+
+---
+
+# UI-4: Trafic și conversii, Paid Media, Social
+
+Interfețele sunt `TrafficProvider`, `PaidProvider` și `SocialProvider`. Aceleași reguli ca mai sus (fără formule în UI, `null` ≠ 0, acces verificat pe server). În plus, pentru bani: **moneda vine din sursă și se afișează lângă valoare**, fără conversii (spec 2.3). Registrul nu are unitate monetară (`currency`); KPI-urile Paid nu sunt metrici din registru.
+
+## Trafic și conversii
+
+KPI-urile GA4 vin din registru (`ga4_sessions`, `ga4_active_users`, `ga4_engaged_sessions`, `ga4_key_events`). `ga4_engagement_rate` nu e în registru: cardul rămâne „Sursă neconectată" (rata nu se calculează în UI din două metrici).
+
+| Cerere | Răspuns | Note |
+|---|---|---|
+| `channels(ctx, device)` | `TrafficChannels` | Pe grup de canale GA4: `sessions`, `share_pct` (cota în totalul filtrat), `change_pct` (relativă, în %), `engagement_rate`, `key_events`. Filtrul `device` (`desktop`, `mobile`, `tablet`) se aplică doar canalelor; KPI-urile rămân pe toate device-urile (UI-ul o spune explicit). |
+| `aiReferrals(ctx)` | `AiReferrals` | Surse cu `sessions`, `key_events`, `conversion_rate` (calculată de server); `rules_version` și `rules_effective_from` (regulile sunt versionate, spec cap. 16). |
+| `clarityDevices(ctx)` | `ClarityDevices` | Defalcarea pe device pentru cele patru metrici `clarity_*`. Coloana „Toate" vine din registru; `clarity_daily` are dimensiunea `device`, dar view-ul de observații o exclude, deci defalcarea cere un view nou. |
+| `trackingQuality(ctx)` | `TrackingQuality` | Verificări cu `status` (`ok`, `warning`, `problem`, `unknown`), titlu și notă, plus `checked_at`. |
+
+Starea sincronizării Clarity (bannerul „Sincronizarea Clarity are probleme") se citește din `SourcesProvider.statuses`, nu dintr-o cerere nouă.
+
+## Paid Media
+
+`summary` e poarta paginii: `not_connected` = niciun import pentru brand; pagina arată „Sursă neconectată" cu acțiunea „Importă CSV" (intrare în Administrare → Surse, doar `agency_admin`).
+
+| Cerere | Răspuns | Note |
+|---|---|---|
+| `summary(ctx, {platform})` | `PaidSummary` | Șapte KPI (`spend`, `impressions`, `clicks`, `ctr`, `cpc`, `conversions`, `cpa`), fiecare cu `definition` (tooltip), `change` (relativă în %, la CTR în p.p.), `status`; moneda, `source_timezone`, `imported_at`, `data_as_of`. CTR, CPC, CPA din totaluri, nu medii de rate; CPA doar pentru campaniile cu conversii (awareness fără). |
+| `budget(ctx)` | `PaidBudget` | `approved_budget` (încărcat de agenție), `spent`, zile trecute/planificate, `spend_pct` și `time_pct` calculate de server. UI-ul arată cele două procente fără verdict. |
+| `series(ctx, {platform})` | `PaidSeries` | Spend și rezultate separate, cu zile `null` unde nu există import. |
+| `rows(ctx, {platform})` | `PaidRow[]` | Câte un rând pe zi, platformă, cont, campanie, cu `attribution_window`. `conversions` și `cpa` sunt `null` unde nu se aplică. |
+
+Nu sunt în UI (nu au contract): „Observații" (modificări de campanie notate de echipă) și „Creatives proprii" (după lansare; designul cere explicit fără galerie).
+
+## Social propriu
+
+`summary` e poarta paginii, ca la Paid (sursa: Planable).
+
+| Cerere | Răspuns | Note |
+|---|---|---|
+| `summary(ctx, filters)` | `SocialSummary` | Cinci KPI (`posts`, `followers`, `net_growth`, `interactions`, `reach`) cu `definition`, `status` și `note`. Reach din raportul pe interval (nu se însumează); followers la sfârșit de interval. |
+| `posts(ctx, filters)` | `SocialPost[]` | `mature` (fereastra comună de maturizare, 7 zile) decisă de server; `reach` și `interactions` `null` când lipsesc datele de performanță; `permalink` validat în UI. |
+| `groups(ctx, filters)` | `SocialGroups` | Pe topic și pe format: `n`, `posts_per_week`, `median_interactions`. Mediana include doar postările mature cu date; perioada de observare e în răspuns. |
+| `calendar(ctx, filters)` | `SocialCalendarItem[]` | Publicări observate; postările fără analytics rămân, cu `has_performance: false`. |
+| `competitors(ctx)` | `SocialCompetitor[]` | Doar date publice (cadence, followers, interacțiuni pe postare); fără reach privat. |
+
+Filtrele ecranului în URL: `platform` (`facebook`, `instagram`, `linkedin`) și `format` (`image`, `video`, `carousel`, `story`). La Paid: `platform` (`google_ads`, `meta_ads`).

@@ -1,5 +1,5 @@
 import type { DataProviders, SourceProviderId } from '../contracts'
-import { AI_ENGINES } from '../contracts'
+import { AI_ENGINES, SOCIAL_FORMATS, SOCIAL_PLATFORMS } from '../contracts'
 import { AI_ENGINE_LABELS } from '../lib/ai'
 import type { FilterDef } from '../lib/period'
 
@@ -56,6 +56,32 @@ export const KEYWORD_TYPE_FILTER: FilterDef = {
   ],
 }
 
+export const PAID_PLATFORM_FILTER: FilterDef = {
+  key: 'platform',
+  label: 'Platformă',
+  defaultValue: 'all',
+  options: [
+    { value: 'all', label: 'Toate platformele' },
+    { value: 'google_ads', label: 'Google Ads' },
+    { value: 'meta_ads', label: 'Meta Ads' },
+  ],
+}
+
+export const SOCIAL_PLATFORM_FILTER: FilterDef = {
+  key: 'platform',
+  label: 'Platformă',
+  defaultValue: 'all',
+  options: [{ value: 'all', label: 'Toate platformele' }, ...SOCIAL_PLATFORMS.map((p) => ({ value: p, label: p === 'linkedin' ? 'LinkedIn' : p[0]!.toUpperCase() + p.slice(1) }))],
+}
+
+const FORMAT_LABELS: Record<string, string> = { image: 'Imagine', video: 'Video', carousel: 'Carusel', story: 'Story' }
+export const SOCIAL_FORMAT_FILTER: FilterDef = {
+  key: 'format',
+  label: 'Format',
+  defaultValue: 'all',
+  options: [{ value: 'all', label: 'Toate formatele' }, ...SOCIAL_FORMATS.map((f) => ({ value: f, label: FORMAT_LABELS[f] ?? f }))],
+}
+
 const AI_GROUPS: DynamicFilter = {
   key: 'group',
   label: 'Grup',
@@ -77,8 +103,7 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
     title: 'Paid Media',
     subtitle: () => '',
     sources: ['google_ads', 'meta_ads'],
-    filters: [],
-    connectLabel: 'Conectează Google Ads',
+    filters: [PAID_PLATFORM_FILTER],
     disconnected: (b) => `Google Ads și Meta Ads nu sunt conectate pentru ${b}. Până la conectare nu afișăm cifre, nici estimate.`,
   },
   social: {
@@ -86,8 +111,7 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
     title: 'Social',
     subtitle: () => '',
     sources: ['planable'],
-    filters: [],
-    connectLabel: 'Conectează Planable',
+    filters: [SOCIAL_PLATFORM_FILTER, SOCIAL_FORMAT_FILTER],
     disconnected: (b) => `Datele despre postările ${b} vin din Planable, care nu e încă conectat. Pentru comparația publică cu competitorii, vezi Concurență.`,
   },
   listening: { segment: 'listening', title: 'Listening', subtitle: () => 'Mențiunile publice despre brand, cu sentiment revizuit de echipa AdSymphony.', sources: [], filters: [] },

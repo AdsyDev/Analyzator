@@ -2,7 +2,10 @@ import {
   notConnected,
   type AiVisibilityProvider,
   type BrandsProvider,
+  type PaidProvider,
   type SearchProvider,
+  type SocialProvider,
+  type TrafficProvider,
   type DataProviders,
   type InsightsProvider,
   type MentionsProvider,
@@ -98,10 +101,36 @@ const search: SearchProvider = {
   contentGaps: async () => notConnected(SEARCH_UNAVAILABLE),
 }
 
+const TRAFFIC_UNAVAILABLE = 'Datele de trafic nu sunt încă disponibile pentru acest brand.'
+const NO_PAID_IMPORT = 'Nu există date de Paid Media importate pentru acest brand.'
+const NO_SOCIAL_IMPORT = 'Nu există date sociale importate pentru acest brand.'
+
+const traffic: TrafficProvider = {
+  channels: async () => notConnected(TRAFFIC_UNAVAILABLE),
+  aiReferrals: async () => notConnected(TRAFFIC_UNAVAILABLE),
+  clarityDevices: async () => notConnected('Datele Microsoft Clarity pe device nu sunt încă disponibile pentru acest brand.'),
+  trackingQuality: async () => notConnected('Verificările de tracking nu sunt încă disponibile pentru acest brand.'),
+}
+
+const paid: PaidProvider = {
+  summary: async () => notConnected(NO_PAID_IMPORT),
+  budget: async () => notConnected(NO_PAID_IMPORT),
+  series: async () => notConnected(NO_PAID_IMPORT),
+  rows: async () => notConnected(NO_PAID_IMPORT),
+}
+
+const social: SocialProvider = {
+  summary: async () => notConnected(NO_SOCIAL_IMPORT),
+  posts: async () => notConnected(NO_SOCIAL_IMPORT),
+  groups: async () => notConnected(NO_SOCIAL_IMPORT),
+  calendar: async () => notConnected(NO_SOCIAL_IMPORT),
+  competitors: async () => notConnected(NO_SOCIAL_IMPORT),
+}
+
 /**
  * Implementarea reală. Rămâne goală: fiecare provider se completează ecran cu ecran, pe măsură ce
  * tabelele și conectorii livrează date (UI-6 pentru Administrare, apoi restul modulelor).
  */
 export function createSupabaseProviders(): DataProviders {
-  return { kind: 'supabase', metrics, insights, mentions, sources, brands, ai, search }
+  return { kind: 'supabase', metrics, insights, mentions, sources, brands, ai, search, traffic, paid, social }
 }

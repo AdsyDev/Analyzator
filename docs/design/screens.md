@@ -163,3 +163,24 @@ Ce s-a implementat diferit de designul din `docs/design/reference/` și de ce. N
 | Detaliu răspuns cu citări | Citările sunt linkuri validate; răspuns refuzat/eroare/necolectat au explicație proprie | Spec 2.2 și 28. |
 | Corectarea etichetelor de un specialist (cu motiv) | Nu e implementată | Cere un contract de scriere și audit; nu există. |
 | Marcarea PV pe răspuns | Pentru răspunsurile valide (cu text) | Un răspuns fără text nu are ce se înregistra. |
+
+---
+
+# Diferențe față de design (UI-4: Trafic și conversii, Paid Media, Social)
+
+| Design / spec | Implementat | Motiv |
+|---|---|---|
+| „Engagement rate" ca KPI (spec cap. 16) | „Sursă neconectată" | Cheia nu e în registru; rata nu se calculează în UI din sesiuni cu implicare și sesiuni. |
+| „Key events selectate" | `ga4_key_events` | Nu există selecție de key events în contract. |
+| Filtru Canal în Trafic | Doar Device | Designul îl aplica doar tabelului de canale, iar Device nu are corespondent în metricile din registru: secțiunea Canale spune explicit că KPI-urile rămân pe toate device-urile. |
+| Landing pages din trafic, parcursuri definite (spec cap. 16) | Lipsesc | Nu sunt în cerința UI-4; nu au contract. |
+| Comportament Clarity cu valori pe device | Coloana „Toate" din registru, device din provider; definițiile `draft` marcate „Provizoriu"; banner când sursa are probleme | Registrul are doar agregatul pe brand; defalcarea cere un view nou. Valorile Clarity rămân neconfirmate (`docs/contracts/clarity.md`). |
+| „Reconectează în Surse" | Doar pentru `agency_admin` | Surse e doar pentru `agency_admin`. |
+| Paid: „Observații" și „Creatives" | Lipsesc | Fără contract; creatives după lansare, iar designul cere fără galerie. |
+| Paid/Social fără import: „Conectează Google Ads / Planable" | „Sursă neconectată" cu „Importă CSV" (agency_admin) | Cerința UI-4: modulele sunt pe bază de import; acțiunea doar intră în flux (Administrare → Surse), fără logica importului. Clientul și ceilalți nu primesc acțiune (nu există canal de cerere). |
+| Pacing cu stare „în ritm / în urmă" | Două bare (spend față de buget, zile trecute din plan) și nota „reper, nu verdict" | Spec cap. 15: progresul liniar e un reper; nu emitem o judecată automată. |
+| Postări cu preview imagine | Text scurt, platformă, format, topic, link validat | Nu există imagini autorizate; fără dependențe externe în interfață. |
+| Social: clasarea postărilor | Postările sub 7 zile marcate „date incomplete"; mediana doar din cele mature | Spec cap. 17: nu clasăm o postare de ieri împotriva uneia cu trei luni de expunere fără avertizare. |
+| Cardul KPI se deschide în EvidenceDrawer | Doar pentru metricile din registru (Trafic); Paid și Social au `StatCard` cu definiție în tooltip | Datele importate nu sunt `MetricResponse` și nu au `evidence_query`. |
+| Variație „−0 p.p." cu săgeată | „0 p.p." fără săgeată | Direcția se derivă din valoarea rotunjită, ca textul și săgeata să nu se contrazică. |
+
