@@ -75,3 +75,14 @@ _De completat._
 - `not_connected` în log = lipsește credentialul Google al tenantului, sau a fost marcat invalid. Nu e o eroare a rulării.
 - `access_denied` pe un brand = service account-ul nu are acces la proprietatea respectivă (adaugă-l în GA4 / Search Console).
 - `ga4_incompatible_*` = combinație de dimensiuni și metrici respinsă de `checkCompatibility`; metrica rămâne NULL, nu 0.
+
+
+## Import CSV (paid, social, listening)
+
+- Contracte și șabloane: `docs/contracts/csv-*.md` și `docs/templates/csv/*.csv` (generate cu `npm run docs:csv`).
+- Flux (Edge Function `csv-import`): `preview` (validare; nimic nu intră în tabelul țintă) → agenția verifică raportul → `confirm`. Doar `agency_admin` și `account` cu `brand_access` pot importa.
+- La încărcare se declară moneda (paid), fusul orar și, opțional, `attribution_config` și `click_type`.
+- Un fișier respins: `import_batches.detected.errors` (antet / format) și `import_batch_rows` (`status = rejected`, `reason`).
+- Fișier identic după import → 409. Un reimport al aceleiași perioade, dintr-un fișier diferit, înlocuiește rândurile cu aceeași cheie.
+- Lot rămas în `validating` (proces întrerupt): se reia cu `confirm`; dacă a rămas blocat, `update import_batches set status = 'validated' where id = …` (service role), apoi reconfirmă.
+- Cost / CPC / CPA sunt `draft` până când contractul `MetricResponse` primește unitatea monetară (vezi `docs/decisions.md`, B6-9).

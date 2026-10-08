@@ -497,19 +497,19 @@ select is(
 
 -- Registrul ----------------------------------------------------------------------------------------
 
-select is((select count(*)::int from public.metric_definitions), 16, 'D1: 16 definiții de nivel A');
-select is((select count(*)::int from public.metric_definitions_current), 16, 'D1: câte o versiune curentă per metrică');
+select is((select count(*)::int from public.metric_definitions where primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity')), 16, 'D1: 16 definiții de nivel A (nivelul B, import CSV, are propriile teste în 08)');
+select is((select count(*)::int from public.metric_definitions_current where primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity')), 16, 'D1: câte o versiune curentă per metrică (nivel A)');
 select is_empty(
   $$ select metric_key from public.metric_definitions where primary_source = 'clarity' and lifecycle <> 'draft' $$,
   'D1: toate metricile Clarity sunt draft până la fixtures'
 );
 select results_eq(
   $$ select primary_source::text collate "C", min(freshness_grace_days), max(freshness_grace_days)
-     from public.metric_definitions group by 1 order by 1 $$,
+     from public.metric_definitions where primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') group by 1 order by 1 $$,
   $$ values ('clarity'::text collate "C", 1, 1), ('ga4', 2, 2), ('gsc', 3, 3), ('seomonitor', 7, 7) $$,
   'D1: toleranța stale per sursă: GA4 2, GSC 3, SEOmonitor 7, Clarity 1'
 );
-select is_empty($$ select metric_key from public.metric_definitions where min_sample is not null $$,
+select is_empty($$ select metric_key from public.metric_definitions where min_sample is not null and primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') $$,
   'D1: nivelul A nu are prag de eșantion');
 select throws_ok($$ update public.metric_definitions set formula_ro = 'alta' where metric_key = 'gsc_ctr' $$,
   '42501', null, 'D2: versiunile nu se modifică (nici de owner)');
@@ -525,7 +525,7 @@ select throws_ok(
 -- Acces ---------------------------------------------------------------------------------------------
 
 select tests.authenticate_as('30000000-0000-0000-0000-000000000005'); -- client fără niciun brand
-select is((select count(*)::int from public.metric_definitions), 16, 'A1: registrul e citibil de orice utilizator autentificat');
+select cmp_ok((select count(*)::int from public.metric_definitions), '>=', 16, 'A1: registrul e citibil de orice utilizator autentificat');
 select is(pg_temp.status(pg_temp.run(pg_temp.def('gsc_ctr'), '[]')), 'cannot_compute',
   'A1: authenticated poate executa funcțiile pure din metrics');
 select throws_ok(

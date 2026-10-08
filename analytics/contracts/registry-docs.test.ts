@@ -43,7 +43,12 @@ describe('contractul MetricResponse', () => {
 
 describe('registrul de metrici', () => {
   const doc = read('docs/metrics/registry.md')
-  const documented = [...section(doc, 'Metrici de nivel A').matchAll(/^\| `([a-z0-9_]+)` \| (\d+) \|/gm)]
+  // Nivel A (conectori automate) și nivel B (import CSV): aceeași regulă pentru ambele.
+  const rowRe = /^\| `([a-z0-9_]+)` \| (\d+) \|/gm
+  const documented = [
+    ...section(doc, 'Metrici de nivel A').matchAll(rowRe),
+    ...section(doc, 'Metrici de nivel B (import CSV)').matchAll(rowRe),
+  ]
     .map((m) => `${m[1]}@${m[2]}`)
     .sort()
 
