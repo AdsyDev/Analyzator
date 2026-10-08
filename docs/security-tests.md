@@ -62,6 +62,39 @@ Registrul de metrici e al produsului, nu al unui client: aceleași definiții pe
 
 Funcțiile de calcul al metricilor sunt pure: primesc definiția și observațiile ca `jsonb` și nu citesc tabele. De aceea `authenticated` le poate executa fără risc de acces la date. Garda A15 cere: IMMUTABLE sau STABLE, fără SECURITY DEFINER, `search_path` gol, nicio referință la tabele sau view-uri, nicio relație în schemă, fără EXECUTE pentru `anon`. Schema nu e expusă prin API (`PGRST_DB_SCHEMAS = public,graphql_public`).
 
+### E4. `create_competitor_set_version` executabilă de `authenticated` (aprobată 8 oct 2026)
+
+Singura funcție din `public` apelabilă de utilizatori. Creează atomic o versiune nouă a setului de competitori (set + membri), pentru că `competitor_sets` și `competitor_set_members` sunt imutabile și două insert-uri separate puteau lăsa un set efectiv fără membri.
+
+- **SECURITY INVOKER**, nu DEFINER: rulează cu drepturile apelantului, deci RLS (`competitor_sets_insert`, `competitor_set_members_insert`) rămâne autoritatea; funcția nu poate scrie nimic ce politicile nu permit. Nu primește actor din exterior: `created_by = auth.uid()`. Garda A10 (nicio funcție DEFINER executabilă de clienți) rămâne neschimbată. Nu e nevoie de Edge Function.
+- Verificarea explicită din corp (`private.has_brand_role`, agency_admin sau strategist) există pentru mesaje clare în română; brand inexistent, brand străin și rol insuficient dau **același** răspuns (fără oracol de existență).
+- Concurența: `pg_advisory_xact_lock` pe brand serializează apelurile, deci `max(version)+1` nu poate produce aceeași versiune de două ori.
+- Auditul: triggerele existente scriu în `audit_events` un rând pentru set și câte unul pentru fiecare membru, cu actorul din JWT, în aceeași tranzacție.
+- `anon` și `PUBLIC` nu au EXECUTE (A11/E4). Garda A11 admite exact această funcție pentru `authenticated`; orice altă funcție din `public` executabilă de clienți pică testul.
+
+**Contractul pentru UI** (`supabase.rpc('create_competitor_set_version', …)`):
+
+| Parametru | Tip | Note |
+|---|---|---|
+| `p_brand_id` | uuid | brandul; tenantul se deduce din brand |
+| `p_effective_from` | date (ISO `YYYY-MM-DD`) | ≥ azi în Europe/Bucharest; unic per brand |
+| `p_note` | text sau null | tăiată; maximum 1000 de caractere; gol → null |
+| `p_members` | jsonb, listă de 1–10 obiecte `{ "name": text, "domain"?: text, "color"?: "#RRGGBB" }` | ordinea din listă devine `sort_order` |
+
+Răspuns: un rând `{ competitor_set_id, version, effective_from, member_count }`.
+
+Normalizări: `name` tăiat (maximum 120 de caractere), unic fără deosebire de majuscule; `domain` lowercase, fără schemă, utilizator, port, cale, query sau fragment, gol → null; `color` gol → null.
+
+Erori (`error.code` PostgREST = SQLSTATE, `error.message` în română, afișabil direct):
+
+| SQLSTATE | Cazuri |
+|---|---|
+| `42501` | „Nu ai dreptul să creezi o versiune a setului de competitori pentru acest brand” (fără sesiune, rol altul decât agency_admin/strategist, fără acces la brand, alt tenant, brand inexistent) |
+| `22023` | dată lipsă sau în trecut; notă prea lungă; membrii nu sunt listă; mai puțin de 1 sau mai mult de 10 membri; nume lipsă, gol, prea lung sau duplicat; domeniu sau culoare invalide. Mesajele pe membru încep cu „Membrul N”. |
+| `23505` | există deja o versiune cu aceeași `effective_from` |
+
+Orice eroare anulează toată tranzacția: nu rămâne set parțial. Versiunile existente nu se modifică. O versiune cu `effective_from` mai mică decât a unei versiuni viitoare existente primește totuși numărul următor (versiunea efectivă se alege după dată, nu după număr).
+
 ## Inventar la 7 oct 2026
 
 | Tip | Ce există | Acoperit de |
@@ -93,7 +126,7 @@ Funcțiile de calcul al metricilor sunt pure: primesc definiția și observații
 | A8 | Orice view din `public` are `security_invoker = true` |
 | A9 | Niciun materialized view în schemele expuse (nu respectă RLS) |
 | A10 | Nicio funcție SECURITY DEFINER în schemele expuse; toate au `search_path` fixat; niciuna nu returnează date (doar boolean sau trigger); lista exactă a funcțiilor executabile de `authenticated` |
-| A11 | Nicio funcție RPC în `public`. **O funcție nouă trebuie revizuită și adăugată explicit.** |
+| A11 | Nicio funcție RPC în `public` executabilă de anon sau authenticated, în afara excepției E4 (`create_competitor_set_version`, SECURITY INVOKER). **O funcție nouă trebuie revizuită și adăugată explicit.** |
 | A12 | Niciun bucket public |
 | A13 | Niciun tabel în `supabase_realtime`, nicio publicație FOR ALL TABLES |
 | A14 | Fără oracol: un brand străin existent și unul inexistent dau același răspuns; `user_has_brand_role` și TRUNCATE sunt refuzate ca `authenticated` |
@@ -116,6 +149,21 @@ Funcțiile de calcul al metricilor sunt pure: primesc definiția și observații
   - V8: secretul trebuie să aparțină conexiunii.
   - V9: ștergerea conexiunii șterge secretul.
   - V10: `provider_api_calls` e append-only, izolat pe brand și scris doar de service role.
+
+## F. Versiune nouă a setului de competitori (pgTAP, `07_competitor_set_version.test.sql`)
+
+| ID | Verificare |
+|---|---|
+| F1 | Respinși: strategist fără acces la brand, client_viewer (cu și fără acces), account, admin al altui tenant, brand inexistent (același mesaj ca brand străin), anon; nicio versiune creată |
+| F2 | 0 și 11 membri, nume gol (al doilea membru, după ce primul fusese inserat), nume lipsă, duplicat (majuscule/spații), culoare și domeniu invalide, membri non-listă: niciun set parțial, niciun membru orfan |
+| F3 | `effective_from` în trecut (inclusiv ieri în Europe/Bucharest) și null respins |
+| F4 | Succes cu data de azi: versiune = max+1, normalizare (nume, domeniu, notă), `created_by`, `tenant_id` din brand, ordinea; versiunea 1 neatinsă |
+| F5 | Audit: un eveniment pentru set și unul pe membru, cu actor |
+| F6 | `effective_from` duplicat respins; versiunea crește la 3; lock advisory luat pe brand |
+| F7 | Numărătoare independentă per brand; agency_admin pe orice brand al tenantului |
+| F8 | Update și delete pe `competitor_sets` / `competitor_set_members` rămân interzise |
+
+Concurența reală (două sesiuni) nu poate fi reprodusă într-un test pgTAP, care rulează într-o singură tranzacție. Verificat manual pe 8 oct 2026, local: sesiunea A apelează funcția și ține tranzacția deschisă 4 s; sesiunea B apelează cu altă dată. B așteaptă lock-ul și primește versiunea imediat următoare (A=2, B=3, B întârziat cu 4 s).
 
 ## B. Atacuri prin API (`tests/security/api-isolation.test.mjs`)
 
