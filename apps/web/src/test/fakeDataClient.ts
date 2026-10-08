@@ -12,6 +12,8 @@ interface Opts {
   tables?: Record<string, Row[]>
   errors?: Record<string, { code?: string; message: string }>
   /** Răspuns pentru `functions.invoke`; poate fi o eroare cu `context.json()`. */
+  /** Utilizatorul sesiunii (pentru `auth.getSession`). */
+  userId?: string | null
   invoke?: (name: string, body: unknown) => { data?: unknown; error?: unknown } | Promise<{ data?: unknown; error?: unknown }>
 }
 
@@ -69,7 +71,10 @@ export function fakeDataClient(opts: Opts = {}) {
         const err = opts.errors?.[`${table}:${call.op}`] ?? opts.errors?.[table]
         let result: { data: unknown; error: unknown }
         if (err) result = { data: null, error: err }
-        else if (call.op === 'insert') result = { data: single ? { ...(call.payload as Row), id: 'new-id', credential_status: 'missing' } : call.payload, error: null }
+        else if (call.op === 'update') {
+          for (const r of rows()) Object.assign(r, call.payload as Row)
+          result = { data: null, error: null }
+        } else if (call.op === 'insert') result = { data: single ? { ...(call.payload as Row), id: 'new-id', credential_status: 'missing' } : call.payload, error: null }
         else {
           const r = rows()
           result = { data: single ? (r[0] ?? null) : r, error: null }
@@ -81,6 +86,7 @@ export function fakeDataClient(opts: Opts = {}) {
   }
 
   const client = {
+    auth: { getSession: async () => ({ data: { session: opts.userId === null ? null : { user: { id: opts.userId ?? 'me' } } } }) },
     from: (table: string) => builder(table),
     functions: {
       invoke: async (name: string, init: { body: unknown }) => {

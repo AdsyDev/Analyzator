@@ -2,7 +2,6 @@ import { MagnifyingGlassIcon, PlugsIcon, ProhibitIcon, WarningCircleIcon } from 
 import { useNavigate } from 'react-router-dom'
 import type { ProviderResult } from '../contracts'
 import { EmptyState } from '../components/EmptyState'
-import { adminPath } from '../lib/navigation'
 import type { AdminModule } from './modules'
 
 export function NotFoundPage() {
@@ -53,17 +52,7 @@ export function ProviderProblem({ result, onRetry }: { result: Exclude<ProviderR
   )
 }
 
+/** Ecran de Administrare încă neconstruit (Clienți și site-uri): spune adevărul, fără „în curând". */
 export function AdminPlaceholder({ module }: { module: AdminModule }) {
-  const navigate = useNavigate()
-  if (module.segment === 'config') {
-    return (
-      <EmptyState
-        icon={<MagnifyingGlassIcon size={36} weight="thin" />}
-        title="Configurarea e gestionată de AdSymphony"
-        text="Seturile de competitori, întrebările din panelul AI și keywords-urile urmărite se modifică momentan la cerere, cu versiune și dată efectivă."
-        action={{ label: 'Vezi sursele', onClick: () => navigate(adminPath('sources')) }}
-      />
-    )
-  }
   return <EmptyState icon={<WarningCircleIcon size={36} weight="thin" />} title="Acest ecran nu este încă disponibil" text={`Ecranul ${module.title} nu a fost livrat în această versiune.`} />
 }

@@ -5,7 +5,9 @@ import { LoginPage } from './LoginPage'
 import { ADMIN_MODULES, BRAND_MODULES } from './modules'
 import { AdminPlaceholder, NotFoundPage } from './pages'
 import { RequireAuth } from './RequireAuth'
+import { ConfigPage } from '../screens/admin/ConfigPage'
 import { SourcesPage } from '../screens/admin/SourcesPage'
+import { UsersPage } from '../screens/admin/UsersPage'
 import { InsightsPage } from '../screens/insights/InsightsPage'
 import { AiPage } from '../screens/ai/AiPage'
 import { CompetitionPage } from '../screens/competition/CompetitionPage'
@@ -56,6 +58,8 @@ function AdminModulePage() {
   // Fără acces la Administrare (sau la această pagină): redirect, fără să confirmi dacă pagina există.
   if (adminItemsFor(user.role).length === 0 || (module && !canAccessAdmin(user.role, module.segment))) return <Navigate to="/" replace />
   if (module?.segment === 'sources') return <SourcesPage />
+  if (module?.segment === 'users') return <UsersPage />
+  if (module?.segment === 'config') return <ConfigPage />
   return module ? <AdminPlaceholder module={module} /> : <NotFoundPage />
 }
 

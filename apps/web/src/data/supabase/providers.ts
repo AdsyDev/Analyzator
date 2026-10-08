@@ -3,6 +3,8 @@ import {
   type AiVisibilityProvider,
   type BrandsProvider,
   type CompetitionProvider,
+  type ConfigProvider,
+  type UsersProvider,
   type PaidProvider,
   type SearchProvider,
   type SocialProvider,
@@ -16,6 +18,7 @@ import {
   type SourcesProvider,
 } from '../../contracts'
 import type { DataClient } from './dataClient'
+import { createSupabaseConfig, createSupabaseUsers } from './adminProviders'
 import { createSupabaseBrands } from './brandsProvider'
 import { createSupabaseSources } from './sourcesProvider'
 import { comparisonRange } from '../../lib/period'
@@ -135,6 +138,19 @@ const social: SocialProvider = {
   competitors: async () => notConnected(NO_SOCIAL_IMPORT),
 }
 
+const users: UsersProvider = {
+  people: async () => notConnected('Lista persoanelor cu acces nu este încă disponibilă.'),
+  setRole: async () => notConnected('Modificarea accesului nu este încă disponibilă.'),
+  setMembershipActive: async () => notConnected('Modificarea accesului nu este încă disponibilă.'),
+  setBrandAccess: async () => notConnected('Modificarea accesului nu este încă disponibilă.'),
+}
+
+const config: ConfigProvider = {
+  competitorVersions: async () => notConnected('Setul de competitori nu este încă disponibil.'),
+  aliases: async () => notConnected('Aliasurile brandului nu sunt încă disponibile.'),
+  seomonitorMappings: async () => notConnected('Maparea grupurilor nu este încă disponibilă.'),
+}
+
 const competition: CompetitionProvider = {
   matrix: async () => notConnected('Datele despre competitori nu sunt încă disponibile pentru acest brand.'),
   gaps: async () => notConnected('Datele despre competitori nu sunt încă disponibile pentru acest brand.'),
@@ -165,5 +181,7 @@ export function createSupabaseProviders(deps?: SupabaseProvidersDeps): DataProvi
     paid,
     social,
     competition,
+    users: deps ? createSupabaseUsers(deps.client) : users,
+    config: deps ? createSupabaseConfig(deps.client, now) : config,
   }
 }

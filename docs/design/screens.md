@@ -209,3 +209,14 @@ Ce s-a implementat diferit de designul din `docs/design/reference/` și de ce. N
 | „Configurat de <persoană>" | „utilizator <id scurt>" | Numele utilizatorilor nu sunt citibile din client (nu există profil în schemă). |
 | Filtrul de status al analizelor | Stare locală (taburi), nu în URL | E o vedere, nu perioadă sau filtru de date. |
 | Brandurile reale în topbar | Citite din `brands` | Fără categorie (nu există în schemă). |
+
+## Diferențe față de design (UI-6, seria 2)
+
+| Design | Implementat | Motiv |
+|---|---|---|
+| „Trimite invitație" cu formular | Mesaj că invitarea nu e disponibilă | Nu există funcție server care să creeze contul și rolul; un formular ar pretinde o trimitere inexistentă. |
+| Persoană cu nume și email | Nume și email când există; altfel „Utilizator <id scurt>" | Datele nu sunt citibile din client. |
+| Configurare: doar EmptyState | Competitori (cu istoric de versiuni), aliasuri, maparea SEOmonitor | Cerința UI-6. Fără editare: versiunile sunt imutabile, iar crearea cere o funcție atomică pe server. |
+| Aliasuri | „Sursă neconectată" pe date reale | Nu există tabel pentru ele. |
+| Clienți și site-uri | Neconstruit (spune asta) | Nu face parte din UI-6. |
+| Acces propriu | Rol și acces dezactivate pentru propriul rând | Previne blocarea contului; serverul trebuie să aplice și el regula. |

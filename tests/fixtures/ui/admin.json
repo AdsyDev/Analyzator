@@ -1,0 +1,257 @@
+{
+ "_marker": "analyzator-design-preview-fixture",
+ "people": [
+  {
+   "user_id": "preview-admin",
+   "organization": "AdSymphony",
+   "role": "agency_admin",
+   "membership_active": true,
+   "since_days_ago": 210,
+   "name": "Ioana Popescu",
+   "email": "ioana.popescu@adsymphony.example",
+   "brands": [
+    "brand-urinal",
+    "brand-minimartieni",
+    "brand-proenzi"
+   ]
+  },
+  {
+   "user_id": "6f1b2c3d-1111-4222-8333-444455556602",
+   "organization": "AdSymphony",
+   "role": "strategist",
+   "membership_active": true,
+   "since_days_ago": 160,
+   "name": "Andrei Vasile",
+   "email": "andrei.vasile@adsymphony.example",
+   "brands": [
+    "brand-urinal",
+    "brand-minimartieni"
+   ]
+  },
+  {
+   "user_id": "6f1b2c3d-1111-4222-8333-444455556603",
+   "organization": "AdSymphony",
+   "role": "account",
+   "membership_active": true,
+   "since_days_ago": 120,
+   "name": "Maria Ilie",
+   "email": "maria.ilie@adsymphony.example",
+   "brands": [
+    "brand-urinal",
+    "brand-proenzi"
+   ]
+  },
+  {
+   "user_id": "6f1b2c3d-1111-4222-8333-444455556604",
+   "organization": "STADA",
+   "role": "client_viewer",
+   "membership_active": true,
+   "since_days_ago": 40,
+   "name": "Elena Dobre",
+   "email": "elena.dobre@stada.example",
+   "brands": [
+    "brand-urinal"
+   ]
+  },
+  {
+   "user_id": "6f1b2c3d-1111-4222-8333-444455556605",
+   "organization": "STADA",
+   "role": "client_viewer",
+   "membership_active": true,
+   "since_days_ago": 12,
+   "name": null,
+   "email": null,
+   "brands": [
+    "brand-minimartieni",
+    "brand-proenzi"
+   ]
+  },
+  {
+   "user_id": "6f1b2c3d-1111-4222-8333-444455556606",
+   "organization": "STADA",
+   "role": "client_viewer",
+   "membership_active": false,
+   "since_days_ago": 90,
+   "name": "Dan Radu",
+   "email": "dan.radu@stada.example",
+   "brands": [
+    "brand-proenzi"
+   ]
+  }
+ ],
+ "competitor_versions": {
+  "brand-urinal": [
+   {
+    "version": 3,
+    "effective_from_days_ago": 37,
+    "note": "Cisticare înlocuiește un competitor retras din piață.",
+    "members": [
+     {
+      "id": "c-uronova",
+      "name": "Uronova",
+      "domain": "uronova.example"
+     },
+     {
+      "id": "c-cisticare",
+      "name": "Cisticare",
+      "domain": "cisticare.example"
+     },
+     {
+      "id": "c-vitamerin",
+      "name": "Vitamerin",
+      "domain": "vitamerin.example"
+     }
+    ]
+   },
+   {
+    "version": 2,
+    "effective_from_days_ago": 110,
+    "note": null,
+    "members": [
+     {
+      "id": "c-uronova",
+      "name": "Uronova",
+      "domain": "uronova.example"
+     },
+     {
+      "id": "c-urofix",
+      "name": "Urofix",
+      "domain": "urofix.example"
+     },
+     {
+      "id": "c-vitamerin",
+      "name": "Vitamerin",
+      "domain": "vitamerin.example"
+     }
+    ]
+   },
+   {
+    "version": 1,
+    "effective_from_days_ago": 200,
+    "note": "Set inițial, validat cu clientul.",
+    "members": [
+     {
+      "id": "c-uronova",
+      "name": "Uronova",
+      "domain": "uronova.example"
+     },
+     {
+      "id": "c-urofix",
+      "name": "Urofix",
+      "domain": "urofix.example"
+     }
+    ]
+   }
+  ],
+  "brand-minimartieni": [
+   {
+    "version": 2,
+    "effective_from_days_ago": 54,
+    "note": null,
+    "members": [
+     {
+      "id": "c-kidvit",
+      "name": "Kidvitto",
+      "domain": "kidvitto.example"
+     },
+     {
+      "id": "c-junior",
+      "name": "JuniorVit",
+      "domain": "juniorvit.example"
+     }
+    ]
+   },
+   {
+    "version": 1,
+    "effective_from_days_ago": 180,
+    "note": "Set inițial.",
+    "members": [
+     {
+      "id": "c-kidvit",
+      "name": "Kidvitto",
+      "domain": "kidvitto.example"
+     }
+    ]
+   }
+  ]
+ },
+ "aliases": {
+  "brand-urinal": [
+   {
+    "id": "al-u-1",
+    "alias": "Urinal",
+    "used_in": "AI Visibility și Listening"
+   },
+   {
+    "id": "al-u-2",
+    "alias": "Urinal Forte",
+    "used_in": "AI Visibility și Listening"
+   }
+  ],
+  "brand-minimartieni": [
+   {
+    "id": "al-m-1",
+    "alias": "Minimartieni",
+    "used_in": "AI Visibility și Listening"
+   }
+  ],
+  "brand-proenzi": []
+ },
+ "seomonitor_mappings": [
+  {
+   "campaign_id": "101",
+   "group_id": "2001",
+   "version": 2,
+   "effective_days_ago": 30,
+   "kind": "brand",
+   "brand_id": "brand-urinal",
+   "brand_type": "branded",
+   "is_primary_visibility": true,
+   "note": null
+  },
+  {
+   "campaign_id": "101",
+   "group_id": "2002",
+   "version": 1,
+   "effective_days_ago": 90,
+   "kind": "brand",
+   "brand_id": "brand-urinal",
+   "brand_type": "nonbranded",
+   "is_primary_visibility": false,
+   "note": null
+  },
+  {
+   "campaign_id": "101",
+   "group_id": "2010",
+   "version": 1,
+   "effective_days_ago": 90,
+   "kind": "brand",
+   "brand_id": "brand-minimartieni",
+   "brand_type": "branded",
+   "is_primary_visibility": true,
+   "note": null
+  },
+  {
+   "campaign_id": "101",
+   "group_id": "2020",
+   "version": 1,
+   "effective_days_ago": 60,
+   "kind": "multi_brand",
+   "brand_id": null,
+   "brand_type": null,
+   "is_primary_visibility": false,
+   "note": "Cuvinte comune mai multor branduri; nu se atribuie automat."
+  },
+  {
+   "campaign_id": "102",
+   "group_id": "3001",
+   "version": 1,
+   "effective_days_ago": 45,
+   "kind": "excluded",
+   "brand_id": null,
+   "brand_type": null,
+   "is_primary_visibility": false,
+   "note": "Grup de test, ignorat intenționat."
+  }
+ ]
+}

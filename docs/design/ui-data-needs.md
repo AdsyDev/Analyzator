@@ -129,3 +129,24 @@ Reguli de derivare a stării (clasificare, nu metrică): fără conexiune → `n
 ### Analize și acțiuni — `InsightsProvider`
 
 Doar citire. Nu există tabele pentru analize și acțiuni în `supabase/migrations`, deci providerul `supabase` rămâne `not_connected`. Ecranul funcționează pe fixtures în previzualizare. Server: clientul primește doar `published` (RLS); acțiunile vin împreună cu analiza lor.
+
+## Administrare → Utilizatori și Configurare (UI-6, seria 2)
+
+### Utilizatori — `UsersProvider` (real, prin sesiunea utilizatorului / RLS)
+
+| Metodă | Tabele | Note |
+|---|---|---|
+| `people()` | `memberships` (+ `tenants.name`), `brand_access` | RLS: `agency_admin` vede toți membrii tenantului. `name` și `email` sunt **null**: trăiesc doar în `auth.users`, ilizibil din client. UI-ul afișează „Utilizator <id scurt>". |
+| `setRole` | `update memberships set role` | Granturile permit `role` și `revoked_at`. Propriul rând e refuzat în provider și dezactivat în UI (nu te poți bloca singur). |
+| `setMembershipActive` | `update memberships set revoked_at` | Revocarea nu șterge. |
+| `setBrandAccess` | `brand_access` (insert cu `granted_by = utilizatorul curent` sau update `revoked_at`) | Unic pe (tenant, brand, user): un acces revocat se restabilește, nu se reinserează. Persoana trebuie să aibă membership în tenant (FK). |
+
+**Cerințe server rămase:** (1) o sursă citibilă pentru nume și email (view/RPC de profil, pe tenant); (2) o funcție de invitare care creează utilizatorul, membership-ul și accesul într-un singur pas; (3) protecția „ultimul `agency_admin`" în server. Până atunci, „Trimite invitație" spune că nu e disponibilă.
+
+### Configurare — `ConfigProvider`
+
+| Metodă | Tabele | Note |
+|---|---|---|
+| `competitorVersions(brandId)` | `competitor_sets` + `competitor_set_members` | Doar citire. Versiunea în vigoare = cea mai mare `effective_from <= azi`. Crearea unei versiuni cere două insert-uri; fără funcție atomică ar putea lăsa un set fără membri (imutabil), deci nu o expunem din UI. |
+| `aliases(brandId)` | — | Nu există tabel: `not_connected` cu motiv. |
+| `seomonitorMappings()` | `seomonitor_group_mappings` | Doar citire; ultima versiune în vigoare per (campanie, grup). **Depinde de migrația `20261008120000_seomonitor.sql`, încă necomisă în repo la data scrierii.** |

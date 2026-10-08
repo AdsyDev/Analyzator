@@ -31,6 +31,7 @@ import {
   type Sentiment,
 } from '../../contracts'
 import { addDays, comparisonRange, todayBucharest } from '../../lib/period'
+import { createAdminFixtures } from './admin'
 import { createAiFixtures } from './ai'
 import { createCompetitionFixtures } from './competition'
 import { createPaidFixtures } from './paid'
@@ -369,7 +370,9 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
 
   const competition = createCompetitionFixtures({ allowed, ai: aiFx, search, social, mentions })
 
-  return { kind: 'fixtures', metrics, insights, mentions, sources, brands, ai: aiFx.provider, search, traffic, paid, social, competition }
+  const admin = createAdminFixtures({ now, getRole, getUserId: () => getUser().id, allowed })
+
+  return { kind: 'fixtures', metrics, insights, mentions, sources, brands, ai: aiFx.provider, search, traffic, paid, social, competition, users: admin.users, config: admin.config }
 }
 
 type ProviderGuard<T> = Extract<import('../../contracts').ProviderResult<T>, { kind: 'error' }>

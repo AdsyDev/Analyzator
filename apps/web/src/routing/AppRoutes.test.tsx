@@ -350,11 +350,9 @@ describe('Administrare: acces pe roluri', () => {
     expect(where()).toBe('/admin/sources')
   })
 
-  it('Configurare: textul din design, cu acțiunea „Vezi sursele"', async () => {
+  it('Configurare are conținutul real: competitori, aliasuri, maparea SEOmonitor', async () => {
     setup('/admin/config')
-    expect(await screen.findByRole('heading', { name: 'Configurarea e gestionată de AdSymphony' })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Vezi sursele' }))
-    await waitFor(() => expect(where()).toBe('/admin/sources'))
+    for (const h of ['Competitori', 'Aliasuri', 'Grupuri SEOmonitor → brand']) expect(await screen.findByRole('heading', { level: 2, name: h })).toBeInTheDocument()
   })
 
   it('FilterBar lipsește pe paginile de administrare', async () => {
