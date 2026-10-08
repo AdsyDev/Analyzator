@@ -104,7 +104,8 @@ select is_empty(
 -- O funcție nouă în public trebuie adăugată explicit în lista de mai jos, după revizuire.
 create temporary table allowed_public_functions (name text primary key) on commit drop;
 insert into allowed_public_functions values
-  ('get_source_token'), ('record_source_validation'), ('set_source_token');
+  ('get_source_token'), ('record_source_validation'), ('set_source_token'),
+  ('invite_user_grant'), ('list_tenant_people');
 
 select is_empty(
   $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -127,7 +128,8 @@ select is_empty(
 select results_eq(
   $$ select p.proname::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and has_function_privilege('service_role', p.oid, 'execute') order by 1 $$,
-  $$ values ('get_source_token'::text collate "C"), ('record_source_validation'), ('set_source_token') $$,
+  $$ values ('get_source_token'::text collate "C"), ('invite_user_grant'), ('list_tenant_people'),
+            ('record_source_validation'), ('set_source_token') $$,
   'A10: funcțiile aprobate sunt executabile de service_role'
 );
 select is_empty(

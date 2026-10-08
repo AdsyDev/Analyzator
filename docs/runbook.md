@@ -60,6 +60,21 @@ Build-ul de staging și cel de producție se fac fără `VITE_DESIGN_PREVIEW`: v
   | `pagination_stalled` | Offset-ul pare ignorat (pagini identice); verifică ruta. |
   | `mapped_group_missing` | Grupul a fost șters sau redenumit în SEOmonitor; actualizează maparea. |
 
+## Invitarea utilizatorilor (Edge Function `invite-user`)
+
+- Funcția: `supabase/functions/invite-user`. Acțiuni: `invite` (`{ email, tenant_id, role, brand_ids[] }`) și `people` (`{ tenant_id }`), ambele doar pentru `agency_admin` activ al tenantului. Contractul complet: `docs/design/ui-data-needs.md`.
+- **Secrete și variabile** (Supabase le injectează automat în Edge Functions: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`). Cheia service role nu se pune niciodată în frontend sau în repo. Opțional, ca secrete ale funcției:
+  - `ANALYZATOR_APP_ORIGIN`: originea aplicației, pentru CORS;
+  - `ANALYZATOR_INVITE_REDIRECT_URL`: unde ajunge persoana după linkul din e-mail (trebuie să fie în `additional_redirect_urls` din Auth).
+  Pe staging: `supabase secrets set ANALYZATOR_APP_ORIGIN=… ANALYZATOR_INVITE_REDIRECT_URL=…`.
+- **Migrația** `20261008130000_invite_user.sql` trebuie aplicată înainte de deploy (funcțiile `invite_user_grant`, `list_tenant_people`).
+- **Pornire locală:** `supabase start`, apoi `supabase functions serve invite-user`. E-mailurile locale ajung în Inbucket (`http://127.0.0.1:54324`). Apel de probă, cu JWT-ul unui `agency_admin` obținut prin login:
+  `curl -X POST "$API_URL/functions/v1/invite-user" -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ADMIN_JWT" -d '{"action":"invite","email":"…","tenant_id":"…","role":"strategist","brand_ids":["…"]}'`
+- **Deploy:** `supabase functions deploy invite-user`.
+- **Valabilitatea invitației** o dă `[auth.email] otp_expiry` (setare globală Auth, comună cu resetarea parolei), nu funcția. Vezi S10 în `docs/security-tests.md`.
+- Erori: 409 = există deja un cont cu acel e-mail; 429 = limita de e-mailuri Auth; 502 = Auth nu a putut trimite. Dacă în loguri apare `invite-user: compensarea a eșuat`, există un cont invitat fără membership; se șterge din Auth → Users.
+- Audit: `audit_events` cu `action = 'user_invited'` (actorul, rolul, brandurile; fără e-mail).
+
 ## Incidente
 _De completat._ 401 → verifică tokenul; 403 → verifică permisiunile; fără reîncercări agresive.
 

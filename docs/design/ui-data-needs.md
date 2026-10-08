@@ -141,7 +141,18 @@ Doar citire. Nu există tabele pentru analize și acțiuni în `supabase/migrati
 | `setMembershipActive` | `update memberships set revoked_at` | Revocarea nu șterge. |
 | `setBrandAccess` | `brand_access` (insert cu `granted_by = utilizatorul curent` sau update `revoked_at`) | Unic pe (tenant, brand, user): un acces revocat se restabilește, nu se reinserează. Persoana trebuie să aibă membership în tenant (FK). |
 
-**Cerințe server rămase:** (1) o sursă citibilă pentru nume și email (view/RPC de profil, pe tenant); (2) o funcție de invitare care creează utilizatorul, membership-ul și accesul într-un singur pas; (3) protecția „ultimul `agency_admin`" în server. Până atunci, „Trimite invitație" spune că nu e disponibilă.
+**Contract server disponibil (8 oct 2026), încă nelegat în UI** — Edge Function `invite-user`, `POST ${SUPABASE_URL}/functions/v1/invite-user`, `Authorization: Bearer <JWT-ul sesiunii>`:
+
+| Acțiune | Cerere | Răspuns 200 |
+|---|---|---|
+| `invite` | `{ action: "invite", email, tenant_id, role, brand_ids: uuid[] }` | `{ tenant_id, user_id, membership_id, email, role, brand_ids }` |
+| `people` | `{ action: "people", tenant_id }` | `{ tenant_id, people: [{ user_id, email, full_name, invited_at, last_sign_in_at }] }`, toți membrii tenantului (inclusiv revocați); `null` = lipsă, nu text gol |
+
+Reguli pentru UI: `role` ∈ `agency_admin | strategist | account | client_viewer`; `strategist`, `account` și `client_viewer` cer cel puțin un `brand_id`; `agency_admin` cere `brand_ids` gol. Erori, cu `{ error }` în română: 400 corp sau `tenant_id` malformat; 401 sesiune; 403 rol diferit de `agency_admin`; 404 fără rol în tenant; 409 e-mail cu cont existent sau persoana are deja membership în tenant; 422 validare (e-mail, rol, branduri); 429 limita de e-mailuri; 502 Auth indisponibil. Nu există cale de citire a `auth.users` în afara acțiunii `people`. Valabilitatea linkului nu e de 7 zile (vezi S10 în `docs/security-tests.md`); UI-ul nu trebuie să promită o durată.
+
+**Cerințe server rămase:** (1) ~~o sursă citibilă~~ acțiunea `people` de mai sus (nume din `raw_user_meta_data.full_name`/`name`, deci `null` pentru conturi create prin invitație până când persoana își setează numele; UI-ul poate afișa emailul); (2) ~~funcția de invitare~~ acțiunea `invite`; (3) protecția „ultimul `agency_admin`" în server. Mai jos, textul inițial al cerințelor:
+
+**Cerințe server inițiale:** (1) o sursă citibilă pentru nume și email (view/RPC de profil, pe tenant); (2) o funcție de invitare care creează utilizatorul, membership-ul și accesul într-un singur pas; (3) protecția „ultimul `agency_admin`" în server. Până atunci, „Trimite invitație" spune că nu e disponibilă.
 
 ### Configurare — `ConfigProvider`
 

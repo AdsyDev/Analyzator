@@ -44,6 +44,15 @@ Garda inițială interzicea orice funcție în `public` și orice SECURITY DEFIN
 | `get_source_token(connection)` | **tokenul decriptat** | worker-ul, Edge Function (validare) |
 | `record_source_validation(connection, ok, error)` | starea | Edge Function, worker |
 
+**Extindere (8 oct 2026)**, aceleași condiții:
+
+| Funcție | Returnează | Cine o apelează |
+|---|---|---|
+| `invite_user_grant(actor, tenant, invited_user, role, brand_ids)` | `id`-ul membership-ului | Edge Function `invite-user`, după ce Auth Admin a creat utilizatorul |
+| `list_tenant_people(actor, tenant)` | `user_id`, `email`, `full_name`, `invited_at`, `last_sign_in_at` ale membrilor tenantului | Edge Function `invite-user` (acțiunea `people`) |
+
+`list_tenant_people` e singura cale către `auth.users`: doar membrii tenantului cerut și doar pentru `agency_admin` activ al lui (verificat în corp). `auth.users` nu e expus prin API.
+
 Condiții, verificate de teste:
 - `anon`, `authenticated` și `PUBLIC` nu au EXECUTE (A10, A11, V1, B8).
 - Fiecare funcție din `public` e într-o listă explicită în `04_security_inventory.test.sql`. O funcție nelistată pică testul.
@@ -147,6 +156,24 @@ Verificat cap-coadă pe Supabase local (7 oct 2026), cu `scripts/set-source-toke
 
 **Rerulare:** `supabase functions serve source-credentials`, apoi pașii din README (secțiunea „Tokenul unei surse").
 
+## C2. Funcția server `invite-user`
+
+Teste unitare (`supabase/functions/invite-user/handler.test.ts`, `npm run test:connectors`, 33 de teste): fără JWT sau cu cheia service role ca Bearer: 401; `tenant_id` cu filtre PostgREST: 400 fără query; strategist și client_viewer: 403; admin din alt tenant: 404 (și pe `people`); autorizarea precede validarea; 13 cazuri 422 (e-mail invalid, rol invalid, rol fără brand, `agency_admin` cu branduri, brand din alt tenant, brand inexistent, `brand_ids` neliste/ne-UUID) fără niciun e-mail trimis; e-mail existent: 409; limită de e-mailuri: 429; eșec SQL: utilizatorul creat de invitație se șterge (nu se șterge dacă are deja membership oriunde); eșec neașteptat: 500 fără adresa de e-mail în răspuns.
+
+pgTAP (`supabase/tests/database/07_invite_user.test.sql`, 40 de verificări):
+
+| ID | Scenariu | Așteptat |
+|---|---|---|
+| I1–I2 | `authenticated`, `anon`, apelant fără rolul `service_role` (chiar `postgres`); `select email from auth.users` ca admin | 42501 |
+| I3 | Invită: admin T2 în T1, strategist, account, client_viewer, fără membership, admin cu membership revocat | 42501, fără date rămase |
+| I4 | Brand din alt tenant (singur sau amestecat cu unul valid), brand inexistent, rol fără brand, `brand_ids` null, `agency_admin` cu branduri, element null, utilizator inexistent | 23503 / 22023 / P0002, fără date parțiale |
+| I5 | Eșec forțat (trigger) la ultimul pas, auditul | eroarea ajunge la apelant; nu rămân membership și `brand_access` |
+| I6 | Succes: membership, `brand_access` cu `granted_by` = apelantul, audit `user_invited` cu actorul și fără e-mail; invitatul vede prin RLS doar brandurile alocate; re-invitare în același tenant | rolul inițial rămâne (23505) |
+| I7 | `agency_admin` nou în T2 | niciun acces în T1 |
+| I8 | `list_tenant_people`: admin T2 pe T1, strategist, client_viewer; admin T1 și admin T2 văd exact membrii propriului tenant, numele din `raw_user_meta_data` | 42501 / liste disjuncte |
+
+**Atomicitate.** Pasul Auth (`/auth/v1/invite`) și pasul SQL nu pot fi o singură tranzacție. Ordinea e: autorizare și validări (inclusiv brandurile), invitația, apoi `invite_user_grant` (membership + acces + audit, atomic). Dacă pasul SQL eșuează, funcția șterge utilizatorul creat doar dacă nu are niciun membership; dacă ștergerea eșuează, se loghează `invite-user: compensarea a eșuat` și rămâne un cont fără rol (inofensiv: fără membership, RLS nu-i dă acces la nimic).
+
 ## D. Atacuri pe Edge Function prin HTTP real (`tests/security/edge-credentials.test.mjs`)
 
 Obiective: tokenul în clar nu poate fi obținut, iar bugetul de apeluri al altui brand nu poate fi consumat. Rulează cu `npm run test:security`.
@@ -212,6 +239,8 @@ Ultima rulare: 7 oct 2026, 13/13 mutații prinse.
 - **Service role în worker:** nu există cod de worker. Verificarea explicită `tenant_id` din worker se testează odată cu conectorii.
 - **Configurarea Auth pe staging:** signup dezactivat doar în `config.toml` local; pe staging se aplică prin CI (`supabase config push`).
 - **Contextul trimis către AI:** nivel C, nu există.
+- **`invite-user` cap-coadă:** testat cu fetch simulat (handler) și pgTAP; neverificat cu Auth real (`/auth/v1/invite` cu service role), cu e-mail livrat (Inbucket local, SMTP pe staging) și cu `redirect_to` real. Comportamentul GoTrue pentru un utilizator invitat anterior și neconfirmat (reinvitare) e presupus din documentație.
+- **Comportamentul real al lui `DELETE /auth/v1/admin/users/{id}`** în compensare, neexersat pe un Auth real.
 
 ## Constatări deschise (propuneri, neaplicate)
 
@@ -219,7 +248,9 @@ Ultima rulare: 7 oct 2026, 13/13 mutații prinse.
 |---|---|---|---|
 | S1 | Scăzută | `sync_runs.source_connection_id` verifică doar tenantul: un run pe 1A poate referi conexiunea lui 1B. Scrie doar service role, deci e o problemă de integritate, nu de acces. | Trigger: conexiunea are `brand_id` null sau egal cu `brand_id` al run-ului. |
 | S2 | Scăzută | Un strategist poate adăuga competitori într-o versiune veche a setului (istoricul nu e înghețat). | Trigger pe `competitor_set_members`: insert permis doar în cea mai recentă versiune, sau coloană `published_at` după care setul e înghețat. |
-| S3 | Scăzută | Admin T1 poate insera membership pentru orice UUID; eroarea FK spune dacă UUID-ul există în `auth.users` (oracol de existență, dar UUID-urile nu se pot ghici). Poate adăuga și un utilizator din T2 fără acordul lui (fără acces la datele T2). | Membership-urile se creează doar prin funcția server de invitație (service role); scoatem INSERT pe `memberships` pentru `authenticated`. |
+| S3 | Scăzută | Admin T1 poate insera membership pentru orice UUID; eroarea FK spune dacă UUID-ul există în `auth.users` (oracol de existență, dar UUID-urile nu se pot ghici). Poate adăuga și un utilizator din T2 fără acordul lui (fără acces la datele T2). | Funcția server de invitație există din 8 oct 2026 (`invite-user`). Rămâne de aplicat: scoatem INSERT pe `memberships` pentru `authenticated`, după ce UI-ul trece pe funcție (task separat; nu se schimbă permisiuni în acest task). |
+| S9 | Scăzută | `invite-user` răspunde 409 când e-mailul are deja un cont confirmat: un `agency_admin` poate afla dacă o adresă are cont în platformă (în orice tenant). Nu expune date, doar existența. | Acceptat pentru pilot (acces doar pe invitație, doar admini). Dacă se adaugă oameni din mai multe agenții: acțiune separată „adaugă un cont existent" cu confirmare din partea persoanei. |
+| S10 | Medie (operațională) | Invitația nu poate fi de 7 zile prin `inviteUserByEmail`: linkul expiră după `[auth.email] otp_expiry`, setare globală (local 3600 s), valabilă și pentru resetarea parolei. | Pe staging/production: setează `otp_expiry` cât permite proiectul; pentru 7 zile garantate: acțiune `resend` care retrimite invitația la cerere (task separat). |
 | S4 | Medie (operațională) | Revocarea nu închide sesiunea. | Funcția server de revocare apelează `auth.admin.signOut(user, 'global')` după update; JWT expiry scurt (≤ 1 h). |
 | S5 | Medie | `scripts/set-source-token.ts` acceptă orice `SUPABASE_URL`, inclusiv `http://` pe o adresă non-locală. Parola contului și tokenul ar circula necriptate. Verificat: scriptul nu are nicio verificare de schemă. | Refuz dacă URL-ul nu e `https://`, cu excepția `127.0.0.1` / `localhost`. |
 | S6 | Scăzută | Ștergerea unei conexiuni șterge în cascadă rândurile ei din `provider_api_calls`. Verificat: contorul trece de la 10 la 0. Un `agency_admin` care șterge și recreează conexiunea în aceeași zi poate trece de 10 validări (Clarity va răspunde 429), iar istoricul apelurilor se pierde. Impact doar în propriul tenant. | FK `on delete restrict` sau `set null` cu păstrarea `external_account_id` pe rândul de contor; bugetul se calculează pe proiect, nu pe ID-ul conexiunii. |
