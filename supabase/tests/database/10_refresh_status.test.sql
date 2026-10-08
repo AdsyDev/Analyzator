@@ -189,9 +189,17 @@ select throws_ok(
   $$ insert into public.ops_notifications (tenant_id, brand_id, sync_run_id, kind, source, subject, body)
      values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', 'a0000000-0000-0000-0000-000000000009', 'refresh_failed', 'gsc', 's', 'b') $$,
   '23505', null, 'A2: o singură alertă per rulare eșuată (idempotent)');
-select is((select status from public.ops_notifications), 'pending', 'A2: alerta începe pending');
+select lives_ok(
+  $$ insert into public.ops_notifications (tenant_id, brand_id, sync_run_id, kind, source, subject, body)
+     values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', 'a0000000-0000-0000-0000-000000000009', 'refresh_partial', 'gsc', 's', 'b') $$,
+  'A2: aceeași rulare poate avea și o alertă de tip refresh_partial (cheie: rulare + tip)');
+select throws_ok(
+  $$ insert into public.ops_notifications (tenant_id, brand_id, sync_run_id, kind, source, subject, body)
+     values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', 'a0000000-0000-0000-0000-000000000009', 'refresh_unknown', 'gsc', 's', 'b') $$,
+  '23514', null, 'A2: tip de alertă necunoscut respins');
+select is((select count(*)::int from public.ops_notifications where status = 'pending'), 2, 'A2: alertele încep pending');
 select tests.authenticate_as('30000000-0000-0000-0000-000000000001');
-select results_eq($$ select count(*)::int from public.ops_notifications $$, $$ values (1) $$, 'A2: agency_admin vede coada');
+select results_eq($$ select count(*)::int from public.ops_notifications $$, $$ values (2) $$, 'A2: agency_admin vede coada (ambele alerte)');
 select throws_ok($$ update public.ops_notifications set status = 'sent' $$, '42501', null, 'A2: coada nu se modifică de utilizatori');
 reset role;
 select tests.authenticate_as('30000000-0000-0000-0000-000000000002');

@@ -1,4 +1,4 @@
-// Alertele de eșec ale refreshului: coadă `ops_notifications`, același mecanism ca la farmacovigilență
+// Alertele refreshului (rulări eșuate și parțiale): coadă `ops_notifications`, același mecanism ca la farmacovigilență
 // (pending care nu se pierde fără secret sau contacte; reîncercări; failed vizibil), pe tabele proprii.
 // Destinatari: `alert_contacts` active ale tenantului (liste interne, separate de pv_contacts).
 // Reutilizează sendEmail (supabase/functions/_shared/notifications/resend.ts), neschimbat.
@@ -11,7 +11,10 @@ import type { SyncRunError } from '../shared/sync-runs.ts'
 const MAX_ERRORS_SHOWN = 5
 const MAX_MESSAGE = 200
 
-export type FailedRun = {
+export type AlertKind = 'refresh_failed' | 'refresh_partial'
+
+export type RunAlert = {
+  kind: AlertKind
   tenant_id: string
   brand_id: string | null
   sync_run_id: string
@@ -21,33 +24,37 @@ export type FailedRun = {
 }
 
 /** Textul alertei: sursă, brand și coduri de eroare; nu conține tokenuri sau date de client. */
-export function failureMessage(run: FailedRun, appBaseUrl?: string): { subject: string; body: string } {
+export function alertMessage(run: RunAlert, appBaseUrl?: string): { subject: string; body: string } {
   const lines = run.errors.slice(0, MAX_ERRORS_SHOWN).map((e) => `- ${e.code}${e.dimension ? ` (${e.dimension})` : ''}: ${String(e.message).slice(0, MAX_MESSAGE)}`)
+  const failed = run.kind === 'refresh_failed'
+  const where = `${run.source}${run.brand_name ? ` pentru brandul ${run.brand_name}` : ''}`
   return {
-    subject: `[Analyzator] Refresh eșuat: ${run.source}${run.brand_name ? ` · ${run.brand_name}` : ''}`,
+    subject: `[Analyzator] Refresh ${failed ? 'eșuat' : 'parțial'}: ${run.source}${run.brand_name ? ` · ${run.brand_name}` : ''}`,
     body: [
-      `Sincronizarea sursei ${run.source}${run.brand_name ? ` pentru brandul ${run.brand_name}` : ''} a eșuat.`,
+      failed ? `Sincronizarea sursei ${where} a eșuat.` : `Sincronizarea sursei ${where} s-a încheiat parțial: lipsesc date.`,
       '',
       `Rulare: ${run.sync_run_id}`,
-      run.errors.length ? `Erori (${run.errors.length}):` : 'Fără detalii de eroare.',
+      run.errors.length ? `${failed ? 'Erori' : 'Note'} (${run.errors.length}):` : 'Fără detalii de eroare.',
       ...lines,
       run.errors.length > MAX_ERRORS_SHOWN ? `… și încă ${run.errors.length - MAX_ERRORS_SHOWN}` : '',
       '',
-      'Ce faci: runbook, secțiunea „Refresh săptămânal” → „O sursă a eșuat”. Celelalte surse au continuat.',
+      failed
+        ? 'Ce faci: runbook, secțiunea „Refresh săptămânal” → „O sursă a eșuat”. Celelalte surse au continuat.'
+        : 'Ce faci: runbook, „Refresh săptămânal” → „O rulare parțială”. Datele existente rămân; zilele lipsă sunt neconfirmate, nu zero.',
       appBaseUrl ? `Stare surse: ${appBaseUrl.replace(/\/+$/, '')}/administrare/surse` : '',
     ].filter((l, i, a) => l !== '' || (a[i - 1] !== '' && i > 0)).join('\n'),
   }
 }
 
-/** O alertă per sync_run eșuat; idempotent (unique sync_run_id + kind). */
-export async function enqueueFailure(db: Db, run: FailedRun, appBaseUrl?: string): Promise<boolean> {
+/** O alertă per sync_run și tip; idempotent (unique sync_run_id + kind). */
+export async function enqueueAlert(db: Db, run: RunAlert, appBaseUrl?: string): Promise<boolean> {
   assertUuid(run.tenant_id, 'tenant_id')
   assertUuid(run.sync_run_id, 'sync_run_id')
   if (run.brand_id) assertUuid(run.brand_id, 'brand_id')
-  const m = failureMessage(run, appBaseUrl)
+  const m = alertMessage(run, appBaseUrl)
   const rows = await db.upsert<Row>(
     'ops_notifications',
-    [{ tenant_id: run.tenant_id, brand_id: run.brand_id, sync_run_id: run.sync_run_id, kind: 'refresh_failed', source: run.source, subject: m.subject, body: m.body }],
+    [{ tenant_id: run.tenant_id, brand_id: run.brand_id, sync_run_id: run.sync_run_id, kind: run.kind, source: run.source, subject: m.subject, body: m.body }],
     ['sync_run_id', 'kind'],
   )
   const row = rows[0]

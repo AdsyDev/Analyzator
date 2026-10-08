@@ -108,7 +108,9 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 1. GitHub → Actions → `weekly-refresh` → ultima rulare. Rezumatul arată, per sursă: rulări reușite / parțiale / eșuate / neconectate și alertele puse în coadă. Roșu = o sursă a eșuat (celelalte au rulat).
 2. Starea pe brand: view-ul `source_status` (`state`, `reason`, `data_as_of`, `coverage`, ultima rulare). Istoricul: `sync_history`.
 3. Verifică `sync_runs` pentru rularea în cauză: `status`, `errors` (coduri), `coverage`. O rulare **parțială** nu e `succeeded`: citește `errors` (de ex. `gsc_truncated`, `reconciliation_mismatch`, `ga4_incompatible_metrics`).
-4. Alertele: `ops_notifications` (`pending` = netrimisă; `failed` = definitiv). Fără contacte active în `alert_contacts` sau fără `RESEND_API_KEY` / `OPS_FROM_EMAIL`, alertele rămân `pending`; vezi-le acolo.
+4. Alertele (eșecuri **și** rulări parțiale): `ops_notifications` (`kind` = `refresh_failed` / `refresh_partial`; `pending` = netrimisă; `failed` = definitiv). Fără contacte active în `alert_contacts` sau fără `RESEND_API_KEY` / `OPS_FROM_EMAIL`, alertele rămân `pending`; vezi-le acolo.
+
+**O rulare parțială** (alertă `Refresh parțial`): sursa a adus doar o parte din date. Citește `sync_runs.errors` (`gsc_truncated`, `reconciliation_mismatch`, `ga4_incompatible_metrics`, `ga4_data_loss_other_row`…) și `source_status` (`state = partial`, `coverage`). Datele existente rămân; zilele lipsă sunt neconfirmate, nu zero. Dacă e o limită a sursei (plafon de pagini, thresholding), nu e nimic de reluat; dacă a fost o eroare tranzitorie, reia sursa (`only = <sursă>`). Alerta se șterge de la sine din atenție la următoarea rulare reușită (`state` revine la `ok`).
 
 **O sursă a eșuat**
 - `access_denied` / `credential_invalid`: tokenul sau service account-ul a fost refuzat. Setează unul nou (`npm run set-source-token`), apoi „Testează conexiunea”; refresh-ul nu reîncearcă singur un credential invalid (`source_status.reason = credential_invalid`).

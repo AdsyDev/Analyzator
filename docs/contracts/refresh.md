@@ -9,8 +9,8 @@ Surse: brief cap. 4 (sincronizare marți 06:00 Europe/Bucharest), spec cap. 9 ș
 - **Ordinea:** `seomonitor → ga4 → gsc`. Clarity are colectare zilnică proprie (`clarity-daily.yml`, buget de 10 apeluri/zi) și nu intră în refresh-ul săptămânal.
 - **Flag-uri:** `CONNECTOR_SEOMONITOR_ENABLED`, `CONNECTOR_GOOGLE_ENABLED` (ga4 și gsc), `CONNECTOR_CLARITY_ENABLED`; citite **doar** din `connectors/shared/flags.ts`. Un conector dezactivat e sărit (fără sync_run); doar valoarea `true` activează.
 - **Izolare:** eșecul sau excepția unei surse nu le oprește pe celelalte. O excepție (înainte ca un conector să-și fi scris `sync_runs`) se înregistrează ca rulare `failed` (`orchestrator_exception`) pentru fiecare brand afectat: conexiunile active ale sursei; una la nivel de client (SEOmonitor) afectează toate brandurile active ale clientului.
-- **Statusuri:** `succeeded`, `partial`, `failed` vin de la conectori. O rulare parțială nu e `succeeded` și nu e eșec; `not_connected` nu e eșec (fără sync_run). Exit code 1 doar la `failed` sau excepție; parțialele apar ca avertismente în log.
-- **Alerte:** pentru fiecare rulare `failed` se pune o alertă în `ops_notifications` (idempotent pe `sync_run_id`). La final se încearcă trimiterea.
+- **Statusuri:** `succeeded`, `partial`, `failed` vin de la conectori. O rulare parțială nu e `succeeded` și nu e eșec, dar primește alertă; `not_connected` nu e eșec (fără sync_run, fără alertă). Exit code 1 doar la `failed` sau excepție; parțialele apar ca avertismente în log și în alerte.
+- **Alerte:** pentru fiecare rulare `failed` (inclusiv excepții) **și** `partial` se pune o alertă în `ops_notifications` (`refresh_failed` / `refresh_partial`), idempotent pe `sync_run_id` + tip. O rulare parțială e o sursă cu date lipsă pe care cineva trebuie s-o vadă. La final se încearcă trimiterea.
 
 ## Statusul surselor (view-uri `security_invoker`)
 
@@ -46,7 +46,11 @@ Prioritatea e cea din tabel (de sus în jos). Toleranța (`grace_days`) vine din
 ## Alerte de eșec
 
 - `alert_contacts` (e-mail, nume, activ): contacte interne, configurate de `agency_admin`; separate de `pv_contacts`.
-- `ops_notifications`: o alertă per `sync_run` eșuat; `status` `pending` → `sending` → `sent` | `failed`; vizibilă doar `agency_admin`.
+- `ops_notifications`: o alertă per `sync_run` eșuat sau parțial și per tip (`refresh_failed`, `refresh_partial`); `status` `pending` → `sending` → `sent` | `failed`; vizibilă doar `agency_admin`.
 - Mecanismul e cel de la farmacovigilență: fără `RESEND_API_KEY` / `OPS_FROM_EMAIL` (sau `PV_FROM_EMAIL`) nu se încearcă nimic, iar alertele rămân `pending`; fără contacte active rămân `pending` (`last_error = no_contacts`); erori tranzitorii: reîncercare, apoi `failed` după 5 încercări (vizibil, reluabil). `Idempotency-Key` = `ops-notification-<id>`.
-- Textul conține sursa, brandul, ID-ul rulării și primele 5 coduri de eroare (mesaje de maximum 200 de caractere); fără tokenuri sau date de client.
+- Textul (diferit pentru eșec și pentru rulare parțială) conține sursa, brandul, ID-ul rulării și primele 5 coduri de eroare / note (mesaje de maximum 200 de caractere); fără tokenuri sau date de client.
 - Reluare: `npm run send:ops-notifications`.
+
+## De făcut mai târziu
+
+- **Acoperirea pe perioada selectată.** Acum acoperirea (`source_status.coverage`) e pe fereastra fixă de 35 de zile. Când UI-ul cere acoperire pe perioada aleasă de utilizator: view/funcție parametrizat pe perioadă (o funcție executabilă de utilizatori în `public` cere extinderea gărzii A10/A11, deci decizie de securitate; alternativ, UI-ul numără din `source_dataset_days`, care e deja citibil). Notat și în `docs/decisions.md`, C-7.

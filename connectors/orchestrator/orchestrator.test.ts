@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { CONNECTOR_FLAGS, connectorEnabled, flagEnabled } from '../shared/flags.ts'
 import { REFRESH_ORDER, recordSourceFailure, runRefresh, type RefreshSource, type RunnerOutcome, type Runners } from './refresh.ts'
 import { defaultRunners } from './runners.ts'
-import { dispatchOpsNotifications, enqueueFailure, failureMessage } from './ops-notifications.ts'
+import { alertMessage, dispatchOpsNotifications, enqueueAlert, type RunAlert } from './ops-notifications.ts'
 import { FakeDb as BaseFakeDb } from '../shared/test-helpers.ts'
 import type { Db, Row } from '../shared/supabase-rest.ts'
 
@@ -180,21 +180,50 @@ describe('izolarea eșecurilor', () => {
     assert.match(String(n.body), /access_denied/)
     // aceeași rulare reîncercată → același sync_run_id → nu se dublează
     const run = db.rows('sync_runs').find((r) => r.status === 'failed')!
-    await enqueueFailure(db, { tenant_id: T1, brand_id: B1, sync_run_id: run.id as string, source: 'ga4', brand_name: 'Brand A', errors: [] })
+    await enqueueAlert(db, { kind: 'refresh_failed', tenant_id: T1, brand_id: B1, sync_run_id: run.id as string, source: 'ga4', brand_name: 'Brand A', errors: [] })
     assert.equal(db.rows('ops_notifications').length, 1)
   })
 
-  test('rularea parțială nu e succeeded și nu e eșec: numărată separat, fără alertă', async () => {
+  test('rularea parțială nu e succeeded și nu e eșec, dar primește alertă (sursă cu date lipsă), o singură dată', async () => {
     const db = seed()
-    const r = await runRefresh({
-      db, env: ALL_ON, now: NOW,
-      runners: runners(db, [], { gsc: async () => [outcome('gsc', db, { status: 'partial', errors: [{ code: 'gsc_truncated', status: null, message: 'x' }] })] }),
-    })
+    const partial = () => outcome('gsc', db, { status: 'partial', errors: [{ code: 'gsc_truncated', status: null, message: 'plafon atins' }] })
+    const r = await runRefresh({ db, env: ALL_ON, now: NOW, runners: runners(db, [], { gsc: async () => [partial()] }) })
     assert.equal(r.partial_runs, 1)
     assert.equal(r.failed_runs, 0)
     assert.equal(r.clean, false)
     assert.equal(r.sources[2]!.counts.succeeded, 0)
-    assert.equal(db.rows('ops_notifications').length, 0)
+    assert.equal(r.notifications_enqueued, 1)
+    const n = db.rows('ops_notifications')
+    assert.equal(n.length, 1)
+    assert.deepEqual([n[0]!.kind, n[0]!.source, n[0]!.brand_id], ['refresh_partial', 'gsc', B1])
+    assert.match(String(n[0]!.subject), /parțial: gsc · Brand A/)
+    assert.match(String(n[0]!.body), /lipsesc date/)
+    assert.match(String(n[0]!.body), /gsc_truncated/)
+    assert.doesNotMatch(String(n[0]!.body), /a eșuat/)
+  })
+
+  test('rulările reușite nu primesc alertă; failed și partial în aceeași rulare: câte o alertă fiecare, cu tipul lor', async () => {
+    const db = seed()
+    const r = await runRefresh({
+      db, env: ALL_ON, now: NOW,
+      runners: runners(db, [], {
+        ga4: async () => [outcome('ga4', db, { status: 'failed', errors: [{ code: 'access_denied', status: 403, message: 'x' }] })],
+        gsc: async () => [outcome('gsc', db, { status: 'partial' })],
+      }),
+    })
+    assert.equal(r.notifications_enqueued, 2)
+    assert.deepEqual(db.rows('ops_notifications').map((n) => [n.source, n.kind]).sort(), [['ga4', 'refresh_failed'], ['gsc', 'refresh_partial']])
+    const ok = await runRefresh({ db: seed(), env: ALL_ON, now: NOW, runners: runners(seed(), [], {}) })
+    assert.equal(ok.notifications_enqueued, 0)
+  })
+
+  test('aceeași rulare parțială repetată: fără alertă duplicat; aceeași rulare nu poate avea și alertă failed și partial', async () => {
+    const db = seed()
+    const part = outcome('gsc', db, { status: 'partial' })
+    const plan = { gsc: async () => [part] }
+    await runRefresh({ db, env: ALL_ON, now: NOW, runners: runners(db, [], plan) })
+    await runRefresh({ db, env: ALL_ON, now: NOW, runners: runners(db, [], plan) })
+    assert.equal(db.rows('ops_notifications').filter((n) => n.kind === 'refresh_partial').length, 1)
   })
 
   test('neconectat nu e eșec: fără sync_run, fără alertă', async () => {
@@ -266,7 +295,7 @@ describe('adaptoare (conectorii reali, fără conexiuni)', () => {
 
 describe('alerte: coada care nu pierde nimic', () => {
   const ENV = { RESEND_API_KEY: 're_test_KEY_DO_NOT_LOG', OPS_FROM_EMAIL: 'Analyzator <ops@exemplu.ro>' }
-  const run = { tenant_id: T1, brand_id: B1, sync_run_id: '00000000-0000-4000-8000-000000000001', source: 'ga4', brand_name: 'Brand A', errors: [{ code: 'access_denied', status: 403, message: 'fără acces la proprietate' }] }
+  const run: RunAlert = { kind: 'refresh_failed', tenant_id: T1, brand_id: B1, sync_run_id: '00000000-0000-4000-8000-000000000001', source: 'ga4', brand_name: 'Brand A', errors: [{ code: 'access_denied', status: 403, message: 'fără acces la proprietate' }] }
 
   function fakeResend(responses: Array<{ status: number; body?: unknown } | Error>) {
     const calls: Array<{ url: string; headers: Record<string, string>; body: Record<string, unknown> }> = []
@@ -281,14 +310,14 @@ describe('alerte: coada care nu pierde nimic', () => {
   }
   async function pending(extra: Record<string, Row[]> = {}) {
     const db = new FakeDb({ alert_contacts: [{ tenant_id: T1, email: 'Ops@Agentie.ro', active: true }, { tenant_id: T1, email: 'vechi@agentie.ro', active: false }, { tenant_id: T2, email: 'alt@agentie.ro', active: true }], ...extra })
-    await enqueueFailure(db, run)
+    await enqueueAlert(db, run)
     const row = db.rows('ops_notifications')[0]!
     Object.assign(row, { id: '80000000-0000-0000-0000-0000000000a1', status: 'pending', attempts: 0, last_error: null, created_at: '1' })
     return db
   }
 
   test('mesajul conține sursa, brandul și codurile de eroare, nu secrete', () => {
-    const m = failureMessage({ ...run, errors: Array.from({ length: 8 }, (_, i) => ({ code: `e${i}`, status: null, message: 'x'.repeat(500) })) }, 'https://app.exemplu.ro')
+    const m = alertMessage({ ...run, errors: Array.from({ length: 8 }, (_, i) => ({ code: `e${i}`, status: null, message: 'x'.repeat(500) })) }, 'https://app.exemplu.ro')
     assert.match(m.subject, /Refresh eșuat: ga4 · Brand A/)
     assert.match(m.body, /… și încă 3/)
     assert.ok(m.body.length < 2500)
@@ -354,7 +383,7 @@ describe('alerte: coada care nu pierde nimic', () => {
 
   test('enqueue cu ID invalid: respins înainte de scriere', async () => {
     const db = new FakeDb()
-    await assert.rejects(enqueueFailure(db, { ...run, sync_run_id: 'x&status=neq.sent' }))
+    await assert.rejects(enqueueAlert(db, { ...run, sync_run_id: 'x&status=neq.sent' }))
     assert.equal(db.log.length, 0)
   })
 })

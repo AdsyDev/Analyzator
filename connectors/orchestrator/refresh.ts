@@ -1,5 +1,5 @@
 // Orchestratorul refreshului săptămânal. Rulează conectorii activi, în ordine, per sursă (și per brand, în interiorul
-// conectorilor), cu sync_runs. Eșecul unei surse nu le oprește pe celelalte; un eșec rămâne în sync_runs și intră în coada de alerte.
+// conectorilor), cu sync_runs. Eșecul unei surse nu le oprește pe celelalte; un eșec sau o rulare parțială rămâne în sync_runs și intră în coada de alerte.
 //
 // Ordinea (prioritate, și de rulare): seomonitor → ga4 → gsc. Clarity are colectare zilnică proprie (clarity-daily.yml,
 // buget de 10 apeluri/zi) și nu intră în refresh-ul săptămânal. Flag-urile CONNECTOR_*_ENABLED se citesc doar prin
@@ -11,7 +11,7 @@ import { lookbackWindow } from '../google/dates.ts'
 import { finishSyncRun, startSyncRun, type SyncRunError } from '../shared/sync-runs.ts'
 import type { Db } from '../shared/supabase-rest.ts'
 import { assertUuid } from '../shared/supabase-rest.ts'
-import { enqueueFailure } from './ops-notifications.ts'
+import { enqueueAlert } from './ops-notifications.ts'
 
 export type RefreshSource = 'seomonitor' | 'ga4' | 'gsc'
 export const REFRESH_ORDER: readonly RefreshSource[] = ['seomonitor', 'ga4', 'gsc']
@@ -135,18 +135,19 @@ export async function runRefresh(deps: RefreshDeps): Promise<RefreshReport> {
     const counts = emptyCounts()
     for (const o of outcomes) counts[o.status]++
 
-    // Alertă pentru fiecare rulare eșuată (idempotent pe sync_run_id).
-    const failed = outcomes.filter((o) => o.status === 'failed' && o.sync_run_id)
-    if (failed.length) {
-      const ids = [...new Set(failed.map((o) => o.brand_id).filter((b): b is string => !!b))]
+    // Alertă pentru fiecare rulare eșuată SAU parțială (idempotent pe sync_run_id + tip). Parțial = sursă cu date lipsă.
+    const alerting = outcomes.filter((o) => (o.status === 'failed' || o.status === 'partial') && o.sync_run_id)
+    if (alerting.length) {
+      const ids = [...new Set(alerting.map((o) => o.brand_id).filter((b): b is string => !!b))]
       for (const id of ids) assertUuid(id, 'brand_id')
       const names = new Map<string, string>()
       if (ids.length) {
         for (const b of await db.select<{ id: string; name: string }>('brands', `select=id,name&id=in.(${ids.join(',')})`)) names.set(b.id, b.name)
       }
-      for (const o of failed) {
+      for (const o of alerting) {
         try {
-          await enqueueFailure(db, {
+          await enqueueAlert(db, {
+            kind: o.status === 'failed' ? 'refresh_failed' : 'refresh_partial',
             tenant_id: o.tenant_id, brand_id: o.brand_id, sync_run_id: o.sync_run_id!, source,
             brand_name: o.brand_id ? (names.get(o.brand_id) ?? null) : null, errors: o.errors,
           }, deps.appBaseUrl)

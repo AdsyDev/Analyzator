@@ -1,7 +1,7 @@
 // Refresh săptămânal. Rulare: npm run refresh:weekly [-- --only seomonitor,ga4,gsc]
 //
 // Rulează conectorii activi (flag-uri CONNECTOR_*_ENABLED) în ordine: seomonitor → ga4 → gsc. Eșecul unei surse nu le oprește pe
-// celelalte. La final trimite alertele de eșec din coadă (dacă RESEND_API_KEY și OPS_FROM_EMAIL există; altfel rămân pending).
+// celelalte. La final trimite alertele (eșecuri și rulări parțiale) din coadă (dacă RESEND_API_KEY și OPS_FROM_EMAIL există; altfel rămân pending).
 // Cod de ieșire 1 dacă o sursă a eșuat sau a aruncat o excepție; rulările parțiale sunt raportate ca avertismente (cod 0).
 
 import { parseArgs } from 'node:util'

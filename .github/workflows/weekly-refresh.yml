@@ -8,7 +8,7 @@
 # dezactivat e sărit. Workflow-urile per sursă (seomonitor-weekly, google-weekly, clarity-daily) rămân pentru rulări individuale.
 #
 # Eșecul unei surse nu le oprește pe celelalte. Jobul eșuează (cod 1) dacă o sursă a eșuat; rulările parțiale apar ca avertismente.
-# Alertele de eșec intră în coada ops_notifications și se trimit prin Resend dacă secretele există; altfel rămân `pending`.
+# Alertele (rulări eșuate și parțiale) intră în coada ops_notifications și se trimit prin Resend dacă secretele există; altfel rămân `pending`.
 #
 # Secrete în environment-ul GitHub ales (implicit „staging”): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, opțional RESEND_API_KEY, OPS_FROM_EMAIL.
 # Tokenurile conectorilor NU sunt aici: stau în Supabase Vault.
