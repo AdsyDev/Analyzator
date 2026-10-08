@@ -4,10 +4,7 @@
  * (încă: `ai_mention_rate`, `paid_spend`, `listening_mentions`) nu au definiție inventată: providerul le
  * întoarce `not_connected`, iar tooltipul spune că definiția nu e încă în registru.
  */
-export interface KpiSlot {
-  key: string
-  label: string
-}
+import type { KpiSlot } from '../shared/slots'
 
 export const KPI_SLOTS: readonly KpiSlot[] = [
   { key: 'ai_mention_rate', label: 'AI Mention Rate' },
@@ -32,5 +29,3 @@ export const TREND_SLOTS: readonly TrendSlot[] = [
   { key: 'ga4_sessions', tab: 'Trafic' },
   { key: 'listening_mentions', tab: 'Mențiuni' },
 ]
-
-export const MISSING_DEFINITION = 'Definiția acestui indicator nu este încă în registrul de metrici.'

@@ -56,7 +56,7 @@ export function Dialog({ open, onClose, title, placement = 'center', children, f
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-50" onKeyDown={onKeyDown}>
+    <div className="fixed inset-x-0 bottom-0 top-[var(--banner-h,0px)] z-50" onKeyDown={onKeyDown}>
       <div data-testid="scrim" className="absolute inset-0" style={{ background: 'var(--scrim)' }} onClick={onClose} />
       <div
         ref={panel}

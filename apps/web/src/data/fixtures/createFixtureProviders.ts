@@ -31,6 +31,8 @@ import {
   type Sentiment,
 } from '../../contracts'
 import { addDays, comparisonRange, todayBucharest } from '../../lib/period'
+import { createAiFixtures } from './ai'
+import { createSearchFixtures } from './search'
 import { FIXTURE_DEFINITIONS, fixtureEvidence, fixtureMetrics, fixtureTrends } from './metrics'
 
 export interface FixtureOptions {
@@ -116,8 +118,10 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
     },
   }
 
-  // Marcajele PV rămân în memorie cât ține sesiunea de previzualizare.
+  // Marcajele PV rămân în memorie cât ține sesiunea de previzualizare; mențiunile și răspunsurile AI le împart.
   const flags = new Map<string, PvFlag>()
+  const aiFx = createAiFixtures({ allowed, flags, now })
+  const search = createSearchFixtures(allowed)
   const flagKey = (item: PvItemRef) => `${item.kind}:${item.id}`
   const mentionsFor = (brandId: string): Mention[] =>
     mentionsFile.mentions
@@ -162,12 +166,14 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
       if (denied) return denied
       const m = item.kind === 'mention' ? mentionsFor(brandId).find((x) => x.id === item.id) : null
       if (item.kind === 'mention' && !m) return failed('Mențiunea nu a fost găsită.')
+      const answerText = item.kind === 'ai_answer' ? aiFx.plainText(brandId, item.id) : null
+      if (item.kind === 'ai_answer' && !answerText) return failed('Răspunsul nu a fost găsit sau nu are text de marcat.')
       return ready({
         item,
         at: now().toISOString(),
         user: `${getUser().name}, ${getUser().organization}`,
         link: m?.url ?? null,
-        text: m?.text ?? 'Răspuns AI fictiv, pentru previzualizare.',
+        text: m?.text ?? answerText ?? '',
         notify: mentionsFile.pv_contacts,
       })
     },
@@ -255,7 +261,7 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
     },
   }
 
-  return { kind: 'fixtures', metrics, insights, mentions, sources, brands }
+  return { kind: 'fixtures', metrics, insights, mentions, sources, brands, ai: aiFx.provider, search }
 }
 
 type ProviderGuard<T> = Extract<import('../../contracts').ProviderResult<T>, { kind: 'error' }>

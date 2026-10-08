@@ -8,7 +8,7 @@ import { StatusChip } from '../../components/ui/Chip'
 import type { AsyncState } from '../../data/useAsync'
 import { formatDate } from '../../lib/format'
 import { ProviderProblem } from '../../routing/pages'
-import { Section } from './Section'
+import { Section } from '../shared/Section'
 
 type InsightsState = AsyncState<ProviderResult<Insight[]>>
 

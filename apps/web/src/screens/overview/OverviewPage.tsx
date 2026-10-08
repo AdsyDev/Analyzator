@@ -9,10 +9,10 @@ import { sharedSearch } from '../../lib/period'
 import { useLayout } from '../../routing/AppLayout'
 import { CompetitorSection } from './CompetitorSection'
 import { ContextBar } from './ContextBar'
-import { EvidenceHost, type EvidenceTarget } from './EvidenceHost'
+import { EvidenceHost, type EvidenceTarget } from '../shared/EvidenceHost'
 import { LatestInsight, Opportunities } from './InsightSections'
-import { KpiGrid } from './KpiGrid'
-import { KPI_KEYS, TREND_SLOTS } from './slots'
+import { KpiGrid } from '../shared/KpiGrid'
+import { KPI_KEYS, KPI_SLOTS, TREND_SLOTS } from './slots'
 import { TrendSection } from './TrendSection'
 
 const TREND_KEYS = [...new Set([...KPI_KEYS, ...TREND_SLOTS.map((s) => s.key)])]
@@ -47,7 +47,7 @@ function OverviewContent({ brand, ctx, user }: { brand: Brand; ctx: QueryContext
   return (
     <div className="flex flex-col gap-5">
       <ContextBar brand={brand} ctx={ctx} items={metrics.state.status === 'done' ? metrics.state.value.items : null} />
-      <KpiGrid metrics={metrics.state} definitions={byKey} trends={trends.state} onRetry={metrics.reload} onOpen={setTarget} />
+      <KpiGrid slots={KPI_SLOTS} page="Overview" metrics={metrics.state} definitions={byKey} trends={trends.state} onRetry={metrics.reload} onOpen={setTarget} />
       <TrendSection trends={trends.state} labels={trendLabels} onRetry={trends.reload} />
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <LatestInsight state={insights.state} agencyView={agency} allHref={`${brandPath(brand.id, 'insights')}${search}`} onRetry={insights.reload} onOpenEvidence={openEvidence} />

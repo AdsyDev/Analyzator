@@ -5,7 +5,9 @@ import { LoginPage } from './LoginPage'
 import { ADMIN_MODULES, BRAND_MODULES } from './modules'
 import { AdminPlaceholder, ModulePlaceholder, NotFoundPage } from './pages'
 import { RequireAuth } from './RequireAuth'
+import { AiPage } from '../screens/ai/AiPage'
 import { OverviewPage } from '../screens/overview/OverviewPage'
+import { SeoPage } from '../screens/seo/SeoPage'
 
 /** `/`: spre Overview-ul ultimului brand permis (sau al primului). Fără brand permis, AppLayout arată mesajul. */
 function HomeRedirect() {
@@ -25,6 +27,8 @@ function BrandModulePage() {
   if (!module || !brand) return <NotFoundPage />
   // Ecranele construite înlocuiesc placeholder-ul; restul (UI-3…UI-6) rămân pe starea reală a surselor.
   if (module.segment === 'overview') return <OverviewPage />
+  if (module.segment === 'ai') return <AiPage />
+  if (module.segment === 'seo') return <SeoPage />
   return <ModulePlaceholder module={module} brand={brand} role={user.role} />
 }
 

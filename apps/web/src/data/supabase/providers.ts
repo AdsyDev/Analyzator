@@ -1,6 +1,8 @@
 import {
   notConnected,
+  type AiVisibilityProvider,
   type BrandsProvider,
+  type SearchProvider,
   type DataProviders,
   type InsightsProvider,
   type MentionsProvider,
@@ -77,10 +79,29 @@ const brands: BrandsProvider = {
   competitorSet: async () => notConnected('Setul de competitori nu este încă disponibil pentru acest brand.'),
 }
 
+const AI_UNAVAILABLE = 'Datele AI Visibility nu sunt încă disponibile pentru acest brand.'
+const SEARCH_UNAVAILABLE = 'Datele de search nu sunt încă disponibile pentru acest brand.'
+
+const ai: AiVisibilityProvider = {
+  groups: async () => notConnected(AI_UNAVAILABLE),
+  engines: async () => notConnected(AI_UNAVAILABLE),
+  trends: async () => notConnected(AI_UNAVAILABLE),
+  topicMatrix: async () => notConnected(AI_UNAVAILABLE),
+  citedSources: async () => notConnected(AI_UNAVAILABLE),
+  answers: async () => notConnected(AI_UNAVAILABLE),
+  answer: async () => notConnected(AI_UNAVAILABLE),
+}
+
+const search: SearchProvider = {
+  keywords: async () => notConnected(SEARCH_UNAVAILABLE),
+  landingPages: async () => notConnected(SEARCH_UNAVAILABLE),
+  contentGaps: async () => notConnected(SEARCH_UNAVAILABLE),
+}
+
 /**
  * Implementarea reală. Rămâne goală: fiecare provider se completează ecran cu ecran, pe măsură ce
  * tabelele și conectorii livrează date (UI-6 pentru Administrare, apoi restul modulelor).
  */
 export function createSupabaseProviders(): DataProviders {
-  return { kind: 'supabase', metrics, insights, mentions, sources, brands }
+  return { kind: 'supabase', metrics, insights, mentions, sources, brands, ai, search }
 }

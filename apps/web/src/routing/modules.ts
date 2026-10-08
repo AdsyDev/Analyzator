@@ -1,5 +1,16 @@
-import type { SourceProviderId } from '../contracts'
+import type { DataProviders, SourceProviderId } from '../contracts'
+import { AI_ENGINES } from '../contracts'
+import { AI_ENGINE_LABELS } from '../lib/ai'
 import type { FilterDef } from '../lib/period'
+
+/** Filtru ale cărui opțiuni depind de brand (de ex. grupurile de întrebări AI). Opțiunile se încarcă prin provider. */
+export interface DynamicFilter {
+  key: string
+  label: string
+  allLabel: string
+  /** `null` când opțiunile nu sunt disponibile (sursă neconectată sau eroare): filtrul nu apare. */
+  load: (providers: DataProviders, brandId: string) => Promise<string[] | null>
+}
 
 export interface BrandModule {
   segment: string
@@ -8,6 +19,7 @@ export interface BrandModule {
   /** Sursele de care depinde modulul; când toate lipsesc, modulul afișează „Sursă neconectată". */
   sources: readonly SourceProviderId[]
   filters: readonly FilterDef[]
+  dynamicFilter?: DynamicFilter
   /** Textul pentru modulul fără sursă conectată, din design. */
   disconnected?: (brandName: string) => string
   /** Sursa pe care o conectează acțiunea „Conectează …" (doar agency_admin). */
@@ -26,11 +38,39 @@ export const DEVICE_FILTER: FilterDef = {
   ],
 }
 
+export const ENGINE_FILTER: FilterDef = {
+  key: 'engine',
+  label: 'Engine',
+  defaultValue: 'all',
+  options: [{ value: 'all', label: 'Toate engine-urile' }, ...AI_ENGINES.map((e) => ({ value: e, label: AI_ENGINE_LABELS[e] }))],
+}
+
+export const KEYWORD_TYPE_FILTER: FilterDef = {
+  key: 'kw',
+  label: 'Keywords',
+  defaultValue: 'all',
+  options: [
+    { value: 'all', label: 'Toate' },
+    { value: 'brand', label: 'Brand' },
+    { value: 'nonbrand', label: 'Nonbrand' },
+  ],
+}
+
+const AI_GROUPS: DynamicFilter = {
+  key: 'group',
+  label: 'Grup',
+  allLabel: 'Toate grupurile',
+  load: async (providers, brandId) => {
+    const r = await providers.ai.groups(brandId)
+    return r.kind === 'ready' ? r.data : null
+  },
+}
+
 /** Titlurile și subtitlurile din design (`PAGES`). Filtrele sunt allowlist-ul cheilor din URL pentru fiecare modul. */
 export const BRAND_MODULES: Record<string, BrandModule> = {
   overview: { segment: 'overview', title: 'Overview', subtitle: () => 'Starea brandului pe toate sursele. Apasă pe orice indicator ca să vezi înregistrările din spatele lui.', sources: ['ga4', 'gsc', 'seomonitor'], filters: [] },
-  ai: { segment: 'ai', title: 'AI Visibility', subtitle: () => 'Cum apare brandul în răspunsurile asistenților AI, pe aceleași întrebări rulate zilnic.', sources: ['seomonitor'], filters: [] },
-  seo: { segment: 'seo', title: 'SEO și Search', subtitle: () => 'Prezența în Google: clicks, poziții și subiectele pe care competitorii le acoperă înaintea ta.', sources: ['seomonitor', 'gsc'], filters: [] },
+  ai: { segment: 'ai', title: 'AI Visibility', subtitle: () => 'Cum apare brandul în răspunsurile asistenților AI, pe aceleași întrebări rulate zilnic.', sources: ['seomonitor'], filters: [ENGINE_FILTER], dynamicFilter: AI_GROUPS },
+  seo: { segment: 'seo', title: 'SEO și Search', subtitle: () => 'Prezența în Google: clicks, poziții și subiectele pe care competitorii le acoperă înaintea ta.', sources: ['seomonitor', 'gsc'], filters: [KEYWORD_TYPE_FILTER] },
   traffic: { segment: 'traffic', title: 'Trafic și conversii', subtitle: () => 'Ce se întâmplă după click: vizite, acțiuni importante și calitatea măsurării.', sources: ['ga4', 'clarity'], filters: [DEVICE_FILTER] },
   paid: {
     segment: 'paid',

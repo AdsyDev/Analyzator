@@ -5,7 +5,7 @@ import { useProviders } from '../../data/DataProvidersContext'
 import { useDefinitions, useMetrics } from '../../data/hooks'
 import { useAsync } from '../../data/useAsync'
 import { ProviderProblem } from '../../routing/pages'
-import { Section } from './Section'
+import { Section } from '../shared/Section'
 
 /** Rândurile comparației: brandul vine din provider; competitorii nu au (încă) o sursă de date. */
 const ROWS: Array<{ group: string; source?: string; key: string; label: string }> = [

@@ -1,0 +1,68 @@
+{
+  "_marker": "analyzator-design-preview-fixture",
+  "_note": "Date FICTIVE pentru ecranul SEO și Search. rank null = fără rank. Competitorii se referă după etichetă (C1..C3) din brands.json.",
+  "brands": {
+    "brand-urinal": {
+      "keywords": [
+        { "keyword": "urinal", "url": "/", "volume": 5400, "rank_mobile": 1, "rank_desktop": 1, "change_mobile": 0, "is_brand": true, "competitor": null, "shared": false },
+        { "keyword": "urinal akut", "url": "/produse/urinal-akut", "volume": 2900, "rank_mobile": 1, "rank_desktop": 1, "change_mobile": 0, "is_brand": true, "competitor": null, "shared": false },
+        { "keyword": "urinal pareri", "url": "/sfaturi/urinal-pareri", "volume": 1600, "rank_mobile": 2, "rank_desktop": 2, "change_mobile": 1, "is_brand": true, "competitor": null, "shared": false },
+        { "keyword": "urinal pret", "url": "/unde-gasesti", "volume": 1300, "rank_mobile": 3, "rank_desktop": 4, "change_mobile": -1, "is_brand": true, "competitor": { "label": "C1", "position": 2 }, "shared": false },
+        { "keyword": "infectie urinara tratament", "url": "/sfaturi/infectia-urinara", "volume": 12100, "rank_mobile": 9, "rank_desktop": 8, "change_mobile": 2, "is_brand": false, "competitor": { "label": "C2", "position": 3 }, "shared": false },
+        { "keyword": "cistita remedii", "url": "/sfaturi/infectia-urinara", "volume": 8100, "rank_mobile": 12, "rank_desktop": 11, "change_mobile": -3, "is_brand": false, "competitor": { "label": "C1", "position": 4 }, "shared": false },
+        { "keyword": "merisor capsule", "url": "/sfaturi/merisor-si-d-manoza", "volume": 4400, "rank_mobile": 6, "rank_desktop": 5, "change_mobile": 4, "is_brand": false, "competitor": { "label": "C3", "position": 2 }, "shared": false },
+        { "keyword": "d-manoza", "url": "/sfaturi/merisor-si-d-manoza", "volume": 3600, "rank_mobile": 14, "rank_desktop": 13, "change_mobile": 0, "is_brand": false, "competitor": { "label": "C2", "position": 5 }, "shared": false },
+        { "keyword": "arsuri la urinare", "url": "/sfaturi/infectia-urinara", "volume": 9900, "rank_mobile": null, "rank_desktop": null, "change_mobile": null, "is_brand": false, "competitor": { "label": "C1", "position": 6 }, "shared": false },
+        { "keyword": "infectie urinara femei", "url": "/sfaturi/infectia-urinara", "volume": 6600, "rank_mobile": 18, "rank_desktop": 16, "change_mobile": -2, "is_brand": false, "competitor": null, "shared": false },
+        { "keyword": "supliment tract urinar", "url": "/produse/urinal-akut", "volume": 1900, "rank_mobile": 4, "rank_desktop": 4, "change_mobile": 1, "is_brand": false, "competitor": { "label": "C3", "position": 1 }, "shared": false },
+        { "keyword": "cistita in sarcina", "url": "/despre-stada", "volume": 2400, "rank_mobile": null, "rank_desktop": 27, "change_mobile": null, "is_brand": false, "competitor": { "label": "C2", "position": 7 }, "shared": true }
+      ],
+      "pages": [
+        { "url": "/", "base_clicks": 3100, "impressions_per_click": 14, "position": 1.8, "key_events_per_click": 0.05, "shared": false },
+        { "url": "/produse/urinal-akut", "base_clicks": 2400, "impressions_per_click": 22, "position": 3.4, "key_events_per_click": 0.07, "shared": false },
+        { "url": "/sfaturi/infectia-urinara", "base_clicks": 1900, "impressions_per_click": 48, "position": 9.2, "key_events_per_click": null, "shared": false },
+        { "url": "/sfaturi/merisor-si-d-manoza", "base_clicks": 900, "impressions_per_click": 40, "position": 7.6, "key_events_per_click": 0.01, "shared": false },
+        { "url": "/despre-stada", "base_clicks": 300, "impressions_per_click": 60, "position": 24.1, "key_events_per_click": null, "shared": true }
+      ],
+      "gaps": [
+        { "keyword": "d-manoza sau merisor", "volume": 2400, "competitor": "C2", "position": 4 },
+        { "keyword": "cistita dupa contact", "volume": 1900, "competitor": "C1", "position": 6 },
+        { "keyword": "infectie urinara copii", "volume": 3600, "competitor": "C3", "position": 8 },
+        { "keyword": "ceai pentru cistita", "volume": 1300, "competitor": "C2", "position": 3 }
+      ]
+    },
+    "brand-minimartieni": {
+      "keywords": [
+        { "keyword": "minimartieni", "url": "/", "volume": 4400, "rank_mobile": 1, "rank_desktop": 1, "change_mobile": 0, "is_brand": true, "competitor": null, "shared": false },
+        { "keyword": "minimartieni imunitate", "url": "/produse/imunitate", "volume": 1900, "rank_mobile": 1, "rank_desktop": 2, "change_mobile": 1, "is_brand": true, "competitor": null, "shared": false },
+        { "keyword": "vitamine copii", "url": "/sfaturi/vitamine-pe-varste", "volume": 14800, "rank_mobile": 7, "rank_desktop": 6, "change_mobile": 3, "is_brand": false, "competitor": { "label": "C1", "position": 2 }, "shared": false },
+        { "keyword": "jeleuri vitamine copii", "url": "/produse/jeleuri", "volume": 5400, "rank_mobile": 3, "rank_desktop": 3, "change_mobile": 0, "is_brand": false, "competitor": { "label": "C2", "position": 1 }, "shared": false },
+        { "keyword": "vitamina d copii", "url": "/sfaturi/vitamina-d", "volume": 9100, "rank_mobile": 11, "rank_desktop": 10, "change_mobile": -2, "is_brand": false, "competitor": { "label": "C3", "position": 3 }, "shared": false },
+        { "keyword": "multivitamine copii 3 ani", "url": "/sfaturi/vitamine-pe-varste", "volume": 2900, "rank_mobile": null, "rank_desktop": 31, "change_mobile": null, "is_brand": false, "competitor": { "label": "C1", "position": 5 }, "shared": false }
+      ],
+      "pages": [
+        { "url": "/", "base_clicks": 3800, "impressions_per_click": 12, "position": 1.6, "key_events_per_click": 0.06, "shared": false },
+        { "url": "/produse/jeleuri", "base_clicks": 2100, "impressions_per_click": 25, "position": 3.9, "key_events_per_click": 0.05, "shared": false },
+        { "url": "/sfaturi/vitamine-pe-varste", "base_clicks": 1700, "impressions_per_click": 45, "position": 8.4, "key_events_per_click": null, "shared": false }
+      ],
+      "gaps": [
+        { "keyword": "poftă de mâncare copii", "volume": 4800, "competitor": "C2", "position": 3 },
+        { "keyword": "calciu pentru copii", "volume": 2200, "competitor": "C1", "position": 5 }
+      ]
+    },
+    "brand-proenzi": {
+      "keywords": [
+        { "keyword": "proenzi", "url": "/", "volume": 1200, "rank_mobile": 1, "rank_desktop": 1, "change_mobile": 0, "is_brand": true, "competitor": null, "shared": false },
+        { "keyword": "dureri genunchi remedii", "url": "/sfaturi/genunchi", "volume": 7200, "rank_mobile": 22, "rank_desktop": 19, "change_mobile": 1, "is_brand": false, "competitor": { "label": "C1", "position": 3 }, "shared": false },
+        { "keyword": "suplimente articulatii", "url": "/produse/proenzi", "volume": 5400, "rank_mobile": null, "rank_desktop": null, "change_mobile": null, "is_brand": false, "competitor": { "label": "C2", "position": 2 }, "shared": false }
+      ],
+      "pages": [
+        { "url": "/", "base_clicks": 700, "impressions_per_click": 16, "position": 2.1, "key_events_per_click": null, "shared": false },
+        { "url": "/produse/proenzi", "base_clicks": 400, "impressions_per_click": 35, "position": 12.3, "key_events_per_click": null, "shared": false }
+      ],
+      "gaps": [
+        { "keyword": "colagen pentru articulații", "volume": 3100, "competitor": "C1", "position": 4 }
+      ]
+    }
+  }
+}

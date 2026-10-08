@@ -1,0 +1,52 @@
+{
+  "_marker": "analyzator-design-preview-fixture",
+  "_note": "Date FICTIVE pentru ecranul AI Visibility. Răspunsurile, citările și ratele se generează determinist din întrebările de mai jos; domeniile folosesc TLD-ul rezervat .example. Textele nu sunt sfaturi medicale.",
+  "third_party_domains": ["sfatulmedicului.example", "sanatateazi.example", "farmacia-online.example", "forumul-mamicilor.example", "enciclomed.example", "ghidul-pacientului.example"],
+  "brands": {
+    "brand-urinal": {
+      "questions": [
+        { "group": "Prevenție ITU", "text": "Ce pot lua pentru a preveni infecțiile urinare recurente?" },
+        { "group": "Prevenție ITU", "text": "Cum reduc riscul de infecții urinare vara?" },
+        { "group": "Cistită acută", "text": "Ce ajută când apar primele semne de cistită?" },
+        { "group": "Cistită acută", "text": "Când merg la medic pentru arsuri la urinare?" },
+        { "group": "Merișor și D-manoză", "text": "Merișor sau D-manoză pentru tractul urinar?" },
+        { "group": "Merișor și D-manoză", "text": "Cât durează până se simte efectul unui supliment cu merișor?" },
+        { "group": "ITU în sarcină", "text": "Ce suplimente pentru tractul urinar sunt discutate în sarcină?" },
+        { "group": "ITU în sarcină", "text": "Cum prevenim infecțiile urinare în timpul sarcinii?" },
+        { "group": "După antibiotic", "text": "Ce pot lua după un tratament cu antibiotic pentru ITU?" },
+        { "group": "După antibiotic", "text": "Cum susțin tractul urinar după antibiotic?" }
+      ],
+      "forced": { "3:aio": "refused", "7:gemini": "error", "9:perplexity": "not_collected" }
+    },
+    "brand-minimartieni": {
+      "questions": [
+        { "group": "Imunitate", "text": "Ce vitamine ajută imunitatea copiilor în sezonul rece?" },
+        { "group": "Imunitate", "text": "Cum întăresc imunitatea unui preșcolar?" },
+        { "group": "Vitamine pe vârste", "text": "Ce vitamine sunt potrivite pentru un copil de 3 ani?" },
+        { "group": "Vitamine pe vârste", "text": "Din ce vârstă pot da multivitamine copilului?" },
+        { "group": "Jeleuri cu vitamine", "text": "Sunt jeleurile cu vitamine o alegere bună pentru copii?" },
+        { "group": "Jeleuri cu vitamine", "text": "Cât zahăr au jeleurile cu vitamine pentru copii?" },
+        { "group": "Poftă de mâncare", "text": "Ce pot face când copilul mănâncă foarte puțin?" },
+        { "group": "Poftă de mâncare", "text": "Ajută vitaminele la pofta de mâncare?" },
+        { "group": "Creștere și oase", "text": "Ce nutrienți contează pentru creșterea oaselor la copii?" },
+        { "group": "Creștere și oase", "text": "Când se recomandă vitamina D la copii?" }
+      ],
+      "forced": { "5:chatgpt": "refused" }
+    },
+    "brand-proenzi": {
+      "questions": [
+        { "group": "Dureri articulare", "text": "Ce pot face pentru durerile de genunchi la efort?" },
+        { "group": "Dureri articulare", "text": "Când merg la medic pentru dureri articulare persistente?" },
+        { "group": "Mobilitate", "text": "Cum îmi păstrez mobilitatea articulațiilor după 50 de ani?" },
+        { "group": "Mobilitate", "text": "Ce exerciții ajută mobilitatea genunchilor?" },
+        { "group": "Sport și recuperare", "text": "Ce pot lua pentru recuperare după sport intens?" },
+        { "group": "Sport și recuperare", "text": "Cum protejez articulațiile când alerg?" },
+        { "group": "Suplimente pentru articulații", "text": "Merită suplimentele pentru articulații?" },
+        { "group": "Suplimente pentru articulații", "text": "Ce conțin de obicei suplimentele pentru articulații?" },
+        { "group": "Vârsta a treia", "text": "Cum sprijin articulațiile la vârste înaintate?" },
+        { "group": "Vârsta a treia", "text": "Ce alimentație ajută articulațiile?" }
+      ],
+      "forced": { "2:gemini": "error", "6:aio": "not_collected" }
+    }
+  }
+}

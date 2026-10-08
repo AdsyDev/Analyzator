@@ -5,7 +5,7 @@ import { TrendChart } from '../../components/TrendChart'
 import type { AsyncState } from '../../data/useAsync'
 import { toChartSeries, type ChartFormat, type ChartSeries } from '../../lib/chartData'
 import { trendReason } from '../../lib/warnings'
-import { Section } from './Section'
+import { Section } from '../shared/Section'
 import { TREND_SLOTS } from './slots'
 
 const FORMAT: Record<string, ChartFormat> = { count: 'int', percent: 'pct' }

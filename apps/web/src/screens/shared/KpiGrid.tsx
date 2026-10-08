@@ -3,10 +3,14 @@ import { KpiCard } from '../../components/KpiCard'
 import type { AsyncState } from '../../data/useAsync'
 import { formatRange } from '../../lib/format'
 import { sparkPoints } from './sparks'
-import { KPI_SLOTS, MISSING_DEFINITION } from './slots'
+import { MISSING_DEFINITION, type KpiSlot } from './slots'
 import type { EvidenceTarget } from './EvidenceHost'
 
 interface Props {
+  /** Cardurile paginii (cheia metricii și eticheta de rezervă din spec). */
+  slots: readonly KpiSlot[]
+  /** Numele paginii, în EvidenceDrawer („Overview", „AI Visibility"). */
+  page: string
   metrics: AsyncState<MetricsBundle>
   definitions: Map<string, MetricDefinition>
   trends: AsyncState<TrendSeries[]>
@@ -15,11 +19,11 @@ interface Props {
 }
 
 /** Cele 6 KpiCards. Fiecare slot își păstrează starea: lipsa unei definiții sau a unei serii nu blochează cardul. */
-export function KpiGrid({ metrics, definitions, trends, onRetry, onOpen }: Props) {
+export function KpiGrid({ slots, page, metrics, definitions, trends, onRetry, onOpen }: Props) {
   const items = metrics.status === 'done' ? metrics.value.items : []
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="kpi-grid">
-      {KPI_SLOTS.map((slot) => {
+      {slots.map((slot) => {
         const item = items.find((i) => i.metric_key === slot.key) ?? null
         const def = definitions.get(slot.key) ?? null
         const label = def?.label ?? slot.label
@@ -36,7 +40,7 @@ export function KpiGrid({ metrics, definitions, trends, onRetry, onOpen }: Props
             direction={def?.direction ?? 'neutral'}
             qualifier={def?.aggregation_label ?? null}
             compareLabel={cmp ? `față de ${formatRange(cmp.start, cmp.end)}` : undefined}
-            onOpen={() => item && onOpen({ page: 'Overview', label, query: item.evidence_query, item, definition: def })}
+            onOpen={() => item && onOpen({ page, label, query: item.evidence_query, item, definition: def })}
             onRetry={onRetry}
           />
         )

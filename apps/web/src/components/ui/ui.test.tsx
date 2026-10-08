@@ -138,6 +138,11 @@ describe('Dialog', () => {
     await userEvent.tab()
     expect(screen.getByRole('button', { name: 'Închide' })).toHaveFocus()
   })
+  it('respectă înălțimea bannerului de previzualizare (--banner-h), ca antetul să nu fie acoperit', async () => {
+    render(<Dialog open onClose={() => {}} title="x" placement="right">c</Dialog>)
+    expect(screen.getByTestId('scrim').parentElement?.className).toContain('top-[var(--banner-h,0px)]')
+  })
+
   it('click pe scrim închide', async () => {
     const onClose = vi.fn()
     render(<Harness onClose={onClose} />)

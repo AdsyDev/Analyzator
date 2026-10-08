@@ -167,9 +167,9 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
   })
 
   it('modul cu surse conectate: spune adevărul despre ecran, fără „În curând"', async () => {
-    setup('/brands/brand-urinal/seo')
+    setup('/brands/brand-urinal/traffic')
     expect(await screen.findByRole('heading', { name: 'Acest ecran nu este încă disponibil' })).toBeInTheDocument()
-    expect(screen.getByText(/sunt conectate pentru Urinal, dar ecranul SEO și Search nu a fost livrat/)).toBeInTheDocument()
+    expect(screen.getByText(/sunt conectate pentru Urinal, dar ecranul Trafic și conversii nu a fost livrat/)).toBeInTheDocument()
     expect(screen.queryByText(/în curând/i)).toBeNull()
   })
 

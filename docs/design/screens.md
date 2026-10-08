@@ -145,3 +145,21 @@ Ce s-a implementat diferit de designul din `docs/design/reference/` și de ce. N
 | Comparație cu C1-C3 pe AI, SEO, social, listening | Brandul are valori unde există; competitorii sunt N/A cu motiv | Nu există o sursă de date pentru competitori (metrici sau API). Fără rând de social: nicio cheie în registru. |
 | Cardurile `ai_mention_rate`, `paid_spend`, `listening_mentions` cu valori | `not_connected`, fără definiție | Cheile nu sunt în `metric_definitions`; tooltipul spune că definiția nu e încă în registru. |
 | Etichete scrise de designer | `name_ro` din registru când există definiția | Registrul e sursa textelor; eticheta slotului din spec e doar rezerva. |
+
+---
+
+# Diferențe față de design (UI-3: AI Visibility, SEO și Search)
+
+| Design / spec | Implementat | Motiv |
+|---|---|---|
+| Rută `/brands/{id}/search` (spec cap. 14) | `/brands/:id/seo` | Ruta din design și din navigație (UI-1). |
+| Rank absent „Peste 100" | „Fără rank" | Spec 2.2: rank absent nu primește poziția 100. |
+| Competitor „în top 10" | „Niciun competitor prezent" | Datele nu spun că pragul e top 10. |
+| Iconuri de engine din CDN extern | Monogramă text (CH, GE, PE, AI) | Nicio dependență externă în interfață. |
+| Cardurile KPI AI cu valori | „Sursă neconectată" pe toate cinci | `ai_*` nu sunt în registru. Pagina nu are valori reale până atunci; listele (engine, matrice, răspunsuri) se văd doar în previzualizare. |
+| Filtre: engine, suprafață, panel, topic, intenție, brand/nonbrand, cohortă, crawl | Engine și grup (AI); brand/nonbrand (SEO) | Restul nu au sursă în contractele de date. |
+| Trenduri cu marcaje de schimbare de panel | Fără marcaje | Contractul nu are evenimente de metodologie. |
+| „Cerere și sezonalitate", „Pagini de investigat", „Informații de verificat" | Lipsesc | Nu sunt în cerința UI-3; „Informații de verificat" e după lansare (cu AdSy AI). |
+| Detaliu răspuns cu citări | Citările sunt linkuri validate; răspuns refuzat/eroare/necolectat au explicație proprie | Spec 2.2 și 28. |
+| Corectarea etichetelor de un specialist (cu motiv) | Nu e implementată | Cere un contract de scriere și audit; nu există. |
+| Marcarea PV pe răspuns | Pentru răspunsurile valide (cu text) | Un răspuns fără text nu are ce se înregistra. |

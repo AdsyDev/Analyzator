@@ -4,6 +4,8 @@ import { useAuth, useUser } from '../auth/AuthContext'
 import { AppShell } from '../components/AppShell'
 import { FilterBar } from '../components/FilterBar'
 import type { Brand, ProviderResult, QueryContext, SessionUser } from '../contracts'
+import type { FilterBarChange } from '../components/FilterBar'
+import type { FilterDef } from '../lib/period'
 import { useProviders } from '../data/DataProvidersContext'
 import { useAsync } from '../data/useAsync'
 import { brandPath } from '../lib/navigation'
@@ -21,6 +23,8 @@ export interface LayoutContext {
   /** Contextul interogării din URL; null în afara modulelor de brand. */
   ctx: QueryContext | null
   homeBrandId: string | null
+  /** Schimbă filtrele din URL (de ex. selectarea unui engine dintr-un card). */
+  changeFilters: (change: FilterBarChange) => void
 }
 
 export const useLayout = () => useOutletContext<LayoutContext>()
@@ -77,7 +81,24 @@ export function AppLayout() {
   const shellBrand = urlBrandId ? urlBrand : (rememberedBrand ?? brands[0] ?? null)
   const homeBrandId = (rememberedBrand ?? brands[0])?.id ?? null
 
-  const filterDefs = module?.filters ?? []
+  // Filtrul dinamic (opțiuni din provider) există în context încă de la început, cu valoarea implicită: așa
+  // `ctx.filters` are aceeași formă înainte și după încărcarea opțiunilor și secțiunile nu se reîncarcă degeaba.
+  // FilterBar îl arată doar după ce opțiunile au venit; până atunci un parametru din URL nu are efect.
+  const dynamic = module?.dynamicFilter
+  const { state: dynamicState } = useAsync(
+    () => (dynamic && urlBrand ? dynamic.load(providers, urlBrand.id) : Promise.resolve(null)),
+    [providers, dynamic?.key, urlBrand?.id, user.role],
+  )
+  const dynamicOptions = dynamicState.status === 'done' ? dynamicState.value : null
+  const dynamicDef = useMemo<FilterDef | null>(
+    () => (dynamic ? { key: dynamic.key, label: dynamic.label, defaultValue: 'all', options: [{ value: 'all', label: dynamic.allLabel }, ...(dynamicOptions ?? []).map((o) => ({ value: o, label: o }))] } : null),
+    [dynamic, dynamicOptions],
+  )
+  const filterDefs = useMemo<readonly FilterDef[]>(() => [...(module?.filters ?? []), ...(dynamicDef ? [dynamicDef] : [])], [module, dynamicDef])
+  const visibleFilterDefs = useMemo<readonly FilterDef[]>(
+    () => (dynamicDef && (!dynamicOptions || dynamicOptions.length === 0) ? (module?.filters ?? []) : filterDefs),
+    [module, dynamicDef, dynamicOptions, filterDefs],
+  )
   const { ctx, change, reset } = useQueryContext(urlBrand ? urlBrand.id : null, filterDefs)
 
   // „Date până la" și „Ultimul refresh" din starea surselor brandului curent (doar pentru un brand permis).
@@ -116,7 +137,7 @@ export function AppLayout() {
   } else if (urlBrandId && !urlBrand) {
     content = <NoAccessPage homeBrandId={homeBrandId} />
   } else {
-    const context: LayoutContext = { user, brands, brand: urlBrand, ctx, homeBrandId }
+    const context: LayoutContext = { user, brands, brand: urlBrand, ctx, homeBrandId, changeFilters: change }
     // `key` pe rol: la comutarea rolului în previzualizare, ecranele se reîncarcă cu datele noului rol.
     content = <Outlet key={user.role} context={context} />
   }
@@ -133,7 +154,7 @@ export function AppLayout() {
       lastRefreshAt={lastRefreshAt}
       onSignOut={() => void signOut()}
       roleSwitcher={preview ? { role: user.role, onChange: preview.setRole } : undefined}
-      filterBar={module && ctx && urlBrand ? <FilterBar value={ctx} onChange={change} onReset={reset} filterDefs={filterDefs} /> : undefined}
+      filterBar={module && ctx && urlBrand ? <FilterBar value={ctx} onChange={change} onReset={reset} filterDefs={visibleFilterDefs} /> : undefined}
     >
       {content}
     </AppShell>
