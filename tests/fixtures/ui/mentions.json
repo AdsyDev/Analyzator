@@ -1,17 +1,174 @@
 {
   "_marker": "analyzator-design-preview-fixture",
-  "pv_contacts": ["farmacovigilenta@stada.example", "Mihai Dumitrescu (QPPV)"],
+  "pv_contacts": [
+    "farmacovigilenta@stada.example",
+    "Mihai Dumitrescu (QPPV)"
+  ],
   "mentions": [
-    { "id": "m-u-1", "brand_id": "brand-urinal", "source_name": "Forum Sănătatea Ta", "author": "mama_de_trei", "days_ago": 1, "text": "Am luat Urinal două zile și mi-a trecut disconfortul, dar am avut și o ușoară greață. Aveți păreri?", "url": "https://forum.example/t/101", "sentiment": "neutral", "reviewed_by": "Ioana Popescu" },
-    { "id": "m-u-2", "brand_id": "brand-urinal", "source_name": "Facebook (public)", "author": "Radu M.", "days_ago": 2, "text": "Recomand Urinal, l-am luat preventiv după antibiotic și m-a ajutat.", "url": "https://social.example/p/202", "sentiment": "positive", "reviewed_by": "Ioana Popescu" },
-    { "id": "m-u-3", "brand_id": "brand-urinal", "source_name": "Review farmacie online", "author": "Anca", "days_ago": 3, "text": "Prețul a crescut față de luna trecută, nu mai merită.", "url": "https://farmacie.example/r/303", "sentiment": "negative", "reviewed_by": "Andrei Vasile" },
-    { "id": "m-u-4", "brand_id": "brand-urinal", "source_name": "Reddit", "author": "u/sanatos", "days_ago": 5, "text": "Cineva a încercat și alternativa cu merișor singur? Merge la fel?", "url": "https://reddit.example/r/303", "sentiment": "neutral", "reviewed_by": "Andrei Vasile" },
-    { "id": "m-u-5", "brand_id": "brand-urinal", "source_name": "Forum Sănătatea Ta", "author": "iulia88", "days_ago": 7, "text": "După trei zile cu Urinal am avut o erupție pe brațe. Am oprit tratamentul.", "url": "https://forum.example/t/105", "sentiment": "negative", "reviewed_by": "Ioana Popescu" },
-    { "id": "m-u-6", "brand_id": "brand-urinal", "source_name": "Instagram (public)", "author": "farmacistul_x", "days_ago": 9, "text": "Ghid scurt: când ajută suplimentele cu merișor și când mergi direct la medic.", "url": "https://social.example/p/206", "sentiment": "positive", "reviewed_by": "Andrei Vasile" },
-    { "id": "m-m-1", "brand_id": "brand-minimartieni", "source_name": "Grup mămici", "author": "Cristina P.", "days_ago": 1, "text": "Minimartieni jeleuri: copilul le mănâncă fără probleme, le luăm de o lună.", "url": "https://forum.example/t/301", "sentiment": "positive", "reviewed_by": "Ioana Popescu" },
-    { "id": "m-m-2", "brand_id": "brand-minimartieni", "source_name": "Review farmacie online", "author": "Dan", "days_ago": 4, "text": "Ambalajul e frumos, dar zahărul din jeleuri mă îngrijorează.", "url": "https://farmacie.example/r/302", "sentiment": "neutral", "reviewed_by": "Andrei Vasile" },
-    { "id": "m-m-3", "brand_id": "brand-minimartieni", "source_name": "Facebook (public)", "author": "Mihaela T.", "days_ago": 6, "text": "Nu au ajuns comenzile la timp, foarte dezamăgită de livrare.", "url": "https://social.example/p/303", "sentiment": "negative", "reviewed_by": "Ioana Popescu" },
-    { "id": "m-p-1", "brand_id": "brand-proenzi", "source_name": "Forum Mișcare", "author": "veteran60", "days_ago": 2, "text": "Încerc Proenzi de două săptămâni pentru genunchi, încă nu simt diferența.", "url": "https://forum.example/t/401", "sentiment": "neutral", "reviewed_by": "Andrei Vasile" },
-    { "id": "m-p-2", "brand_id": "brand-proenzi", "source_name": "Review farmacie online", "author": "Gabriela", "days_ago": 8, "text": "Merge bine împreună cu mișcarea zilnică, recomand.", "url": "https://farmacie.example/r/402", "sentiment": "positive", "reviewed_by": "Ioana Popescu" }
+    {
+      "id": "m-u-1",
+      "brand_id": "brand-urinal",
+      "source_name": "Forum Sănătatea Ta",
+      "author": "mama_de_trei",
+      "days_ago": 1,
+      "text": "Am luat Urinal două zile și mi-a trecut disconfortul, dar am avut și o ușoară greață. Aveți păreri?",
+      "url": "https://forum.example/t/101",
+      "sentiment": "neutral",
+      "reviewed_by": "Ioana Popescu"
+    },
+    {
+      "id": "m-u-2",
+      "brand_id": "brand-urinal",
+      "source_name": "Facebook (public)",
+      "author": "Radu M.",
+      "days_ago": 2,
+      "text": "Recomand Urinal, l-am luat preventiv după antibiotic și m-a ajutat.",
+      "url": "https://social.example/p/202",
+      "sentiment": "positive",
+      "reviewed_by": "Ioana Popescu"
+    },
+    {
+      "id": "m-u-3",
+      "brand_id": "brand-urinal",
+      "source_name": "Review farmacie online",
+      "author": "Anca",
+      "days_ago": 3,
+      "text": "Prețul a crescut față de luna trecută, nu mai merită.",
+      "url": "https://farmacie.example/r/303",
+      "sentiment": "negative",
+      "reviewed_by": "Andrei Vasile"
+    },
+    {
+      "id": "m-u-4",
+      "brand_id": "brand-urinal",
+      "source_name": "Reddit",
+      "author": "u/sanatos",
+      "days_ago": 5,
+      "text": "Cineva a încercat și alternativa cu merișor singur? Merge la fel?",
+      "url": "https://reddit.example/r/303",
+      "sentiment": null,
+      "reviewed_by": null
+    },
+    {
+      "id": "m-u-5",
+      "brand_id": "brand-urinal",
+      "source_name": "Forum Sănătatea Ta",
+      "author": "iulia88",
+      "days_ago": 7,
+      "text": "După trei zile cu Urinal am avut o erupție pe brațe. Am oprit tratamentul.",
+      "url": "https://forum.example/t/105",
+      "sentiment": "negative",
+      "reviewed_by": "Ioana Popescu"
+    },
+    {
+      "id": "m-u-6",
+      "brand_id": "brand-urinal",
+      "source_name": "Instagram (public)",
+      "author": "farmacistul_x",
+      "days_ago": 9,
+      "text": "Ghid scurt: când ajută suplimentele cu merișor și când mergi direct la medic.",
+      "url": "https://social.example/p/206",
+      "sentiment": "positive",
+      "reviewed_by": "Andrei Vasile"
+    },
+    {
+      "id": "m-u-7",
+      "brand_id": "brand-urinal",
+      "source_name": "Știri online",
+      "author": null,
+      "days_ago": 10,
+      "text": "Cum alegem un supliment pentru tractul urinar: ce spun farmaciștii despre produsele disponibile în România, inclusiv Urinal.",
+      "url": "https://stiri.example/a/707",
+      "sentiment": "neutral",
+      "reviewed_by": "Andrei Vasile"
+    },
+    {
+      "id": "m-u-8",
+      "brand_id": "brand-urinal",
+      "source_name": "Reddit",
+      "author": "u/curios77",
+      "days_ago": 12,
+      "text": "Am văzut reclama la Urinal și m-am gândit să încerc. Merită?",
+      "url": "https://reddit.example/r/404",
+      "sentiment": null,
+      "reviewed_by": null
+    },
+    {
+      "id": "m-u-9",
+      "brand_id": "brand-urinal",
+      "source_name": "Facebook (public)",
+      "author": "Daniela C.",
+      "days_ago": 15,
+      "text": "Livrare rapidă și ambalaj îngrijit. Produsul își face treaba.",
+      "url": "https://social.example/p/909",
+      "sentiment": "positive",
+      "reviewed_by": "Ioana Popescu"
+    },
+    {
+      "id": "m-u-10",
+      "brand_id": "brand-urinal",
+      "source_name": "Review farmacie online",
+      "author": "Vlad",
+      "days_ago": 18,
+      "text": "După două cutii nu am simțit nicio diferență. Poate nu e pentru mine.",
+      "url": null,
+      "sentiment": "negative",
+      "reviewed_by": "Andrei Vasile"
+    },
+    {
+      "id": "m-m-1",
+      "brand_id": "brand-minimartieni",
+      "source_name": "Grup mămici",
+      "author": "Cristina P.",
+      "days_ago": 1,
+      "text": "Minimartieni jeleuri: copilul le mănâncă fără probleme, le luăm de o lună.",
+      "url": "https://forum.example/t/301",
+      "sentiment": "positive",
+      "reviewed_by": "Ioana Popescu"
+    },
+    {
+      "id": "m-m-2",
+      "brand_id": "brand-minimartieni",
+      "source_name": "Review farmacie online",
+      "author": "Dan",
+      "days_ago": 4,
+      "text": "Ambalajul e frumos, dar zahărul din jeleuri mă îngrijorează.",
+      "url": "https://farmacie.example/r/302",
+      "sentiment": "neutral",
+      "reviewed_by": "Andrei Vasile"
+    },
+    {
+      "id": "m-m-3",
+      "brand_id": "brand-minimartieni",
+      "source_name": "Facebook (public)",
+      "author": "Mihaela T.",
+      "days_ago": 6,
+      "text": "Nu au ajuns comenzile la timp, foarte dezamăgită de livrare.",
+      "url": "https://social.example/p/303",
+      "sentiment": "negative",
+      "reviewed_by": "Ioana Popescu"
+    },
+    {
+      "id": "m-p-1",
+      "brand_id": "brand-proenzi",
+      "source_name": "Forum Mișcare",
+      "author": "veteran60",
+      "days_ago": 2,
+      "text": "Încerc Proenzi de două săptămâni pentru genunchi, încă nu simt diferența.",
+      "url": "https://forum.example/t/401",
+      "sentiment": "neutral",
+      "reviewed_by": "Andrei Vasile"
+    },
+    {
+      "id": "m-p-2",
+      "brand_id": "brand-proenzi",
+      "source_name": "Review farmacie online",
+      "author": "Gabriela",
+      "days_ago": 8,
+      "text": "Merge bine împreună cu mișcarea zilnică, recomand.",
+      "url": "https://farmacie.example/r/402",
+      "sentiment": "positive",
+      "reviewed_by": "Ioana Popescu"
+    }
   ]
 }

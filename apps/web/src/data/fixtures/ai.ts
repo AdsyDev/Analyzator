@@ -138,8 +138,20 @@ function buildAnswers(brandId: string, to: string): AiAnswerDetail[] {
 
 export const answerPlainText = (a: AiAnswerDetail): string => a.segments.map((s) => (s.kind === 'cite' ? `[${s.n}]` : s.text)).join('')
 
+/** Numărători pe entitate, din răspunsurile generate (pentru matricea de Concurență). */
+export interface AiEntityRates {
+  entities: AiMatrixEntity[]
+  total: number
+  valid: number
+  mentioned: Record<string, number>
+  recommended: Record<string, number>
+  /** Răspunsuri valide cu cel puțin o citare owned a brandului. */
+  ownedCited: number
+}
+
 export interface AiFixtures {
   provider: AiVisibilityProvider
+  rates: (brandId: string, to: string) => AiEntityRates
   /** Textul sanitizat al unui răspuns, pentru previzualizarea marcării PV. */
   plainText: (brandId: string, id: string) => string | null
 }
@@ -262,6 +274,19 @@ export function createAiFixtures({ allowed, flags, now }: { allowed: Set<string>
 
   return {
     provider,
+    rates: (brandId, to) => {
+      const answers = answersFor(brandId, to)
+      const valid = answers.filter((a) => VALID_OUTCOMES.has(a.outcome))
+      const entities = entitiesFor(brandId)
+      return {
+        entities,
+        total: answers.length,
+        valid: valid.length,
+        mentioned: Object.fromEntries(entities.map((e) => [e.id, valid.filter((a) => a.entities_present.includes(e.id)).length])),
+        recommended: Object.fromEntries(entities.map((e) => [e.id, valid.filter((a) => a.entities_recommended.includes(e.id)).length])),
+        ownedCited: valid.filter((a) => a.citations.some((c) => c.owned)).length,
+      }
+    },
     plainText: (brandId, id) => {
       const a = answersFor(brandId, toFor(brandId)).find((x) => x.id === id)
       return a && a.segments.length > 0 ? answerPlainText(a) : null

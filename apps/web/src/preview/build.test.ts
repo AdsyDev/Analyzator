@@ -13,7 +13,7 @@ const WEB = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const VITE = join(WEB, 'node_modules/vite/bin/vite.js')
 const MARKER = 'analyzator-design-preview-fixture'
 const BANNER = 'Previzualizare design'
-const SENTINELS = [MARKER, BANNER, 'urinal.example', 'Uronova', 'Mihai Dumitrescu (QPPV)', 'adsymphony.example', 'Elena Dobre', 'az-preview-session', 'sfatulmedicului.example', 'Prevenție ITU', 'Cisticare', 'Minimartieni Social', 'Kidvitto', 'chatgpt.com']
+const SENTINELS = [MARKER, BANNER, 'urinal.example', 'Uronova', 'Mihai Dumitrescu (QPPV)', 'adsymphony.example', 'Elena Dobre', 'az-preview-session', 'sfatulmedicului.example', 'Prevenție ITU', 'Cisticare', 'Minimartieni Social', 'Kidvitto', 'chatgpt.com', 'Forum Sănătatea Ta', 'Vitamerin']
 
 const outDirs: string[] = []
 afterAll(() => outDirs.forEach((d) => rmSync(d, { recursive: true, force: true })))

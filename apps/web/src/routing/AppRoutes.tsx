@@ -6,6 +6,8 @@ import { ADMIN_MODULES, BRAND_MODULES } from './modules'
 import { AdminPlaceholder, ModulePlaceholder, NotFoundPage } from './pages'
 import { RequireAuth } from './RequireAuth'
 import { AiPage } from '../screens/ai/AiPage'
+import { CompetitionPage } from '../screens/competition/CompetitionPage'
+import { ListeningPage } from '../screens/listening/ListeningPage'
 import { OverviewPage } from '../screens/overview/OverviewPage'
 import { PaidPage } from '../screens/paid/PaidPage'
 import { SeoPage } from '../screens/seo/SeoPage'
@@ -35,6 +37,8 @@ function BrandModulePage() {
   if (module.segment === 'traffic') return <TrafficPage />
   if (module.segment === 'paid') return <PaidPage />
   if (module.segment === 'social') return <SocialPage />
+  if (module.segment === 'listening') return <ListeningPage />
+  if (module.segment === 'competition') return <CompetitionPage />
   return <ModulePlaceholder module={module} brand={brand} role={user.role} />
 }
 

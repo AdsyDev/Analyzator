@@ -167,10 +167,10 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
     expect(screen.queryByRole('button', { name: /Importă|Conectează|Cere conectarea/ })).toBeNull()
   })
 
-  it('un modul neconstruit (Listening) spune adevărul despre ecran, fără „În curând"', async () => {
-    setup('/brands/brand-urinal/listening')
+  it('un modul neconstruit (Analize și acțiuni) spune adevărul despre ecran, fără „În curând"', async () => {
+    setup('/brands/brand-urinal/insights')
     expect(await screen.findByRole('heading', { name: 'Acest ecran nu este încă disponibil' })).toBeInTheDocument()
-    expect(screen.getByText(/Ecranul Listening nu a fost livrat în această versiune/)).toBeInTheDocument()
+    expect(screen.getByText(/Ecranul Analize și acțiuni nu a fost livrat în această versiune/)).toBeInTheDocument()
     expect(screen.queryByText(/în curând/i)).toBeNull()
   })
 
@@ -190,7 +190,7 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
 
   it('starea surselor în încărcare are schelet, iar eroarea are „Reîncearcă"', async () => {
     let attempts = 0
-    setup('/brands/brand-urinal/listening', {
+    setup('/brands/brand-urinal/insights', {
       providers: (auth) => {
         const base = createFixtureProviders({ now: () => NOW, getRole: () => auth.preview?.role ?? 'agency_admin' })
         return { ...base, sources: { ...base.sources, statuses: async (id) => (++attempts === 1 ? failed('Serverul nu a răspuns.') : base.sources.statuses(id)) } }

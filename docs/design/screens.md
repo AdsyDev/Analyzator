@@ -184,3 +184,15 @@ Ce s-a implementat diferit de designul din `docs/design/reference/` și de ce. N
 | Cardul KPI se deschide în EvidenceDrawer | Doar pentru metricile din registru (Trafic); Paid și Social au `StatCard` cu definiție în tooltip | Datele importate nu sunt `MetricResponse` și nu au `evidence_query`. |
 | Variație „−0 p.p." cu săgeată | „0 p.p." fără săgeată | Direcția se derivă din valoarea rotunjită, ca textul și săgeata să nu se contrazică. |
 
+
+## Diferențe față de design (UI-5)
+
+| Design | Implementat | Motiv |
+|---|---|---|
+| Trend al mențiunilor și topic map | Neimplementate | Fără sursă și fără contract de server; nu inventăm serii. |
+| Analiza competitorilor în Listening | Neimplementată | Listening are date doar pentru brand; competitorii sunt `not_connected` în matrice. |
+| Clic pe celulă în matrice → dovezi | Neimplementat | Celulele de Concurență nu sunt `MetricResponse` și nu au `evidence_query`. |
+| Dimensiuni Presă / Ads / Reviews | Absente | Sunt după lansare. |
+| Filtre Listening | Doar sentiment și sursă | Restul nu au cerință în spec cap. 18. |
+| Sentiment pe fiecare mențiune | „Revizuit de <nume>" sau „Nerevizuit" | Un sentiment neverificat nu se afișează ca neutru. |
+| Jurnal PV | Doar `agency_admin` | Spec cap. 28; la alte roluri nu se face nicio cerere. |

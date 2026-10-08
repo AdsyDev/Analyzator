@@ -44,8 +44,11 @@ export interface PvSnapshot {
   notify: string[]
 }
 
+/** Filtrul de sentiment: o valoare, `unreviewed` (încă fără etichetă umană) sau `null` = toate. */
+export type SentimentFilter = Sentiment | 'unreviewed'
+
 export interface MentionQuery {
-  sentiment: Sentiment | null
+  sentiment: SentimentFilter | null
   source: string | null
   page: number
   page_size: number
@@ -58,9 +61,33 @@ export interface Page<T> {
   page_size: number
 }
 
+/**
+ * Distribuția sentimentului. Doar mențiunile REVIZUITE de un om intră în `total` și în procente; cele
+ * nerevizuite se numără separat (`unreviewed`), nu se presupun neutre. Procentele vin calculate de provider.
+ */
 export interface SentimentDistribution {
+  /** Mențiuni cu sentiment revizuit. */
   total: number
   positive: number
   neutral: number
   negative: number
+  /** Mențiuni eligibile încă fără etichetă umană. */
+  unreviewed: number
+  /** Procente din `total`; `null` când `total` e 0. */
+  shares: { positive: number | null; neutral: number | null; negative: number | null }
+}
+
+/** O intrare din jurnalul de farmacovigilență (doar `agency_admin`): ce s-a marcat, cine, când și cui s-a notificat. */
+export interface PvLogEntry {
+  id: string
+  item: PvItemRef
+  flagged_at: IsoDateTime
+  /** Numele utilizatorului care a marcat. */
+  user: string
+  /** Începutul textului marcat (snapshot-ul întreg rămâne în înregistrare). */
+  excerpt: string
+  link: string | null
+  notified: boolean
+  notified_to: string[]
+  status: PvStatus
 }

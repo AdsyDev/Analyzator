@@ -1,8 +1,9 @@
 import type { AiAnswerDetail, AiAnswerSummary, AiCitedSource, AiEngineStat, AiEngineTrend, AiFilters, AiTopicMatrix } from './ai'
 import type { Brand, CompetitorSet } from './brand'
+import type { CompetitionGap, CompetitionMatrix } from './competition'
 import type { BrandId, ProviderResult } from './common'
 import type { Insight } from './insight'
-import type { Mention, MentionQuery, Page, PvFlag, PvItemRef, PvSnapshot, SentimentDistribution } from './mention'
+import type { Mention, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnapshot, SentimentDistribution } from './mention'
 import type { Evidence, EvidenceQuery, MetricDefinition, MetricsBundle, TrendSeries } from './metric'
 import type { QueryContext } from './period'
 import type { PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from './paid'
@@ -33,8 +34,10 @@ export interface InsightsProvider {
 export interface MentionsProvider {
   list(ctx: QueryContext, query: MentionQuery): Promise<ProviderResult<Page<Mention>>>
   sentiment(ctx: QueryContext): Promise<ProviderResult<SentimentDistribution>>
-  /** Doar agenția și contactele PV. */
-  pvLog(ctx: QueryContext): Promise<ProviderResult<PvFlag[]>>
+  /** Sursele distincte ale mențiunilor, pentru filtrul de sursă. */
+  sources(brandId: BrandId): Promise<ProviderResult<string[]>>
+  /** Doar `agency_admin` (brief cap. 6, spec cap. 28); ceilalți primesc eroare de acces. */
+  pvLog(ctx: QueryContext): Promise<ProviderResult<PvLogEntry[]>>
   /** Ce se va înregistra, pentru dialogul de confirmare. */
   pvPreview(brandId: BrandId, item: PvItemRef): Promise<ProviderResult<PvSnapshot>>
   pvFlag(brandId: BrandId, item: PvItemRef): Promise<ProviderResult<PvFlag>>
@@ -101,6 +104,12 @@ export interface SocialProvider {
   competitors(ctx: QueryContext): Promise<ProviderResult<SocialCompetitor[]>>
 }
 
+/** Concurență (spec cap. 20): matricea comparativă și tabelul „Unde apare concurența și noi lipsim". */
+export interface CompetitionProvider {
+  matrix(ctx: QueryContext): Promise<ProviderResult<CompetitionMatrix>>
+  gaps(ctx: QueryContext): Promise<ProviderResult<CompetitionGap[]>>
+}
+
 export interface DataProviders {
   /** `supabase` pe implicit; `fixtures` doar cu VITE_DESIGN_PREVIEW la build. */
   readonly kind: 'supabase' | 'fixtures'
@@ -114,4 +123,5 @@ export interface DataProviders {
   traffic: TrafficProvider
   paid: PaidProvider
   social: SocialProvider
+  competition: CompetitionProvider
 }

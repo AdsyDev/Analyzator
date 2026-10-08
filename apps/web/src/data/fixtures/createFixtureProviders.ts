@@ -32,6 +32,7 @@ import {
 } from '../../contracts'
 import { addDays, comparisonRange, todayBucharest } from '../../lib/period'
 import { createAiFixtures } from './ai'
+import { createCompetitionFixtures } from './competition'
 import { createPaidFixtures } from './paid'
 import { createSearchFixtures } from './search'
 import { createSocialFixtures } from './social'
@@ -122,13 +123,24 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
   }
 
   // Marcajele PV rămân în memorie cât ține sesiunea de previzualizare; mențiunile și răspunsurile AI le împart.
+  // `flagMeta` păstrează ce are nevoie jurnalul: brandul, utilizatorul, începutul textului, linkul și destinatarii.
   const flags = new Map<string, PvFlag>()
+  interface FlagMeta {
+    brandId: string
+    user: string
+    excerpt: string
+    link: string | null
+    notifiedTo: string[]
+  }
+  const flagMeta = new Map<string, FlagMeta>()
   const aiFx = createAiFixtures({ allowed, flags, now })
   const search = createSearchFixtures(allowed)
   const traffic = createTrafficFixtures({ allowed, now })
   const paid = createPaidFixtures({ allowed, now })
   const social = createSocialFixtures({ allowed, now })
   const flagKey = (item: PvItemRef) => `${item.kind}:${item.id}`
+  const excerptOf = (text: string) => (text.length > 120 ? `${text.slice(0, 117)}...` : text)
+
   const mentionsFor = (brandId: string): Mention[] =>
     mentionsFile.mentions
       .filter((m) => m.brand_id === brandId)
@@ -140,32 +152,70 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
         published_at: instantDaysAgo(m.days_ago, 8 + (m.days_ago % 9)),
         text: m.text,
         url: m.url,
-        sentiment: m.sentiment as Sentiment,
+        // Sentimentul rămâne null până la revizuirea umană; nu se deduce.
+        sentiment: m.sentiment as Sentiment | null,
         reviewed_by: m.reviewed_by,
         pv_flag: flags.get(flagKey({ kind: 'mention', id: m.id })) ?? null,
       }))
+  const inPeriod = (ctx: QueryContext, brandId: string) =>
+    mentionsFor(brandId).filter((m) => m.published_at.slice(0, 10) >= ctx.period.from && m.published_at.slice(0, 10) <= addDays(ctx.period.to, 1))
+
+  // Un marcaj preexistent (cineva din echipă a marcat o relatare acum o zi), ca jurnalul și starea „marcat" să fie vizibile.
+  {
+    const seeded: PvItemRef = { kind: 'mention', id: 'm-u-5' }
+    const m = mentionsFile.mentions.find((x) => x.id === seeded.id)
+    if (m) {
+      flags.set(flagKey(seeded), { id: 'pv-0', item: seeded, flagged_at: instantDaysAgo(1, 9), flagged_by: 'preview-admin', notified: true, status: 'notified' })
+      flagMeta.set(flagKey(seeded), { brandId: m.brand_id, user: 'Ioana Popescu, AdSymphony', excerpt: excerptOf(m.text), link: m.url, notifiedTo: mentionsFile.pv_contacts })
+    }
+  }
 
   const mentions: MentionsProvider = {
     list: async (ctx, q) => {
       const denied = guard<never>(ctx.brandId)
       if (denied) return denied
-      const filtered = mentionsFor(ctx.brandId)
-        .filter((m) => m.published_at.slice(0, 10) >= ctx.period.from && m.published_at.slice(0, 10) <= addDays(ctx.period.to, 1))
-        .filter((m) => (q.sentiment ? m.sentiment === q.sentiment : true) && (q.source ? m.source_name === q.source : true))
+      const filtered = inPeriod(ctx, ctx.brandId)
+        .filter((m) => (q.sentiment === 'unreviewed' ? m.sentiment === null : q.sentiment ? m.sentiment === q.sentiment : true))
+        .filter((m) => (q.source ? m.source_name === q.source : true))
         .sort((a, b) => b.published_at.localeCompare(a.published_at))
       const start = (q.page - 1) * q.page_size
       return ready({ items: filtered.slice(start, start + q.page_size), total: filtered.length, page: q.page, page_size: q.page_size })
     },
+    sources: async (brandId) => {
+      const denied = guard<never>(brandId)
+      if (denied) return denied
+      return ready([...new Set(mentionsFor(brandId).map((m) => m.source_name))].sort((a, b) => a.localeCompare(b, 'ro')))
+    },
     sentiment: async (ctx) => {
       const denied = guard<never>(ctx.brandId)
       if (denied) return denied
-      const all = mentionsFor(ctx.brandId)
-      const count = (s: Sentiment) => all.filter((m) => m.sentiment === s).length
-      return ready({ total: all.length, positive: count('positive'), neutral: count('neutral'), negative: count('negative') })
+      const all = inPeriod(ctx, ctx.brandId)
+      const reviewed = all.filter((m) => m.sentiment !== null)
+      const count = (s: Sentiment) => reviewed.filter((m) => m.sentiment === s).length
+      // Procentele sunt stand-in pentru calculul serverului (doar fixtures).
+      const share = (n: number) => (reviewed.length ? Math.round((1000 * n) / reviewed.length) / 10 : null)
+      return ready({
+        total: reviewed.length,
+        positive: count('positive'),
+        neutral: count('neutral'),
+        negative: count('negative'),
+        unreviewed: all.length - reviewed.length,
+        shares: { positive: share(count('positive')), neutral: share(count('neutral')), negative: share(count('negative')) },
+      })
     },
     pvLog: async (ctx) => {
-      if (!isAgencyRole(getRole())) return failed('Jurnalul de farmacovigilență e vizibil doar echipei AdSymphony și contactelor PV.')
-      return ready([...flags.values()].filter((f) => mentionsFor(ctx.brandId).some((m) => m.id === f.item.id)))
+      const denied = guard<never>(ctx.brandId)
+      if (denied) return denied
+      // Brief cap. 6 și spec cap. 28: jurnalul e vizibil pentru agency admin.
+      if (getRole() !== 'agency_admin') return failed('Jurnalul de farmacovigilență e vizibil doar administratorilor agenției.')
+      return ready(
+        [...flags.entries()]
+          .flatMap(([k, f]) => {
+            const meta = flagMeta.get(k)
+            return meta && meta.brandId === ctx.brandId ? [{ id: f.id, item: f.item, flagged_at: f.flagged_at, user: meta.user, excerpt: meta.excerpt, link: meta.link, notified: f.notified, notified_to: meta.notifiedTo, status: f.status }] : []
+          })
+          .sort((a, b) => b.flagged_at.localeCompare(a.flagged_at)),
+      )
     },
     pvPreview: async (brandId, item) => {
       const denied = guard<never>(brandId)
@@ -188,8 +238,12 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
       if (denied) return denied
       const existing = flags.get(flagKey(item))
       if (existing) return ready(existing)
+      const m = item.kind === 'mention' ? mentionsFor(brandId).find((x) => x.id === item.id) : null
+      const text = m?.text ?? (item.kind === 'ai_answer' ? aiFx.plainText(brandId, item.id) : null)
+      if (!text) return failed('Elementul nu a fost găsit sau nu are text de marcat.')
       const flag: PvFlag = { id: `pv-${flags.size + 1}`, item, flagged_at: now().toISOString(), flagged_by: getUser().id, notified: true, status: 'notified' }
       flags.set(flagKey(item), flag)
+      flagMeta.set(flagKey(item), { brandId, user: `${getUser().name}, ${getUser().organization}`, excerpt: excerptOf(text), link: m?.url ?? null, notifiedTo: mentionsFile.pv_contacts })
       return ready(flag)
     },
   }
@@ -267,7 +321,9 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
     },
   }
 
-  return { kind: 'fixtures', metrics, insights, mentions, sources, brands, ai: aiFx.provider, search, traffic, paid, social }
+  const competition = createCompetitionFixtures({ allowed, ai: aiFx, search, social, mentions })
+
+  return { kind: 'fixtures', metrics, insights, mentions, sources, brands, ai: aiFx.provider, search, traffic, paid, social, competition }
 }
 
 type ProviderGuard<T> = Extract<import('../../contracts').ProviderResult<T>, { kind: 'error' }>

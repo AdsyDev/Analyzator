@@ -82,6 +82,29 @@ export const SOCIAL_FORMAT_FILTER: FilterDef = {
   options: [{ value: 'all', label: 'Toate formatele' }, ...SOCIAL_FORMATS.map((f) => ({ value: f, label: FORMAT_LABELS[f] ?? f }))],
 }
 
+export const SENTIMENT_FILTER: FilterDef = {
+  key: 'sentiment',
+  label: 'Sentiment',
+  defaultValue: 'all',
+  options: [
+    { value: 'all', label: 'Toate' },
+    { value: 'positive', label: 'Pozitiv' },
+    { value: 'neutral', label: 'Neutru' },
+    { value: 'negative', label: 'Negativ' },
+    { value: 'unreviewed', label: 'Nerevizuit' },
+  ],
+}
+
+const MENTION_SOURCES: DynamicFilter = {
+  key: 'source',
+  label: 'Sursă',
+  allLabel: 'Toate sursele',
+  load: async (providers, brandId) => {
+    const r = await providers.mentions.sources(brandId)
+    return r.kind === 'ready' ? r.data : null
+  },
+}
+
 const AI_GROUPS: DynamicFilter = {
   key: 'group',
   label: 'Grup',
@@ -114,7 +137,7 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
     filters: [SOCIAL_PLATFORM_FILTER, SOCIAL_FORMAT_FILTER],
     disconnected: (b) => `Datele despre postările ${b} vin din Planable, care nu e încă conectat. Pentru comparația publică cu competitorii, vezi Concurență.`,
   },
-  listening: { segment: 'listening', title: 'Listening', subtitle: () => 'Mențiunile publice despre brand, cu sentiment revizuit de echipa AdSymphony.', sources: [], filters: [] },
+  listening: { segment: 'listening', title: 'Listening', subtitle: () => 'Mențiunile publice despre brand, cu sentiment revizuit de echipa AdSymphony.', sources: [], filters: [SENTIMENT_FILTER], dynamicFilter: MENTION_SOURCES },
   competition: { segment: 'competition', title: 'Concurență', subtitle: () => 'Brandul față de setul de competitori, pe aceleași surse și aceeași perioadă.', sources: [], filters: [] },
   insights: { segment: 'insights', title: 'Analize și acțiuni', subtitle: () => 'Interpretările echipei AdSymphony și acțiunile care decurg din ele.', sources: [], filters: [] },
 }

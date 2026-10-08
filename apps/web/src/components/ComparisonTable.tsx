@@ -1,8 +1,9 @@
 import { StarIcon } from '@phosphor-icons/react'
-import type { IsoDate, MetricDirection, MetricItem } from '../contracts'
+import type { CompetitionCell, IsoDate, MetricDirection, MetricItem, MetricStatus, MetricUnit } from '../contracts'
 import { cn } from '../lib/cn'
 import { formatDate, formatMetricValue } from '../lib/format'
 import { CoverageBadge } from './CoverageBadge'
+import { InfoTip } from './ui/InfoTip'
 import { coveragePercent, coverageStateFor } from '../lib/metricView'
 import { reasonFor } from '../lib/warnings'
 
@@ -16,16 +17,39 @@ export interface ComparisonColumn {
 }
 
 /**
- * O celulă: o metrică din provider sau un motiv explicit pentru care nu există date (de ex. competitorii nu au
- * sursă). Motivul nu e o stare de metrică: nu se fabrică un `MetricItem` pentru ce nu a venit de la server.
+ * O celulă: o metrică din provider (`MetricItem`), o valoare din matricea de Concurență (`CompetitionCell`) sau un
+ * motiv explicit pentru care nu există date (de ex. competitorii nu au sursă). Motivul nu e o stare de metrică:
+ * nu se fabrică un `MetricItem` pentru ce nu a venit de la server.
  */
-export type ComparisonCell = MetricItem | { unavailable: string }
+export type ComparisonCell = MetricItem | CompetitionCell | { unavailable: string }
 
-const isMetric = (c: ComparisonCell | undefined): c is MetricItem => !!c && 'status' in c
+interface Resolved {
+  value: number | null
+  unit: MetricUnit
+  status: MetricStatus
+  coverage: number | null
+  reason: string | null
+}
+
+const DEFAULT_REASON: Partial<Record<MetricStatus, string>> = {
+  not_connected: 'Sursă neconectată.',
+  unavailable: 'Fără date pentru acest interval.',
+  cannot_compute: 'Nu se poate calcula.',
+}
+
+/** Aduce cele trei tipuri de celulă la aceeași formă. `null` = celulă cu doar un motiv (N/A). */
+function resolve(c: ComparisonCell | undefined): Resolved | { unavailable: string } | null {
+  if (!c) return null
+  if ('unavailable' in c) return c
+  if ('metric_key' in c) return { value: c.value, unit: c.unit, status: c.status, coverage: c.coverage, reason: c.value === null ? reasonFor(c) : null }
+  return { value: c.value, unit: c.unit, status: c.status, coverage: c.coverage, reason: c.value === null ? (c.reason ?? DEFAULT_REASON[c.status] ?? null) : c.reason }
+}
 
 export interface ComparisonRow {
   key: string
   label: string
+  /** Definiția rândului, în tooltip. */
+  definition?: string
   /** Din registru. `neutral` = fără direcție bună: nu se marchează cea mai bună valoare. */
   direction?: MetricDirection
   cells: Record<string, ComparisonCell>
@@ -57,17 +81,18 @@ interface ComparisonTableProps {
  * O diferență de acoperire împiedică formularea automată a unui clasament (spec 2.4).
  */
 function bestKey(row: ComparisonRow, columns: ComparisonColumn[]): string | null {
-  const cells = columns.map((c) => [c.key, row.cells[c.key]] as const)
-  if (cells.length < 2 || cells.some(([, m]) => !isMetric(m) || m.status !== 'ok' || m.value === null)) return null
+  const cells = columns.map((c) => [c.key, resolve(row.cells[c.key])] as const)
+  const complete = (r: ReturnType<typeof resolve>): r is Resolved => !!r && 'status' in r && r.status === 'ok' && r.value !== null
+  if (cells.length < 2 || cells.some(([, r]) => !complete(r))) return null
   const direction = row.direction ?? 'higher_is_better'
   if (direction === 'neutral') return null
   const higher = direction === 'higher_is_better'
   let best: string | null = null
   let bestVal = 0
   let tie = false
-  for (const [key, m] of cells) {
-    const v = isMetric(m) ? m.value : null
-    if (v == null) continue
+  for (const [key, r] of cells) {
+    if (!complete(r) || r.value === null) continue
+    const v = r.value
     if (best === null || (higher ? v > bestVal : v < bestVal)) {
       best = key
       bestVal = v
@@ -83,12 +108,15 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
   }
 
   const reasons: string[] = []
+  const partials: string[] = []
   for (const g of groups) {
     for (const r of g.rows) {
       for (const c of columns) {
-        const m = r.cells[c.key]
-        const reason = m === undefined ? null : isMetric(m) ? (m.value === null ? reasonFor(m) : null) : m.unavailable
+        const v = resolve(r.cells[c.key])
+        const reason = !v ? null : 'unavailable' in v ? v.unavailable : v.value === null ? v.reason : null
         if (reason && !reasons.includes(reason)) reasons.push(reason)
+        // O valoare cu acoperire incompletă se afișează, iar motivul ei apare în subsol.
+        if (v && 'status' in v && v.value !== null && v.status !== 'ok' && v.reason && !partials.includes(v.reason)) partials.push(v.reason)
       }
     }
   }
@@ -141,12 +169,16 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
                 const best = bestKey(r, columns)
                 return (
                   <tr key={r.key} className="border-t border-border">
-                    <th scope="row" className="px-4 py-2.5 text-left font-medium text-text">{r.label}</th>
+                    <th scope="row" className="px-4 py-2.5 text-left font-medium text-text">
+                      <span className="inline-flex items-center gap-1.5">
+                        {r.label}
+                        {r.definition && <InfoTip label={`Ce înseamnă ${r.label}`}>{r.definition}</InfoTip>}
+                      </span>
+                    </th>
                     {columns.map((c) => {
-                      const m = r.cells[c.key]
-                      const metric = isMetric(m) ? m : null
-                      const shown = metric && metric.value !== null ? { item: metric, value: metric.value } : null
-                      const reason = m === undefined ? null : 'unavailable' in m ? m.unavailable : shown ? null : reasonFor(m)
+                      const v = resolve(r.cells[c.key])
+                      const shown = v && 'status' in v && v.value !== null ? { ...v, value: v.value } : null
+                      const reason = !v ? null : 'unavailable' in v ? v.unavailable : shown ? null : v.reason
                       const isBest = best === c.key
                       return (
                         <td key={c.key} className={cn('px-4 py-2.5 text-right tabular-nums', isBest && 'font-semibold text-accent-text')}>
@@ -158,8 +190,8 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
                                   <span className="sr-only">Cea mai bună valoare:</span>
                                 </>
                               )}
-                              {formatMetricValue(shown.value, shown.item.unit)}
-                              {shown.item.status !== 'ok' && <CoverageBadge state={coverageStateFor(shown.item.status)} pct={coveragePercent(shown.item.coverage)} />}
+                              {formatMetricValue(shown.value, shown.unit)}
+                              {shown.status !== 'ok' && <CoverageBadge state={coverageStateFor(shown.status)} pct={coveragePercent(shown.coverage)} />}
                             </span>
                           ) : (
                             <span title={reason ?? undefined} className="text-text-3">
@@ -181,6 +213,9 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
         {anyBest && <p>Cea mai bună valoare pe rând e marcată doar când toate celulele rândului au date complete.</p>}
         {reasons.map((r) => (
           <p key={r}>N/A: {r}</p>
+        ))}
+        {partials.map((r) => (
+          <p key={r}>Date parțiale: {r}</p>
         ))}
         {note && <p>{note}</p>}
       </div>

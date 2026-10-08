@@ -121,4 +121,33 @@ describe('ComparisonTable', () => {
     expect(within(row).queryByText('Cea mai bună valoare:')).toBeNull()
     expect(within(row).getAllByText('N/A')).toHaveLength(1)
   })
+
+  it('celulă din matricea de Concurență (CompetitionCell): valoare, parțial cu motiv în subsol, N/A cu motiv', () => {
+    const g: ComparisonGroup[] = [
+      {
+        name: 'SEO',
+        rows: [
+          {
+            key: 'k',
+            label: 'Keywords în Top 10',
+            definition: 'Numărul de keywords în Top 10.',
+            cells: {
+              brand: { value: 4, unit: 'count', status: 'ok', coverage: null, reason: null },
+              c1: { value: 2, unit: 'count', status: 'partial', coverage: null, reason: 'Se observă doar keywordurile în care apare.' },
+              c2: { value: null, unit: 'count', status: 'not_connected', coverage: null, reason: null },
+            },
+          },
+        ],
+      },
+    ]
+    render(<ComparisonTable caption="c" columns={columns} groups={g} />)
+    const row = screen.getByRole('row', { name: /Keywords în Top 10/ })
+    expect(within(row).getByText('4')).toBeInTheDocument()
+    expect(within(row).getByText('Parțial')).toBeInTheDocument()
+    expect(within(row).getByText('N/A')).toBeInTheDocument()
+    expect(within(row).queryByText('Cea mai bună valoare:')).toBeNull()
+    expect(screen.getByText('Date parțiale: Se observă doar keywordurile în care apare.')).toBeInTheDocument()
+    expect(screen.getByText('N/A: Sursă neconectată.')).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: 'Ce înseamnă Keywords în Top 10' })).toBeInTheDocument()
+  })
 })

@@ -262,34 +262,80 @@ describe('fixtures: surse și mențiuni', () => {
     expect(planable).toMatchObject({ state: 'not_connected', data_as_of: null, imported_at: null })
   })
 
-  it('mențiunile se filtrează pe sentiment și sursă și se paginează', async () => {
+  it('mențiunile se filtrează pe sentiment, pe „nerevizuit" și pe sursă, și se paginează', async () => {
     const p = make()
     const neg = await p.mentions.list(ctx('brand-urinal'), { sentiment: 'negative', source: null, page: 1, page_size: 10 })
     expect(neg.kind === 'ready' && neg.data.items.every((m) => m.sentiment === 'negative')).toBe(true)
-    const page = await p.mentions.list(ctx('brand-urinal'), { sentiment: null, source: null, page: 2, page_size: 4 })
+    const un = await p.mentions.list(ctx('brand-urinal'), { sentiment: 'unreviewed', source: null, page: 1, page_size: 10 })
+    expect(un.kind === 'ready' && un.data.items.length).toBe(2)
+    expect(un.kind === 'ready' && un.data.items.every((m) => m.sentiment === null && m.reviewed_by === null)).toBe(true)
+    const src = await p.mentions.list(ctx('brand-urinal'), { sentiment: null, source: 'Reddit', page: 1, page_size: 10 })
+    expect(src.kind === 'ready' && src.data.items.every((m) => m.source_name === 'Reddit')).toBe(true)
+    const page = await p.mentions.list(ctx('brand-urinal'), { sentiment: null, source: null, page: 3, page_size: 4 })
     expect(page.kind === 'ready' && page.data.items.length).toBe(2)
-    expect(page.kind === 'ready' && page.data.total).toBe(6)
+    expect(page.kind === 'ready' && page.data.total).toBe(10)
   })
 
-  it('fiecare mențiune are sentiment revizuit de un om', async () => {
+  it('sentimentul rămâne null până la revizuirea umană: etichetă și revizor merg împreună', async () => {
     const r = await make().mentions.list(ctx('brand-urinal'), { sentiment: null, source: null, page: 1, page_size: 50 })
-    expect(r.kind === 'ready' && r.data.items.every((m) => m.sentiment !== null && !!m.reviewed_by)).toBe(true)
+    if (r.kind !== 'ready') throw new Error('list')
+    expect(r.data.items.every((m) => (m.sentiment === null) === (m.reviewed_by === null))).toBe(true)
+    expect(r.data.items.some((m) => m.sentiment === null)).toBe(true)
   })
 
-  it('farmacovigilență: previzualizare exactă, marcare, persistență și jurnal', async () => {
-    const p = make()
-    const item = { kind: 'mention' as const, id: 'm-u-5' }
+  it('distribuția: doar mențiunile revizuite intră în total și în procente; nerevizuitele se numără separat', async () => {
+    const r = await make().mentions.sentiment(ctx('brand-urinal'))
+    if (r.kind !== 'ready') throw new Error('sentiment')
+    const d = r.data
+    expect(d.total + d.unreviewed).toBe(10)
+    expect(d.unreviewed).toBe(2)
+    expect(d.positive + d.neutral + d.negative).toBe(d.total)
+    expect((d.shares.positive ?? 0) + (d.shares.neutral ?? 0) + (d.shares.negative ?? 0)).toBeCloseTo(100, 0)
+    expect(d.shares.negative).toBeCloseTo((100 * d.negative) / d.total, 0)
+  })
+
+  it('sursele distincte pentru filtru', async () => {
+    const r = await make().mentions.sources('brand-urinal')
+    expect(r.kind === 'ready' && r.data).toEqual(['Facebook (public)', 'Forum Sănătatea Ta', 'Instagram (public)', 'Reddit', 'Review farmacie online', 'Știri online'])
+  })
+
+  it('farmacovigilență: marcaj preexistent, previzualizare exactă, marcare nouă și jurnal (doar agency_admin)', async () => {
+    const p = createFixtureProviders({ now: () => NOW, getRole: () => 'agency_admin' })
+    const list0 = await p.mentions.list(ctx('brand-urinal'), { sentiment: null, source: null, page: 1, page_size: 50 })
+    expect(list0.kind === 'ready' && list0.data.items.find((m) => m.id === 'm-u-5')?.pv_flag).not.toBeNull()
+    expect(list0.kind === 'ready' && list0.data.items.find((m) => m.id === 'm-u-1')?.pv_flag).toBeNull()
+
+    const item = { kind: 'mention' as const, id: 'm-u-1' }
     const prev = await p.mentions.pvPreview('brand-urinal', item)
-    expect(prev.kind === 'ready' && prev.data.text).toMatch(/erupție/)
+    expect(prev.kind === 'ready' && prev.data.text).toMatch(/greață/)
     expect(prev.kind === 'ready' && prev.data.notify.length).toBeGreaterThan(0)
     const flagged = await p.mentions.pvFlag('brand-urinal', item)
     expect(flagged.kind).toBe('ready')
     const again = await p.mentions.pvFlag('brand-urinal', item)
     expect(again.kind === 'ready' && flagged.kind === 'ready' && again.data.id).toBe(flagged.kind === 'ready' ? flagged.data.id : '')
-    const list = await p.mentions.list(ctx('brand-urinal'), { sentiment: null, source: null, page: 1, page_size: 50 })
-    expect(list.kind === 'ready' && list.data.items.find((m) => m.id === 'm-u-5')?.pv_flag).not.toBeNull()
+
     const log = await p.mentions.pvLog(ctx('brand-urinal'))
-    expect(log.kind === 'ready' && log.data).toHaveLength(1)
+    if (log.kind !== 'ready') throw new Error('log')
+    expect(log.data.map((e) => e.item.id).sort()).toEqual(['m-u-1', 'm-u-5'])
+    const mine = log.data.find((e) => e.item.id === 'm-u-1')!
+    expect(mine.user).toBe('Ioana Popescu, AdSymphony')
+    expect(mine.excerpt).toMatch(/greață/)
+    expect(mine.notified).toBe(true)
+    expect(mine.notified_to.length).toBeGreaterThan(0)
+    expect(log.data[0]!.flagged_at >= log.data[1]!.flagged_at).toBe(true) // cele mai recente întâi
+  })
+
+  it('jurnalul PV: refuzat pentru orice rol în afară de agency_admin', async () => {
+    for (const role of ['strategist', 'account', 'client_viewer'] as const) {
+      const r = await createFixtureProviders({ now: () => NOW, getRole: () => role }).mentions.pvLog(ctx('brand-urinal'))
+      expect(r.kind, role).toBe('error')
+    }
+  })
+
+  it('jurnalul se limitează la brandul cerut', async () => {
+    const p = createFixtureProviders({ now: () => NOW, getRole: () => 'agency_admin' })
+    const r = await p.mentions.pvLog(ctx('brand-minimartieni'))
+    expect(r.kind === 'ready' && r.data).toEqual([])
   })
 
   it('o mențiune inexistentă nu poate fi marcată', async () => {

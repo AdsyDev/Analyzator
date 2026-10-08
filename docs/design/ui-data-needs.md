@@ -86,3 +86,26 @@ Nu sunt în UI (nu au contract): „Observații" (modificări de campanie notate
 | `competitors(ctx)` | `SocialCompetitor[]` | Doar date publice (cadence, followers, interacțiuni pe postare); fără reach privat. |
 
 Filtrele ecranului în URL: `platform` (`facebook`, `instagram`, `linkedin`) și `format` (`image`, `video`, `carousel`, `story`). La Paid: `platform` (`google_ads`, `meta_ads`).
+
+## Listening și Concurență (UI-5)
+
+### Listening — `MentionsProvider`
+
+| Metodă | Răspuns | Cerință |
+|---|---|---|
+| `list(ctx, query)` | `Page<Mention>` | Filtre `sentiment` (`positive`, `neutral`, `negative`, `unreviewed`) și `source`. `sentiment: null` + `reviewed_by: null` = nerevizuit; nu se presupune neutru. |
+| `sources(brandId)` | `string[]` | Sursele distincte ale brandului, independent de perioadă, pentru filtrul „Sursă". |
+| `sentiment(ctx)` | `SentimentDistribution` | `total` = doar mențiunile revizuite; `unreviewed` separat; `shares` în procente calculate de provider (UI-ul nu împarte). |
+| `pvPreview` / `pvFlag` | snapshot / marcaj | Starea „marcat" vine din răspunsul `list`, deci persistă la reîncărcare. |
+| `pvLog(ctx)` | `PvLogEntry[]` | Doar `agency_admin` (brief cap. 6, spec cap. 28); UI-ul nu apelează metoda pentru alte roluri. Serverul trebuie să refuze oricum. |
+
+KPI-urile `listening_mentions`, `listening_sov`, `listening_negative_share` nu sunt în registru: carduri `not_connected`, fără definiție.
+
+### Concurență — `CompetitionProvider`
+
+| Metodă | Răspuns | Cerință |
+|---|---|---|
+| `matrix(ctx)` | `CompetitionMatrix` | Entități (brand + competitori validați), grupuri AI / SEO / Social public / Listening, `set_version`, `effective_from`, `data_as_of`. Fiecare celulă are `status`, `coverage` și `reason`; N/A cu motiv, niciodată zero. |
+| `gaps(ctx)` | `CompetitionGap[]` | Subiecte AI și căutări SEO în care apare un competitor și brandul lipsește sau e mai slab. |
+
+Filtre Listening în URL: `sentiment`, `source`.

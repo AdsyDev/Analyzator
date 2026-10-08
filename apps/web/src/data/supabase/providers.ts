@@ -2,6 +2,7 @@ import {
   notConnected,
   type AiVisibilityProvider,
   type BrandsProvider,
+  type CompetitionProvider,
   type PaidProvider,
   type SearchProvider,
   type SocialProvider,
@@ -66,6 +67,7 @@ const insights: InsightsProvider = { list: async () => notConnected('Analizele n
 const mentions: MentionsProvider = {
   list: async () => notConnected('Sursa de Listening nu este conectată pentru acest brand.'),
   sentiment: async () => notConnected('Sursa de Listening nu este conectată pentru acest brand.'),
+  sources: async () => notConnected('Sursa de Listening nu este conectată pentru acest brand.'),
   pvLog: async () => notConnected('Jurnalul de farmacovigilență nu este încă disponibil.'),
   pvPreview: async () => notConnected('Marcarea pentru farmacovigilență nu este încă disponibilă.'),
   pvFlag: async () => notConnected('Marcarea pentru farmacovigilență nu este încă disponibilă.'),
@@ -127,10 +129,15 @@ const social: SocialProvider = {
   competitors: async () => notConnected(NO_SOCIAL_IMPORT),
 }
 
+const competition: CompetitionProvider = {
+  matrix: async () => notConnected('Datele despre competitori nu sunt încă disponibile pentru acest brand.'),
+  gaps: async () => notConnected('Datele despre competitori nu sunt încă disponibile pentru acest brand.'),
+}
+
 /**
  * Implementarea reală. Rămâne goală: fiecare provider se completează ecran cu ecran, pe măsură ce
  * tabelele și conectorii livrează date (UI-6 pentru Administrare, apoi restul modulelor).
  */
 export function createSupabaseProviders(): DataProviders {
-  return { kind: 'supabase', metrics, insights, mentions, sources, brands, ai, search, traffic, paid, social }
+  return { kind: 'supabase', metrics, insights, mentions, sources, brands, ai, search, traffic, paid, social, competition }
 }
