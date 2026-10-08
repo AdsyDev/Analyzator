@@ -33,4 +33,5 @@ Platformă de analiză pentru clienții AdSymphony (pilot: trei branduri STADA).
 - La începutul fiecărui task enumeri **criteriile de acceptare**.
 - La final dai **diff-ul, testele relevante și ce a rămas neverificat**.
 - Un singur instrument scrie în repo la un moment dat.
-- Comenzi: `npm run dev`, `npm run build`, `npm run typecheck`, `npm run test`.
+- **Gate-ul oricărui task** (înainte de commit și înainte de a trece la următorul task): `npm run typecheck`, **`npm run test` complet** (conectori, funcții server, analytics **și `apps/web`**, nu doar conectorii) și `npm run test:security`. Un test roșu, oricât de departe de zona ta, oprește taskul: nu se comite și nu se trece mai departe cu el roșu. Un test din `apps/web` care pică din cauza unei schimbări a ta se rezolvă fără a modifica `apps/web` dacă taskul nu are voie să-l atingă (de exemplu prin mutarea documentației), altfel se raportează.
+- Comenzi: `npm run dev`, `npm run build`, `npm run typecheck`, `npm run test`, `npm run test:security`.
