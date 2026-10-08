@@ -98,3 +98,25 @@ _De completat._
   - Verificare: `pv_notifications` (`pending` = în așteptare sau fără secret / contacte; `failed` = definitiv, vezi `last_error`), `pv_flag_events` (jurnalul).
   - Reluare după `failed`: `update pv_notifications set status = 'pending', attempts = 0 where id = …` (service role), apoi rulează trimiterea.
   - Termenul de transmitere (de regulă o zi lucrătoare) se urmărește în `pv_flags.status` (`open`/`notified` → `transmitted` → `closed`).
+
+
+## Refresh săptămânal
+
+Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), workflow-ul `weekly-refresh.yml`, activ când `REFRESH_ENABLED = true` (Variables). Contract: `docs/contracts/refresh.md`.
+
+**Procedura de marți**
+1. GitHub → Actions → `weekly-refresh` → ultima rulare. Rezumatul arată, per sursă: rulări reușite / parțiale / eșuate / neconectate și alertele puse în coadă. Roșu = o sursă a eșuat (celelalte au rulat).
+2. Starea pe brand: view-ul `source_status` (`state`, `reason`, `data_as_of`, `coverage`, ultima rulare). Istoricul: `sync_history`.
+3. Verifică `sync_runs` pentru rularea în cauză: `status`, `errors` (coduri), `coverage`. O rulare **parțială** nu e `succeeded`: citește `errors` (de ex. `gsc_truncated`, `reconciliation_mismatch`, `ga4_incompatible_metrics`).
+4. Alertele: `ops_notifications` (`pending` = netrimisă; `failed` = definitiv). Fără contacte active în `alert_contacts` sau fără `RESEND_API_KEY` / `OPS_FROM_EMAIL`, alertele rămân `pending`; vezi-le acolo.
+
+**O sursă a eșuat**
+- `access_denied` / `credential_invalid`: tokenul sau service account-ul a fost refuzat. Setează unul nou (`npm run set-source-token`), apoi „Testează conexiunea”; refresh-ul nu reîncearcă singur un credential invalid (`source_status.reason = credential_invalid`).
+- `orchestrator_exception`: a aruncat conectorul înainte să scrie `sync_runs` (de ex. baza sau API-ul furnizorului indisponibil). Reia doar acea sursă: Actions → `weekly-refresh` → Run workflow, `only = <sursă>` (sau `weekly-refresh` local: `npm run refresh:weekly -- --only gsc`).
+- `insufficient_budget` (SEOmonitor, Clarity): bugetul zilei s-a consumat; reia a doua zi (limita se resetează la 00:00 UTC, presupus).
+- `not_connected` nu e eroare: lipsește credentialul sau maparea; completează-le în Administrare → Surse.
+- Reluare individuală: `npm run collect:seomonitor`, `npm run collect:google -- --only ga4`, `npm run collect:clarity`, sau workflow-urile per sursă.
+- Alertă netrimisă după ce ai rezolvat secretele/contactele: `npm run send:ops-notifications`.
+- Un lot `failed` rămâne în istoric; nu se șterge. Sursa se consideră rezolvată când `source_status.state` revine la `ok` după o rulare reușită.
+
+**Activare** (prima dată): Variables `REFRESH_ENABLED`, `CONNECTOR_SEOMONITOR_ENABLED`, `CONNECTOR_GOOGLE_ENABLED`; secrete `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, opțional `RESEND_API_KEY`, `OPS_FROM_EMAIL`; contacte în `alert_contacts` (agency_admin). Cron-ul GitHub nu urmează ora de vară: la trecerea la EET (25 oct) rularea se mută la 05:00 ora României; ajustează cron-ul dacă ora fixă contează.

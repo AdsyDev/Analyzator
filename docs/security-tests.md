@@ -73,6 +73,7 @@ Funcțiile de calcul al metricilor sunt pure: primesc definiția și observații
 | Tabele GA4/GSC (B5) | `web_daily`, `web_key_events`, `web_active_users_interval`, `search_daily`, `search_queries` (citire pe `has_brand_access`), `source_reconciliations` (doar agenția); scriere doar service role; view-uri `security_invoker` | A1–A9 (generice), `07_google_tables.test.sql`, B9 |
 | Import CSV (B6) | `paid_daily`, `social_daily`, `social_posts`, `mentions` (citire pe `has_brand_access`), `import_batch_rows` (doar agenția); scriere doar service role; Edge Function `csv-import` cu autorizare prin RLS-ul utilizatorului; view-uri `security_invoker` | A1–A9, `08_csv_import.test.sql`, `supabase/functions/csv-import/handler.test.ts`, E1–E5 |
 | Analize și PV (B7) | `insights`, `evidence_links`, `insight_snapshots`, `recommendations`, `actions` (vizibilitate: agenția tot, clientul doar `published` / acțiuni agreate), `insight_transitions`, `action_transitions`, `pv_contacts`, `pv_flags`, `pv_flag_events`, `pv_notifications` (agenție / `agency_admin`); tranziții prin trigger `SECURITY DEFINER`; Edge Function `notify` | A1–A11, `09_insights_pv.test.sql`, `supabase/functions/notify/handler.test.ts`, F1–F4 |
+| Status surse și alerte (B8) | view-uri `source_status`, `source_freshness`, `sync_history`, `source_dataset_days` (`security_invoker`); `alert_contacts`, `ops_notifications` (doar `agency_admin`) | A1–A11, `10_refresh_status.test.sql`, G1–G3 |
 | Vault | Tokenurile surselor; secret `source_connection:<id>` per conexiune | V1–V9, B8 |
 | SEOmonitor | 10 tabele de date (RLS pe brand, scriere doar service role), `ai_answer_originals` (doar roluri de agenție), `seomonitor_group_mappings` (citire agenție, insert doar `agency_admin`, versiuni imutabile, auditate), `seomonitor_mapping_queue` (citire agenție), view-urile `seomonitor_metric_observations` și `seomonitor_ai_answer_states` (`security_invoker`) | A1–A8; RLS prin REST în `tests/integration/seomonitor-pipeline.test.ts` |
 | Clarity | `clarity_daily` (RLS pe brand, scriere doar service role) și view `clarity_metric_observations` (`security_invoker`) | A1–A8; RLS prin REST în `tests/integration/clarity-pipeline.test.ts` |
@@ -260,3 +261,14 @@ Ultima rulare: 7 oct 2026, 13/13 mutații prinse.
 | F4 | izolare între branduri (account cu acces la 1B pe 1A; strategist 1A pe 1B) | refuzat / gol |
 
 **Neverificat (B7):** trimiterea reală prin Resend (niciun cont, deci doar teste cu `fetch` simulat; documentația nu descrie codurile de eroare); conținutul e-mailului față de procedura reală de farmacovigilență (neprimită); comportamentul cu zeci de mii de marcaje în coadă; expirarea cheii `Idempotency-Key` după 24 h (o retrimitere după 24 h ar putea produce un duplicat); restrângerea `notify` la rate limiting.
+
+
+## G. Statusul surselor și alertele prin HTTP real (`tests/security/refresh-status.test.mjs`)
+
+| ID | Vector | Rezultat așteptat |
+|---|---|---|
+| G1 | `source_status`, `sync_history`, `source_dataset_days` citite de strategist, account, admin, admin T2, client cu și fără acces; scriere în view-uri | agenția vede doar brandurile ei; clientul și alt tenant: gol; scrierea refuzată |
+| G2 | `source_freshness` pentru client (brandul lui), client fără acces, alt tenant; coloanele expuse | doar `tenant_id, brand_id, source, data_as_of, grace_days, freshness`; fără erori sau conexiuni |
+| G3 | `alert_contacts` și `ops_notifications` de non-admin, client, admin T2; modificarea cozii de utilizatori | refuzat / gol; coada rămâne `pending` |
+
+**Neverificat (B8):** rularea orchestratorului pe conectorii reali cu surse reale (doar adaptoare cu conexiuni lipsă și runneri simulați); trimiterea reală a alertelor prin Resend; comportamentul cu zeci de branduri (view-ul `source_status` face câte un lateral join pe sursă și brand; neprofilat); ora de vară pentru cron.

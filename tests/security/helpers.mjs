@@ -35,6 +35,7 @@ export const TABLES = [
   'paid_daily', 'social_daily', 'social_posts', 'mentions', 'import_batch_rows',
   'insights', 'evidence_links', 'insight_snapshots', 'recommendations', 'actions', 'insight_transitions', 'action_transitions',
   'pv_contacts', 'pv_flags', 'pv_flag_events', 'pv_notifications',
+  'alert_contacts', 'ops_notifications',
 ]
 export const CLARITY_1A = '50000000-0000-0000-0000-000000000031'
 export const CLARITY_2A = '50000000-0000-0000-0000-000000000032'

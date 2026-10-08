@@ -1,0 +1,94 @@
+# Refresh-ul săptămânal: rulează conectorii activi (SEOmonitor → GA4 → Search Console), în ordine, cu sync_runs.
+#
+# Programare: marți la 04:00 UTC = 06:00 ora României vara (EEST), 05:00 iarna (EET). Cron-ul GitHub e în UTC și nu
+# urmează ora de vară: vezi nota DST din docs/runbook.md. Reimportă ultimele 35 de zile (până ieri).
+#
+# Rularea programată e DEZACTIVATĂ până când variabila REFRESH_ENABLED = "true" (Settings → Secrets and variables → Actions →
+# Variables). workflow_dispatch funcționează oricând. Fiecare conector se activează separat prin CONNECTOR_*_ENABLED; unul
+# dezactivat e sărit. Workflow-urile per sursă (seomonitor-weekly, google-weekly, clarity-daily) rămân pentru rulări individuale.
+#
+# Eșecul unei surse nu le oprește pe celelalte. Jobul eșuează (cod 1) dacă o sursă a eșuat; rulările parțiale apar ca avertismente.
+# Alertele de eșec intră în coada ops_notifications și se trimit prin Resend dacă secretele există; altfel rămân `pending`.
+#
+# Secrete în environment-ul GitHub ales (implicit „staging”): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, opțional RESEND_API_KEY, OPS_FROM_EMAIL.
+# Tokenurile conectorilor NU sunt aici: stau în Supabase Vault.
+
+name: weekly-refresh
+
+on:
+  schedule:
+    - cron: '0 4 * * 2'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment GitHub cu secretele Supabase'
+        type: choice
+        options: [staging]
+        default: staging
+      only:
+        description: 'Doar anumite surse, separate prin virgulă (seomonitor, ga4, gsc); gol = toate cele active'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  # O singură colectare odată: bugetele furnizorilor (SEOmonitor, Google) se consumă împreună.
+  group: weekly-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.event_name == 'workflow_dispatch' || vars.REFRESH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dependențe
+        run: npm ci
+
+      - name: Teste orchestrator și conectori (fără rețea)
+        run: node --experimental-strip-types --test 'connectors/**/*.test.ts'
+
+      - name: Refresh săptămânal
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          OPS_FROM_EMAIL: ${{ secrets.OPS_FROM_EMAIL }}
+          APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+          CONNECTOR_SEOMONITOR_ENABLED: ${{ vars.CONNECTOR_SEOMONITOR_ENABLED }}
+          CONNECTOR_GOOGLE_ENABLED: ${{ vars.CONNECTOR_GOOGLE_ENABLED }}
+          CONNECTOR_CLARITY_ENABLED: ${{ vars.CONNECTOR_CLARITY_ENABLED }}
+          ONLY: ${{ inputs.only }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Lipsesc secretele SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY în environment-ul ${{ inputs.environment || 'staging' }}."
+            exit 1
+          fi
+          if [ -n "$ONLY" ]; then
+            node --experimental-strip-types connectors/orchestrator/run.ts --only "$ONLY" | tee refresh.log
+          else
+            node --experimental-strip-types connectors/orchestrator/run.ts | tee refresh.log
+          fi
+
+      - name: Rezumat
+        if: always()
+        run: |
+          {
+            echo "### Refresh săptămânal: $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo
+            echo '```'
+            [ -f refresh.log ] && cat refresh.log || echo "fără output"
+            echo '```'
+            echo
+            echo "Detalii: view-urile source_status (stare, date până la, acoperire), sync_history și tabela ops_notifications."
+          } >> "$GITHUB_STEP_SUMMARY"
