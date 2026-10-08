@@ -1,0 +1,50 @@
+# Trimite notificările din coadă (farmacovigilență; ulterior și alertele de refresh) prin Resend.
+#
+# Rulează la fiecare 15 minute, DEZACTIVAT până când variabila NOTIFICATIONS_ENABLED = "true"
+# (Settings → Secrets and variables → Actions → Variables). workflow_dispatch funcționează oricând.
+#
+# Secrete în environment-ul GitHub ales (implicit „staging”): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, PV_FROM_EMAIL.
+# Fără RESEND_API_KEY scriptul nu face nimic: notificările rămân `pending`, nu se pierd.
+
+name: notifications-dispatch
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment GitHub cu secretele'
+        type: choice
+        options: [staging]
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notifications-dispatch
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    if: github.event_name == 'workflow_dispatch' || vars.NOTIFICATIONS_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Dependențe
+        run: npm ci
+      - name: Trimite notificările
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          PV_FROM_EMAIL: ${{ secrets.PV_FROM_EMAIL }}
+          APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+        run: node --experimental-strip-types scripts/send-notifications.ts

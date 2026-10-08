@@ -72,6 +72,7 @@ Funcțiile de calcul al metricilor sunt pure: primesc definiția și observații
 | SECURITY DEFINER | În `private`: 4 de autorizare (boolean, răspund doar pentru `auth.uid()`), `user_has_brand_role` și `user_can_import` (user_id explicit, neexecutabile de clienți), triggere (`audit_row`, `delete_source_secret`). În `public`: 3 funcții server pentru credențiale, doar `service_role` (vezi excepția E1) | A10, A11, A14, B3, B8, V1–V3 |
 | Tabele GA4/GSC (B5) | `web_daily`, `web_key_events`, `web_active_users_interval`, `search_daily`, `search_queries` (citire pe `has_brand_access`), `source_reconciliations` (doar agenția); scriere doar service role; view-uri `security_invoker` | A1–A9 (generice), `07_google_tables.test.sql`, B9 |
 | Import CSV (B6) | `paid_daily`, `social_daily`, `social_posts`, `mentions` (citire pe `has_brand_access`), `import_batch_rows` (doar agenția); scriere doar service role; Edge Function `csv-import` cu autorizare prin RLS-ul utilizatorului; view-uri `security_invoker` | A1–A9, `08_csv_import.test.sql`, `supabase/functions/csv-import/handler.test.ts`, E1–E5 |
+| Analize și PV (B7) | `insights`, `evidence_links`, `insight_snapshots`, `recommendations`, `actions` (vizibilitate: agenția tot, clientul doar `published` / acțiuni agreate), `insight_transitions`, `action_transitions`, `pv_contacts`, `pv_flags`, `pv_flag_events`, `pv_notifications` (agenție / `agency_admin`); tranziții prin trigger `SECURITY DEFINER`; Edge Function `notify` | A1–A11, `09_insights_pv.test.sql`, `supabase/functions/notify/handler.test.ts`, F1–F4 |
 | Vault | Tokenurile surselor; secret `source_connection:<id>` per conexiune | V1–V9, B8 |
 | SEOmonitor | 10 tabele de date (RLS pe brand, scriere doar service role), `ai_answer_originals` (doar roluri de agenție), `seomonitor_group_mappings` (citire agenție, insert doar `agency_admin`, versiuni imutabile, auditate), `seomonitor_mapping_queue` (citire agenție), view-urile `seomonitor_metric_observations` și `seomonitor_ai_answer_states` (`security_invoker`) | A1–A8; RLS prin REST în `tests/integration/seomonitor-pipeline.test.ts` |
 | Clarity | `clarity_daily` (RLS pe brand, scriere doar service role) și view `clarity_metric_observations` (`security_invoker`) | A1–A8; RLS prin REST în `tests/integration/clarity-pipeline.test.ts` |
@@ -247,3 +248,15 @@ Ultima rulare: 7 oct 2026, 13/13 mutații prinse.
 | E5 | reimport de mențiuni cu sentiment revizuit de un om | sentimentul rămâne; textul se actualizează |
 
 **Neverificat (B6):** fișierele reale ale platformelor (niciun export real; alias-urile sunt neconfirmate); fișiere de zeci de mii de rânduri pe Edge Function în producție (limita de timp / memorie); stocarea fișierului brut; rollback pe lot.
+
+
+## F. Analize, acțiuni și farmacovigilență prin HTTP real (`tests/security/insights-pv.test.mjs`)
+
+| ID | Vector | Rezultat așteptat |
+|---|---|---|
+| F1 | statusul / autorul setat la inserare sau modificat direct (autor, admin); draft citit de client / admin T2 / account fără acces; tranziții de client, admin T2, strategist T2, account; corp falsificat (tenant, brand, actor, from_status); publicare fără dovezi; metrică necunoscută; editarea / ștergerea unei analize publicate (inclusiv service role); modificarea unui snapshot | 400 / 403; datele neschimbate; clientul vede doar `published`, dovezile și snapshotul (valoarea = `metrics.compute`), nu jurnalul |
+| F2 | responsabil din afara agenției; status direct; tranziție ilegală; tranziții de client / alt tenant; vizibilitatea acțiunilor pentru client | 400 / 403; clientul vede doar acțiunile agreate |
+| F3 | marcare PV de client / account fără acces / admin T2; câmpuri falsificate (tenant, autor, status); vizibilitatea marcajelor, jurnalului, cozii și contactelor; modificarea / ștergerea marcajelor; scrierea evenimentelor de sistem de către utilizatori; contacte PV de non-admin sau pe alt tenant; `notify` fără contacte, ca client, fără JWT, cu JWT expirat | 403 / 401; coada rămâne `pending`; nu se trimite nimic |
+| F4 | izolare între branduri (account cu acces la 1B pe 1A; strategist 1A pe 1B) | refuzat / gol |
+
+**Neverificat (B7):** trimiterea reală prin Resend (niciun cont, deci doar teste cu `fetch` simulat; documentația nu descrie codurile de eroare); conținutul e-mailului față de procedura reală de farmacovigilență (neprimită); comportamentul cu zeci de mii de marcaje în coadă; expirarea cheii `Idempotency-Key` după 24 h (o retrimitere după 24 h ar putea produce un duplicat); restrângerea `notify` la rate limiting.

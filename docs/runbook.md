@@ -86,3 +86,15 @@ _De completat._
 - Fișier identic după import → 409. Un reimport al aceleiași perioade, dintr-un fișier diferit, înlocuiește rândurile cu aceeași cheie.
 - Lot rămas în `validating` (proces întrerupt): se reia cu `confirm`; dacă a rămas blocat, `update import_batches set status = 'validated' where id = …` (service role), apoi reconfirmă.
 - Cost / CPC / CPA sunt `draft` până când contractul `MetricResponse` primește unitatea monetară (vezi `docs/decisions.md`, B6-9).
+
+
+## Analize și farmacovigilență
+
+- Contract și reguli: `docs/contracts/insights.md`. Tranzițiile de status se fac prin `INSERT` în `insight_transitions`, `action_transitions` și `pv_flag_events` (nu prin `UPDATE`).
+- **Publicarea unei analize** îngheață metricile citate. Dacă eșuează, citește mesajul: metrică necunoscută, sursă fără observații pentru analize, SEOmonitor fără `device`. Nu rămân snapshoturi parțiale.
+- **Corecția unei analize publicate:** `INSERT` în `insights` cu `supersedes_id` = analiza publicată; apoi review și publicare. Versiunea veche devine `superseded` (istoric păstrat).
+- **Farmacovigilență:** configurează contactele (`pv_contacts`, `agency_admin`) înainte de a activa Listening. Fiecare marcaj creează o notificare `pending`.
+  - Trimitere: `npm run send:notifications` (service role) sau workflow `notifications-dispatch.yml` (activ când `NOTIFICATIONS_ENABLED = true`). Secrete: `RESEND_API_KEY`, `PV_FROM_EMAIL`.
+  - Verificare: `pv_notifications` (`pending` = în așteptare sau fără secret / contacte; `failed` = definitiv, vezi `last_error`), `pv_flag_events` (jurnalul).
+  - Reluare după `failed`: `update pv_notifications set status = 'pending', attempts = 0 where id = …` (service role), apoi rulează trimiterea.
+  - Termenul de transmitere (de regulă o zi lucrătoare) se urmărește în `pv_flags.status` (`open`/`notified` → `transmitted` → `closed`).

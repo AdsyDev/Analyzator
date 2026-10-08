@@ -30,6 +30,7 @@ export class MemImportDb implements ImportDb {
       const expr = part.slice(eq + 1)
       if (['select', 'order', 'limit', 'offset'].includes(col)) continue
       if (expr.startsWith('eq.')) out = out.filter((r) => String(r[col]) === expr.slice(3))
+      else if (expr.startsWith('in.(')) out = out.filter((r) => expr.slice(4, -1).split(',').includes(String(r[col])))
       else if (expr === 'not.is.null') out = out.filter((r) => r[col] !== null && r[col] !== undefined)
       else if (expr === 'is.null') out = out.filter((r) => r[col] === null || r[col] === undefined)
       else throw new Error(`MemImportDb: filtru nesuportat ${part}`)

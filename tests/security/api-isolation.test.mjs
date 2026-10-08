@@ -21,7 +21,7 @@ describe('B1. Citire REST directă cu ID modificat', () => {
       const byTenant = await rest(`${table}?select=*&${table === 'tenants' ? 'id' : 'tenant_id'}=eq.${T2}`, { token })
       assert.equal(byTenant.status, 200, `${table} tenant`)
       assert.deepEqual(byTenant.json, [], `${table}: rânduri din T2 vizibile`)
-      if (!['tenants', 'memberships'].includes(table)) {
+      if (!['tenants', 'memberships', 'pv_contacts'].includes(table)) { // pv_contacts nu are brand_id
         const col = table === 'brands' ? 'id' : 'brand_id'
         const byBrand = await rest(`${table}?select=*&${col}=in.(${B1B},${B2A},${B2B})`, { token })
         assert.equal(byBrand.status, 200, `${table} brand`)
