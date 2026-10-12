@@ -95,6 +95,16 @@ Erori (`error.code` PostgREST = SQLSTATE, `error.message` în română, afișabi
 
 Orice eroare anulează toată tranzacția: nu rămâne set parțial. Versiunile existente nu se modifică. O versiune cu `effective_from` mai mică decât a unei versiuni viitoare existente primește totuși numărul următor (versiunea efectivă se alege după dată, nu după număr).
 
+### E5. Crearea unui client de către orice `agency_admin` activ (aprobată 12 oct 2026)
+
+Decizia D-1 din `docs/decisions.md`. Până la 12 oct, `tenants_insert` era `with check (false)` (clienții se creau doar cu service role). Migrația `20261012090000_tenant_creation.sql`:
+
+- **Cine:** `authenticated` primește `INSERT (id, slug, name)` pe `tenants`. Politica cere un rol `agency_admin` nerevocat într-un tenant activ (prin `private.has_role`, deja în lista A10). Statusul nu se alege: coloana nu are grant, iar politica cere `active`.
+- **Creatorul devine `agency_admin`** în tenantul nou prin triggerul `tenants_add_creator` (`private.add_tenant_creator`, SECURITY DEFINER, `search_path` gol, returnează `trigger`, neexecutabil de `anon`/`authenticated`). Actorul e `auth.uid()`, nu un parametru. O inserție cu service role (fără utilizator) nu creează membership.
+- **Neschimbat:** nimeni nu se poate adăuga într-un tenant existent; brandurile, accesul și conexiunile rămân pe politicile existente (`agency_admin` al tenantului). Lista A10/A11 de funcții executabile de clienți e aceeași.
+- **Riscul acceptat:** un `agency_admin` al oricărui client (de regulă oameni AdSymphony) poate crea clienți noi, goi, în care doar el are acces. Nu poate vedea sau modifica alți clienți. Ștergerea nu există (doar arhivare prin `status`).
+- **Teste:** `11_tenant_creation.test.sql` (H1–H6): roluri respinse, anon, status impus, creare și membership, unicitatea slug-ului, izolare față de alți admini, admin revocat, service role, audit, arhivarea și restaurarea brandurilor.
+
 ## Inventar la 7 oct 2026
 
 | Tip | Ce există | Acoperit de |

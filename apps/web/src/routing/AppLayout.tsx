@@ -27,6 +27,10 @@ export interface LayoutContext {
   homeBrandId: string | null
   /** Schimbă filtrele din URL (de ex. selectarea unui engine dintr-un card). */
   changeFilters: (change: FilterBarChange) => void
+  /** Reîncarcă lista de branduri (de ex. după ce Administrarea a creat sau a arhivat un site). */
+  reloadBrands: () => void
+  /** Alege spațiul din topbar (de ex. site-ul tocmai creat, înainte de a deschide Surse). */
+  selectBrand: (id: string) => void
 }
 
 export const useLayout = () => useOutletContext<LayoutContext>()
@@ -64,7 +68,7 @@ export function AppLayout() {
   const adminModule = adminMatch?.params.segment ? ADMIN_MODULES[adminMatch.params.segment] : undefined
   const isHome = location.pathname === '/'
 
-  const { state: brandsState } = useAsync(() => providers.brands.list(), [providers, user.id, user.role])
+  const { state: brandsState, reload: reloadBrands } = useAsync(() => providers.brands.list(), [providers, user.id, user.role])
   const brandsResult: ProviderResult<Brand[]> | null =
     brandsState.status === 'done' ? brandsState.value : brandsState.status === 'failed' ? { kind: 'error', message: brandsState.message } : null
   const brands = brandsResult?.kind === 'ready' ? brandsResult.data : []
@@ -139,7 +143,7 @@ export function AppLayout() {
   } else if (urlBrandId && !urlBrand) {
     content = <NoAccessPage homeBrandId={homeBrandId} />
   } else {
-    const context: LayoutContext = { user, brands, brand: urlBrand, activeBrand: shellBrand, ctx, homeBrandId, changeFilters: change }
+    const context: LayoutContext = { user, brands, brand: urlBrand, activeBrand: shellBrand, ctx, homeBrandId, changeFilters: change, reloadBrands, selectBrand: onBrandChange }
     // `key` pe rol: la comutarea rolului în previzualizare, ecranele se reîncarcă cu datele noului rol.
     content = <Outlet key={user.role} context={context} />
   }

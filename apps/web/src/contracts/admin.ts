@@ -80,3 +80,53 @@ export interface ConfigProvider {
   aliases(brandId: BrandId): Promise<ProviderResult<BrandAlias[]>>
   seomonitorMappings(): Promise<ProviderResult<SeomonitorMapping[]>>
 }
+
+export type RecordStatus = 'active' | 'archived'
+
+/** Un spațiu de brand (un site) al unui client, așa cum îl vede Administrarea (inclusiv arhivat). */
+export interface ClientSpace {
+  id: BrandId
+  tenant_id: TenantId
+  slug: string
+  name: string
+  domain: string | null
+  status: RecordStatus
+  created_at: IsoDateTime
+  /** Conexiunile active ale spațiului (`source_connections` cu brandul lui). */
+  connections: number
+}
+
+/** Un client (tenant) cu spațiile lui. */
+export interface Client {
+  id: TenantId
+  slug: string
+  name: string
+  status: RecordStatus
+  created_at: IsoDateTime
+  spaces: ClientSpace[]
+}
+
+export interface NewClient {
+  name: string
+  slug: string
+}
+
+export interface NewSpace {
+  name: string
+  slug: string
+  domain: string | null
+}
+
+export type SpacePatch = Partial<Pick<ClientSpace, 'name' | 'domain' | 'status'>>
+
+/**
+ * Administrare → Clienți și site-uri (doar `agency_admin`; RLS e autoritatea). Crearea unui client îl face pe
+ * creator `agency_admin` în el (docs/security-tests.md, E5). Clientul nu se arhivează din aplicație (D-2).
+ */
+export interface ClientsProvider {
+  list(): Promise<ProviderResult<Client[]>>
+  createClient(input: NewClient): Promise<ProviderResult<{ id: TenantId }>>
+  renameClient(id: TenantId, name: string): Promise<ProviderResult<null>>
+  createSpace(tenantId: TenantId, input: NewSpace): Promise<ProviderResult<{ id: BrandId }>>
+  updateSpace(id: BrandId, patch: SpacePatch): Promise<ProviderResult<null>>
+}

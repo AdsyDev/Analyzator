@@ -9,7 +9,7 @@ import type { QueryContext } from './period'
 import type { PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from './paid'
 import type { ContentGap, LandingPage, SearchFilters, SearchKeyword } from './search'
 import type { SocialCalendarItem, SocialCompetitor, SocialFilters, SocialGroups, SocialPost, SocialSummary } from './social'
-import type { ConfigProvider, UsersProvider } from './admin'
+import type { ClientsProvider, ConfigProvider, UsersProvider } from './admin'
 import type { NewConnection, SourceConnection, SourceStatusInfo, SyncRun, TokenSaved, ValidationOutcome } from './source'
 import type { AiReferrals, ClarityDevices, Device, TrackingQuality, TrafficChannels } from './traffic'
 
@@ -133,4 +133,5 @@ export interface DataProviders {
   competition: CompetitionProvider
   users: UsersProvider
   config: ConfigProvider
+  clients: ClientsProvider
 }

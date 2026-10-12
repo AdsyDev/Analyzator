@@ -11,7 +11,7 @@ Ghiduri pas cu pas pentru agenție (rolul `agency_admin`): de unde obții cheia,
 
 ## Înainte de prima sursă (o singură dată)
 
-1. **Clientul și brandurile există în aplicație.** Le vezi în selectorul de brand din bara de sus. Până există ecranul „Adaugă client/brand”, le creează echipa tehnică.
+1. **Clientul și brandurile există în aplicație.** Administrare → **Clienți și site-uri** → „Adaugă client” (clientul și primul site) sau „Adaugă site” pe cardul unui client existent. Cine creează clientul devine administratorul lui.
 2. **Ești `agency_admin`** pe clientul respectiv. Doar acest rol vede Administrare → Surse.
 3. **Aplicația are voie să vorbească cu funcțiile server.** Salvarea tokenului din aplicație trece prin funcția `source-credentials`, care acceptă doar domeniul aplicației. În Supabase → Edge Functions → Secrets trebuie setat `ANALYZATOR_APP_ORIGIN` = adresa exactă a aplicației (de ex. `https://analyzator.exemplu.ro`, fără `/` la final). Fără ea, butonul „Salvează tokenul” dă eroare de rețea.
 4. **Colectarea automată e pornită.** Conectorii rulează din GitHub Actions. În repo → Settings → Secrets and variables → Actions:

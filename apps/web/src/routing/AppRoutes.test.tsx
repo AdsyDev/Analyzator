@@ -167,10 +167,10 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
     expect(screen.queryByRole('button', { name: /Importă|Conectează|Cere conectarea/ })).toBeNull()
   })
 
-  it('un ecran de Administrare neconstruit (Clienți și site-uri) spune adevărul, fără „În curând"', async () => {
+  it('Clienți și site-uri e construit: pagina reală, fără placeholder și fără „În curând"', async () => {
     setup('/admin/clients')
-    expect(await screen.findByRole('heading', { name: 'Acest ecran nu este încă disponibil' })).toBeInTheDocument()
-    expect(screen.getByText(/Ecranul Clienți și site-uri nu a fost livrat în această versiune/)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Cum adaugi un client nou' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Acest ecran nu este încă disponibil' })).toBeNull()
     expect(screen.queryByText(/în curând/i)).toBeNull()
   })
 

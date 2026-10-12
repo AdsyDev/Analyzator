@@ -2,6 +2,7 @@ import {
   notConnected,
   type AiVisibilityProvider,
   type BrandsProvider,
+  type ClientsProvider,
   type CompetitionProvider,
   type ConfigProvider,
   type UsersProvider,
@@ -21,6 +22,7 @@ import type { DataClient } from './dataClient'
 import { createSupabaseConfig, createSupabaseUsers } from './adminProviders'
 import { createSupabaseBrands } from './brandsProvider'
 import { createSupabaseSources } from './sourcesProvider'
+import { createSupabaseClients } from './clientsProvider'
 import { comparisonRange } from '../../lib/period'
 
 const NO_SOURCE = 'Sursa nu este conectată pentru acest brand. Nu afișăm valori estimate până la conectare.'
@@ -151,6 +153,15 @@ const config: ConfigProvider = {
   seomonitorMappings: async () => notConnected('Maparea grupurilor nu este încă disponibilă.'),
 }
 
+const CLIENTS_UNAVAILABLE = 'Administrarea clienților nu este încă disponibilă.'
+const clients: ClientsProvider = {
+  list: async () => notConnected(CLIENTS_UNAVAILABLE),
+  createClient: async () => notConnected(CLIENTS_UNAVAILABLE),
+  renameClient: async () => notConnected(CLIENTS_UNAVAILABLE),
+  createSpace: async () => notConnected(CLIENTS_UNAVAILABLE),
+  updateSpace: async () => notConnected(CLIENTS_UNAVAILABLE),
+}
+
 const competition: CompetitionProvider = {
   matrix: async () => notConnected('Datele despre competitori nu sunt încă disponibile pentru acest brand.'),
   gaps: async () => notConnected('Datele despre competitori nu sunt încă disponibile pentru acest brand.'),
@@ -183,5 +194,6 @@ export function createSupabaseProviders(deps?: SupabaseProvidersDeps): DataProvi
     competition,
     users: deps ? createSupabaseUsers(deps.client) : users,
     config: deps ? createSupabaseConfig(deps.client, now) : config,
+    clients: deps ? createSupabaseClients(deps.client) : clients,
   }
 }
