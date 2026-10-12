@@ -1,5 +1,5 @@
 import { useId, useState, type ChangeEvent, type FormEvent } from 'react'
-import type { TenantConnection, TenantId } from '../../contracts'
+import type { TenantConnection, TenantId, ValidationOutcome } from '../../contracts'
 import { Button } from '../../components/ui/Button'
 import { StatusChip } from '../../components/ui/Chip'
 import { useProviders } from '../../data/DataProvidersContext'
@@ -7,13 +7,13 @@ import { useAsync } from '../../data/useAsync'
 import { formatDateTime } from '../../lib/format'
 import { checkServiceAccount, type ServiceAccountCheck } from '../../lib/serviceAccount'
 import { Resolved } from '../shared/Resolved'
-import { CREDENTIAL_LABELS } from './labels'
+import { CREDENTIAL_LABELS, OUTCOME_TONE } from './labels'
 
 const field = 'h-9 rounded-[10px] border border-border-strong bg-surface px-3 text-[13px]'
 
 /**
  * Conturile la nivel de client (un cont pentru toate brandurile clientului): cheia Google pentru GA4 și Search
- * Console și contul SEOmonitor. Cheia și tokenul pleacă o singură dată spre funcția server `source-credentials`;
+ * Console, contul SEOmonitor și tokenul Planable. Cheia și tokenul pleacă o singură dată spre funcția server `source-credentials`;
  * nu se afișează și nu rămân în interfață.
  */
 export function TenantAccounts({ tenantId, onChanged }: { tenantId: TenantId; onChanged: () => void }) {
@@ -28,7 +28,8 @@ export function TenantAccounts({ tenantId, onChanged }: { tenantId: TenantId; on
       {(conns) => (
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
           <GoogleKeyCard tenantId={tenantId} connection={conns.find((c) => c.provider === 'google_service_account') ?? null} onChanged={changed} />
-          <SeomonitorCard tenantId={tenantId} connection={conns.find((c) => c.provider === 'seomonitor') ?? null} onChanged={changed} />
+          <TokenAccountCard spec={SEOMONITOR} tenantId={tenantId} connection={conns.find((c) => c.provider === 'seomonitor') ?? null} onChanged={changed} />
+          <TokenAccountCard spec={PLANABLE} tenantId={tenantId} connection={conns.find((c) => c.provider === 'planable_account') ?? null} onChanged={changed} />
         </div>
       )}
     </Resolved>
@@ -152,16 +153,61 @@ function GoogleKeyCard({ tenantId, connection, onChanged }: { tenantId: TenantId
   )
 }
 
-function SeomonitorCard({ tenantId, connection, onChanged }: { tenantId: TenantId; connection: TenantConnection | null; onChanged: () => void }) {
+interface TokenAccountSpec {
+  provider: 'seomonitor' | 'planable_account'
+  aria: string
+  title: string
+  subtitle: string
+  idLabel: string
+  idPlaceholder: string
+  idPattern: RegExp
+  idHint: string
+  tokenPlaceholder: string
+  footnote: string
+  savedNote: string
+}
+
+const SEOMONITOR: TokenAccountSpec = {
+  provider: 'seomonitor',
+  aria: 'Contul SEOmonitor al clientului',
+  title: 'SEOmonitor',
+  subtitle: 'Un cont pentru toate brandurile clientului; brandurile se despart prin grupurile de keywords.',
+  idLabel: 'ID-ul companiei (company_id)',
+  idPlaceholder: 'de ex. 4821',
+  idPattern: /^\d+$/,
+  idHint: 'Doar cifre.',
+  tokenPlaceholder: 'Account Settings → Edit Profile → API Token',
+  footnote: 'Datele intră pe branduri doar după maparea grupurilor SEOmonitor (Configurare → Grupuri SEOmonitor → brand). Ghid: docs/connectors/seomonitor.md.',
+  savedNote: 'Token salvat. Testează conexiunea sau așteaptă prima rulare SEOmonitor.',
+}
+
+const PLANABLE: TokenAccountSpec = {
+  provider: 'planable_account',
+  aria: 'Contul Planable al clientului',
+  title: 'Planable (social și Listening)',
+  subtitle: 'Un token pentru toate workspace-urile clientului; workspace-ul fiecărui brand se adaugă mai jos, pe brand.',
+  idLabel: 'Numele companiei în Planable',
+  idPlaceholder: 'de ex. STADA România',
+  idPattern: /^.{2,120}$/,
+  idHint: 'O etichetă, ca să recunoști contul.',
+  tokenPlaceholder: 'pln_… (Company settings → API tokens, scope Read)',
+  footnote: 'Necesită plan Pro sau Enterprise. Ghid: docs/connectors/planable.md.',
+  savedNote: 'Token salvat. Testează conexiunea pentru a confirma că funcționează.',
+}
+
+/** Un cont cu token (SEOmonitor, Planable): creare, rotirea tokenului și testul într-un singur apel de citire. */
+function TokenAccountCard({ spec, tenantId, connection, onChanged }: { spec: TokenAccountSpec; tenantId: TenantId; connection: TenantConnection | null; onChanged: () => void }) {
   const providers = useProviders()
   const ids = [useId(), useId()] as const
-  const [company, setCompany] = useState('')
+  const [account, setAccount] = useState('')
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
-  const companyOk = connection !== null || /^\d+$/.test(company.trim())
-  const ok = companyOk && token.trim() !== ''
+  const [outcome, setOutcome] = useState<ValidationOutcome | null>(null)
+  const accountOk = connection !== null || spec.idPattern.test(account.trim())
+  const ok = accountOk && token.trim() !== ''
 
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -170,9 +216,10 @@ function SeomonitorCard({ tenantId, connection, onChanged }: { tenantId: TenantI
     setBusy(true)
     setError(null)
     setSaved(false)
+    setOutcome(null)
     let target = connection
     if (!target) {
-      const created = await providers.sources.createTenantConnection(tenantId, { provider: 'seomonitor', external_account_id: company.trim(), display_name: 'SEOmonitor' })
+      const created = await providers.sources.createTenantConnection(tenantId, { provider: spec.provider, external_account_id: account.trim(), display_name: spec.title })
       if (created.kind !== 'ready') {
         setBusy(false)
         setToken('')
@@ -189,33 +236,57 @@ function SeomonitorCard({ tenantId, connection, onChanged }: { tenantId: TenantI
     onChanged()
   }
 
+  async function test() {
+    if (!connection || testing) return
+    setTesting(true)
+    setError(null)
+    setSaved(false)
+    const r = await providers.sources.validate(connection.id)
+    setTesting(false)
+    if (r.kind !== 'ready') return setError(r.kind === 'error' ? r.message : r.reason)
+    setOutcome(r.data)
+    onChanged()
+  }
+
   return (
-    <article aria-label="Contul SEOmonitor al clientului" className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 shadow-1">
-      <CardHeader title="SEOmonitor" subtitle="Un cont pentru toate brandurile clientului; brandurile se despart prin grupurile de keywords." connection={connection} />
+    <article aria-label={spec.aria} className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 shadow-1">
+      <CardHeader title={spec.title} subtitle={spec.subtitle} connection={connection} />
       {connection && (
         <p className="text-[12.5px] text-text-2">
-          Companie <span className="font-mono text-[12px]">{connection.external_account_id}</span>
+          <span className="font-mono text-[12px]">{connection.external_account_id}</span>
           {connection.credential_updated_at && <span className="font-mono text-[11.5px] text-text-3"> · token salvat {formatDateTime(connection.credential_updated_at)}</span>}
         </p>
       )}
       <form onSubmit={save} className="flex flex-col gap-3">
         {!connection && (
           <div className="flex flex-col gap-1">
-            <label htmlFor={ids[0]} className="text-[12.5px] font-semibold">ID-ul companiei (company_id)</label>
-            <input id={ids[0]} value={company} onChange={(e) => setCompany(e.target.value)} inputMode="numeric" placeholder="de ex. 4821" className={`${field} font-mono`} />
+            <label htmlFor={ids[0]} className="text-[12.5px] font-semibold">{spec.idLabel}</label>
+            <input id={ids[0]} value={account} onChange={(e) => setAccount(e.target.value)} placeholder={spec.idPlaceholder} className={`${field} font-mono`} aria-describedby={`${ids[0]}-hint`} />
+            <span id={`${ids[0]}-hint`} className="text-[12px] text-text-3">{spec.idHint}</span>
           </div>
         )}
         <div className="flex flex-col gap-1">
           <label htmlFor={ids[1]} className="text-[12.5px] font-semibold">{connection && connection.credential_status !== 'missing' ? 'Rotește tokenul' : 'Token API'}</label>
           <div className="flex flex-wrap gap-2">
-            <input id={ids[1]} type="password" autoComplete="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} placeholder="Account Settings → Edit Profile → API Token" className={`${field} min-w-[16rem] flex-1 font-mono`} />
+            <input id={ids[1]} type="password" autoComplete="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} placeholder={spec.tokenPlaceholder} className={`${field} min-w-[16rem] flex-1 font-mono`} />
             <Button type="submit" variant="primary" loading={busy} disabled={!ok}>Salvează</Button>
           </div>
         </div>
-        <p className="text-[12px] leading-snug text-text-3">Datele intră pe branduri doar după maparea grupurilor SEOmonitor (Configurare → Grupuri SEOmonitor → brand). Ghid: docs/connectors/seomonitor.md.</p>
+        {connection && connection.credential_status !== 'missing' && (
+          <span>
+            <Button onClick={() => void test()} loading={testing}>Testează conexiunea</Button>
+          </span>
+        )}
+        <p className="text-[12px] leading-snug text-text-3">{spec.footnote}</p>
       </form>
-      <div aria-live="polite">
-        {saved && <p className="text-[12.5px] text-pos-text">Token salvat. Prima rulare SEOmonitor confirmă accesul.</p>}
+      <div aria-live="polite" className="flex flex-col gap-1.5">
+        {saved && <p className="text-[12.5px] text-pos-text">{spec.savedNote}</p>}
+        {outcome && (
+          <p className="flex flex-wrap items-center gap-2 text-[12.5px]" data-outcome={outcome.outcome}>
+            <StatusChip tone={OUTCOME_TONE[outcome.outcome]}>{CREDENTIAL_LABELS[outcome.credential_status].label}</StatusChip>
+            <span>{outcome.message}</span>
+          </p>
+        )}
         {error && <p role="alert" className="text-[12.5px] text-neg-text">{error}</p>}
       </div>
     </article>

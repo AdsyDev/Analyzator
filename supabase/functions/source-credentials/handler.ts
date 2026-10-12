@@ -19,7 +19,29 @@ export type HandlerDeps = {
 }
 
 export const CLARITY_ENDPOINT = 'https://www.clarity.ms/export-data/api/v1/project-live-insights'
-export const DAILY_LIMIT: Record<string, number> = { clarity: 10 }
+
+/**
+ * Furnizorii care se pot testa cu un singur apel de citire. `limit` = testele permise pe zi (UTC) per conexiune:
+ * la Clarity e chiar bugetul furnizorului (10 apeluri/zi, comun cu colectarea); la ceilalți e o limită proprie, ca
+ * testele repetate să nu consume cota zilnică.
+ */
+type Validator = { label: string; limit: number; url: string; headers: (token: string) => Record<string, string>; renew: string }
+export const VALIDATORS: Record<string, Validator> = {
+  clarity: {
+    label: 'Clarity', limit: 10, url: `${CLARITY_ENDPOINT}?numOfDays=1`,
+    headers: (t) => ({ Authorization: `Bearer ${t}` }), renew: 'Generează un token nou din Settings → Data Export.',
+  },
+  seomonitor: {
+    label: 'SEOmonitor', limit: 20, url: 'https://apigw.seomonitor.com/v3/dashboard/v3.0/campaigns/tracked?limit=1',
+    // SEOmonitor: tokenul brut, fără „Bearer” (docs/contracts/seomonitor.md).
+    headers: (t) => ({ Authorization: t, Accept: 'application/json' }), renew: 'Generează un token nou din Account Settings → Edit Profile → API Token.',
+  },
+  planable_account: {
+    label: 'Planable', limit: 20, url: 'https://api.planable.io/api/v1/workspaces',
+    headers: (t) => ({ Authorization: `Bearer ${t}`, Accept: 'application/json' }), renew: 'Creează un token nou (scope Read) din Company settings → API tokens.',
+  },
+}
+export const DAILY_LIMIT: Record<string, number> = Object.fromEntries(Object.entries(VALIDATORS).map(([k, v]) => [k, v.limit]))
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -189,8 +211,9 @@ async function validate(deps: HandlerDeps, userId: string, connectionId: string)
   const conn = await loadConnection(deps, connectionId)
   await assertAgencyAdmin(deps, userId, conn.tenant_id)
 
-  const limit = DAILY_LIMIT[conn.provider]
-  if (limit === undefined) throw new HttpError(422, `Validarea nu e disponibilă pentru ${conn.provider}.`)
+  const validator = VALIDATORS[conn.provider]
+  if (validator === undefined) throw new HttpError(422, `Validarea nu e disponibilă pentru ${conn.provider}.`)
+  const limit = validator.limit
   if (conn.credential_status === 'missing') throw new HttpError(409, 'Conexiunea nu are token.')
 
   const day = utcDay(deps.now())
@@ -228,7 +251,7 @@ async function validate(deps: HandlerDeps, userId: string, connectionId: string)
 
   let httpStatus: number | null = null
   try {
-    const res = await deps.fetch(`${CLARITY_ENDPOINT}?numOfDays=1`, { headers: { Authorization: `Bearer ${token}` } })
+    const res = await deps.fetch(validator.url, { headers: validator.headers(token) })
     httpStatus = res.status
     await res.body?.cancel()
   } catch {
@@ -243,13 +266,13 @@ async function validate(deps: HandlerDeps, userId: string, connectionId: string)
     message = 'Conexiunea funcționează.'
   } else if (httpStatus === 401 || httpStatus === 403) {
     outcome = 'invalid'
-    message = `Clarity a refuzat tokenul (${httpStatus}). Generează un token nou din Settings → Data Export.`
+    message = `${validator.label} a refuzat tokenul (${httpStatus}). ${validator.renew}`
   } else if (httpStatus === 429) {
     outcome = 'rate_limited'
-    message = 'Clarity a răspuns 429: limita zilnică e atinsă. Starea tokenului nu s-a schimbat.'
+    message = `${validator.label} a răspuns 429: limita de apeluri e atinsă. Starea tokenului nu s-a schimbat.`
   } else {
     outcome = 'provider_error'
-    message = `Clarity nu a răspuns corect (${httpStatus ?? 'eroare de rețea'}). Starea tokenului nu s-a schimbat.`
+    message = `${validator.label} nu a răspuns corect (${httpStatus ?? 'eroare de rețea'}). Starea tokenului nu s-a schimbat.`
   }
 
   if (outcome === 'valid' || outcome === 'invalid') {

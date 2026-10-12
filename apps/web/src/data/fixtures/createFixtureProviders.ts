@@ -349,7 +349,11 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
     },
     validate: async (connectionId) => {
       if (getRole() !== 'agency_admin') return failed('Doar administratorii agenției pot testa conexiuni.')
-      const all = [...Object.values(connectionsFile).flat().map((c) => ({ id: c.id, calls: c.calls_today, status: c.credential_status })), ...createdConnections.map((c) => ({ id: c.id, calls: c.calls_today, status: c.credential_status }))]
+      const all = [
+        ...Object.values(connectionsFile).flat().map((c) => ({ id: c.id, calls: c.calls_today, status: c.credential_status })),
+        ...createdConnections.map((c) => ({ id: c.id, calls: c.calls_today, status: c.credential_status })),
+        ...tenantConnectionsMem.map((c) => ({ id: c.id, calls: 0, status: c.credential_status })),
+      ]
       const base = all.find((c) => c.id === connectionId)
       if (!base) return failed('Conexiune inexistentă sau inactivă.')
       const patch = connectionPatch.get(connectionId) ?? {}

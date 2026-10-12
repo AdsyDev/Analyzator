@@ -324,6 +324,8 @@ export async function confirmImport(deps: { db: ImportDb; now?: () => Date }, ba
       const payloadHash = await sha256Hex(JSON.stringify(s.data))
       const base: Row = {
         ...s.data, tenant_id: batch.tenant_id, brand_id: batch.brand_id, import_batch_id: batch.id, row_number: s.row_number,
+        // Explicit NULL: un rând venit anterior prin API cu aceeași cheie devine rând CSV (CHECK de proveniență, D-4).
+        source_id: null, sync_run_id: null,
         collected_at: collectedAt, collection_method: 'csv', payload_hash: payloadHash, source_timezone: timezone, schema_version: SCHEMA_VERSION,
       }
       if (s.target === 'paid_daily') {

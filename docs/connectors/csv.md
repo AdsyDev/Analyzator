@@ -48,4 +48,4 @@ Pot importa doar `agency_admin` și `account`, cu acces la brand.
 
 ## Conectare prin API
 
-Pentru Google Ads, Meta, TikTok și Planable nu există încă conector API. E în planificare; ghidurile vor fi adăugate aici când conectorii există.
+**Planable** are conector API: [planable.md](planable.md). CSV-ul rămâne o variantă de rezervă, în aceleași tabele. Pentru Google Ads, Meta și TikTok conectorii API sunt în lucru.

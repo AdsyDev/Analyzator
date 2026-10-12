@@ -10,6 +10,14 @@ import { PROVIDER_LABELS } from '../../lib/sources'
  */
 export const CONNECTABLE: readonly SourceProviderId[] = ['ga4', 'gsc', 'clarity', 'planable']
 
+/** Ce se completează la „Cont sau proiect”, per sursă (docs/connectors). */
+const ACCOUNT_HINT: Partial<Record<SourceProviderId, string>> = {
+  ga4: 'Property ID GA4 (doar cifre)',
+  gsc: 'sc-domain:exemplu.ro sau https://www.exemplu.ro/',
+  clarity: 'Project ID Clarity',
+  planable: 'ID-ul workspace-ului Planable',
+}
+
 interface Props {
   brandId: string
   initialProvider?: SourceProviderId
@@ -57,7 +65,7 @@ export function AddConnection({ brandId, initialProvider, onCreated }: Props) {
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor={ids[1]} className="text-[12.5px] font-semibold">Cont sau proiect</label>
-          <input id={ids[1]} value={account} onChange={(e) => setAccount(e.target.value)} placeholder="de ex. ID-ul proiectului" className={`${field} font-mono`} />
+          <input id={ids[1]} value={account} onChange={(e) => setAccount(e.target.value)} placeholder={ACCOUNT_HINT[provider] ?? 'de ex. ID-ul proiectului'} className={`${field} font-mono`} />
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor={ids[2]} className="text-[12.5px] font-semibold">Nume afișat (opțional)</label>

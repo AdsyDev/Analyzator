@@ -7,8 +7,13 @@ import { formatDateTime } from '../../lib/format'
 import { PROVIDER_LABELS } from '../../lib/sources'
 import { BUDGET_RESET_NOTE, CREDENTIAL_LABELS, OUTCOME_TONE, VALIDATABLE } from './labels'
 
-/** GA4 și Search Console folosesc cheia Google a clientului (Conturile clientului), nu un token pe conexiune. */
-const USES_TENANT_KEY: readonly string[] = ['ga4', 'gsc']
+/** GA4 și Search Console folosesc cheia Google a clientului, Planable tokenul clientului (Conturile clientului), nu un token pe conexiune. */
+const TENANT_KEY_NOTE: Record<string, string> = {
+  ga4: 'Nu are token propriu: folosește cheia Google din „Conturile clientului”. Service account-ul trebuie să aibă acces la această proprietate.',
+  gsc: 'Nu are token propriu: folosește cheia Google din „Conturile clientului”. Service account-ul trebuie să aibă acces la această proprietate.',
+  planable: 'Nu are token propriu: folosește tokenul Planable din „Conturile clientului”. Tokenul trebuie să aibă acces la acest workspace.',
+}
+const USES_TENANT_KEY: readonly string[] = Object.keys(TENANT_KEY_NOTE)
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** `credential_updated_by` e un id de utilizator: nu avem nume în schemă, deci afișăm un id scurt, nu un nume presupus. */
@@ -105,7 +110,7 @@ export function ConnectionCard({ connection: c, onChanged }: Props) {
 
       {USES_TENANT_KEY.includes(c.provider) ? (
         <p className="rounded-lg bg-surface-2 px-3 py-2 text-[12.5px] leading-snug text-text-2">
-          Nu are token propriu: folosește cheia Google din „Conturile clientului”. Service account-ul trebuie să aibă acces la această proprietate.
+          {TENANT_KEY_NOTE[c.provider]}
         </p>
       ) : (
         <form onSubmit={save} className="flex flex-col gap-2">

@@ -28,7 +28,19 @@ _De completat._ Sincronizare marți la 06:00 Europe/Bucharest pentru săptămân
 
 ## Hosting: aplicația web (SPA)
 
-Rutele aplicației sunt în browser (`/brands/:brandId/<modul>`, `/admin/<pagină>`, `/login`). Serverul de producție trebuie să **redirecționeze orice cale către `index.html`** (SPA fallback, cu status 200), altfel o reîncărcare sau un link direct dă 404. Fișierele din `assets/` rămân servite ca atare. Configurarea concretă depinde de hostul ales și se face la deploy; verifică după deploy că `/brands/<id>/overview` se deschide direct din bara de adrese.
+Rutele aplicației sunt în browser (`/brands/:brandId/<modul>`, `/admin/<pagină>`, `/login`). Serverul de producție trebuie să **redirecționeze orice cale către `index.html`** (SPA fallback, cu status 200), altfel o reîncărcare sau un link direct dă 404. Fișierele din `assets/` rămân servite ca atare. Verifică după deploy că `/brands/<id>/overview` se deschide direct din bara de adrese.
+
+**Host: Cloudflare Workers (static assets), `app.analyzator.ro`.**
+
+- Configurația: `wrangler.jsonc` în rădăcină (Worker `analyzator-web`, `not_found_handling: single-page-application`, custom domain `app.analyzator.ro`; DNS-ul se creează la deploy). Headerele de securitate și cache: `apps/web/public/_headers`.
+- Deploy din git cu Workers Builds (Workers & Pages → Worker `analyzator-web` → Settings → Builds), branch `main`:
+  - Root directory: `/` (aplicația importă `analytics/` din rădăcină).
+  - Build command: `npm ci --prefix apps/web && npm run build` (dependențele din rădăcină se instalează automat; Node din `.nvmrc`).
+  - Deploy command: `npx wrangler deploy`.
+  - Build variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (publice prin design), opțional `VITE_SUPPORT_EMAIL`. Niciodată `SUPABASE_SERVICE_ROLE_KEY` sau `VITE_DESIGN_PREVIEW`.
+- Supabase → Authentication → URL Configuration: Site URL `https://app.analyzator.ro`, Redirect URLs `https://app.analyzator.ro/login`. Fără ele, linkurile de invitație și resetare parolă duc în altă parte.
+- `APP_BASE_URL=https://app.analyzator.ro`: ca GitHub Variable (citită de `weekly-refresh` și `notifications-dispatch`) și ca secret al funcției `notify` în Supabase (linkurile din notificări).
+- Variabilele de build se citesc la build: după o schimbare, rulează din nou deploy-ul (Retry build).
 
 Build-ul de staging și cel de producție se fac fără `VITE_DESIGN_PREVIEW`: variabila oprește build-ul în orice mod în afară de `development` și `design-preview` (vezi README, „Previzualizare design"). Nu o seta în mediul CI.
 
@@ -122,3 +134,13 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 - Un lot `failed` rămâne în istoric; nu se șterge. Sursa se consideră rezolvată când `source_status.state` revine la `ok` după o rulare reușită.
 
 **Activare** (prima dată): Variables `REFRESH_ENABLED`, `CONNECTOR_SEOMONITOR_ENABLED`, `CONNECTOR_GOOGLE_ENABLED`; secrete `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, opțional `RESEND_API_KEY`, `OPS_FROM_EMAIL`; contacte în `alert_contacts` (agency_admin). Cron-ul GitHub nu urmează ora de vară: la trecerea la EET (25 oct) rularea se mută la 05:00 ora României; ajustează cron-ul dacă ora fixă contează.
+
+
+## Colectare săptămânală Planable
+
+- Configurare și reguli: `docs/contracts/planable.md`; pași pentru agenție: `docs/connectors/planable.md`.
+- Conexiuni: `planable_account` per client (tokenul, din Administrare → Surse → „Conturile clientului”, cu test) și `planable` per brand (workspace-ul).
+- Rulare: `.github/workflows/planable-weekly.yml`, marți 04:00 UTC, activ când `CONNECTOR_PLANABLE_ENABLED = true`; manual: Actions → planable-weekly → Run workflow, sau local `npm run collect:planable`.
+- Verificare: `sync_runs` (`source` = `planable_analytics` / `planable_listening`: `status`, `errors`, `coverage`), `provider_api_calls` (apelul `/workspaces` e pe conexiunea clientului, restul pe conexiunea brandului).
+- Mesaje: `access_denied` la `/workspaces` = token refuzat (marcat `invalid`; token nou din Planable). `workspace_not_found` = ID greșit sau token fără acces la workspace. `parser_note` = câmp invalid sau postare fără metrici; nu schimbă statusul.
+- Planable nu e încă în orchestratorul `weekly-refresh` (rulează pe workflow propriu, la aceeași oră).

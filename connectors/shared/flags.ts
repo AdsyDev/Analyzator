@@ -2,7 +2,7 @@
 // În GitHub se setează ca Variables (Settings → Secrets and variables → Actions → Variables); workflow-urile le pasează ca
 // variabile de mediu. Doar valoarea „true” (fără diferență de majuscule) activează; orice altceva = dezactivat.
 
-export type ConnectorSource = 'seomonitor' | 'ga4' | 'gsc' | 'clarity'
+export type ConnectorSource = 'seomonitor' | 'ga4' | 'gsc' | 'clarity' | 'planable'
 
 /** ga4 și gsc împart un singur flag (B5): aceeași conexiune de service account, același workflow. */
 export const CONNECTOR_FLAGS: Record<ConnectorSource, string> = {
@@ -10,6 +10,7 @@ export const CONNECTOR_FLAGS: Record<ConnectorSource, string> = {
   ga4: 'CONNECTOR_GOOGLE_ENABLED',
   gsc: 'CONNECTOR_GOOGLE_ENABLED',
   clarity: 'CONNECTOR_CLARITY_ENABLED',
+  planable: 'CONNECTOR_PLANABLE_ENABLED',
 }
 
 export const REFRESH_FLAG = 'REFRESH_ENABLED'

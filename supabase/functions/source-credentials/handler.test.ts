@@ -31,6 +31,9 @@ function fakeFetch(): HandlerDeps['fetch'] {
     state.calls.push({ url, method, body, headers })
     const ok = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status })
 
+    if (url.startsWith('https://apigw.seomonitor.com/') || url.startsWith('https://api.planable.io/')) {
+      return new Response('[]', { status: state.clarityStatus as number })
+    }
     if (url.startsWith('https://www.clarity.ms/')) {
       if (state.clarityStatus instanceof Error) throw state.clarityStatus
       return new Response('[]', { status: state.clarityStatus })
@@ -224,6 +227,38 @@ describe('validate', () => {
 
   test('furnizor fără validare: 422', async () => {
     state.connection = { ...state.connection, provider: 'ga4' }
+    assert.equal((await call({ action: 'validate', connection_id: CONN })).status, 422)
+  })
+})
+
+describe('validate: SEOmonitor și Planable', () => {
+  test('SEOmonitor: tokenul brut, fără Bearer, pe campaniile urmărite; mesajul spune de unde se ia un token nou', async () => {
+    state.connection = { ...state.connection, provider: 'seomonitor', brand_id: null }
+    state.clarityStatus = 401
+    const r = await call({ action: 'validate', connection_id: CONN })
+    assert.equal(r.status, 200)
+    assert.equal(r.body.outcome, 'invalid')
+    assert.equal(r.body.daily_limit, 20)
+    assert.match(String(r.body.message), /SEOmonitor a refuzat tokenul \(401\).*Edit Profile → API Token/)
+    const provider = state.calls.find((c) => c.url.startsWith('https://apigw.seomonitor.com/'))!
+    assert.equal(provider.url, 'https://apigw.seomonitor.com/v3/dashboard/v3.0/campaigns/tracked?limit=1')
+    assert.equal(provider.headers.Authorization, SECRET)
+    assert.ok(!r.text.includes(SECRET))
+  })
+
+  test('Planable: Bearer pe /workspaces; un răspuns 200 marchează conexiunea funcțională', async () => {
+    state.connection = { ...state.connection, provider: 'planable_account', brand_id: null }
+    state.clarityStatus = 200
+    const r = await call({ action: 'validate', connection_id: CONN })
+    assert.equal(r.body.outcome, 'valid')
+    assert.equal(r.body.credential_status, 'valid')
+    const provider = state.calls.find((c) => c.url.startsWith('https://api.planable.io/'))!
+    assert.equal(provider.url, 'https://api.planable.io/api/v1/workspaces')
+    assert.equal(provider.headers.Authorization, `Bearer ${SECRET}`)
+  })
+
+  test('Google (service account) nu are test într-un singur apel: 422', async () => {
+    state.connection = { ...state.connection, provider: 'google_service_account', brand_id: null }
     assert.equal((await call({ action: 'validate', connection_id: CONN })).status, 422)
   })
 })

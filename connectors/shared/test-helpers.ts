@@ -28,7 +28,7 @@ export const noSleep = () => {
 function matches(row: Row, query: string): boolean {
   for (const part of query.split('&')) {
     const [col, expr] = part.split('=', 2) as [string, string | undefined]
-    if (col === 'select' || expr === undefined) continue
+    if (col === 'select' || col === 'order' || col === 'limit' || col === 'offset' || expr === undefined) continue
     if (expr.startsWith('eq.')) {
       if (String(row[col]) !== expr.slice(3)) return false
     } else if (expr.startsWith('in.(')) {
