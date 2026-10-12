@@ -120,7 +120,8 @@ Migrația `20261012180000_brand_metrics_rpc.sql`, decizia D-11.
 - `public.brand_metrics` și `public.brand_metric_trends`: executabile de `authenticated`, **SECURITY INVOKER**. Verifică în corp `has_brand_access`; brand străin, brand inexistent și lipsa sesiunii dau **același** răspuns (42501). Datele vin din view-urile de observații prin RLS-ul apelantului; UI-ul trimite doar chei, perioadă și brand, iar formulele rămân în `metrics` (regula 4).
 - `private.compute_metric_snapshot` și `private.metric_observations`: executabile de `authenticated`, tot SECURITY INVOKER (citesc prin RLS). `metric_observations` acceptă doar view-urile din allowlist.
 - `private.brand_source_connected` și `private.brand_source_query_ok`: SECURITY DEFINER, întorc **doar boolean** și răspund `false` fără acces la brand (fără oracol). Sunt necesare pentru că `source_connections` și `sync_runs` sunt vizibile prin RLS doar agenției, iar un client trebuie totuși să vadă metricile brandului său.
-- Garda A10/A11 le listează explicit și verifică faptul că sunt INVOKER. Teste: `15_brand_metrics.test.sql` (L1–L4: valori calculate în SQL, clientul vede aceleași cifre ca agenția, refuzuri identice, serii cu null pe zilele fără date).
+- Același regim pentru ecranele de brand care au urmat (D-12 … D-15): `brand_paid`, `brand_mentions`, `brand_mention_sentiment`, `brand_insights`, `brand_traffic_channels`, `brand_clarity_devices`, `brand_search_keywords`, `brand_landing_pages`, `brand_ai_*`, plus utilitarele private INVOKER `ai_check`, `ai_scope`, `ai_engine_db`, `ai_engine_ui`, `ai_outcome`.
+- Garda A10/A11 le listează explicit și verifică faptul că sunt INVOKER. Teste: `15_brand_metrics.test.sql`, `16_brand_listening_insights.test.sql`, `17_brand_traffic_seo.test.sql`, `18_ai_visibility.test.sql` (L1–L4: valori calculate în SQL, clientul vede aceleași cifre ca agenția, refuzuri identice, serii cu null pe zilele fără date).
 
 ## Inventar la 7 oct 2026
 

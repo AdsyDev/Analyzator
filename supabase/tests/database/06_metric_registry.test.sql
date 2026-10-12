@@ -497,8 +497,8 @@ select is(
 
 -- Registrul ----------------------------------------------------------------------------------------
 
-select is((select count(*)::int from public.metric_definitions where primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity')), 16, 'D1: 16 definiții de nivel A (nivelul B, import CSV, are propriile teste în 08)');
-select is((select count(*)::int from public.metric_definitions_current where primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity')), 16, 'D1: câte o versiune curentă per metrică (nivel A)');
+select is((select count(*)::int from public.metric_definitions where primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') and metric_key not like 'ai\_%'), 16, 'D1: 16 definiții de nivel A (nivelul B, import CSV, are propriile teste în 08)');
+select is((select count(*)::int from public.metric_definitions_current where primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') and metric_key not like 'ai\_%'), 16, 'D1: câte o versiune curentă per metrică (nivel A)');
 select is_empty(
   $$ select metric_key from public.metric_definitions where primary_source = 'clarity' and lifecycle <> 'draft' $$,
   'D1: toate metricile Clarity sunt draft până la fixtures'
@@ -509,8 +509,13 @@ select results_eq(
   $$ values ('clarity'::text collate "C", 1, 1), ('ga4', 2, 2), ('gsc', 3, 3), ('seomonitor', 7, 7) $$,
   'D1: toleranța stale per sursă: GA4 2, GSC 3, SEOmonitor 7, Clarity 1'
 );
-select is_empty($$ select metric_key from public.metric_definitions where min_sample is not null and primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') $$,
-  'D1: nivelul A nu are prag de eșantion');
+select is_empty($$ select metric_key from public.metric_definitions where min_sample is not null and primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') and metric_key not like 'ai\_%' $$,
+  'D1: nivelul A (fără AI) nu are prag de eșantion');
+-- Metricile AI (D-15): cinci definiții draft; ratele au pragul de 50 de răspunsuri valide (spec cap. 10).
+select is((select count(*)::int from public.metric_definitions_current where metric_key like 'ai\_%'), 5, 'D1: 5 metrici AI în registru');
+select is_empty($$ select metric_key from public.metric_definitions where metric_key like 'ai\_%' and lifecycle <> 'draft' $$, 'D1: metricile AI sunt draft până la prima rulare reală');
+select is_empty($$ select metric_key from public.metric_definitions where metric_key like 'ai\_%' and aggregation = 'ratio' and min_sample is distinct from 50 $$,
+  'D1: ratele AI au pragul de 50 de răspunsuri valide');
 select throws_ok($$ update public.metric_definitions set formula_ro = 'alta' where metric_key = 'gsc_ctr' $$,
   '42501', null, 'D2: versiunile nu se modifică (nici de owner)');
 select throws_ok($$ delete from public.metric_definitions where metric_key = 'gsc_ctr' $$,

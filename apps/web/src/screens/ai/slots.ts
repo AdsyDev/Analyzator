@@ -1,8 +1,8 @@
 import type { KpiSlot } from '../shared/slots'
 
 /**
- * KPI-urile din spec cap. 13. Cheile `ai_*` nu sunt încă în registrul de metrici: providerul le întoarce
- * `not_connected`, fără definiție inventată, până intră în registru.
+ * KPI-urile din spec cap. 13, din registrul de metrici (D-15). Recommendation Rate nu are observații (SEOmonitor nu dă
+ * recomandarea explicită) și apare indisponibil, fără valoare estimată.
  */
 export const AI_KPI_SLOTS: readonly KpiSlot[] = [
   { key: 'ai_mention_rate', label: 'Mention Rate' },

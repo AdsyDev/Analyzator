@@ -34,8 +34,13 @@ Calculul: `metrics.compute` (SQL). Contractul răspunsului: `docs/contracts/metr
 | `clarity_dead_click_sessions` | 1 | Sesiuni cu dead clicks | Clarity | count | sum | — | 1 | draft |
 | `clarity_quickback_sessions` | 1 | Sesiuni cu quick backs | Clarity | count | sum | — | 1 | draft |
 | `clarity_scroll_depth` | 1 | Scroll depth mediu | Clarity | percent | weighted_mean | sesiuni | 1 | draft |
+| `ai_mention_rate` | 1 | AI Mention Rate | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft |
+| `ai_recommendation_rate` | 1 | AI Recommendation Rate | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft |
+| `ai_owned_citation_rate` | 1 | Owned Citation Rate | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft |
+| `ai_sov` | 1 | AI SoV în setul urmărit | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft |
+| `ai_valid_answers` | 1 | Răspunsuri AI valide | SEOmonitor (AI) | count | sum | — | 7 | draft |
 
-Toate au `valid_from = 2026-10-01` și `min_sample = null`: nivelul A nu are încă prag de eșantion. Pragurile AI din spec (50 de răspunsuri, acoperire minimă 80%) intră cu conectorul AI.
+Metricile GA4, GSC, SEOmonitor și Clarity au `valid_from = 2026-10-01` și `min_sample = null`. Metricile AI (migrația `20261012230000_ai_metrics.sql`, D-15) au `valid_from = 2026-10-12` și pragul din spec cap. 10: **50 de răspunsuri valide** (`min_sample = 50`, sub prag `insufficient_sample`); acoperirea sub 100% dă `partial`.
 
 ## Metrici de nivel B (import CSV)
 
@@ -102,3 +107,21 @@ Sesiunile Clarity cu quick backs; suma zilelor. **Draft**, ca mai sus.
 
 ### clarity_scroll_depth
 Scroll depth Clarity, medie ponderată cu sesiunile fiecărei zile (80% pe 100 de sesiuni și 20% pe 900 dau 26%, nu 50%). **Draft**, ca mai sus.
+
+### ai_mention_rate
+_Sursa observațiilor AI: view-ul `ai_metric_observations`, pe ziua colectării; răspunsurile AI SEOmonitor (`ai_answers`)._
+
+100 × răspunsuri valide cu brandul menționat / toate răspunsurile valide (spec cap. 11). **Valid** = orice stare în afară de eroare tehnică: refuzul motorului intră la numitor și scade rata, eroarea tehnică iese din numitor și scade acoperirea (spec 2.2). Un brand prezent de mai multe ori într-un răspuns contează o dată. Toate engine-urile urmărite, **neponderat**. **Acoperirea:** colectarea e săptămânală (un răspuns pe întrebare și engine), deci o zi e acoperită dacă a existat o colectare validă în ultimele 7 zile. **Draft** până la prima rulare reală SEOmonitor.
+
+### ai_recommendation_rate
+100 × răspunsuri valide care **recomandă explicit** brandul / răspunsuri valide. SEOmonitor marchează doar prezența și poziția brandului în răspuns, nu recomandarea explicită; metrica nu are observații și apare `unavailable`, fără valoare estimată. **Draft** până la o sursă care dă semnalul.
+
+### ai_owned_citation_rate
+100 × răspunsuri valide cu cel puțin o citare a domeniului propriu (domeniul campaniei SEOmonitor sau un subdomeniu, `ai_citations.is_own_domain`) / răspunsuri valide. O citare corporate pe alt domeniu nu e citare a brandului (spec cap. 3). **Draft.**
+
+### ai_sov
+100 × prezențele brandului / suma prezențelor brandului și ale competitorilor din setul în vigoare la data colectării, maximum una per brand și răspuns (spec cap. 11). Prezențele vin din `ai_brand_observations`; un competitor contează doar dacă domeniul observat e în setul de competitori. Nu e Share of Voice-ul calculat de furnizor (spec cap. 3). **Draft.**
+
+### ai_valid_answers
+Numărul de răspunsuri AI fără eroare tehnică (inclusiv refuzurile valide), însumat pe zilele de colectare. Numitorul ratelor de mai sus și reperul pentru pragul de 50. **Draft.**
+

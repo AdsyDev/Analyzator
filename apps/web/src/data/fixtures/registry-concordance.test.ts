@@ -51,10 +51,18 @@ describe('fixtures ↔ registrul de metrici', () => {
     expect(FIXTURE_DEFINITIONS).toEqual(parseDefinitions(registryFromSql()))
   })
 
-  it('cheile din registru.md = cheile din migrație', () => {
+  it('cheile din registru.md = cheile de nivel A din toate migrațiile (nivelul B e în registry-b.md)', () => {
     const md = readFileSync(join(ROOT, 'docs/metrics/registry.md'), 'utf8')
     const keys = [...md.matchAll(/^\| `([a-z0-9_]+)` \| \d+ \|/gm)].map((m) => m[1])
-    expect(keys).toEqual(registryFromSql().map((r) => r.metric_key))
+    const levelB = new Set([...readFileSync(join(ROOT, 'docs/metrics/registry-b.md'), 'utf8').matchAll(/^\| `([a-z0-9_]+)` \| \d+ \|/gm)].map((m) => m[1]))
+    const all = readdirSync(migrations)
+      .filter((f) => f.endsWith('.sql'))
+      .sort()
+      .flatMap((f) => [...readFileSync(join(migrations, f), 'utf8').matchAll(/^\s*\('([a-z][a-z0-9_]*)', \d+, '/gm)].map((m) => m[1]!))
+    const levelA = [...new Set(all)].filter((k) => !levelB.has(k))
+    expect(keys).toEqual(levelA)
+    // Prima migrație rămâne baza nivelului A; cele adăugate ulterior (de ex. AI, D-15) vin după.
+    expect(levelA.slice(0, registryFromSql().length)).toEqual(registryFromSql().map((r) => r.metric_key))
   })
 
   it('profilurile de date fictive acoperă exact cheile din registru, nimic în plus', () => {
