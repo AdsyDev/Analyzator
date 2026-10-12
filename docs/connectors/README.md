@@ -8,7 +8,8 @@ Ghiduri pas cu pas pentru agenție (rolul `agency_admin`): de unde obții cheia,
 | SEOmonitor | [seomonitor.md](seomonitor.md) | rankuri, visibility, AI Search, AI Overview | Contul din aplicație; maparea grupurilor pe branduri încă din SQL |
 | Google Analytics 4 și Search Console | [google.md](google.md) | sesiuni, key events, clicks și impresii din căutare | Din aplicație: cheia clientului (fișier JSON) și proprietățile pe brand |
 | Planable | [planable.md](planable.md) | social propriu (pagini, postări) și Listening | Din aplicație: tokenul clientului, cu test, și workspace-ul pe brand |
-| Google Ads, Meta Ads, TikTok Ads | [csv.md](csv.md) | cost, clicks, conversii | Import de fișier CSV; conectorii API sunt în lucru |
+| Meta Ads | [meta-ads.md](meta-ads.md) | cost, afișări, clickuri pe zi și reclamă | Din aplicație: tokenul system user, cu test, și contul de ads pe brand |
+| Google Ads, TikTok Ads | [csv.md](csv.md) | cost, clicks, conversii | Import de fișier CSV; conectorii API sunt în lucru (cer OAuth) |
 
 ## Înainte de prima sursă (o singură dată)
 
@@ -17,7 +18,7 @@ Ghiduri pas cu pas pentru agenție (rolul `agency_admin`): de unde obții cheia,
 3. **Aplicația are voie să vorbească cu funcțiile server.** Salvarea tokenului din aplicație trece prin funcția `source-credentials`, care acceptă doar domeniul aplicației. În Supabase → Edge Functions → Secrets trebuie setat `ANALYZATOR_APP_ORIGIN` = adresa exactă a aplicației (de ex. `https://analyzator.exemplu.ro`, fără `/` la final). Fără ea, butonul „Salvează tokenul” dă eroare de rețea.
 4. **Colectarea automată e pornită.** Conectorii rulează din GitHub Actions. În repo → Settings → Secrets and variables → Actions:
    - **Secrets** (environment `staging`): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`;
-   - **Variables:** `CONNECTOR_CLARITY_ENABLED`, `CONNECTOR_SEOMONITOR_ENABLED`, `CONNECTOR_GOOGLE_ENABLED`, `CONNECTOR_PLANABLE_ENABLED`, `REFRESH_ENABLED` = `true` pentru sursele pe care le folosești.
+   - **Variables:** `CONNECTOR_CLARITY_ENABLED`, `CONNECTOR_SEOMONITOR_ENABLED`, `CONNECTOR_GOOGLE_ENABLED`, `CONNECTOR_PLANABLE_ENABLED`, `CONNECTOR_META_ENABLED`, `REFRESH_ENABLED` = `true` pentru sursele pe care le folosești.
 
    Fără variabile, programarea pornește, dar jobul e sărit. Rularea manuală (Actions → workflow → Run workflow) merge oricând.
 
@@ -26,7 +27,7 @@ Ghiduri pas cu pas pentru agenție (rolul `agency_admin`): de unde obții cheia,
 1. **Obții cheia** de la furnizor (fiecare ghid spune unde).
 2. **Creezi conexiunea:** Administrare → Surse → alegi brandul din bara de sus → „Adaugă conexiune” → sursa și ID-ul contului sau al proiectului.
 3. **Salvezi tokenul** pe cardul conexiunii. Tokenul intră în seiful serverului (Supabase Vault) și **nu se mai poate citi** din aplicație; dacă îl pierzi, generezi unul nou.
-4. **Testezi** cu „Testează conexiunea” (Clarity, SEOmonitor, Planable), altfel rulezi manual workflow-ul sursei.
+4. **Testezi** cu „Testează conexiunea” (Clarity, SEOmonitor, Planable, Meta), altfel rulezi manual workflow-ul sursei.
 5. **Verifici rezultatul** în Administrare → Surse → „Istoricul sincronizărilor”.
 
 ## Ce înseamnă stările

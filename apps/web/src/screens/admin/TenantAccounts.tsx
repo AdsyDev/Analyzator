@@ -13,7 +13,7 @@ const field = 'h-9 rounded-[10px] border border-border-strong bg-surface px-3 te
 
 /**
  * Conturile la nivel de client (un cont pentru toate brandurile clientului): cheia Google pentru GA4 și Search
- * Console, contul SEOmonitor și tokenul Planable. Cheia și tokenul pleacă o singură dată spre funcția server `source-credentials`;
+ * Console, contul SEOmonitor, tokenul Planable și tokenul Meta Ads. Cheia și tokenul pleacă o singură dată spre funcția server `source-credentials`;
  * nu se afișează și nu rămân în interfață.
  */
 export function TenantAccounts({ tenantId, onChanged }: { tenantId: TenantId; onChanged: () => void }) {
@@ -30,6 +30,7 @@ export function TenantAccounts({ tenantId, onChanged }: { tenantId: TenantId; on
           <GoogleKeyCard tenantId={tenantId} connection={conns.find((c) => c.provider === 'google_service_account') ?? null} onChanged={changed} />
           <TokenAccountCard spec={SEOMONITOR} tenantId={tenantId} connection={conns.find((c) => c.provider === 'seomonitor') ?? null} onChanged={changed} />
           <TokenAccountCard spec={PLANABLE} tenantId={tenantId} connection={conns.find((c) => c.provider === 'planable_account') ?? null} onChanged={changed} />
+          <TokenAccountCard spec={META} tenantId={tenantId} connection={conns.find((c) => c.provider === 'meta_account') ?? null} onChanged={changed} />
         </div>
       )}
     </Resolved>
@@ -154,7 +155,7 @@ function GoogleKeyCard({ tenantId, connection, onChanged }: { tenantId: TenantId
 }
 
 interface TokenAccountSpec {
-  provider: 'seomonitor' | 'planable_account'
+  provider: 'seomonitor' | 'planable_account' | 'meta_account'
   aria: string
   title: string
   subtitle: string
@@ -195,7 +196,21 @@ const PLANABLE: TokenAccountSpec = {
   savedNote: 'Token salvat. Testează conexiunea pentru a confirma că funcționează.',
 }
 
-/** Un cont cu token (SEOmonitor, Planable): creare, rotirea tokenului și testul într-un singur apel de citire. */
+const META: TokenAccountSpec = {
+  provider: 'meta_account',
+  aria: 'Contul Meta Ads al clientului',
+  title: 'Meta Ads',
+  subtitle: 'Tokenul unui system user din Business Manager, cu acces de citire la conturile de ads ale clientului.',
+  idLabel: 'Business Manager',
+  idPlaceholder: 'de ex. BM AdSymphony',
+  idPattern: /^.{2,120}$/,
+  idHint: 'O etichetă, ca să recunoști contul.',
+  tokenPlaceholder: 'Token system user (Business Settings → System users, ads_read)',
+  footnote: 'Contul de ads al fiecărui brand (act_…) se adaugă mai jos, pe brand. Ghid: docs/connectors/meta-ads.md.',
+  savedNote: 'Token salvat. Testează conexiunea pentru a confirma că funcționează.',
+}
+
+/** Un cont cu token (SEOmonitor, Planable, Meta): creare, rotirea tokenului și testul într-un singur apel de citire. */
 function TokenAccountCard({ spec, tenantId, connection, onChanged }: { spec: TokenAccountSpec; tenantId: TenantId; connection: TenantConnection | null; onChanged: () => void }) {
   const providers = useProviders()
   const ids = [useId(), useId()] as const

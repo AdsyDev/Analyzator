@@ -74,9 +74,10 @@ export interface NewConnection {
  * Conturi la nivel de client (`source_connections.brand_id` NULL): un cont de furnizor pentru toate brandurile
  * clientului. `google_service_account` = cheia Google pentru GA4 și Search Console (docs/contracts/google.md);
  * `seomonitor` = contul SEOmonitor, cu grupurile mapate pe branduri (docs/contracts/seomonitor.md);
- * `planable_account` = tokenul Planable, cu workspace-ul pe fiecare brand (docs/contracts/planable.md).
+ * `planable_account` = tokenul Planable, cu workspace-ul pe fiecare brand (docs/contracts/planable.md);
+ * `meta_account` = tokenul system user Meta, cu contul de ads pe fiecare brand (docs/contracts/meta-ads.md).
  */
-export const TENANT_PROVIDERS = ['google_service_account', 'seomonitor', 'planable_account'] as const
+export const TENANT_PROVIDERS = ['google_service_account', 'seomonitor', 'planable_account', 'meta_account'] as const
 export type TenantProviderId = (typeof TENANT_PROVIDERS)[number]
 
 export interface TenantConnection {

@@ -42,6 +42,24 @@ select throws_ok($$
           (select v from ctx where k = 'conn'), (select v from ctx where k = 'run'), 1)
 $$, '23514', null, 'J2: un rând nu poate avea ambele proveniențe');
 
+-- J2b. paid_daily (Meta Ads prin API): aceeași regulă, moneda obligatorie ----------------------------
+insert into public.source_connections (tenant_id, brand_id, provider, external_account_id)
+values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', 'meta_ads', 'act_111');
+insert into ctx select 'meta', id from public.source_connections where provider = 'meta_ads' and external_account_id = 'act_111';
+insert into public.sync_runs (tenant_id, brand_id, source_connection_id, source, period_start, period_end, status, rows_written, started_at, finished_at)
+values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', (select v from ctx where k = 'meta'), 'meta_ads',
+        current_date - 35, current_date - 1, 'succeeded', 1, now() - interval '1 minute', now());
+insert into ctx select 'meta_run', id from public.sync_runs where source = 'meta_ads' and brand_id = '20000000-0000-0000-0000-000000000011';
+select lives_ok($$
+  insert into public.paid_daily (tenant_id, brand_id, source, account_id, campaign_id, date, spend, currency, collected_at, collection_method, payload_hash, source_timezone, schema_version, source_id, sync_run_id)
+  values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', 'meta_ads', '111', 'c1', current_date - 2, 12.5, 'RON', now(), 'api', repeat('b', 64), 'Europe/Bucharest', 't',
+          (select v from ctx where k = 'meta'), (select v from ctx where k = 'meta_run'))
+$$, 'J2b: rând Meta Ads prin API');
+select tests.authenticate_as('30000000-0000-0000-0000-000000000001');
+select is((select connected from public.source_status where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'meta_ads'), true,
+  'J2b: Meta Ads e conectat după o rulare API reușită');
+reset role;
+
 -- J3. O rulare API parțială face sursa conectată și se vede ca parțială ---------------------------------
 select tests.authenticate_as('30000000-0000-0000-0000-000000000001');
 select is((select connected from public.source_status where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'planable_analytics'), true,

@@ -31,7 +31,7 @@ function fakeFetch(): HandlerDeps['fetch'] {
     state.calls.push({ url, method, body, headers })
     const ok = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status })
 
-    if (url.startsWith('https://apigw.seomonitor.com/') || url.startsWith('https://api.planable.io/')) {
+    if (url.startsWith('https://apigw.seomonitor.com/') || url.startsWith('https://api.planable.io/') || url.startsWith('https://graph.facebook.com/')) {
       return new Response('[]', { status: state.clarityStatus as number })
     }
     if (url.startsWith('https://www.clarity.ms/')) {
@@ -260,5 +260,16 @@ describe('validate: SEOmonitor și Planable', () => {
   test('Google (service account) nu are test într-un singur apel: 422', async () => {
     state.connection = { ...state.connection, provider: 'google_service_account', brand_id: null }
     assert.equal((await call({ action: 'validate', connection_id: CONN })).status, 422)
+  })
+
+  test('Meta: un 400 de la /me (token expirat, cod 190) înseamnă token refuzat', async () => {
+    state.connection = { ...state.connection, provider: 'meta_account', brand_id: null }
+    state.clarityStatus = 400
+    const r = await call({ action: 'validate', connection_id: CONN })
+    assert.equal(r.body.outcome, 'invalid')
+    assert.match(String(r.body.message), /Meta a refuzat tokenul \(400\).*System users/)
+    const provider = state.calls.find((c) => c.url.startsWith('https://graph.facebook.com/'))!
+    assert.equal(provider.url, 'https://graph.facebook.com/v26.0/me?fields=id')
+    assert.equal(provider.headers.Authorization, `Bearer ${SECRET}`)
   })
 })

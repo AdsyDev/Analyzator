@@ -12,6 +12,7 @@ const TENANT_KEY_NOTE: Record<string, string> = {
   ga4: 'Nu are token propriu: folosește cheia Google din „Conturile clientului”. Service account-ul trebuie să aibă acces la această proprietate.',
   gsc: 'Nu are token propriu: folosește cheia Google din „Conturile clientului”. Service account-ul trebuie să aibă acces la această proprietate.',
   planable: 'Nu are token propriu: folosește tokenul Planable din „Conturile clientului”. Tokenul trebuie să aibă acces la acest workspace.',
+  meta_ads: 'Nu are token propriu: folosește tokenul Meta din „Conturile clientului”. System user-ul trebuie să aibă contul de ads atribuit.',
 }
 const USES_TENANT_KEY: readonly string[] = Object.keys(TENANT_KEY_NOTE)
 

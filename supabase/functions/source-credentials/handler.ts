@@ -25,7 +25,15 @@ export const CLARITY_ENDPOINT = 'https://www.clarity.ms/export-data/api/v1/proje
  * la Clarity e chiar bugetul furnizorului (10 apeluri/zi, comun cu colectarea); la ceilalți e o limită proprie, ca
  * testele repetate să nu consume cota zilnică.
  */
-type Validator = { label: string; limit: number; url: string; headers: (token: string) => Record<string, string>; renew: string }
+type Validator = {
+  label: string
+  limit: number
+  url: string
+  headers: (token: string) => Record<string, string>
+  renew: string
+  /** Coduri HTTP care înseamnă „token refuzat” (implicit 401 și 403; Meta răspunde 400 cu cod 190). */
+  invalidStatuses?: number[]
+}
 export const VALIDATORS: Record<string, Validator> = {
   clarity: {
     label: 'Clarity', limit: 10, url: `${CLARITY_ENDPOINT}?numOfDays=1`,
@@ -35,6 +43,11 @@ export const VALIDATORS: Record<string, Validator> = {
     label: 'SEOmonitor', limit: 20, url: 'https://apigw.seomonitor.com/v3/dashboard/v3.0/campaigns/tracked?limit=1',
     // SEOmonitor: tokenul brut, fără „Bearer” (docs/contracts/seomonitor.md).
     headers: (t) => ({ Authorization: t, Accept: 'application/json' }), renew: 'Generează un token nou din Account Settings → Edit Profile → API Token.',
+  },
+  meta_account: {
+    label: 'Meta', limit: 20, url: 'https://graph.facebook.com/v26.0/me?fields=id',
+    headers: (t) => ({ Authorization: `Bearer ${t}`, Accept: 'application/json' }), renew: 'Generează un token nou pentru system user din Business Settings → System users (permisiunea ads_read).',
+    invalidStatuses: [400, 401, 403],
   },
   planable_account: {
     label: 'Planable', limit: 20, url: 'https://api.planable.io/api/v1/workspaces',
@@ -264,7 +277,7 @@ async function validate(deps: HandlerDeps, userId: string, connectionId: string)
   if (httpStatus !== null && httpStatus >= 200 && httpStatus < 300) {
     outcome = 'valid'
     message = 'Conexiunea funcționează.'
-  } else if (httpStatus === 401 || httpStatus === 403) {
+  } else if (httpStatus !== null && (validator.invalidStatuses ?? [401, 403]).includes(httpStatus)) {
     outcome = 'invalid'
     message = `${validator.label} a refuzat tokenul (${httpStatus}). ${validator.renew}`
   } else if (httpStatus === 429) {

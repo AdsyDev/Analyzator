@@ -21,6 +21,7 @@
     "test:integration": "scripts/test-integration.sh",
     "collect:seomonitor": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/seomonitor/collect.ts",
     "collect:google": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/google/collect.ts",
+    "collect:meta": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/meta/collect.ts",
     "collect:planable": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/planable/collect.ts",
     "docs:csv": "node --experimental-strip-types scripts/generate-csv-docs.ts",
     "send:notifications": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/send-notifications.ts",

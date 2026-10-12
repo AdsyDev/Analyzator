@@ -1,0 +1,74 @@
+# Colectarea săptămânală Meta Ads (Marketing API v26.0): cost, afișări și clickuri pe zi, pentru toate conturile active.
+#
+# Programare: marți la 04:00 UTC = 06:00 ora României vara (EEST), 05:00 iarna (EET); vezi nota DST din docs/runbook.md.
+# Reimportă ultimele 35 de zile (până ieri, în fusul contului de ads).
+#
+# Rularea programată e DEZACTIVATĂ până când variabila CONNECTOR_META_ENABLED = "true"
+# (Settings → Secrets and variables → Actions → Variables). workflow_dispatch funcționează oricând.
+#
+# Secrete în environment-ul GitHub ales (implicit „staging"): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+# Tokenurile Meta NU sunt aici: stau în Supabase Vault și se citesc la rulare prin get_source_token.
+
+name: meta-weekly
+
+on:
+  schedule:
+    - cron: '0 4 * * 2'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment GitHub cu secretele Supabase'
+        type: choice
+        options: [staging]
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: meta-weekly
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: github.event_name == 'workflow_dispatch' || vars.CONNECTOR_META_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dependențe
+        run: npm ci
+
+      - name: Teste conector (fără rețea)
+        run: node --experimental-strip-types --test 'connectors/meta/**/*.test.ts' 'connectors/shared/**/*.test.ts'
+
+      - name: Colectare Meta Ads
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Lipsesc secretele SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY în environment-ul ${{ inputs.environment || 'staging' }}."
+            exit 1
+          fi
+          node --experimental-strip-types connectors/meta/collect.ts | tee collect.log
+
+      - name: Rezumat
+        if: always()
+        run: |
+          {
+            echo "### Meta Ads: $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo
+            echo '```'
+            [ -f collect.log ] && cat collect.log || echo "fără output"
+            echo '```'
+            echo
+            echo "Detalii: sync_runs (source = meta_ads), paid_daily, provider_api_calls."
+          } >> "$GITHUB_STEP_SUMMARY"

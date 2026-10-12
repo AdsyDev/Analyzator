@@ -144,3 +144,12 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 - Verificare: `sync_runs` (`source` = `planable_analytics` / `planable_listening`: `status`, `errors`, `coverage`), `provider_api_calls` (apelul `/workspaces` e pe conexiunea clientului, restul pe conexiunea brandului).
 - Mesaje: `access_denied` la `/workspaces` = token refuzat (marcat `invalid`; token nou din Planable). `workspace_not_found` = ID greșit sau token fără acces la workspace. `parser_note` = câmp invalid sau postare fără metrici; nu schimbă statusul.
 - Planable nu e încă în orchestratorul `weekly-refresh` (rulează pe workflow propriu, la aceeași oră).
+
+## Colectare săptămânală Meta Ads
+
+- Configurare și reguli: `docs/contracts/meta-ads.md`; pași pentru agenție: `docs/connectors/meta-ads.md`.
+- Conexiuni: `meta_account` per client (tokenul system user, din „Conturile clientului”, cu test) și `meta_ads` per brand (`act_…`).
+- Rulare: `.github/workflows/meta-weekly.yml`, marți 04:00 UTC, activ când `CONNECTOR_META_ENABLED = true`; manual din Actions sau `npm run collect:meta`.
+- Verificare: `sync_runs` (`source = meta_ads`), `paid_daily` (`collection_method = api`), `provider_api_calls`.
+- Mesaje: `access_denied` = token refuzat (marcat `invalid`, celelalte conturi ale clientului sărite); `permission_denied` = contul nu e atribuit system user-ului; `rate_limited` = limita de utilizare Meta (retry automat 10 s / 60 s / 5 min).
+- Meta nu e încă în orchestratorul `weekly-refresh` (workflow propriu, la aceeași oră).
