@@ -1,4 +1,4 @@
-import { failed, ready, type ProviderResult, type SourceConnection, type SourcesProvider, type TokenSaved, type ValidationOutcome, type ValidationOutcomeKind } from '../../contracts'
+import { failed, ready, TENANT_PROVIDERS, type CredentialStatus, type ProviderResult, type SourceConnection, type SourcesProvider, type TenantConnection, type TenantProviderId, type TokenSaved, type ValidationOutcome, type ValidationOutcomeKind } from '../../contracts'
 import type { DataClient } from './dataClient'
 import { QUERY_FAILED } from './dataClient'
 import { deriveStatuses, mapConnection, mapSyncRun, SourceContractError, type ConnectionRow, type ImportBatchRow, type SyncRunRow } from './mapSources'
@@ -12,6 +12,30 @@ const OUTCOMES: readonly ValidationOutcomeKind[] = ['valid', 'invalid', 'rate_li
 const CREDENTIALS = ['missing', 'unverified', 'valid', 'invalid']
 
 const utcDay = (d: Date) => d.toISOString().slice(0, 10)
+const TENANT_COLUMNS = 'id, tenant_id, provider, external_account_id, display_name, credential_status, credential_updated_at'
+
+interface TenantConnectionRow {
+  id: string
+  tenant_id: string
+  provider: string
+  external_account_id: string
+  display_name: string | null
+  credential_status: string
+  credential_updated_at: string | null
+}
+
+function mapTenantConnection(r: TenantConnectionRow): TenantConnection {
+  if (!CREDENTIALS.includes(r.credential_status)) throw new SourceContractError(`credential_status necunoscut: ${r.credential_status}`)
+  return {
+    id: r.id,
+    tenant_id: r.tenant_id,
+    provider: r.provider as TenantProviderId,
+    external_account_id: r.external_account_id,
+    display_name: r.display_name,
+    credential_status: r.credential_status as CredentialStatus,
+    credential_updated_at: r.credential_updated_at,
+  }
+}
 
 /** Mesajul în română al funcției server (`{ error }`), dacă răspunsul HTTP îl conține; altfel un mesaj generic. */
 async function functionError(error: unknown): Promise<string> {
@@ -144,6 +168,31 @@ export function createSupabaseSources(client: DataClient, now: () => Date = () =
           outcome: d.outcome as ValidationOutcomeKind,
           message: d.message,
         }
+      }),
+
+    tenantConnections: (tenantId) =>
+      guarded(async () => {
+        const { data, error } = await client.from('source_connections').select(TENANT_COLUMNS).eq('tenant_id', tenantId).is('brand_id', null).eq('status', 'active').order('created_at')
+        if (error) throw new Error(QUERY_FAILED)
+        return ((data ?? []) as unknown as TenantConnectionRow[])
+          .filter((r) => (TENANT_PROVIDERS as readonly string[]).includes(r.provider))
+          .map(mapTenantConnection)
+      }),
+
+    createTenantConnection: (tenantId, input) =>
+      guarded(async () => {
+        if (!(TENANT_PROVIDERS as readonly string[]).includes(input.provider)) throw new Error('Sursă necunoscută.')
+        const { data, error } = await client
+          .from('source_connections')
+          .insert({ tenant_id: tenantId, brand_id: null, provider: input.provider, external_account_id: input.external_account_id, display_name: input.display_name })
+          .select(TENANT_COLUMNS)
+          .single()
+        if (error) {
+          if (error.code === '23505') throw new Error('Există deja o conexiune pentru acest cont.')
+          if (error.code === '42501') throw new Error('Doar administratorii agenției pot adăuga conexiuni.')
+          throw new Error('Conexiunea nu a putut fi creată. Verifică datele și reîncearcă.')
+        }
+        return mapTenantConnection(data as unknown as TenantConnectionRow)
       }),
   }
 }

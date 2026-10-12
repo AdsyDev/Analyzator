@@ -7,6 +7,9 @@ import { formatDateTime } from '../../lib/format'
 import { PROVIDER_LABELS } from '../../lib/sources'
 import { BUDGET_RESET_NOTE, CREDENTIAL_LABELS, OUTCOME_TONE, VALIDATABLE } from './labels'
 
+/** GA4 și Search Console folosesc cheia Google a clientului (Conturile clientului), nu un token pe conexiune. */
+const USES_TENANT_KEY: readonly string[] = ['ga4', 'gsc']
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 /** `credential_updated_by` e un id de utilizator: nu avem nume în schemă, deci afișăm un id scurt, nu un nume presupus. */
 const who = (v: string | null) => (v === null ? null : UUID.test(v) ? `utilizator ${v.slice(0, 8)}` : v)
@@ -78,7 +81,7 @@ export function ConnectionCard({ connection: c, onChanged }: Props) {
             <span className="font-mono text-[12px]">{c.external_account_id}</span>
           </p>
         </div>
-        <StatusChip tone={cred.tone}>{cred.label}</StatusChip>
+        {USES_TENANT_KEY.includes(c.provider) ? <StatusChip tone="neutral">Cheia clientului</StatusChip> : <StatusChip tone={cred.tone}>{cred.label}</StatusChip>}
       </header>
 
       <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-[12px] sm:grid-cols-3">
@@ -100,27 +103,33 @@ export function ConnectionCard({ connection: c, onChanged }: Props) {
         </div>
       </dl>
 
-      <form onSubmit={save} className="flex flex-col gap-2">
-        <label htmlFor={inputId} className="text-[12.5px] font-semibold">
-          {c.credential_status === 'missing' ? 'Setează tokenul' : 'Rotește tokenul'}
-        </label>
-        <div className="flex flex-wrap gap-2">
-          <input
-            id={inputId}
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder="Lipește tokenul"
-            className="h-9 min-w-[16rem] flex-1 rounded-[10px] border border-border-strong bg-surface px-3 font-mono text-[13px]"
-          />
-          <Button type="submit" variant="primary" loading={saving} disabled={token.trim() === ''}>
-            Salvează tokenul
-          </Button>
-        </div>
-        <p className="text-[12px] text-text-3">Tokenul nu se mai afișează după salvare; aplicația primește doar starea lui.</p>
-      </form>
+      {USES_TENANT_KEY.includes(c.provider) ? (
+        <p className="rounded-lg bg-surface-2 px-3 py-2 text-[12.5px] leading-snug text-text-2">
+          Nu are token propriu: folosește cheia Google din „Conturile clientului”. Service account-ul trebuie să aibă acces la această proprietate.
+        </p>
+      ) : (
+        <form onSubmit={save} className="flex flex-col gap-2">
+          <label htmlFor={inputId} className="text-[12.5px] font-semibold">
+            {c.credential_status === 'missing' ? 'Setează tokenul' : 'Rotește tokenul'}
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <input
+              id={inputId}
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="Lipește tokenul"
+              className="h-9 min-w-[16rem] flex-1 rounded-[10px] border border-border-strong bg-surface px-3 font-mono text-[13px]"
+            />
+            <Button type="submit" variant="primary" loading={saving} disabled={token.trim() === ''}>
+              Salvează tokenul
+            </Button>
+          </div>
+          <p className="text-[12px] text-text-3">Tokenul nu se mai afișează după salvare; aplicația primește doar starea lui.</p>
+        </form>
+      )}
 
       {canValidate ? (
         <div className="flex flex-col gap-2">

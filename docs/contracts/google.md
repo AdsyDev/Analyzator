@@ -17,7 +17,7 @@ Fixtures: `tests/fixtures/google/docs-derived/` (**derivate din documentație, n
 | `gsc` | brandul | `site_url`: `https://…/` sau `sc-domain:…` | nu | (ignorat: GSC e în PT) |
 
 - Service account-ul trebuie adăugat ca utilizator cu drept de citire pe proprietatea GA4 și pe proprietatea Search Console.
-- JSON-ul se setează cu `npm run set-source-token` (conexiunea `google_service_account`), nu din fișiere sau din mediu.
+- JSON-ul se setează din Administrare → Surse → „Conturile clientului” (fișierul e verificat în browser și trimis o singură dată funcției `source-credentials`) sau cu `npm run set-source-token` (conexiunea `google_service_account`); niciodată din fișiere sau din mediul workerului.
 - **Fără credential** (conexiune lipsă, `missing` sau `invalid`): conexiunile `ga4`/`gsc` ale tenantului raportează `not_connected`, fără excepție, fără `sync_run`, fără cereri.
 - Un `403` pe o proprietate înseamnă „service account-ul nu are acces la proprietatea asta”; credentialul tenantului nu se marchează invalid.
 

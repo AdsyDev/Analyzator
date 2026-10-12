@@ -9,8 +9,8 @@ Ultimele 35 de zile se reimportă la fiecare rulare.
 **Timp:** ~30 de minute prima dată per client (contul tehnic Google), apoi ~5 minute per brand.
 
 **Ce se face unde:**
-- contul tehnic se creează în Google Cloud și se salvează din **SQL** și **terminal**;
-- proprietățile GA4 și Search Console se adaugă **din aplicație**;
+- contul tehnic se creează în Google Cloud;
+- cheia și proprietățile GA4 și Search Console se pun **din aplicație** (Administrare → Surse);
 - testul înseamnă o **rulare manuală**.
 
 ## Cum funcționează accesul
@@ -39,29 +39,14 @@ Analyzator nu se loghează cu contul tău Google. Folosește un **service accoun
 - **GA4:** Admin → Property → **Property access management** → „+” → Add users → adresa service account-ului → rol **Viewer** → fără notificare pe email → Add.
 - **Search Console:** proprietatea site-ului → Settings → **Users and permissions** → Add user → adresa service account-ului → permisiune **Restricted** → Add.
 
-## 3. Salvează cheia în Analyzator (SQL + terminal, o dată per client)
+## 3. Încarcă cheia în Analyzator (o dată per client)
 
-Afli ID-ul clientului:
+1. Administrare → **Surse** (cu oricare brand al clientului ales sus) → secțiunea **„Conturile clientului”** → cardul **Google (GA4 și Search Console)**.
+2. **Încarcă cheia JSON** → alege fișierul descărcat la pasul 1. Aplicația verifică fișierul în browser și îți arată adresa service account-ului; un fișier greșit (de ex. un „OAuth client”) e refuzat cu explicație.
+3. **Salvează cheia.** Starea devine „Token salvat, netestat”, iar adresa service account-ului apare pe card, cu butonul „Copiază adresa” (îți trebuie la pasul 2, dacă nu l-ai făcut).
+4. **Șterge fișierul `.json`** de pe calculator.
 
-```sql
-select id, slug, name from public.tenants order by name;
-```
-
-Creezi conexiunea pentru cheie (fără brand; eticheta = adresa service account-ului):
-
-```sql
-insert into public.source_connections (tenant_id, brand_id, provider, external_account_id, display_name)
-values ('<tenant_id>', null, 'google_service_account', '<adresa-service-account>', 'Google service account')
-returning id;
-```
-
-Salvezi conținutul JSON-ului ca token. Comanda cere parola ta de Analyzator pe prima linie și conținutul JSON pe a doua; `jq -c` pune JSON-ul pe o singură linie:
-
-```bash
-{ printf 'Parola Analyzator: ' >&2; read -rs P; echo >&2; printf '%s\n%s\n' "$P" "$(jq -c . <cale-către-cheie.json>)"; } | npm run set-source-token -- --connection <id-conexiune> --email <emailul-tău-de-admin>
-```
-
-După mesajul de confirmare, **șterge fișierul `.json`** de pe calculator.
+Cheia nu se mai poate citi din aplicație. Pentru o cheie nouă (rotire), încarci alt fișier pe același card.
 
 ## 4. Adaugă proprietățile (din aplicație, per brand)
 
@@ -72,7 +57,7 @@ Alege brandul din bara de sus → Administrare → **Surse** → „Adaugă cone
 | Google Analytics 4 | **Property ID** (doar cifre, de ex. `412345678`) | GA4 → Admin → Property → Property details. **Nu** e Measurement ID-ul `G-…`. |
 | Search Console | **Exact** cum apare proprietatea | Domain property: `sc-domain:exemplu.ro`. URL prefix: `https://www.exemplu.ro/` (cu `/` la final). |
 
-**La GA4 și Search Console nu pune token** pe card: ele folosesc cheia de la pasul 3. Cardul va arăta „Token neconfigurat”; e normal pentru aceste două surse.
+La GA4 și Search Console **nu există token pe card**: ele folosesc cheia clientului de la pasul 3 (eticheta „Cheia clientului”).
 
 Fusul orar al conexiunii GA4 e implicit `Europe/Bucharest`. Dacă proprietatea GA4 e în alt fus, rularea semnalează `timezone_mismatch`; cere echipei tehnice să corecteze fusul conexiunii.
 
@@ -88,7 +73,7 @@ Colectarea automată rulează **marțea la 04:00 UTC**, după ce `CONNECTOR_GOOG
 
 | Simptom | Cauză probabilă | Soluție |
 |---|---|---|
-| Rularea spune `not_connected`, fără date | Lipsește cheia clientului sau a fost refuzată | Pasul 3. |
+| Rularea spune `not_connected`, fără date | Lipsește cheia clientului sau a fost refuzată | Pasul 3 (cardul Google din „Conturile clientului”). |
 | `access_denied` pe un brand | Service account-ul nu are acces la proprietatea acelui brand | Pasul 2 pentru acea proprietate. Cheia rămâne validă pentru celelalte branduri. |
 | GA4 nu găsește proprietatea | S-a pus Measurement ID (`G-…`) în loc de Property ID | Conexiune nouă cu Property ID-ul numeric. |
 | Search Console nu găsește site-ul | `site_url` nu e exact ca în Search Console | `sc-domain:` pentru domain property; URL complet cu `/` pentru URL prefix. |

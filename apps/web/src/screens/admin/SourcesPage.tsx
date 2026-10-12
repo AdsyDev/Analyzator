@@ -15,6 +15,7 @@ import { Section } from '../shared/Section'
 import { AddConnection, CONNECTABLE } from './AddConnection'
 import { ConnectionCard } from './ConnectionCard'
 import { SYNC_LABELS } from './labels'
+import { TenantAccounts } from './TenantAccounts'
 
 const duration = (r: SyncRun): string => {
   if (!r.finished_at) return '—'
@@ -89,6 +90,10 @@ function SourcesContent({ brand }: { brand: Brand }) {
             </div>
           )}
         </Resolved>
+      </Section>
+
+      <Section id="tenant-accounts" title="Conturile clientului" description="Conturi folosite de toate brandurile clientului: cheia Google (GA4 și Search Console) și SEOmonitor.">
+        <TenantAccounts tenantId={brand.tenant_id} onChanged={refresh} />
       </Section>
 
       <Section id="connections" title="Conexiuni și credențiale" description="Un token per conexiune. Se salvează în seiful serverului și nu mai poate fi citit din aplicație.">

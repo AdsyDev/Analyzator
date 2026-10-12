@@ -1,4 +1,4 @@
-import type { BrandId, IsoDate, IsoDateTime } from './common'
+import type { BrandId, IsoDate, IsoDateTime, TenantId } from './common'
 
 export const SOURCE_PROVIDERS = [
   'seomonitor',
@@ -66,6 +66,30 @@ export interface SyncRun {
 /** Conexiune nouă (agency_admin). Tokenul se setează separat, prin funcția server. */
 export interface NewConnection {
   provider: SourceProviderId
+  external_account_id: string
+  display_name: string | null
+}
+
+/**
+ * Conturi la nivel de client (`source_connections.brand_id` NULL): un cont de furnizor pentru toate brandurile
+ * clientului. `google_service_account` = cheia Google pentru GA4 și Search Console (docs/contracts/google.md);
+ * `seomonitor` = contul SEOmonitor, cu grupurile mapate pe branduri (docs/contracts/seomonitor.md).
+ */
+export const TENANT_PROVIDERS = ['google_service_account', 'seomonitor'] as const
+export type TenantProviderId = (typeof TENANT_PROVIDERS)[number]
+
+export interface TenantConnection {
+  id: string
+  tenant_id: TenantId
+  provider: TenantProviderId
+  external_account_id: string
+  display_name: string | null
+  credential_status: CredentialStatus
+  credential_updated_at: IsoDateTime | null
+}
+
+export interface NewTenantConnection {
+  provider: TenantProviderId
   external_account_id: string
   display_name: string | null
 }

@@ -21,6 +21,7 @@ import {
   type Role,
   type SessionUser,
   type SourceConnection,
+  type TenantConnection,
   type SourceProviderId,
   type SourceState,
   type SourceStatusInfo,
@@ -257,6 +258,10 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
   const createdConnections: SourceConnection[] = []
   const connectionPatch = new Map<string, Partial<SourceConnection>>()
 
+  // Conturile la nivel de client (previzualizare): SEOmonitor configurat, cheia Google încă lipsă.
+  const tenantConnectionsMem: TenantConnection[] = [
+    { id: '00000000-0000-4000-9000-000000000001', tenant_id: brandsFile.tenant_id, provider: 'seomonitor', external_account_id: '4821', display_name: 'SEOmonitor STADA', credential_status: 'valid', credential_updated_at: instantDaysAgo(20) },
+  ]
   const sources: SourcesProvider = {
     statuses: async (brandId) => {
       const denied = guard<never>(brandId)
@@ -356,6 +361,24 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
       }
       connectionPatch.set(connectionId, { ...patch, credential_status: 'valid', calls_today: used + 1, last_validated_at: now().toISOString(), last_validation_error: null })
       return ready({ connection_id: connectionId, credential_status: 'valid' as CredentialStatus, calls_today: used + 1, daily_limit: 10, outcome: 'valid' as const, message: 'Conexiunea funcționează.' })
+    },
+    tenantConnections: async (tenantId) => {
+      if (!isAgencyRole(getRole())) return failed('Conexiunile și credențialele sunt vizibile doar echipei AdSymphony.')
+      return ready(
+        tenantConnectionsMem
+          .filter((c) => c.tenant_id === tenantId)
+          .map((c) => {
+            const patch = connectionPatch.get(c.id)
+            return patch?.credential_status ? { ...c, credential_status: patch.credential_status as CredentialStatus, credential_updated_at: now().toISOString() } : { ...c }
+          }),
+      )
+    },
+    createTenantConnection: async (tenantId, input) => {
+      if (getRole() !== 'agency_admin') return failed('Doar administratorii agenției pot adăuga conexiuni.')
+      if (tenantConnectionsMem.some((c) => c.tenant_id === tenantId && c.provider === input.provider && c.external_account_id === input.external_account_id)) return failed('Există deja o conexiune pentru acest cont.')
+      const conn: TenantConnection = { id: `00000000-0000-4000-9000-${String(100000000000 + tenantConnectionsMem.length).slice(-12)}`, tenant_id: tenantId, provider: input.provider, external_account_id: input.external_account_id, display_name: input.display_name, credential_status: 'missing', credential_updated_at: null }
+      tenantConnectionsMem.push(conn)
+      return ready({ ...conn })
     },
   }
 

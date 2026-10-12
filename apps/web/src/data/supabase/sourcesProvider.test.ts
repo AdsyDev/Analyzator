@@ -152,3 +152,33 @@ describe('sources.createConnection (supabase)', () => {
     expect(await createSupabaseSources(dup.client, NOW).createConnection(BRAND, { provider: 'clarity', external_account_id: 'p9', display_name: null })).toEqual({ kind: 'error', message: 'Există deja o conexiune pentru acest cont.' })
   })
 })
+
+describe('conturile la nivel de client', () => {
+  const tenantRow = (o: Record<string, unknown> = {}) => ({ id: 'tc-1', tenant_id: 't-1', brand_id: null, provider: 'google_service_account', external_account_id: 'sa@p.iam.gserviceaccount.com', display_name: null, credential_status: 'unverified', credential_updated_at: null, status: 'active', ...o })
+
+  it('citește doar conexiunile fără brand ale tenantului, pentru furnizorii de client', async () => {
+    const { client, calls } = fakeDataClient({
+      tables: {
+        source_connections: [
+          tenantRow(),
+          tenantRow({ id: 'tc-2', provider: 'seomonitor', external_account_id: '4821' }),
+          tenantRow({ id: 'tc-3', brand_id: BRAND, provider: 'clarity' }),
+          tenantRow({ id: 'tc-4', tenant_id: 't-2' }),
+          tenantRow({ id: 'tc-5', provider: 'altceva' }),
+        ],
+      },
+    })
+    const r = await createSupabaseSources(client, NOW).tenantConnections('t-1')
+    expect(r.kind === 'ready' && r.data.map((c) => c.id)).toEqual(['tc-1', 'tc-2'])
+    expect(calls[0]?.filters).toEqual(expect.arrayContaining([['tenant_id', 'eq', 't-1'], ['brand_id', 'is', null]]))
+  })
+
+  it('creează conexiunea fără brand; refuză furnizorii care nu sunt la nivel de client', async () => {
+    const { client, calls } = fakeDataClient()
+    const p = createSupabaseSources(client, NOW)
+    const r = await p.createTenantConnection('t-1', { provider: 'seomonitor', external_account_id: '4821', display_name: 'SEOmonitor' })
+    expect(r.kind).toBe('ready')
+    expect(calls.find((c) => c.op === 'insert')?.payload).toEqual({ tenant_id: 't-1', brand_id: null, provider: 'seomonitor', external_account_id: '4821', display_name: 'SEOmonitor' })
+    expect((await p.createTenantConnection('t-1', { provider: 'clarity' as never, external_account_id: 'x', display_name: null })).kind).toBe('error')
+  })
+})

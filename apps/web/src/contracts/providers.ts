@@ -1,7 +1,7 @@
 import type { AiAnswerDetail, AiAnswerSummary, AiCitedSource, AiEngineStat, AiEngineTrend, AiFilters, AiTopicMatrix } from './ai'
 import type { Brand, CompetitorSet } from './brand'
 import type { CompetitionGap, CompetitionMatrix } from './competition'
-import type { BrandId, ProviderResult } from './common'
+import type { BrandId, ProviderResult, TenantId } from './common'
 import type { Insight } from './insight'
 import type { Mention, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnapshot, SentimentDistribution } from './mention'
 import type { Evidence, EvidenceQuery, MetricDefinition, MetricsBundle, TrendSeries } from './metric'
@@ -10,7 +10,7 @@ import type { PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from '
 import type { ContentGap, LandingPage, SearchFilters, SearchKeyword } from './search'
 import type { SocialCalendarItem, SocialCompetitor, SocialFilters, SocialGroups, SocialPost, SocialSummary } from './social'
 import type { ClientsProvider, ConfigProvider, UsersProvider } from './admin'
-import type { NewConnection, SourceConnection, SourceStatusInfo, SyncRun, TokenSaved, ValidationOutcome } from './source'
+import type { NewConnection, NewTenantConnection, SourceConnection, SourceStatusInfo, SyncRun, TenantConnection, TokenSaved, ValidationOutcome } from './source'
 import type { AiReferrals, ClarityDevices, Device, TrackingQuality, TrafficChannels } from './traffic'
 
 /**
@@ -55,6 +55,10 @@ export interface SourcesProvider {
   setToken(connectionId: string, token: string): Promise<ProviderResult<TokenSaved>>
   /** Funcția server `source-credentials`, `validate`. Consumă 1 din bugetul zilnic de apeluri. */
   validate(connectionId: string): Promise<ProviderResult<ValidationOutcome>>
+  /** Conturile la nivel de client (Google, SEOmonitor); doar agenția (RLS). */
+  tenantConnections(tenantId: TenantId): Promise<ProviderResult<TenantConnection[]>>
+  /** Doar `agency_admin` (RLS). Tokenul se setează apoi cu `setToken`. */
+  createTenantConnection(tenantId: TenantId, input: NewTenantConnection): Promise<ProviderResult<TenantConnection>>
 }
 
 export interface BrandsProvider {

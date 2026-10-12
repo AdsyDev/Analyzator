@@ -4,8 +4,11 @@ import { Button } from '../../components/ui/Button'
 import { useProviders } from '../../data/DataProvidersContext'
 import { PROVIDER_LABELS } from '../../lib/sources'
 
-/** Sursele cu conexiune prin cont; Import CSV nu are conexiune, ci fișiere. */
-export const CONNECTABLE: readonly SourceProviderId[] = ['seomonitor', 'ga4', 'gsc', 'clarity', 'planable']
+/**
+ * Sursele cu conexiune pe brand; Import CSV nu are conexiune, ci fișiere. SEOmonitor și cheia Google sunt la nivel
+ * de client (Conturile clientului), nu pe brand.
+ */
+export const CONNECTABLE: readonly SourceProviderId[] = ['ga4', 'gsc', 'clarity', 'planable']
 
 interface Props {
   brandId: string

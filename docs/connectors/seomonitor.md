@@ -5,12 +5,11 @@
 **Timp:** ~20 de minute per client, plus maparea grupurilor.
 
 **Ce se face unde:**
-- tokenul se obține din SEOmonitor;
-- conexiunea și maparea grupurilor se fac din **SQL**;
-- tokenul se salvează din **terminal**;
+- tokenul se obține din SEOmonitor și se pune **din aplicație** (Administrare → Surse → „Conturile clientului”);
+- maparea grupurilor pe branduri se face deocamdată din **SQL**;
 - testul înseamnă o **rulare manuală** (nu există buton de test).
 
-**De ce e diferit de Clarity:** un cont SEOmonitor acoperă **toate brandurile unui client**. Brandurile se despart prin grupurile de keywords din SEOmonitor, de aceea conexiunea e la nivel de client, nu de brand, și nu apare pe pagina Surse a unui brand.
+**De ce e diferit de Clarity:** un cont SEOmonitor acoperă **toate brandurile unui client**. Brandurile se despart prin grupurile de keywords din SEOmonitor, de aceea conexiunea e la nivel de client, nu de brand: apare în Surse, la „Conturile clientului”, pentru oricare brand al clientului.
 
 ## 1. Obține tokenul și ID-ul companiei
 
@@ -18,33 +17,22 @@
 2. **ID-ul companiei** (`company_id`): îl afli de la SEOmonitor sau din contul tău. Analyzator îl folosește doar ca etichetă a conexiunii (unică per client); colectarea vede toate campaniile la care are acces tokenul.
 3. Notează, pentru fiecare campanie a clientului, **ID-ul campaniei** și **grupurile de keywords** (ID-ul fiecărui grup). Le găsești în Rank Tracker → grupuri. Echipa tehnică le poate lista și prin API, la cerere.
 
-## 2. Creează conexiunea (SQL)
+## 2. Conectează contul (din aplicație)
 
-Afli ID-ul clientului:
+1. Administrare → **Surse** (cu oricare brand al clientului ales sus) → **„Conturile clientului”** → cardul **SEOmonitor**.
+2. Completează **ID-ul companiei** și **tokenul**, apoi **Salvează**. Tokenul nu se mai afișează după salvare.
+3. Pentru un token nou (rotire): același card → „Rotește tokenul”.
 
-```sql
-select id, slug, name from public.tenants order by name;
-```
-
-Creezi conexiunea (fără brand):
+Pentru maparea de la pasul 3 îți trebuie ID-ul clientului și ID-ul conexiunii:
 
 ```sql
-insert into public.source_connections (tenant_id, brand_id, provider, external_account_id, display_name)
-values ('<tenant_id>', null, 'seomonitor', '<company_id>', 'SEOmonitor <client>')
-returning id;
+select t.id as tenant_id, t.name, c.id as id_conexiune
+from public.tenants t
+join public.source_connections c on c.tenant_id = t.id and c.provider = 'seomonitor' and c.brand_id is null
+order by t.name;
 ```
 
-Păstrează `id`-ul întors: e ID-ul conexiunii.
-
-## 3. Salvează tokenul (terminal)
-
-```bash
-npm run set-source-token -- --connection <id-conexiune> --email <emailul-tău-de-admin>
-```
-
-Comanda îți cere parola contului din Analyzator și apoi tokenul. Ce tastezi nu apare pe ecran.
-
-## 4. Mapează grupurile pe branduri (SQL)
+## 3. Mapează grupurile pe branduri (SQL)
 
 Fără mapare **nu se atribuie nimic** niciunui brand. Fiecare grup SEOmonitor primește un tip:
 
@@ -77,7 +65,7 @@ values
 
 Maparea curentă apare în Administrare → **Configurare** → „Grupuri SEOmonitor → brand”.
 
-## 5. Testează: rulare manuală
+## 4. Testează: rulare manuală
 
 GitHub → Actions → **seomonitor-weekly** → Run workflow. Durează câteva minute.
 
@@ -98,9 +86,9 @@ Până la confirmare, visibility apare ca „draft”, nu ca cifră finală. Tri
 
 | Simptom | Cauză probabilă | Soluție |
 |---|---|---|
-| Nicio rulare pe brand | Grupurile nu sunt mapate pe brand | Pasul 4. |
-| `access_denied` (401/403), rularea se oprește | Token invalid sau revocat; tokenul e marcat refuzat | Token nou din Edit Profile → API Token, apoi pasul 3. |
+| Nicio rulare pe brand | Grupurile nu sunt mapate pe brand | Pasul 3. |
+| `access_denied` (401/403), rularea se oprește | Token invalid sau revocat; tokenul e marcat refuzat | Token nou din Edit Profile → API Token, apoi „Rotește tokenul” (pasul 2). |
 | `mapped_group_missing`, rulare „Parțial” | Grupul a fost șters sau mutat în SEOmonitor | Mapare nouă (versiune nouă) pentru grupul corect. |
 | `campaign_not_found` | Campania nu mai e urmărită în SEOmonitor | Verifică Tracked Campaigns. |
-| Grup în coada de verificare | Grup nou, nemapat, sau `multi_brand` | Mapează-l (pasul 4). |
+| Grup în coada de verificare | Grup nou, nemapat, sau `multi_brand` | Mapează-l (pasul 3). |
 | 429 | Limita SEOmonitor (10 cereri/secundă, 10.000/zi) | Rularea reîncearcă singură după 1, 5, 15 minute. |

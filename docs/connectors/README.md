@@ -5,8 +5,8 @@ Ghiduri pas cu pas pentru agenție (rolul `agency_admin`): de unde obții cheia,
 | Sursă | Ghid | Ce date aduce | Cât de simplu e azi |
 |---|---|---|---|
 | Microsoft Clarity | [clarity.md](clarity.md) | comportament pe site (sesiuni, rage clicks, scroll) | Complet din aplicație, cu buton de test |
-| SEOmonitor | [seomonitor.md](seomonitor.md) | rankuri, visibility, AI Search, AI Overview | Conexiunea și maparea grupurilor se fac din SQL; tokenul din terminal |
-| Google Analytics 4 și Search Console | [google.md](google.md) | sesiuni, key events, clicks și impresii din căutare | Cheia Google se pune din SQL și terminal; proprietățile se adaugă din aplicație |
+| SEOmonitor | [seomonitor.md](seomonitor.md) | rankuri, visibility, AI Search, AI Overview | Contul din aplicație; maparea grupurilor pe branduri încă din SQL |
+| Google Analytics 4 și Search Console | [google.md](google.md) | sesiuni, key events, clicks și impresii din căutare | Din aplicație: cheia clientului (fișier JSON) și proprietățile pe brand |
 | Google Ads, Meta Ads, TikTok Ads, Planable | [csv.md](csv.md) | cost, clicks, conversii; social și listening | Import de fișier CSV; încă fără ecran de încărcare |
 
 ## Înainte de prima sursă (o singură dată)
