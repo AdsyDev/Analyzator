@@ -134,8 +134,20 @@ describe('parseMetricsEnvelope', () => {
 
   it('o unitate din afara registrului încalcă contractul', () => {
     const p = payload()
-    ;(p.data[0] as { unit: string }).unit = 'currency'
+    ;(p.data[0] as { unit: string }).unit = 'euro'
     expect(() => parseMetricsEnvelope(p, defs)).toThrow(/unit/)
+  })
+
+  it('contract v2: o sumă cere moneda; moneda apare doar la unitatea currency', () => {
+    const money = payload()
+    Object.assign(money.data[0] as object, { unit: 'currency', value: 70, currency: 'RON' })
+    expect(parseMetricsEnvelope(money, defs).items[0]).toMatchObject({ unit: 'currency', currency: 'RON' })
+    const missing = payload()
+    Object.assign(missing.data[0] as object, { unit: 'currency', value: 70, currency: null })
+    expect(() => parseMetricsEnvelope(missing, defs)).toThrow(/currency lipsește/)
+    const stray = payload()
+    Object.assign(stray.data[0] as object, { currency: 'RON' })
+    expect(() => parseMetricsEnvelope(stray, defs)).toThrow(/trebuie să fie null/)
   })
 
   it('coverage ca procent (0-100) în loc de fracție încalcă contractul', () => {

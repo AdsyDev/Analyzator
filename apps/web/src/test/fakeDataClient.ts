@@ -15,6 +15,8 @@ interface Opts {
   /** Utilizatorul sesiunii (pentru `auth.getSession`). */
   userId?: string | null
   invoke?: (name: string, body: unknown) => { data?: unknown; error?: unknown } | Promise<{ data?: unknown; error?: unknown }>
+  /** Răspuns pentru `rpc`; fără handler, eroare. */
+  rpc?: (fn: string, args: unknown) => { data?: unknown; error?: unknown } | Promise<{ data?: unknown; error?: unknown }>
 }
 
 /**
@@ -24,6 +26,7 @@ interface Opts {
 export function fakeDataClient(opts: Opts = {}) {
   const calls: Call[] = []
   const invocations: Array<{ name: string; body: unknown }> = []
+  const rpcs: Array<{ fn: string; args: unknown }> = []
   const tables = opts.tables ?? {}
 
   function builder(table: string) {
@@ -88,6 +91,11 @@ export function fakeDataClient(opts: Opts = {}) {
   const client = {
     auth: { getSession: async () => ({ data: { session: opts.userId === null ? null : { user: { id: opts.userId ?? 'me' } } } }) },
     from: (table: string) => builder(table),
+    rpc: async (fn: string, args: unknown) => {
+      rpcs.push({ fn, args })
+      const r = (await opts.rpc?.(fn, args)) ?? { error: { message: 'no rpc handler' } }
+      return { data: r.data ?? null, error: r.error ?? null }
+    },
     functions: {
       invoke: async (name: string, init: { body: unknown }) => {
         invocations.push({ name, body: init.body })
@@ -96,5 +104,5 @@ export function fakeDataClient(opts: Opts = {}) {
     },
   } as unknown as DataClient
 
-  return { client, calls, invocations }
+  return { client, calls, invocations, rpcs }
 }

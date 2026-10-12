@@ -98,7 +98,7 @@ export function metricView(m: MetricItem): MetricView {
   const caveatStatuses: MetricStatus[] = ['partial', 'stale', 'insufficient_sample', 'base_zero']
   return {
     hasValue: true,
-    valueText: formatMetricValue(m.value, m.unit),
+    valueText: formatMetricValue(m.value, m.unit, m.currency),
     deltaText,
     deltaDirection,
     caveat: caveatStatuses.includes(m.status) ? reasonFor(m) : null,

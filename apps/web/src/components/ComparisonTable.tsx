@@ -190,7 +190,7 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
                                   <span className="sr-only">Cea mai bună valoare:</span>
                                 </>
                               )}
-                              {formatMetricValue(shown.value, shown.unit)}
+                              {formatMetricValue(shown.value, shown.unit, 'currency' in shown && typeof shown.currency === 'string' ? shown.currency : null)}
                               {shown.status !== 'ok' && <CoverageBadge state={coverageStateFor(shown.status)} pct={coveragePercent(shown.coverage)} />}
                             </span>
                           ) : (

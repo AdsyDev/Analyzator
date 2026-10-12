@@ -23,6 +23,7 @@ import { createSupabaseConfig, createSupabaseUsers } from './adminProviders'
 import { createSupabaseBrands } from './brandsProvider'
 import { createSupabaseSources } from './sourcesProvider'
 import { createSupabaseClients } from './clientsProvider'
+import { createSupabaseMetrics } from './metricsProvider'
 import { comparisonRange } from '../../lib/period'
 
 const NO_SOURCE = 'Sursa nu este conectată pentru acest brand. Nu afișăm valori estimate până la conectare.'
@@ -34,6 +35,7 @@ export function notConnectedMetric(ctx: QueryContext, metricKey: string): Metric
     metric_key: metricKey,
     value: null,
     unit: 'count',
+    currency: null,
     numerator: null,
     denominator: null,
     comparison_value: null,
@@ -184,7 +186,7 @@ export function createSupabaseProviders(deps?: SupabaseProvidersDeps): DataProvi
   const now = deps?.now
   return {
     kind: 'supabase',
-    metrics,
+    metrics: deps ? createSupabaseMetrics(deps.client) : metrics,
     insights,
     mentions,
     sources: deps ? createSupabaseSources(deps.client, now) : sources,

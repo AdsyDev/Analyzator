@@ -2,6 +2,8 @@
 
 **Versiunea 2** (8 oct 2026). Adaugă unitatea `currency` și câmpul `currency`. Istoric: v1 (7 oct 2026) avea unitățile `count`, `percent`, `seconds`, `position`, `score` și nu avea câmpul `currency`. Vezi „Istoricul versiunilor”.
 
+Acces din aplicație: RPC `public.brand_metrics(p_brand_id, p_metric_keys, p_start, p_end, p_kind, p_device)` întoarce exact acest răspuns; `public.brand_metric_trends(…)` întoarce seriile zilnice `[{ metric_key, label, unit, status, points: [{ date, value }] }]` (decizia D-11, excepția E8).
+
 Sursa de adevăr: `docs/product/spec.md` cap. 26, cu deciziile din 7 oct 2026 (B2). Implementare: `metrics.compute` și `metrics.build_response` (migrația `20261007140000_metric_registry.sql`). Tipul TypeScript: `analytics/contracts/metric-response.ts`. Un test compară lista de câmpuri de mai jos cu tipul TS, iar testul pgTAP `06_metric_registry` o compară cu ieșirea SQL.
 
 Un răspuns are forma `{ data, meta }`. `data` e o listă de metrici; fiecare are `metric_key` plus câmpurile de mai jos.

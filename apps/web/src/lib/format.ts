@@ -23,9 +23,12 @@ export function formatCompact(v: number): string {
 }
 
 /** Formatează o valoare deja calculată. Nu aplică nicio formulă; `null` nu devine niciodată „0". */
-export function formatMetricValue(value: number | null, unit: MetricUnit): string | null {
+export function formatMetricValue(value: number | null, unit: MetricUnit, currency: string | null = null): string | null {
   if (value === null) return null
   switch (unit) {
+    case 'currency':
+      // Moneda vine cu valoarea (contract v2); fără monedă, suma nu se afișează ca bani.
+      return currency ? formatCurrency(value, currency, 2) : ONE.format(value)
     case 'percent':
       return `${ONE.format(value)}${NBSP}%`
     case 'seconds':

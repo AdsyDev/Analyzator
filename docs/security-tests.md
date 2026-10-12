@@ -113,6 +113,15 @@ Funcție `SECURITY DEFINER` în `public`, executabilă **doar de service_role** 
 
 Întoarcerea de la Google / TikTok nu are JWT, deci `verify_jwt = false`. Compensări: pornirea verifică sesiunea și rolul `agency_admin` în handler; `state` aleatoriu de 32 de octeți, păstrat doar ca hash, legat de client, furnizor și utilizator, valabil 10 minute și revendicat atomic o singură dată; PKCE la Google; rolul se reverifică la întoarcere; răspunsul e doar un redirect fix spre `APP_BASE_URL`, fără token. `oauth_states` nu e accesibil lui `authenticated` sau `anon` (K1). Teste: `supabase/functions/oauth/handler.test.ts`.
 
+### E8. Poarta de metrici pentru ecranele de brand (aprobată 12 oct 2026)
+
+Migrația `20261012180000_brand_metrics_rpc.sql`, decizia D-11.
+
+- `public.brand_metrics` și `public.brand_metric_trends`: executabile de `authenticated`, **SECURITY INVOKER**. Verifică în corp `has_brand_access`; brand străin, brand inexistent și lipsa sesiunii dau **același** răspuns (42501). Datele vin din view-urile de observații prin RLS-ul apelantului; UI-ul trimite doar chei, perioadă și brand, iar formulele rămân în `metrics` (regula 4).
+- `private.compute_metric_snapshot` și `private.metric_observations`: executabile de `authenticated`, tot SECURITY INVOKER (citesc prin RLS). `metric_observations` acceptă doar view-urile din allowlist.
+- `private.brand_source_connected` și `private.brand_source_query_ok`: SECURITY DEFINER, întorc **doar boolean** și răspund `false` fără acces la brand (fără oracol). Sunt necesare pentru că `source_connections` și `sync_runs` sunt vizibile prin RLS doar agenției, iar un client trebuie totuși să vadă metricile brandului său.
+- Garda A10/A11 le listează explicit și verifică faptul că sunt INVOKER. Teste: `15_brand_metrics.test.sql` (L1–L4: valori calculate în SQL, clientul vede aceleași cifre ca agenția, refuzuri identice, serii cu null pe zilele fără date).
+
 ## Inventar la 7 oct 2026
 
 | Tip | Ce există | Acoperit de |

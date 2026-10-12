@@ -104,7 +104,7 @@ select is_empty(
 -- O funcție nouă în public trebuie adăugată explicit în lista de mai jos, după revizuire.
 create temporary table allowed_public_functions (name text primary key) on commit drop;
 insert into allowed_public_functions values
-  ('create_competitor_set_version'), ('get_source_token'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token');
+  ('brand_metric_trends'), ('brand_metrics'), ('create_competitor_set_version'), ('get_source_token'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token');
 
 select is_empty(
   $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -127,7 +127,7 @@ select is_empty(
 select results_eq(
   $$ select p.proname::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and has_function_privilege('service_role', p.oid, 'execute') order by 1 $$,
-  $$ values ('create_competitor_set_version'::text collate "C"), ('get_source_token'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token') $$,
+  $$ values ('brand_metric_trends'::text collate "C"), ('brand_metrics'), ('create_competitor_set_version'), ('get_source_token'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token') $$,
   'A10: funcțiile aprobate sunt executabile de service_role'
 );
 select is_empty(
@@ -158,14 +158,21 @@ select is_empty(
      where n.nspname = 'private' and has_function_privilege('anon', p.oid, 'execute') $$,
   'A10: anon nu execută nicio funcție din private'
 );
--- Lista exactă a funcțiilor private executabile de authenticated (toate primesc doar ID-ul
--- brandului/tenantului și răspund pentru auth.uid(), deci nu sunt oracol pentru alți useri).
+-- Lista exactă a funcțiilor private executabile de authenticated. Cele de autorizare primesc doar ID-ul
+-- brandului/tenantului și răspund pentru auth.uid(); brand_source_* (E8) întorc boolean și răspund false fără acces;
+-- compute_metric_snapshot și metric_observations (E8) sunt SECURITY INVOKER: citesc prin RLS-ul apelantului.
 select results_eq(
   $$ select p.proname::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'private' and has_function_privilege('authenticated', p.oid, 'execute')
      order by 1 $$,
-  $$ values ('can_see_tenant'::text collate "C"), ('has_brand_access'), ('has_brand_role'), ('has_role') $$,
-  'A10: doar cele 4 funcții de autorizare sunt executabile de authenticated'
+  $$ values ('brand_source_connected'::text collate "C"), ('brand_source_query_ok'), ('can_see_tenant'), ('compute_metric_snapshot'),
+            ('has_brand_access'), ('has_brand_role'), ('has_role'), ('metric_observations') $$,
+  'A10: doar funcțiile aprobate (autorizare + E8) sunt executabile de authenticated'
+);
+select is_empty(
+  $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'private' and p.proname in ('compute_metric_snapshot', 'metric_observations') and p.prosecdef $$,
+  'A10/E8: calculul și observațiile rulează cu drepturile apelantului (SECURITY INVOKER)'
 );
 
 -- A11. RPC în public: nicio funcție executabilă de anon sau authenticated, în afara excepției E4 -----
@@ -174,8 +181,13 @@ select is_empty(
   $$ select p.proname || ' → ' || r from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      cross join unnest(array['anon', 'authenticated']) r
      where n.nspname = 'public' and has_function_privilege(r, p.oid, 'execute')
-       and not (r = 'authenticated' and p.proname = 'create_competitor_set_version') $$,
-  'A11: nicio funcție din public executabilă de anon sau authenticated, în afara excepției E4'
+       and not (r = 'authenticated' and p.proname in ('create_competitor_set_version', 'brand_metrics', 'brand_metric_trends')) $$,
+  'A11: nicio funcție din public executabilă de anon sau authenticated, în afara excepțiilor E4 și E8'
+);
+select is_empty(
+  $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname in ('brand_metrics', 'brand_metric_trends') and p.prosecdef $$,
+  'A11/E8: brand_metrics și brand_metric_trends sunt SECURITY INVOKER (RLS rămâne autoritatea)'
 );
 select ok(has_function_privilege('authenticated', 'public.create_competitor_set_version(uuid, date, text, jsonb)', 'execute'),
   'A11/E4: authenticated execută create_competitor_set_version');

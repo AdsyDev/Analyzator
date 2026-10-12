@@ -49,6 +49,15 @@ function oneOf<T extends string>(v: unknown, allowed: readonly T[], path: string
   return v as T
 }
 
+/** Contract v2: moneda e obligatorie la `unit = currency` cu valoare; null la celelalte unități. */
+function currencyOf(v: unknown, unit: MetricUnit, value: number | null, path: string): string | null {
+  const c = strOrNull(v, `${path}.currency`)
+  if (c !== null && !/^[A-Z]{3}$/.test(c)) throw new MetricContractError(`${path}.currency=${c} nu e cod ISO 4217`)
+  if (unit !== 'currency' && c !== null) throw new MetricContractError(`${path}.currency trebuie să fie null pentru unitatea ${unit}`)
+  if (unit === 'currency' && value !== null && c === null) throw new MetricContractError(`${path}.currency lipsește pentru o sumă`)
+  return c
+}
+
 function period(v: unknown, path: string): ServerPeriod {
   const o = obj(v, path)
   return { start: str(o.start, `${path}.start`), end: str(o.end, `${path}.end`) }
@@ -111,6 +120,7 @@ export function parseMetricsEnvelope(json: unknown, definitions: readonly Metric
       metric_key: key,
       value: numOrNull(o.value, `${path}.value`),
       unit,
+      currency: currencyOf(o.currency, unit, numOrNull(o.value, `${path}.value`), path),
       numerator: numOrNull(o.numerator, `${path}.numerator`),
       denominator: numOrNull(o.denominator, `${path}.denominator`),
       comparison_value: numOrNull(o.comparison_value, `${path}.comparison_value`),

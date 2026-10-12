@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { META_FIELDS, METRIC_FIELDS } from '@analytics/contracts/metric-response'
+import { META_FIELDS, METRIC_FIELDS_V2 } from '@analytics/contracts/metric-response'
 import { METRIC_STATUSES, type MetricItem, type MetricStatus, type QueryContext } from '../../contracts'
 import { resolvePeriod } from '../../lib/period'
 import { createFixtureProviders } from './createFixtureProviders'
@@ -25,7 +25,7 @@ describe('fixtures: forma contractului', () => {
     const { items } = await make().metrics.metrics(ctx('brand-urinal'), REGISTRY_KEYS)
     for (const m of items) {
       const keys = Object.keys(m).sort()
-      expect(keys, m.metric_key).toEqual([...METRIC_FIELDS, 'metric_key', 'source', 'warnings'].sort())
+      expect(keys, m.metric_key).toEqual([...METRIC_FIELDS_V2, 'metric_key', 'source', 'warnings'].sort())
     }
   })
 

@@ -21,6 +21,7 @@ export function metric(over: Partial<MetricItem> = {}): MetricItem {
     metric_key: 'ga4_sessions',
     value: 1240,
     unit: 'count',
+    currency: null,
     numerator: null,
     denominator: null,
     comparison_value: 1100,

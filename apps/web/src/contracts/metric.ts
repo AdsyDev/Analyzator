@@ -1,5 +1,5 @@
 import type { IsoDate, IsoDateTime } from './common'
-import type { EvidenceQuery, MetricResponse, MetricUnit, MetricWarning, MetricsMeta } from '@analytics/contracts/metric-response'
+import type { EvidenceQuery, MetricResponseV2 as MetricResponse, MetricUnitV2 as MetricUnit, MetricWarning, MetricsMeta } from '@analytics/contracts/metric-response'
 
 /**
  * Contractul răspunsului unei metrici NU se definește aici. Sursa: `docs/contracts/metric-response.md`,
@@ -7,11 +7,12 @@ import type { EvidenceQuery, MetricResponse, MetricUnit, MetricWarning, MetricsM
  * `analytics/contracts/metric-response.ts` (verificat la compilare). UI-ul îl importă neschimbat.
  */
 export { METRIC_STATUSES } from '@analytics/contracts/metric-response'
+// Versiunea 2 a contractului (unitatea și câmpul `currency`, decizia C-3): UI-ul o folosește sub numele canonice.
 export type {
   EvidenceQuery,
-  MetricResponse,
+  MetricResponseV2 as MetricResponse,
   MetricStatus,
-  MetricUnit,
+  MetricUnitV2 as MetricUnit,
   MetricWarning,
   MetricsEnvelope,
   MetricsMeta,
@@ -21,7 +22,7 @@ export type {
 import type { MetricStatus } from '@analytics/contracts/metric-response'
 
 /** Unitățile din contract, ca listă la rulare (contractul le exportă doar ca tip). Exhaustivitatea e verificată la compilare. */
-export const METRIC_UNITS = ['count', 'percent', 'seconds', 'position', 'score'] as const satisfies readonly MetricUnit[]
+export const METRIC_UNITS = ['count', 'percent', 'seconds', 'position', 'score', 'currency'] as const satisfies readonly MetricUnit[]
 type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
 export const UNITS_ARE_EXHAUSTIVE: Exact<MetricUnit, (typeof METRIC_UNITS)[number]> = true
 
