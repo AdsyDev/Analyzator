@@ -36,6 +36,8 @@ export const FIELD_MAP: Record<string, Partial<Record<string, MetricColumn>>> = 
     totalSessionCount: 'sessions',
     totalBotSessionCount: 'bot_sessions',
     distantUserCount: 'distinct_users',
+    // Pe payload real (12 oct 2026): „distinctUserCount” (documentația: „distantUserCount”).
+    distinctUserCount: 'distinct_users',
     PagesPerSessionPercentage: 'pages_per_session',
   },
   'Scroll Depth': {},
@@ -58,6 +60,21 @@ export const BREAKDOWN_BLOCKS = new Set([
   'Page Title',
   'Referrer URL',
 ])
+
+/**
+ * Pe payload real (12 oct 2026) numele vin altfel decât în documentație: blocurile fără spații („RageClickCount”),
+ * câmpurile și dimensiunile cu altă capitalizare („pagesPerSessionPercentage”, „Url”). Potrivirea ignoră spațiile și
+ * majusculele; numele originale rămân în note.
+ */
+const canon = (name: string) => name.replace(/\s+/g, '').toLowerCase()
+const FIELD_MAP_BY_CANON = new Map(Object.entries(FIELD_MAP).map(([k, v]) => [canon(k), v]))
+const BREAKDOWN_BY_CANON = new Set([...BREAKDOWN_BLOCKS].map(canon))
+const columnFor = (mapping: Partial<Record<string, MetricColumn>>, field: string): MetricColumn | undefined =>
+  mapping[field] ?? Object.entries(mapping).find(([k]) => canon(k) === canon(field))?.[1]
+const dimensionValue = (info: Record<string, unknown>, key: string): { field: string; raw: unknown } | null => {
+  const field = Object.keys(info).find((k) => canon(k) === canon(key))
+  return field === undefined ? null : { field, raw: info[field] }
+}
 
 /** Coloana `dimension` → cheia din rânduri (numele dimensiunii din documentație). */
 const DIMENSION_KEY: Record<string, string | null> = { all: null, device: 'Device', source: 'Source', page: 'URL' }
@@ -138,11 +155,11 @@ export function parseClarityPayload(payload: unknown, ctx: ParseContext): ParseR
       note({ code: 'unknown_block_key', metric_name: block.metricName, field: key, message: `cheie necunoscută „${key}" în blocul „${block.metricName}"` })
     }
 
-    if (BREAKDOWN_BLOCKS.has(block.metricName)) {
+    if (BREAKDOWN_BY_CANON.has(canon(block.metricName))) {
       note({ code: 'ignored_breakdown_block', metric_name: block.metricName, message: `bloc de defalcare „${block.metricName}" ignorat` })
       continue
     }
-    const mapping = FIELD_MAP[block.metricName]
+    const mapping = FIELD_MAP_BY_CANON.get(canon(block.metricName))
     if (!mapping) {
       note({ code: 'unknown_block', metric_name: block.metricName, message: `bloc necunoscut „${block.metricName}"` })
       continue
@@ -152,7 +169,7 @@ export function parseClarityPayload(payload: unknown, ctx: ParseContext): ParseR
     for (const info of block.information) {
       let value = 'all'
       if (dimensionKey) {
-        const raw = info[dimensionKey]
+        const raw = dimensionValue(info, dimensionKey)?.raw
         value = typeof raw === 'string' && raw.trim() !== '' ? raw.trim().slice(0, 2048) : '(unknown)'
         if (value === '(unknown)') {
           note({ code: 'missing_dimension_value', metric_name: block.metricName, field: dimensionKey, message: `rând fără „${dimensionKey}" → „(unknown)"` })
@@ -166,9 +183,10 @@ export function parseClarityPayload(payload: unknown, ctx: ParseContext): ParseR
       seenValues.add(value)
       const row = rowFor(value)
 
+      const dimField = dimensionKey ? dimensionValue(info, dimensionKey)?.field : undefined
       for (const [field, raw] of Object.entries(info)) {
-        if (field === dimensionKey) continue
-        const column = mapping[field]
+        if (field === dimField) continue
+        const column = columnFor(mapping, field)
         if (!column) {
           note({
             code: Object.keys(mapping).length === 0 ? 'unconfirmed_field' : 'unknown_field',

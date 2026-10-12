@@ -138,3 +138,23 @@ describe('toleranță și jurnalizare (date sintetice)', () => {
     assert.ok(notes.some((n) => n.code === 'duplicate_dimension_value'))
   })
 })
+
+describe('numele reale din API (12 oct 2026)', () => {
+  test('blocuri fără spații, câmpuri cu altă capitalizare și „Url”: recunoscute; câmpurile de comportament apar în note', () => {
+    const payload = [
+      { metricName: 'Traffic', information: [{ totalSessionCount: '120', totalBotSessionCount: '3', distinctUserCount: '98', pagesPerSessionPercentage: 1.4, Url: 'https://x.ro/a' }, { totalSessionCount: '5', Url: 'https://x.ro/b' }] },
+      { metricName: 'RageClickCount', information: [{ sessionsCount: '120', sessionsWithMetricPercentage: 2.5, Url: 'https://x.ro/a' }] },
+      { metricName: 'PopularPages', information: [{ url: 'https://x.ro/a', visitsCount: '9' }] },
+    ]
+    const { rows, notes } = parseClarityPayload(payload, ctx('page'))
+    const a = rows.find((r) => r.dimension_value === 'https://x.ro/a')!
+    assert.equal(a.sessions, 120)
+    assert.equal(a.distinct_users, 98)
+    assert.equal(a.pages_per_session, 1.4)
+    assert.ok(rows.some((r) => r.dimension_value === 'https://x.ro/b'), 'a doua pagină nu cade pe „(unknown)”')
+    assert.ok(!notes.some((n) => n.code === 'unknown_block'), JSON.stringify(notes.filter((n) => n.code === 'unknown_block')))
+    assert.ok(!notes.some((n) => n.code === 'missing_dimension_value'))
+    // Câmpurile blocului de comportament se notează cu numele lor (fără valori), ca maparea să se facă pe date reale.
+    assert.ok(notes.some((n) => n.metric_name === 'RageClickCount' && n.field === 'sessionsWithMetricPercentage'))
+  })
+})
