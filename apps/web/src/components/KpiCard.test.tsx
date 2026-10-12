@@ -20,6 +20,14 @@ describe('KpiCard, stări', () => {
     expect(screen.getByText('Complet')).toBeInTheDocument()
   })
 
+  it('emptyReason înlocuiește doar motivul stării goale; o valoare existentă nu e ascunsă', () => {
+    setup({ metric: metric({ status: 'not_connected', value: null, source: null }), emptyReason: 'Motiv dat de ecran.' })
+    expect(screen.getByText('Sursă neconectată')).toBeInTheDocument()
+    expect(screen.getByText('Motiv dat de ecran.')).toBeInTheDocument()
+    setup({ emptyReason: 'Nu trebuie afișat.' })
+    expect(screen.queryByText('Nu trebuie afișat.')).toBeNull()
+  })
+
   it('loading: schelet, fără valoare', () => {
     setup({ metric: null, loading: true })
     expect(screen.getByRole('status', { name: 'Se încarcă' })).toBeInTheDocument()

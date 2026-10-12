@@ -1,4 +1,4 @@
-import { failed, ready, type BrandsProvider, type Competitor, type CompetitorSet } from '../../contracts'
+import { failed, notConnected, ready, type BrandsProvider, type Competitor, type CompetitorSet } from '../../contracts'
 import { todayBucharest } from '../../lib/period'
 import type { DataClient } from './dataClient'
 import { QUERY_FAILED } from './dataClient'
@@ -26,7 +26,8 @@ export function createSupabaseBrands(client: DataClient, now: () => Date = () =>
         .maybeSingle()
       if (set.error) return failed(QUERY_FAILED)
       const s = set.data as { id: string; version: number; effective_from: string } | null
-      if (!s) return failed('Brandul nu are încă un set de competitori în vigoare.')
+      // Lipsa setului e o stare de configurare, nu o eroare: fără „Reîncearcă", cu motivul afișat.
+      if (!s) return notConnected('Brandul nu are încă un set de competitori în vigoare; comparația apare după configurarea lui.')
       const members = await client.from('competitor_set_members').select('id, name, sort_order').eq('competitor_set_id', s.id).order('sort_order')
       if (members.error) return failed(QUERY_FAILED)
       const competitors = ((members.data ?? []) as unknown as Array<{ id: string; name: string }>).map<Competitor>((m, i) => ({ id: m.id, name: m.name, label: `C${i + 1}` }))

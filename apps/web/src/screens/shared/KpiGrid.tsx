@@ -3,7 +3,7 @@ import { KpiCard } from '../../components/KpiCard'
 import type { AsyncState } from '../../data/useAsync'
 import { formatRange } from '../../lib/format'
 import { sparkPoints } from './sparks'
-import { MISSING_DEFINITION, type KpiSlot } from './slots'
+import { MISSING_DEFINITION, unregisteredReason, type KpiSlot } from './slots'
 import type { EvidenceTarget } from './EvidenceHost'
 
 interface Props {
@@ -40,6 +40,7 @@ export function KpiGrid({ slots, page, metrics, definitions, trends, onRetry, on
             direction={def?.direction ?? 'neutral'}
             qualifier={def?.aggregation_label ?? null}
             compareLabel={cmp ? `față de ${formatRange(cmp.start, cmp.end)}` : undefined}
+            emptyReason={def === null && item?.status === 'not_connected' ? unregisteredReason(slot) : null}
             onOpen={() => item && onOpen({ page, label, query: item.evidence_query, item, definition: def })}
             onRetry={onRetry}
           />

@@ -24,6 +24,8 @@ export interface KpiCardProps {
   /** `aggregation_label` din registru (de ex. „medie în perioadă"), afișat lângă etichetă. */
   qualifier?: string | null
   compareLabel?: string
+  /** Înlocuiește motivul stării goale (de ex. indicator fără definiție în registru); nu schimbă starea. */
+  emptyReason?: string | null
   onOpen: () => void
   onRetry?: () => void
 }
@@ -40,8 +42,9 @@ const DELTA_ICON: Record<DeltaDirection, typeof ArrowUpRightIcon> = {
   flat: MinusIcon,
 }
 
-export function KpiCard({ label, definition, metric, loading = false, error = null, spark, direction = 'higher_is_better', qualifier = null, compareLabel, onOpen, onRetry }: KpiCardProps) {
-  const view = metric ? metricView(metric) : null
+export function KpiCard({ label, definition, metric, loading = false, error = null, spark, direction = 'higher_is_better', qualifier = null, compareLabel, emptyReason = null, onOpen, onRetry }: KpiCardProps) {
+  const base = metric ? metricView(metric) : null
+  const view = base && emptyReason && !base.hasValue ? { ...base, emptyReason } : base
   const paths = spark ? sparkPaths(spark) : { line: '', area: '' }
   const state = loading ? 'loading' : error ? 'error' : 'ready'
 

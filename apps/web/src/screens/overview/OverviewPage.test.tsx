@@ -103,6 +103,17 @@ describe('Overview: cardurile KPI', () => {
     expect(within(c).getByRole('tooltip')).toHaveTextContent('Definiția acestui indicator nu este încă în registrul de metrici.')
   })
 
+  it.each([
+    ['Cost paid', 'Indicatorul vine din Google Ads, Meta Ads și TikTok Ads, dar nu are încă definiție în registrul de metrici'],
+    ['Mențiuni eligibile', 'Indicatorul vine din Planable, dar nu are încă definiție în registrul de metrici'],
+  ])('%s: motivul numește sursele așteptate, fără să spună că sunt deconectate', async (name, reason) => {
+    setup()
+    await loaded()
+    const c = card(name)
+    expect(within(c).getByText(new RegExp(reason))).toBeInTheDocument()
+    expect(within(c).queryByText(/^Sursa nu este conectată/)).toBeNull()
+  })
+
   it('metricile din registru au valoare, variație, sursă, „Date până la" și tooltip cu formula din registru', async () => {
     setup()
     await loaded()

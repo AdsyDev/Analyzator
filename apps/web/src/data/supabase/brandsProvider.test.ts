@@ -31,8 +31,13 @@ describe('brands (supabase)', () => {
     expect(r).toEqual({ kind: 'ready', data: { brand_id: 'b1', version: 2, effective_from: '2026-10-01', competitors: [{ id: 'm1', name: 'Alfa', label: 'C1' }, { id: 'm2', name: 'Beta', label: 'C2' }] } })
   })
 
-  it('fără set în vigoare: eroare explicită, nu un set gol', async () => {
+  it('fără set în vigoare: „Sursă neconectată" cu motivul, nu un set gol și nu o eroare', async () => {
     const { client } = fakeDataClient({ tables: { competitor_sets: [] } })
+    expect(await createSupabaseBrands(client, NOW).competitorSet('b1')).toEqual({ kind: 'not_connected', reason: expect.stringMatching(/set de competitori/) })
+  })
+
+  it('eroare la citirea setului → eroare, nu „neconectat"', async () => {
+    const { client } = fakeDataClient({ errors: { competitor_sets: { code: '42501', message: 'permission denied' } } })
     expect((await createSupabaseBrands(client, NOW).competitorSet('b1')).kind).toBe('error')
   })
 
