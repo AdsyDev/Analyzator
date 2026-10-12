@@ -107,4 +107,37 @@ describe('config (supabase)', () => {
     expect(r.data.map((m) => [m.group_id, m.version, m.kind])).toEqual(expect.arrayContaining([['10', 2, 'brand'], ['11', 1, 'excluded']]))
     expect(r.data).toHaveLength(2)
   })
+
+  it('saveSeomonitorMappings: versiunea următoare per grup, în vigoare de ieri, cu autorul sesiunii; filtrat pe client și conexiune', async () => {
+    const { client, calls } = fakeDataClient({
+      userId: 'u-admin',
+      tables: {
+        seomonitor_group_mappings: [
+          { tenant_id: 't1', source_id: 's1', campaign_id: '501', group_id: '12', version: 2 },
+          { tenant_id: 't1', source_id: 's1', campaign_id: '501', group_id: '12', version: 1 },
+          { tenant_id: 't2', source_id: 's9', campaign_id: '501', group_id: '13', version: 7 },
+        ],
+      },
+    })
+    const r = await createSupabaseConfig(client, NOW).saveSeomonitorMappings('t1', 's1', [
+      { campaign_id: '501', group_id: '12', kind: 'brand', brand_id: 'b1', brand_type: 'branded', is_primary_visibility: true },
+      { campaign_id: '501', group_id: '13', kind: 'excluded', brand_id: null, brand_type: null, is_primary_visibility: false },
+    ])
+    expect(r).toEqual({ kind: 'ready', data: { effective_from: '2026-10-07' } })
+    const read = calls.find((c) => c.op === 'select' && c.table === 'seomonitor_group_mappings')!
+    expect(read.filters).toEqual(expect.arrayContaining([['tenant_id', 'eq', 't1'], ['source_id', 'eq', 's1']]))
+    const insert = calls.find((c) => c.op === 'insert')!.payload as Array<Record<string, unknown>>
+    expect(insert.map((i) => [i.group_id, i.version, i.mapping_kind, i.effective_from, i.created_by])).toEqual([
+      ['12', 3, 'brand', '2026-10-07', 'u-admin'],
+      ['13', 1, 'excluded', '2026-10-07', 'u-admin'],
+    ])
+    expect(insert[1]).toMatchObject({ brand_id: null, brand_type: null, is_primary_visibility: false })
+  })
+
+  it('saveSeomonitorMappings: fără sesiune sau fără drept, mesaj clar', async () => {
+    const row = [{ campaign_id: '1', group_id: '2', kind: 'excluded' as const, brand_id: null, brand_type: null, is_primary_visibility: false }]
+    expect((await createSupabaseConfig(fakeDataClient({ userId: null }).client, NOW).saveSeomonitorMappings('t1', 's1', row)).kind).toBe('error')
+    const denied = await createSupabaseConfig(fakeDataClient({ errors: { 'seomonitor_group_mappings:insert': { code: '42501', message: 'rls' } } }).client, NOW).saveSeomonitorMappings('t1', 's1', row)
+    expect(denied).toEqual({ kind: 'error', message: 'Doar administratorii agenției pot mapa grupurile SEOmonitor.' })
+  })
 })

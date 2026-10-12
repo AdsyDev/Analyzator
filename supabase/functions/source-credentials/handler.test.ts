@@ -337,6 +337,15 @@ describe('list_accounts (selectorul din pagina site-ului)', () => {
     assert.equal(r.body.credential_status, 'invalid')
   })
 
+  test('grupurile SEOmonitor cer campaign_id numeric', async () => {
+    state.connection = { id: CONN, tenant_id: T1, brand_id: null, provider: 'seomonitor', status: 'active', credential_status: 'valid' }
+    assert.equal((await call({ action: 'list_accounts', connection_id: CONN, kind: 'seomonitor_groups' })).status, 400)
+    assert.equal((await call({ action: 'list_accounts', connection_id: CONN, kind: 'seomonitor_groups', campaign_id: '1;drop' })).status, 400)
+    const r = await call({ action: 'list_accounts', connection_id: CONN, kind: 'seomonitor_groups', campaign_id: '501' })
+    assert.equal(r.status, 200)
+    assert.ok(state.calls.some((c) => c.url.includes('/rank-tracker/v3.0/groups?campaign_id=501')))
+  })
+
   test('cheie lipsă: 409', async () => {
     state.connection = { ...tenantPlanable(), credential_status: 'missing' }
     assert.equal((await call({ action: 'list_accounts', connection_id: CONN, kind: 'planable' })).status, 409)

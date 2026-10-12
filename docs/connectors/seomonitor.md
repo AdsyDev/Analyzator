@@ -6,64 +6,34 @@
 
 **Ce se face unde:**
 - tokenul se obține din SEOmonitor și se pune **din aplicație**, în pagina site-ului (Administrare → Clienți și site-uri → **Editează și surse**) → cardul SEOmonitor → pasul 1;
-- maparea grupurilor pe branduri se face deocamdată din **SQL**;
-- testul înseamnă o **rulare manuală** (nu există buton de test).
+- maparea grupurilor pe site se face **din același card**, la pasul 2: aplicația citește campaniile și grupurile direct din SEOmonitor, cu tokenul clientului;
+- dacă lista de campanii apare, tokenul funcționează; datele vin la prima rulare.
 
 **De ce e diferit de Clarity:** un cont SEOmonitor acoperă **toate brandurile unui client**. Brandurile se despart prin grupurile de keywords din SEOmonitor, de aceea conexiunea e la nivel de client, nu de brand: se salvează din pagina oricărui site al clientului și e refolosită de celelalte.
 
-## 1. Obține tokenul și ID-ul companiei
+## 1. Obține tokenul
 
 1. În SEOmonitor: **Account Settings → Edit Profile → API Token**. Copiază tokenul. Tokenul e legat de utilizatorul tău; ideal folosește un utilizator dedicat agenției, ca să nu se oprească colectarea când pleacă cineva.
 2. **Numele contului**: o etichetă liberă (de ex. numele clientului), ca să recunoști contul. Colectarea vede toate campaniile la care are acces tokenul.
-3. Notează, pentru fiecare campanie a clientului, **ID-ul campaniei** și **grupurile de keywords** (ID-ul fiecărui grup). Le găsești în Rank Tracker → grupuri. Echipa tehnică le poate lista și prin API, la cerere.
 
-## 2. Conectează contul (din aplicație)
+## 2. Conectează contul (din aplicație, o dată per client)
 
 1. Pagina site-ului (Administrare → Clienți și site-uri → **Editează și surse**) al oricărui site al clientului → cardul **SEOmonitor** → **Conectează** → pasul 1.
-2. Completează **ID-ul companiei** și **tokenul**, apoi **Salvează**. Tokenul nu se mai afișează după salvare.
-3. Pentru un token nou (rotire): același card → „Rotește tokenul”.
+2. Completează **numele contului** și **tokenul**, apoi **Salvează**. Tokenul nu se mai afișează după salvare.
+3. Pentru un token nou (rotire): același card → „Schimbă cheia”.
 
-Pentru maparea de la pasul 3 îți trebuie ID-ul clientului și ID-ul conexiunii:
+## 3. Mapează grupurile pe site (din card, per site)
 
-```sql
-select t.id as tenant_id, t.name, c.id as id_conexiune
-from public.tenants t
-join public.source_connections c on c.tenant_id = t.id and c.provider = 'seomonitor' and c.brand_id is null
-order by t.name;
-```
+Fără mapare **nu se colectează nimic** pentru site: conectorul cere datele doar pentru grupurile mapate.
 
-## 3. Mapează grupurile pe branduri (SQL)
+1. Cardul **SEOmonitor** al site-ului → pasul 2. Aplicația listează campaniile tokenului și o propune pe cea cu domeniul site-ului.
+2. Apar grupurile campaniei (cu folderele și subgrupurile lor). Bifezi grupurile site-ului și alegi, pentru fiecare:
+   - **Branded**: keywords cu numele brandului; **Nonbranded**: restul. Aplicația propune Branded pentru grupurile cu „brand” în nume.
+   - **Principal**: exact un grup bifat; din el vine indicatorul „Visibility SEOmonitor”.
+3. **Salvează maparea.** Fiecare grup schimbat primește o versiune nouă, în vigoare de **ieri**, ca prima rulare să o aplice. Nimic nu se șterge: un grup debifat devine „exclus” (ignorat), iar istoricul rămâne.
+4. Un grup mapat deja pe alt site al clientului apare „Mapat pe <site>” și nu se poate bifa. Grupurile care amestecă branduri (`multi_brand`) se marchează, deocamdată, din SQL.
 
-Fără mapare **nu se atribuie nimic** niciunui brand. Fiecare grup SEOmonitor primește un tip:
-
-- **`brand`**: grupul aparține unui brand, cu `brand_type`:
-  - `branded`: keywords cu numele brandului;
-  - `nonbranded`: restul.
-  
-  Cel mult un grup per brand are `is_primary_visibility = true`: din el vine cifra principală de visibility.
-- **`multi_brand`**: grupul amestecă branduri; nu se atribuie automat.
-- **`excluded`**: ignorat intenționat.
-
-Afli ID-urile brandurilor:
-
-```sql
-select id, slug, name from public.brands where tenant_id = '<tenant_id>' order by name;
-```
-
-Adaugi maparea (un rând per grup; `version` = 1 la prima mapare):
-
-```sql
-insert into public.seomonitor_group_mappings
-  (tenant_id, source_id, campaign_id, group_id, version, effective_from, mapping_kind, brand_id, brand_type, is_primary_visibility, note)
-values
-  ('<tenant_id>', '<id-conexiune>', '<campaign_id>', '<group_id>', 1, current_date, 'brand', '<brand_id>', 'branded', true,  'Brand X - branded'),
-  ('<tenant_id>', '<id-conexiune>', '<campaign_id>', '<group_id>', 1, current_date, 'brand', '<brand_id>', 'nonbranded', false, 'Brand X - nonbranded'),
-  ('<tenant_id>', '<id-conexiune>', '<campaign_id>', '<group_id>', 1, current_date, 'excluded', null, null, false, 'Grup de test');
-```
-
-**Maparea nu se editează.** O schimbare înseamnă un rând nou pentru același grup, cu `version` mai mare și `effective_from` = data de la care se aplică. Istoricul rămâne.
-
-Maparea curentă apare în Administrare → **Configurare** → „Grupuri SEOmonitor → brand”.
+Toate mapările clientului sunt în Administrare → **Configurare** → „Grupuri SEOmonitor → brand”.
 
 ## 4. Testează: rulare manuală
 

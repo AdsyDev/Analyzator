@@ -75,10 +75,26 @@ export interface SeomonitorMapping {
   note: string | null
 }
 
+/** O versiune nouă de mapare pentru un grup (`brand` cere `brand_id` și `brand_type`; `excluded` le are null). */
+export interface NewSeomonitorMapping {
+  campaign_id: string
+  group_id: string
+  kind: 'brand' | 'excluded'
+  brand_id: BrandId | null
+  brand_type: 'branded' | 'nonbranded' | null
+  is_primary_visibility: boolean
+}
+
 export interface ConfigProvider {
   competitorVersions(brandId: BrandId): Promise<ProviderResult<CompetitorSetVersion[]>>
   aliases(brandId: BrandId): Promise<ProviderResult<BrandAlias[]>>
   seomonitorMappings(): Promise<ProviderResult<SeomonitorMapping[]>>
+  /**
+   * Doar `agency_admin` (RLS). Fiecare grup primește o versiune nouă (cea mai mare + 1), în vigoare de ieri
+   * (Europe/Bucharest), ca prima colectare să o aplice; versiunile vechi rămân, nimic nu se modifică.
+   * `sourceId` = conexiunea SEOmonitor a clientului.
+   */
+  saveSeomonitorMappings(tenantId: TenantId, sourceId: string, rows: NewSeomonitorMapping[]): Promise<ProviderResult<{ effective_from: IsoDate }>>
 }
 
 export type RecordStatus = 'active' | 'archived'

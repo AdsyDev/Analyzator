@@ -20,7 +20,7 @@ interface Opts {
 }
 
 /**
- * Client Supabase fals, suficient pentru providerii de Administrare. Aplică filtrele `eq`, `is`, `lte`, ca testele
+ * Client Supabase fals, suficient pentru providerii de Administrare. Aplică filtrele `eq`, `is`, `lte`, `in`, ca testele
  * să prindă un provider care uită un filtru (de ex. `brand_id`).
  */
 export function fakeDataClient(opts: Opts = {}) {
@@ -42,6 +42,7 @@ export function fakeDataClient(opts: Opts = {}) {
           if (op === 'eq') return v === val
           if (op === 'is') return v === val
           if (op === 'lte') return String(v) <= String(val)
+          if (op === 'in') return (val as unknown[]).includes(v)
           return true
         }),
       )
@@ -66,6 +67,7 @@ export function fakeDataClient(opts: Opts = {}) {
       eq: (c: string, v: unknown) => (call.filters.push([c, 'eq', v]), b),
       is: (c: string, v: unknown) => (call.filters.push([c, 'is', v]), b),
       lte: (c: string, v: unknown) => (call.filters.push([c, 'lte', v]), b),
+      in: (c: string, v: unknown[]) => (call.filters.push([c, 'in', v]), b),
       order: (col: string, o?: { ascending?: boolean }) => ((order = { col, asc: o?.ascending !== false }), b),
       limit: (n: number) => ((limit = n), b),
       maybeSingle: () => ((single = 'maybe'), b),

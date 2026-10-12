@@ -2,7 +2,7 @@
 // Independent de runtime: doar fetch și WebCrypto (Deno și Node). Cheia nu iese de aici: rezultatul are doar
 // ID-ul, numele și un detaliu al fiecărui cont.
 
-export type DiscoverKind = 'ga4' | 'gsc' | 'planable' | 'meta_ads' | 'seomonitor'
+export type DiscoverKind = 'ga4' | 'gsc' | 'planable' | 'meta_ads' | 'seomonitor' | 'seomonitor_groups'
 
 export type DiscoveredAccount = { id: string; name: string; detail: string | null }
 
@@ -19,6 +19,7 @@ export const DISCOVER: Record<DiscoverKind, { tenantProvider: string; label: str
   planable: { tenantProvider: 'planable_account', label: 'Planable' },
   meta_ads: { tenantProvider: 'meta_account', label: 'Meta' },
   seomonitor: { tenantProvider: 'seomonitor', label: 'SEOmonitor' },
+  seomonitor_groups: { tenantProvider: 'seomonitor', label: 'SEOmonitor' },
 }
 export const DISCOVER_DAILY_LIMIT = 30
 
@@ -31,10 +32,12 @@ export const GSC_SITES_URL = 'https://www.googleapis.com/webmasters/v3/sites'
 const GA4_SCOPE = 'https://www.googleapis.com/auth/analytics.readonly'
 const GSC_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly'
 
-export async function discover(kind: DiscoverKind, token: string, fetch: Fetch, now: Date): Promise<DiscoverOutcome> {
+/** `campaignId`: doar pentru `seomonitor_groups` (grupurile unei campanii). */
+export async function discover(kind: DiscoverKind, token: string, fetch: Fetch, now: Date, campaignId?: string): Promise<DiscoverOutcome> {
   if (kind === 'ga4' || kind === 'gsc') return discoverGoogle(kind, token, fetch, now)
   if (kind === 'planable') return discoverPlanable(token, fetch)
   if (kind === 'meta_ads') return discoverMeta(token, fetch)
+  if (kind === 'seomonitor_groups') return discoverSeomonitorGroups(token, fetch, campaignId ?? '')
   return discoverSeomonitor(token, fetch)
 }
 
@@ -201,6 +204,36 @@ async function discoverSeomonitor(token: string, fetch: Fetch): Promise<Discover
     accounts.push({ id, name: typeof info?.name === 'string' && info.name.trim() ? info.name.trim() : (domain ?? id), detail: domain })
   }
   return { ok: true, accounts, truncated: rows.length >= 100 }
+}
+
+type SeoGroup = { group_id?: unknown; name?: unknown; type?: unknown; subgroups?: SeoGroup[] }
+
+/**
+ * Grupurile unei campanii SEOmonitor, aplatizate: `detail` = tipul (group / folder / smart) și, pentru un subgrup,
+ * `în <părinte>`. Ordinea din SEOmonitor se păstrează, ca ierarhia să se poată citi.
+ */
+async function discoverSeomonitorGroups(token: string, fetch: Fetch, campaignId: string): Promise<DiscoverOutcome> {
+  if (!/^\d+$/.test(campaignId)) return { ok: false, reason: 'provider_error', status: null, message: 'Campanie SEOmonitor invalidă.' }
+  const res = await safeFetch(fetch, `https://apigw.seomonitor.com/v3/rank-tracker/v3.0/groups?campaign_id=${campaignId}`, { headers: { Authorization: token, Accept: 'application/json' } })
+  if (!res) return networkError('SEOmonitor')
+  if (res.status === 401 || res.status === 403) return refused('SEOmonitor', res.status, 'Generează un token nou din Account Settings → Edit Profile → API Token.')
+  if (res.status === 429) return { ok: false, reason: 'rate_limited', status: 429, message: 'SEOmonitor a limitat cererile (429). Reîncearcă peste un minut.' }
+  if (!res.ok) return providerError('SEOmonitor', res.status)
+  const body = (await res.json()) as unknown
+  const roots = (Array.isArray(body) ? body : Array.isArray((body as { data?: unknown })?.data) ? (body as { data: unknown[] }).data : []) as SeoGroup[]
+  const accounts: DiscoveredAccount[] = []
+  const walk = (groups: SeoGroup[], parent: string | null) => {
+    for (const g of groups) {
+      const id = typeof g.group_id === 'number' || typeof g.group_id === 'string' ? String(g.group_id) : null
+      if (id === null || !/^-?\d+$/.test(id)) continue
+      const name = typeof g.name === 'string' && g.name.trim() ? g.name.trim() : id
+      const type = typeof g.type === 'string' ? g.type : 'group'
+      accounts.push({ id, name, detail: parent ? `${type} în ${parent}` : type })
+      if (Array.isArray(g.subgroups) && g.subgroups.length) walk(g.subgroups, name)
+    }
+  }
+  walk(roots, null)
+  return { ok: true, accounts, truncated: false }
 }
 
 // --- Comun ------------------------------------------------------------------------------------------

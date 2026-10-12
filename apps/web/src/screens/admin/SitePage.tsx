@@ -357,9 +357,12 @@ function SiteSourceCard({ source, space, client, status, connections, tenantConn
           {provider === 'seomonitor' && (
             <Step n={++n} total={steps} title={`Grupurile de keywords ale ${space.name}`} done={false}>
               <div className="flex flex-col items-start gap-2">
-                <p className="text-[12.5px] leading-snug text-text-2">SEOmonitor nu are cont pe site: datele intră pe {space.name} după ce grupurile lui de keywords sunt mapate pe site.</p>
-                {keySaved && <SeomonitorCampaigns tenantConnectionId={tenantConnection.id} siteDomain={space.domain} />}
-                <Button onClick={() => navigate(adminPath('config'))}>Mapează în Configurare</Button>
+                {keySaved ? (
+                  <SeomonitorCampaigns tenantId={client.id} tenantConnectionId={tenantConnection.id} site={space} spaces={client.spaces} />
+                ) : (
+                  <p className="text-[12.5px] leading-snug text-text-2">După ce salvezi tokenul la pasul 1, alegi aici campania lui {space.name} și grupurile ei de keywords.</p>
+                )}
+                <Button variant="ghost" onClick={() => navigate(adminPath('config'))}>Toate mapările, în Configurare</Button>
               </div>
             </Step>
           )}

@@ -104,7 +104,7 @@ export async function handle(req: Request, deps: HandlerDeps): Promise<Response>
   try {
     const userId = await authenticate(req, deps)
 
-    let body: { action?: unknown; connection_id?: unknown; token?: unknown; kind?: unknown }
+    let body: { action?: unknown; connection_id?: unknown; token?: unknown; kind?: unknown; campaign_id?: unknown }
     try {
       body = (await req.json()) as typeof body
     } catch {
@@ -123,7 +123,12 @@ export async function handle(req: Request, deps: HandlerDeps): Promise<Response>
     }
     if (body.action === 'list_accounts') {
       if (typeof body.kind !== 'string' || !(body.kind in DISCOVER)) throw new HttpError(400, 'Tip de cont necunoscut.')
-      return json(env, 200, await listAccounts(deps, userId, body.connection_id, body.kind as DiscoverKind))
+      let campaignId: string | undefined
+      if (body.kind === 'seomonitor_groups') {
+        if (typeof body.campaign_id !== 'string' || !/^\d+$/.test(body.campaign_id)) throw new HttpError(400, 'campaign_id invalid.')
+        campaignId = body.campaign_id
+      }
+      return json(env, 200, await listAccounts(deps, userId, body.connection_id, body.kind as DiscoverKind, campaignId))
     }
     throw new HttpError(400, 'Acțiune necunoscută.')
   } catch (err) {
@@ -337,7 +342,7 @@ async function validate(deps: HandlerDeps, userId: string, connectionId: string)
  * (`brand_id` NULL) ale furnizorului potrivit; rezultatul are doar ID-ul, numele și un detaliu, niciodată cheia.
  * O listare reușită confirmă cheia (`valid`); un refuz al furnizorului o marchează `invalid`.
  */
-async function listAccounts(deps: HandlerDeps, userId: string, connectionId: string, kind: DiscoverKind) {
+async function listAccounts(deps: HandlerDeps, userId: string, connectionId: string, kind: DiscoverKind, campaignId?: string) {
   const conn = await loadConnection(deps, connectionId)
   await assertAgencyAdmin(deps, userId, conn.tenant_id)
   if (conn.brand_id !== null || conn.provider !== DISCOVER[kind].tenantProvider) {
@@ -374,7 +379,7 @@ async function listAccounts(deps: HandlerDeps, userId: string, connectionId: str
     body: JSON.stringify({ tenant_id: conn.tenant_id, brand_id: null, source_connection_id: connectionId, call_date_utc: day, purpose: 'discover', calls: 1, actor_user_id: userId }),
   })
 
-  const result = await discover(kind, token, deps.fetch, deps.now())
+  const result = await discover(kind, token, deps.fetch, deps.now(), campaignId)
 
   let credentialStatus = conn.credential_status
   if (result.ok || result.reason === 'invalid') {

@@ -366,13 +366,24 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
       connectionPatch.set(connectionId, { ...patch, credential_status: 'valid', calls_today: used + 1, last_validated_at: now().toISOString(), last_validation_error: null })
       return ready({ connection_id: connectionId, credential_status: 'valid' as CredentialStatus, calls_today: used + 1, daily_limit: 10, outcome: 'valid' as const, message: 'Conexiunea funcționează.' })
     },
-    listAccounts: async (connectionId, kind) => {
+    listAccounts: async (connectionId, kind, campaignId) => {
       if (getRole() !== 'agency_admin') return failed('Doar administratorii agenției pot lista conturile.')
       const conn = tenantConnectionsMem.find((c) => c.id === connectionId)
       if (!conn) return failed('Conexiune inexistentă sau inactivă.')
       if ((connectionPatch.get(conn.id)?.credential_status ?? conn.credential_status) === 'missing') return failed('Cheia clientului nu e salvată.')
       connectionPatch.set(conn.id, { ...(connectionPatch.get(conn.id) ?? {}), credential_status: 'valid' })
       // Previzualizare: conturi construite din spațiile clientului, ca selectorul să aibă ce arăta.
+      if (kind === 'seomonitor_groups') {
+        const brand = (brandsFile.brands as Array<{ id: string; name: string }>)[Number(campaignId) - 500]
+        const accounts = brand
+          ? [
+              { id: '-1', name: 'Brand', detail: 'folder' },
+              { id: `${campaignId}1`, name: `${brand.name} brand`, detail: 'group în Brand' },
+              { id: `${campaignId}2`, name: `${brand.name} generic`, detail: 'group' },
+            ]
+          : []
+        return ready({ outcome: 'ok' as const, credential_status: 'valid' as CredentialStatus, accounts, truncated: false, message: null })
+      }
       const spaces = (brandsFile.brands as Array<{ id: string; name: string; domain: string | null }>)
       const accounts = spaces.map((b, i) => {
         const domain = b.domain ?? `${b.id}.example`

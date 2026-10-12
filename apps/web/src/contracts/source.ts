@@ -119,7 +119,7 @@ export interface ValidationOutcome {
 }
 
 /** Sursele cu selector de cont: lista vine din cheia clientului (funcția server, `list_accounts`). */
-export type DiscoverKind = 'ga4' | 'gsc' | 'planable' | 'meta_ads' | 'seomonitor'
+export type DiscoverKind = 'ga4' | 'gsc' | 'planable' | 'meta_ads' | 'seomonitor' | 'seomonitor_groups'
 
 /** Un cont văzut de cheia clientului: doar ID-ul, numele și un detaliu (contul GA4, fusul orar, moneda, domeniul). */
 export interface DiscoveredAccount {

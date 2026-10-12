@@ -175,17 +175,60 @@ describe('pagina site-ului: sursele, fiecare conectată pe site (fixtures de pre
     expect(within(card).getByRole('button', { name: 'Reîncarcă' })).toBeInTheDocument()
   })
 
-  it('SEOmonitor: campaniile văzute de token, cu cea a domeniului site-ului marcată', async () => {
+  it('SEOmonitor: campania propusă după domeniu; grupurile se mapează din card, cu grupul principal obligatoriu', async () => {
     renderApp({ route: site('brand-urinal') })
     await pageReady('Site și surse')
     const card = await open('SEOmonitor')
-    const list = await within(card).findByRole('region', { name: 'Campaniile SEOmonitor ale clientului' })
-    expect(within(list).getByText(/Tokenul funcționează și vede 3 campanii/)).toBeInTheDocument()
-    const match = within(list).getByText('Domeniul site-ului').closest('li')!
-    expect(match).toHaveTextContent('urinal.example')
+    const mapping = await within(card).findByRole('region', { name: 'Maparea SEOmonitor a site-ului' })
+    expect(within(mapping).getByLabelText('Campania SEOmonitor')).toHaveValue('500')
+    expect(within(mapping).getByText(/Propusă după domeniul site-ului/)).toBeInTheDocument()
+    await within(mapping).findByRole('list', { name: 'Grupurile campaniei' })
+    await userEvent.click(within(mapping).getByRole('checkbox', { name: 'Urinal brand pe Urinal' }))
+    await userEvent.click(within(mapping).getByRole('checkbox', { name: 'Urinal generic pe Urinal' }))
+    expect(within(mapping).getByRole('combobox', { name: 'Tipul grupului Urinal brand' })).toHaveValue('branded')
+    expect(within(mapping).getByRole('combobox', { name: 'Tipul grupului Urinal generic' })).toHaveValue('nonbranded')
+    const save = within(mapping).getByRole('button', { name: 'Salvează maparea' })
+    expect(save).toBeDisabled()
+    expect(within(mapping).getByText('Alege grupul principal dintre cele bifate.')).toBeInTheDocument()
+    await userEvent.click(within(mapping).getByRole('radio', { name: 'Urinal brand e grupul principal' }))
+    await userEvent.click(save)
+    expect(await within(mapping).findByText(/Maparea a fost salvată, în vigoare din/)).toBeInTheDocument()
+    expect(await within(mapping).findByText('Nicio schimbare față de maparea salvată.')).toBeInTheDocument()
+
+    // Pe alt site al clientului, același grup apare „Mapat pe Urinal” și nu se poate bifa.
+    await userEvent.click(screen.getByRole('link', { name: 'Înapoi la clienți și site-uri' }))
+    await pageReady('Clienți și site-uri')
+    await userEvent.click(await screen.findByRole('button', { name: 'Editează Proenzi și sursele lui' }))
+    await pageReady('Site și surse')
+    const other = await open('SEOmonitor')
+    const otherMapping = await within(other).findByRole('region', { name: 'Maparea SEOmonitor a site-ului' })
+    await userEvent.selectOptions(within(otherMapping).getByLabelText('Campania SEOmonitor'), '500')
+    await within(otherMapping).findByRole('list', { name: 'Grupurile campaniei' })
+    expect(within(otherMapping).getByRole('checkbox', { name: 'Urinal brand pe Proenzi' })).toBeDisabled()
+    expect(within(otherMapping).getAllByText('Mapat pe Urinal')).toHaveLength(2)
   })
 
-  it('SEOmonitor: contul clientului e refolosit; „Schimbă cheia” rotește tokenul; grupurile se mapează în Configurare', async () => {
+  it('SEOmonitor: un grup scos de pe site devine exclus (versiune nouă, nimic șters)', async () => {
+    const saved: unknown[] = []
+    renderApp({
+      route: site('brand-urinal'),
+      wrap: (b) => ({ ...b, config: { ...b.config, saveSeomonitorMappings: async (t, src, rows) => (saved.push(rows), b.config.saveSeomonitorMappings(t, src, rows)) } }),
+    })
+    await pageReady('Site și surse')
+    const card = await open('SEOmonitor')
+    const mapping = await within(card).findByRole('region', { name: 'Maparea SEOmonitor a site-ului' })
+    await within(mapping).findByRole('list', { name: 'Grupurile campaniei' })
+    await userEvent.click(within(mapping).getByRole('checkbox', { name: 'Urinal brand pe Urinal' }))
+    await userEvent.click(within(mapping).getByRole('radio', { name: 'Urinal brand e grupul principal' }))
+    await userEvent.click(within(mapping).getByRole('button', { name: 'Salvează maparea' }))
+    await within(mapping).findByText(/Maparea a fost salvată/)
+    await userEvent.click(within(mapping).getByRole('checkbox', { name: 'Urinal brand pe Urinal' }))
+    await userEvent.click(within(mapping).getByRole('button', { name: 'Salvează maparea' }))
+    await waitFor(() => expect(saved).toHaveLength(2))
+    expect(saved[1]).toEqual([{ campaign_id: '500', group_id: '5001', kind: 'excluded', brand_id: null, brand_type: null, is_primary_visibility: false }])
+  })
+
+  it('SEOmonitor: contul clientului e refolosit; „Schimbă cheia” rotește tokenul; toate mapările rămân în Configurare', async () => {
     renderApp({ route: site('brand-minimartieni') })
     await pageReady('Site și surse')
     const card = await open('SEOmonitor')
@@ -196,7 +239,7 @@ describe('pagina site-ului: sursele, fiecare conectată pe site (fixtures de pre
     await userEvent.click(within(card).getByRole('button', { name: 'Salvează' }))
     expect(await within(card).findByText('Token salvat. Testează conexiunea sau așteaptă prima rulare SEOmonitor.')).toBeInTheDocument()
     expect(document.body.textContent).not.toContain('jwt-secret')
-    await userEvent.click(within(card).getByRole('button', { name: 'Mapează în Configurare' }))
+    await userEvent.click(within(card).getByRole('button', { name: 'Toate mapările, în Configurare' }))
     await waitFor(() => expect(where()).toBe('/admin/config'))
   })
 

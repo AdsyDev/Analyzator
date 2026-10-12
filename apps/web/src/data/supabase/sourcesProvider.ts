@@ -176,9 +176,9 @@ export function createSupabaseSources(client: DataClient, now: () => Date = () =
         }
       }),
 
-    listAccounts: (connectionId, kind) =>
+    listAccounts: (connectionId, kind, campaignId) =>
       guarded(async (): Promise<AccountList> => {
-        const { data, error } = await client.functions.invoke(FUNCTION, { body: { action: 'list_accounts', connection_id: connectionId, kind } })
+        const { data, error } = await client.functions.invoke(FUNCTION, { body: { action: 'list_accounts', connection_id: connectionId, kind, ...(campaignId ? { campaign_id: campaignId } : {}) } })
         if (error) throw new Error(await functionError(error))
         const d = data as Record<string, unknown> | null
         if (

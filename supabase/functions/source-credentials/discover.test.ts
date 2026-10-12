@@ -133,6 +133,29 @@ describe('Planable, Meta, SEOmonitor', () => {
     assert.equal((calls[0]!.init?.headers as Record<string, string>).Authorization, 'jwt')
   })
 
+  test('SEOmonitor: grupurile campaniei, aplatizate, cu tipul și părintele', async () => {
+    const { fetch, calls } = fakeFetch({
+      'https://apigw.seomonitor.com/v3/rank-tracker/v3.0/groups': () => json([{ group_id: -1, name: 'Brand', type: 'folder', subgroups: [{ group_id: 12, name: 'Minimartieni brand', type: 'group' }] }, { group_id: 13, name: 'Vitamine copii', type: 'group' }, { name: 'fără id' }]),
+    })
+    assert.deepEqual(await discover('seomonitor_groups', 'jwt', fetch, NOW, '501'), {
+      ok: true,
+      truncated: false,
+      accounts: [
+        { id: '-1', name: 'Brand', detail: 'folder' },
+        { id: '12', name: 'Minimartieni brand', detail: 'group în Brand' },
+        { id: '13', name: 'Vitamine copii', detail: 'group' },
+      ],
+    })
+    assert.ok(calls[0]!.url.endsWith('groups?campaign_id=501'))
+  })
+
+  test('SEOmonitor: o campanie invalidă nu pleacă spre furnizor', async () => {
+    const { fetch, calls } = fakeFetch({})
+    const r = await discover('seomonitor_groups', 'jwt', fetch, NOW, '501&x=1')
+    assert.ok(!r.ok)
+    assert.equal(calls.length, 0)
+  })
+
   test('eroare de rețea → provider_error, nu invalid', async () => {
     const r = await discover('seomonitor', 'jwt', async () => { throw new Error('ECONNRESET') }, NOW)
     assert.ok(!r.ok && r.reason === 'provider_error')

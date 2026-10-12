@@ -69,6 +69,17 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
   }
 
   const versions = adminFile.competitor_versions as Record<string, Array<{ version: number; effective_from_days_ago: number; note: string | null; members: Array<{ id: string; name: string; domain: string | null }> }>>
+  const mappings: SeomonitorMapping[] = adminFile.seomonitor_mappings.map<SeomonitorMapping>((m) => ({
+    campaign_id: m.campaign_id,
+    group_id: m.group_id,
+    version: m.version,
+    effective_from: addDays(today(), -m.effective_days_ago),
+    kind: m.kind as MappingKind,
+    brand_id: m.brand_id,
+    brand_type: m.brand_type as SeomonitorMapping['brand_type'],
+    is_primary_visibility: m.is_primary_visibility,
+    note: m.note,
+  }))
   const aliases = adminFile.aliases as Record<string, Array<{ id: string; alias: string; used_in: string }>>
 
   const config: ConfigProvider = {
@@ -91,22 +102,26 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
       if (!allowed.has(brandId)) return failed('Acces refuzat la acest spațiu de brand.')
       return ready<BrandAlias[]>(aliases[brandId] ?? [])
     },
-    seomonitorMappings: async () =>
-      getRole() === 'client_viewer'
-        ? failed('Maparea grupurilor este vizibilă doar echipei AdSymphony.')
-        : ready(
-            adminFile.seomonitor_mappings.map<SeomonitorMapping>((m) => ({
-              campaign_id: m.campaign_id,
-              group_id: m.group_id,
-              version: m.version,
-              effective_from: addDays(today(), -m.effective_days_ago),
-              kind: m.kind as MappingKind,
-              brand_id: m.brand_id,
-              brand_type: m.brand_type as SeomonitorMapping['brand_type'],
-              is_primary_visibility: m.is_primary_visibility,
-              note: m.note,
-            })),
-          ),
+    seomonitorMappings: async () => {
+      if (getRole() === 'client_viewer') return failed('Maparea grupurilor este vizibilă doar echipei AdSymphony.')
+      // Versiunea cea mai mare per grup, ca în providerul real.
+      const latest = new Map<string, SeomonitorMapping>()
+      for (const m of mappings) {
+        const k = `${m.campaign_id}:${m.group_id}`
+        if ((latest.get(k)?.version ?? 0) < m.version) latest.set(k, m)
+      }
+      return ready([...latest.values()])
+    },
+    saveSeomonitorMappings: async (_tenantId, _sourceId, rows) => {
+      if (getRole() !== 'agency_admin') return failed('Doar administratorii agenției pot mapa grupurile.')
+      if (rows.length === 0) return failed('Nicio schimbare de salvat.')
+      const effective = addDays(today(), -1)
+      for (const r of rows) {
+        const version = Math.max(0, ...mappings.filter((m) => m.campaign_id === r.campaign_id && m.group_id === r.group_id).map((m) => m.version)) + 1
+        mappings.push({ campaign_id: r.campaign_id, group_id: r.group_id, version, effective_from: effective, kind: r.kind, brand_id: r.brand_id, brand_type: r.brand_type, is_primary_visibility: r.is_primary_visibility, note: 'Din pagina site-ului' })
+      }
+      return ready({ effective_from: effective })
+    },
   }
   return { users, config }
 }

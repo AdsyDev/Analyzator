@@ -1,6 +1,6 @@
-import { failed, ready, notConnected, type AccessPerson, type CompetitorSetVersion, type ConfigProvider, type MappingKind, type ProviderResult, type Role, type SeomonitorMapping, type UsersProvider } from '../../contracts'
+import { failed, ready, notConnected, type AccessPerson, type CompetitorSetVersion, type ConfigProvider, type MappingKind, type NewSeomonitorMapping, type ProviderResult, type Role, type SeomonitorMapping, type UsersProvider } from '../../contracts'
 import { ROLES } from '../../contracts'
-import { todayBucharest } from '../../lib/period'
+import { addDays, todayBucharest } from '../../lib/period'
 import type { DataClient } from './dataClient'
 import { QUERY_FAILED } from './dataClient'
 
@@ -168,6 +168,44 @@ export function createSupabaseConfig(client: DataClient, now: () => Date = () =>
           note: r.note,
         })),
       )
+    },
+
+    async saveSeomonitorMappings(tenantId, sourceId, rows: NewSeomonitorMapping[]) {
+      if (rows.length === 0) return failed('Nicio schimbare de salvat.')
+      const userId = await currentUserId(client)
+      if (!userId) return failed('Sesiunea a expirat. Autentifică-te din nou.')
+      const campaigns = [...new Set(rows.map((r) => r.campaign_id))]
+      const existing = await client
+        .from('seomonitor_group_mappings')
+        .select('campaign_id, group_id, version')
+        .eq('tenant_id', tenantId)
+        .eq('source_id', sourceId)
+        .in('campaign_id', campaigns)
+      if (existing.error) return failed(QUERY_FAILED)
+      const maxVersion = new Map<string, number>()
+      for (const r of (existing.data ?? []) as unknown as Array<{ campaign_id: string; group_id: string; version: number }>) {
+        const k = `${r.campaign_id}:${r.group_id}`
+        maxVersion.set(k, Math.max(maxVersion.get(k) ?? 0, r.version))
+      }
+      // În vigoare de ieri: colectarea aplică versiunea valabilă la sfârșitul intervalului (ieri).
+      const effective = addDays(todayBucharest(now()), -1)
+      const insert = rows.map((r) => ({
+        tenant_id: tenantId,
+        source_id: sourceId,
+        campaign_id: r.campaign_id,
+        group_id: r.group_id,
+        version: (maxVersion.get(`${r.campaign_id}:${r.group_id}`) ?? 0) + 1,
+        effective_from: effective,
+        mapping_kind: r.kind,
+        brand_id: r.kind === 'brand' ? r.brand_id : null,
+        brand_type: r.kind === 'brand' ? r.brand_type : null,
+        is_primary_visibility: r.kind === 'brand' && r.is_primary_visibility,
+        note: 'Din pagina site-ului',
+        created_by: userId,
+      }))
+      const { error } = await client.from('seomonitor_group_mappings').insert(insert)
+      if (error) return failed(error.code === '42501' ? 'Doar administratorii agenției pot mapa grupurile SEOmonitor.' : error.code === '23505' ? 'Maparea a fost schimbată între timp. Reîncarcă și încearcă din nou.' : QUERY_FAILED)
+      return ready({ effective_from: effective })
     },
   }
 }

@@ -162,6 +162,7 @@ const config: ConfigProvider = {
   competitorVersions: async () => notConnected('Setul de competitori nu este încă disponibil.'),
   aliases: async () => notConnected('Aliasurile brandului nu sunt încă disponibile.'),
   seomonitorMappings: async () => notConnected('Maparea grupurilor nu este încă disponibilă.'),
+  saveSeomonitorMappings: async () => notConnected('Maparea grupurilor nu este încă disponibilă.'),
 }
 
 const CLIENTS_UNAVAILABLE = 'Administrarea clienților nu este încă disponibilă.'

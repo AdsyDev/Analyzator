@@ -59,7 +59,7 @@ export interface SourcesProvider {
    * Funcția server `source-credentials`, `list_accounts`: conturile pe care le vede cheia clientului (conexiunea de
    * client dată), pentru selectorul din pagina site-ului. Doar `agency_admin`; cheia nu ajunge în browser.
    */
-  listAccounts(tenantConnectionId: string, kind: DiscoverKind): Promise<ProviderResult<AccountList>>
+  listAccounts(tenantConnectionId: string, kind: DiscoverKind, campaignId?: string): Promise<ProviderResult<AccountList>>
   /** Conturile la nivel de client (Google, SEOmonitor); doar agenția (RLS). */
   tenantConnections(tenantId: TenantId): Promise<ProviderResult<TenantConnection[]>>
   /** Doar `agency_admin` (RLS). Tokenul se setează apoi cu `setToken`. */
