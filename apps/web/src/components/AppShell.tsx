@@ -229,7 +229,7 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
       </aside>
 
       <div className={cn('transition-[margin] duration-200', collapsed ? 'ml-[72px]' : 'ml-[240px]')}>
-        <header className="glass sticky top-[var(--banner-h,0px)] z-20 flex h-14 items-center gap-3 border-x-0 border-t-0 px-6">
+        <header className="glass-bar sticky top-[var(--banner-h,0px)] z-20 flex h-14 items-center gap-3 border-x-0 border-t-0 px-6">
           {brands === null ? (
             <span className="h-8 w-40 rounded-lg bg-skeleton" role="status" aria-label="Se încarcă brandurile" />
           ) : brands.kind !== 'ready' ? (

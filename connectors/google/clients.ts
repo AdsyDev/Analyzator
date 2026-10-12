@@ -61,13 +61,18 @@ export const createGoogleClients: ClientFactory = (credentials) => {
         dimensions: req.dimensions.map((name) => ({ name })),
         metrics: req.metrics.map((name) => ({ name })),
       })
+      // Răspunsul acoperă toate câmpurile proprietății: păstrăm doar câmpurile cerute.
+      const dims = new Set(req.dimensions)
+      const mets = new Set(req.metrics)
       return {
         incompatibleDimensions: (res.dimensionCompatibilities ?? [])
           .filter((c) => isIncompatible(c.compatibility))
-          .map((c) => c.dimensionMetadata?.apiName ?? '(necunoscută)'),
+          .map((c) => c.dimensionMetadata?.apiName ?? '')
+          .filter((n) => dims.has(n)),
         incompatibleMetrics: (res.metricCompatibilities ?? [])
           .filter((c) => isIncompatible(c.compatibility))
-          .map((c) => c.metricMetadata?.apiName ?? '(necunoscută)'),
+          .map((c) => c.metricMetadata?.apiName ?? '')
+          .filter((n) => mets.has(n)),
       }
     },
     async runReport(req) {

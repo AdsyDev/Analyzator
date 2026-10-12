@@ -457,6 +457,15 @@ describe('collectGoogle: GA4', () => {
     assert.equal((db.tables.web_daily ?? []).length, 0)
   })
 
+  test('GA4 marchează incompatibile câmpuri necerute (itemBrand, cohortNthDay…): rapoartele rulează normal (12 oct 2026)', async () => {
+    const db = makeDb()
+    const { outcomes } = await run(db, { compat: { incompatibleDimensions: ['itemBrand', 'cohortNthDay', 'userGender'], incompatibleMetrics: ['itemRevenue'] } }, 'ga4')
+    const o = outcomes[0]!
+    if (o.status === 'not_connected') assert.fail()
+    assert.ok(!o.errors.some((e) => e.code === 'ga4_incompatible_dimensions' || e.code === 'ga4_incompatible_metrics'), JSON.stringify(o.errors))
+    assert.ok((db.tables.web_daily ?? []).length > 0)
+  })
+
   test('acces refuzat (403/gRPC 7): failed, fără retry, fără excepție, fără alte cereri', async () => {
     const db = makeDb()
     const { outcomes, calls } = await run(db, { denyGa4: true }, 'ga4')

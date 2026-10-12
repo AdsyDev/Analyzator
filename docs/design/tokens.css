@@ -11,6 +11,8 @@
   --glass:rgba(255,255,255,0.65);
   --glass-strong:rgba(255,255,255,0.86);
   --glass-thick:rgba(250,252,254,0.8);
+  /* Bara de sus stă peste conținutul care derulează: aproape opacă, altfel textul de dedesubt se citește prin ea. */
+  --glass-bar:rgba(250,252,254,0.94);
   --glass-border:rgba(255,255,255,0.8);
   --surface:#FFFFFF;
   --surface-2:#F4F7FA;
@@ -68,6 +70,7 @@
   --glass:rgba(18,24,33,0.6);
   --glass-strong:rgba(20,27,37,0.88);
   --glass-thick:rgba(16,22,30,0.76);
+  --glass-bar:rgba(16,22,30,0.94);
   --glass-border:rgba(255,255,255,0.08);
   --surface:#141B24;
   --surface-2:#18212C;

@@ -307,13 +307,17 @@ async function collectGa4(
       compat.set(key, result)
     }
     if (result === 'failed') return null
-    if (result.incompatibleDimensions.length) {
-      fail('ga4_incompatible_dimensions', `${spec.name}: dimensiuni incompatibile (${result.incompatibleDimensions.join(', ')}); raport sărit`, { dimension: spec.name })
+    // GA4 întoarce compatibilitatea pentru toate câmpurile proprietății (de ex. itemBrand, cohortNthDay), nu doar pentru
+    // cele cerute: contează doar câmpurile raportului.
+    const badDimensions = result.incompatibleDimensions.filter((d) => spec.dimensions.includes(d))
+    const badMetrics = result.incompatibleMetrics.filter((m) => spec.metrics.includes(m))
+    if (badDimensions.length) {
+      fail('ga4_incompatible_dimensions', `${spec.name}: dimensiuni incompatibile (${badDimensions.join(', ')}); raport sărit`, { dimension: spec.name })
       return null
     }
-    const metrics = spec.metrics.filter((m) => !result.incompatibleMetrics.includes(m))
-    if (result.incompatibleMetrics.length) {
-      fail('ga4_incompatible_metrics', `${spec.name}: metrici incompatibile cu dimensiunile (${result.incompatibleMetrics.join(', ')}); rămân NULL`, { dimension: spec.name })
+    const metrics = spec.metrics.filter((m) => !badMetrics.includes(m))
+    if (badMetrics.length) {
+      fail('ga4_incompatible_metrics', `${spec.name}: metrici incompatibile cu dimensiunile (${badMetrics.join(', ')}); rămân NULL`, { dimension: spec.name })
     }
     if (metrics.length === 0) return null
     return { dimensions: spec.dimensions, metrics }

@@ -77,10 +77,17 @@ button, input, select, textarea { font-family: inherit; }
 ::selection { background: var(--accent-soft); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Sticla: singurele clase care folosesc backdrop-filter. Doar pe sidebar, topbar,
+/* Sticla: singurele clase care folosesc backdrop-filter (`.glass-bar` = topbar, aproape opac). Doar pe sidebar, topbar,
    drawere, modale și popovere. Suprafețele cu date folosesc bg-surface (solid). */
 .glass {
   background: var(--glass);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--sh-glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+.glass-bar {
+  background: var(--glass-bar);
   border: 1px solid var(--glass-border);
   box-shadow: var(--sh-glass);
   backdrop-filter: var(--glass-blur);
