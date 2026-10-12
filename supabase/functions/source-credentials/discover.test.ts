@@ -63,11 +63,12 @@ describe('Google: proprietăți GA4 și site-uri Search Console', () => {
   test('GA4: Admin API neactivat → mesaj care spune ce API trebuie activat', async () => {
     const { fetch } = fakeFetch({
       [GOOGLE_TOKEN_URL]: (c) => googleToken(c, 'https://www.googleapis.com/auth/analytics.readonly'),
-      [GA4_ACCOUNTS_URL]: () => json({ error: { code: 403, status: 'PERMISSION_DENIED', details: [{ reason: 'SERVICE_DISABLED' }] } }, 403),
+      [GA4_ACCOUNTS_URL]: () => json({ error: { code: 403, message: 'Google Analytics Admin API has not been used in project 123456789012 before or it is disabled.', status: 'PERMISSION_DENIED', details: [{ reason: 'SERVICE_DISABLED', metadata: { consumer: 'projects/123456789012' } }] } }, 403),
     })
     const r = await discover('ga4', serviceAccount, fetch, NOW)
     assert.equal(r.ok, false)
     assert.ok(!r.ok && r.reason === 'api_disabled' && r.message.includes('Google Analytics Admin API'))
+    assert.ok(!r.ok && r.message.includes('proiectul nr. 123456789012'))
   })
 
   test('Search Console: site-urile verificate, fără cele neverificate', async () => {

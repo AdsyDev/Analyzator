@@ -111,7 +111,10 @@ async function discoverGoogle(kind: 'ga4' | 'gsc', raw: string, fetch: Fetch, no
 async function googleFailure(res: Response, api: string): Promise<DiscoverOutcome> {
   const text = await res.text()
   if (res.status === 403 && /SERVICE_DISABLED|accessNotConfigured|has not been used in project|is disabled/i.test(text)) {
-    return { ok: false, reason: 'api_disabled', status: 403, message: `${api} nu e activat în proiectul Google Cloud al cheii. Google Cloud → APIs & Services → Library → activează „${api}”, apoi reîncearcă peste câteva minute.` }
+    // Google spune în ce proiect caută API-ul (numărul proiectului, nu un secret): ajută când API-ul a fost activat în alt proiect.
+    const project = /projects?[ /:=]+(\d{6,})/i.exec(text)?.[1]
+    const where = project ? ` Google caută API-ul în proiectul nr. ${project}: verifică în Google Cloud (bara de sus) că acesta e proiectul selectat când îl activezi.` : ''
+    return { ok: false, reason: 'api_disabled', status: 403, message: `${api} nu e activat în proiectul Google Cloud al cheii. Google Cloud → APIs & Services → Library → activează „${api}”, apoi reîncearcă peste câteva minute.${where}` }
   }
   if (res.status === 429) return { ok: false, reason: 'rate_limited', status: 429, message: 'Google a limitat cererile (429). Reîncearcă peste un minut.' }
   return providerError('Google', res.status)
