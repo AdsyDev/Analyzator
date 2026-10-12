@@ -157,4 +157,18 @@ describe('numele reale din API (12 oct 2026)', () => {
     // Câmpurile blocului de comportament se notează cu numele lor (fără valori), ca maparea să se facă pe date reale.
     assert.ok(notes.some((n) => n.metric_name === 'RageClickCount' && n.field === 'sessionsWithMetricPercentage'))
   })
+
+  test('ScrollDepth.averageScrollDepth → scroll_depth; valorile câmpurilor nedocumentate apar doar pe agregat', () => {
+    const payload = [
+      { metricName: 'Traffic', information: [{ totalSessionCount: '200' }] },
+      { metricName: 'ScrollDepth', information: [{ averageScrollDepth: 47.3 }] },
+      { metricName: 'RageClickCount', information: [{ sessionsCount: '12', sessionsWithMetricPercentage: 6 }] },
+    ]
+    const all = parseClarityPayload(payload, ctx('all'))
+    assert.equal(all.rows[0]!.scroll_depth, 47.3)
+    assert.equal(all.rows[0]!.rage_click_count, null, 'rage clicks rămân NULL până la confirmare')
+    assert.ok(all.notes.some((n) => n.field === 'sessionsCount' && /= 12/.test(n.message)))
+    const dev = parseClarityPayload(payload.map((b) => ({ ...b, information: b.information.map((i) => ({ ...i, Device: 'PC' })) })), ctx('device'))
+    assert.ok(dev.notes.every((n) => !/ = /.test(n.message)), 'pe defalcări nu se notează valori')
+  })
 })

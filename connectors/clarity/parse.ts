@@ -40,7 +40,8 @@ export const FIELD_MAP: Record<string, Partial<Record<string, MetricColumn>>> = 
     distinctUserCount: 'distinct_users',
     PagesPerSessionPercentage: 'pages_per_session',
   },
-  'Scroll Depth': {},
+  // Pe payload real (12 oct 2026): „ScrollDepth” → { averageScrollDepth }. Numele e neechivoc; procent mediu.
+  'Scroll Depth': { averageScrollDepth: 'scroll_depth' },
   'Engagement Time': {},
   'Dead Click Count': {},
   'Rage Click Count': {},
@@ -188,11 +189,14 @@ export function parseClarityPayload(payload: unknown, ctx: ParseContext): ParseR
         if (field === dimField) continue
         const column = columnFor(mapping, field)
         if (!column) {
+          // Pe dimensiunea agregată („all”), valoarea câmpurilor de comportament nedocumentate intră în notă: totaluri
+          // anonime ale proiectului, necesare ca să stabilim pe dovezi ce înseamnă fiecare câmp (D-21).
+          const sample = dimension === 'all' && (typeof raw === 'number' || typeof raw === 'string') ? ` = ${String(raw).slice(0, 32)}` : ''
           note({
             code: Object.keys(mapping).length === 0 ? 'unconfirmed_field' : 'unknown_field',
             metric_name: block.metricName,
             field,
-            message: `câmp nemapat „${field}" în „${block.metricName}" (rămâne neînregistrat)`,
+            message: `câmp nemapat „${field}" în „${block.metricName}"${sample} (rămâne neînregistrat)`,
           })
           continue
         }
