@@ -161,6 +161,30 @@ describe('pagina site-ului: sursele, fiecare conectată pe site (fixtures de pre
     expect(document.body.textContent).not.toContain('EAAG-secret')
   })
 
+  it('GA4: Admin API neactivat → motivul vizibil, câmpul manual doar la cerere', async () => {
+    renderApp({
+      route: site('brand-proenzi'),
+      wrap: (b) => ({
+        ...b,
+        sources: {
+          ...b.sources,
+          tenantConnections: async (t) => {
+            const r = await b.sources.tenantConnections(t)
+            return r.kind === 'ready' ? { kind: 'ready' as const, data: [...r.data, { id: 'gkey', tenant_id: t, provider: 'google_service_account' as const, external_account_id: 'sa@p.iam.gserviceaccount.com', display_name: null, credential_status: 'valid' as const, credential_updated_at: null }] } : r
+          },
+          listAccounts: async () => ({ kind: 'ready' as const, data: { outcome: 'api_disabled' as const, credential_status: 'valid' as const, accounts: [], truncated: false, message: 'Google Analytics Admin API nu e activat în proiectul Google Cloud al cheii.' } }),
+        },
+      }),
+    })
+    await pageReady('Site și surse')
+    const card = await open('Google Analytics 4')
+    const form = await within(card).findByRole('form', { name: 'Adaugă conexiunea Google Analytics 4' })
+    expect(await within(form).findByRole('alert')).toHaveTextContent('Google Analytics Admin API nu e activat')
+    expect(within(form).queryByLabelText('Property ID GA4')).toBeNull()
+    await userEvent.click(within(form).getByRole('button', { name: 'Nu e în listă? Introdu manual' }))
+    expect(within(form).getByLabelText('Property ID GA4')).toBeInTheDocument()
+  })
+
   it('lista nu poate fi citită: motivul, „Reîncarcă lista” și câmpul manual', async () => {
     renderApp({
       route: site('brand-urinal'),

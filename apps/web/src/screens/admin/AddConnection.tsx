@@ -135,7 +135,8 @@ export function AddConnection({ brandId, provider, discovery, onCreated }: Props
         </div>
       )}
 
-      {(usingList || manual || (discovery && list.state.status !== 'loading')) && (
+      {/* Cu o problemă la listă, câmpul manual apare doar la cerere: motivul rămâne vizibil. */}
+      {(usingList || manual) && (
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             {usingList ? (
@@ -170,7 +171,7 @@ export function AddConnection({ brandId, provider, discovery, onCreated }: Props
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" variant="primary" loading={busy} disabled={!value}>Adaugă conexiunea</Button>
+        {(usingList || manual) && <Button type="submit" variant="primary" loading={busy} disabled={!value}>Adaugă conexiunea</Button>}
         {discovery && (
           <Button variant="ghost" onClick={() => setManual(!manual)}>
             {manual ? 'Alege din lista cheii' : 'Nu e în listă? Introdu manual'}
