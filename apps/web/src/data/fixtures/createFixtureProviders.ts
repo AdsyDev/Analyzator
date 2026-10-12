@@ -366,6 +366,24 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
       connectionPatch.set(connectionId, { ...patch, credential_status: 'valid', calls_today: used + 1, last_validated_at: now().toISOString(), last_validation_error: null })
       return ready({ connection_id: connectionId, credential_status: 'valid' as CredentialStatus, calls_today: used + 1, daily_limit: 10, outcome: 'valid' as const, message: 'Conexiunea funcționează.' })
     },
+    listAccounts: async (connectionId, kind) => {
+      if (getRole() !== 'agency_admin') return failed('Doar administratorii agenției pot lista conturile.')
+      const conn = tenantConnectionsMem.find((c) => c.id === connectionId)
+      if (!conn) return failed('Conexiune inexistentă sau inactivă.')
+      if ((connectionPatch.get(conn.id)?.credential_status ?? conn.credential_status) === 'missing') return failed('Cheia clientului nu e salvată.')
+      connectionPatch.set(conn.id, { ...(connectionPatch.get(conn.id) ?? {}), credential_status: 'valid' })
+      // Previzualizare: conturi construite din spațiile clientului, ca selectorul să aibă ce arăta.
+      const spaces = (brandsFile.brands as Array<{ id: string; name: string; domain: string | null }>)
+      const accounts = spaces.map((b, i) => {
+        const domain = b.domain ?? `${b.id}.example`
+        if (kind === 'ga4') return { id: String(410000000 + i), name: b.name, detail: 'STADA România' }
+        if (kind === 'gsc') return { id: `sc-domain:${domain}`, name: `sc-domain:${domain}`, detail: 'Domain property' }
+        if (kind === 'planable') return { id: `ws-${b.id}`, name: b.name, detail: 'Europe/Bucharest' }
+        if (kind === 'meta_ads') return { id: `act_${1000 + i}`, name: `${b.name} RO`, detail: 'RON' }
+        return { id: String(500 + i), name: b.name, detail: domain }
+      })
+      return ready({ outcome: 'ok' as const, credential_status: 'valid' as CredentialStatus, accounts, truncated: false, message: null })
+    },
     tenantConnections: async (tenantId) => {
       if (!isAgencyRole(getRole())) return failed('Conexiunile și credențialele sunt vizibile doar echipei AdSymphony.')
       return ready(

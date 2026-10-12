@@ -45,7 +45,7 @@ Testul e limitat la 20 pe zi pentru fiecare cont.
    - rulează **GET /workspaces**.
 
    Fiecare workspace are un `id` și un `name`.
-2. În Analyzator: pagina site-ului → cardul **Planable** → pasul 2 → la „Workspace Planable” pune **ID-ul workspace-ului**.
+2. În Analyzator: pagina site-ului → cardul **Planable** → pasul 2 → alegi workspace-ul din listă (aplicația o cere Planable cu tokenul clientului și îl propune pe cel cu numele site-ului). Manual, dacă e nevoie: **ID-ul workspace-ului**.
 3. Cardul conexiunii arată „Cheia clientului”: nu are token propriu, ci folosește tokenul de la pasul 2.
 
 Repetă pasul 3 pentru fiecare brand.

@@ -2,7 +2,7 @@ import { useEffect, useId, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeftIcon, CaretDownIcon, CaretUpIcon, CheckCircleIcon, CircleHalfIcon, ClockIcon, PlugsIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
-import type { Client, ClientSpace, SourceConnection, SourceProviderId, SourceState, SourceStatusInfo, SyncRun, TenantConnection, TenantProviderId } from '../../contracts'
+import type { Client, ClientSpace, DiscoverKind, SourceConnection, SourceProviderId, SourceState, SourceStatusInfo, SyncRun, TenantConnection, TenantProviderId } from '../../contracts'
 import { EmptyState } from '../../components/EmptyState'
 import { Button } from '../../components/ui/Button'
 import { StatusChip, type ChipTone } from '../../components/ui/Chip'
@@ -18,6 +18,7 @@ import { useLayout } from '../../routing/AppLayout'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
 import { AddConnection } from './AddConnection'
+import { SeomonitorCampaigns } from './SeomonitorCampaigns'
 import { ConnectionCard } from './ConnectionCard'
 import { CREDENTIAL_LABELS, SYNC_LABELS } from './labels'
 import { TenantAccountCard } from './TenantAccounts'
@@ -46,6 +47,9 @@ export const SITE_SOURCES: readonly SiteSource[] = [
   { provider: 'tiktok_ads', tenant: 'tiktok_account', brand: true },
   { provider: 'csv_import', tenant: null, brand: false },
 ]
+
+/** Sursele cu selector: contul site-ului se alege din lista văzută de cheia clientului. */
+const DISCOVER_KIND: Partial<Record<SourceProviderId, DiscoverKind>> = { ga4: 'ga4', gsc: 'gsc', planable: 'planable', meta_ads: 'meta_ads' }
 
 const STATE: Record<SourceState, { label: string; tone: ChipTone; icon: ReactNode }> = {
   connected: { label: 'Conectat', tone: 'pos', icon: <CheckCircleIcon size={11} weight="bold" aria-hidden="true" /> },
@@ -337,7 +341,15 @@ function SiteSourceCard({ source, space, client, status, connections, tenantConn
                 {connections.map((c) => (
                   <ConnectionCard key={c.id} connection={c} onChanged={onChanged} />
                 ))}
-                {connections.length === 0 && <AddConnection brandId={space.id} provider={provider} onCreated={onChanged} />}
+                {connections.length === 0 && (
+                  <AddConnection
+                    key={keySaved ? tenantConnection.id : 'manual'}
+                    brandId={space.id}
+                    provider={provider}
+                    discovery={keySaved && DISCOVER_KIND[provider] ? { tenantConnectionId: tenantConnection.id, kind: DISCOVER_KIND[provider]!, siteName: space.name, siteDomain: space.domain } : undefined}
+                    onCreated={onChanged}
+                  />
+                )}
               </div>
             </Step>
           )}
@@ -346,6 +358,7 @@ function SiteSourceCard({ source, space, client, status, connections, tenantConn
             <Step n={++n} total={steps} title={`Grupurile de keywords ale ${space.name}`} done={false}>
               <div className="flex flex-col items-start gap-2">
                 <p className="text-[12.5px] leading-snug text-text-2">SEOmonitor nu are cont pe site: datele intră pe {space.name} după ce grupurile lui de keywords sunt mapate pe site.</p>
+                {keySaved && <SeomonitorCampaigns tenantConnectionId={tenantConnection.id} siteDomain={space.domain} />}
                 <Button onClick={() => navigate(adminPath('config'))}>Mapează în Configurare</Button>
               </div>
             </Step>

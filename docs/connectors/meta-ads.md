@@ -40,7 +40,7 @@ Același token poate servi mai mulți clienți: îl salvezi pe fiecare client.
 ## 3. Leagă fiecare brand de contul lui de ads
 
 1. ID-ul contului apare în Ads Manager, în selectorul de cont sau în adresă (`act=1234567890`), și în Business Settings → Accounts → Ad accounts.
-2. Analyzator: pagina site-ului → cardul **Meta Ads** → pasul 2 → `act_1234567890` (sau doar cifrele).
+2. Analyzator: pagina site-ului → cardul **Meta Ads** → pasul 2 → alegi contul de ads din lista conturilor atribuite system user-ului. Manual, dacă e nevoie: `act_1234567890`.
 3. Cardul conexiunii arată „Cheia clientului”: folosește tokenul de la pasul 2.
 
 ## 4. Pornește colectarea

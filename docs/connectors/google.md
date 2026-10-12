@@ -24,7 +24,8 @@ Analyzator nu se loghează cu contul tău Google. Folosește un **service accoun
 
 1. [console.cloud.google.com](https://console.cloud.google.com) → creează un proiect (de ex. `analyzator-<client>`) sau folosește unul existent al agenției.
 2. **APIs & Services → Library**, activează:
-   - **Google Analytics Data API**
+   - **Google Analytics Data API** (colectarea)
+   - **Google Analytics Admin API** (lista proprietăților din selectorul aplicației)
    - **Google Search Console API**
 3. **IAM & Admin → Service Accounts → Create service account.** Nume: `analyzator`. Nu îi da niciun rol în proiect (nu are nevoie).
 4. Deschide service account-ul → **Keys → Add key → Create new key → JSON**. Se descarcă un fișier `.json`.
@@ -50,7 +51,7 @@ Cheia nu se mai poate citi din aplicație. Pentru o cheie nouă (rotire), încar
 
 ## 4. Adaugă proprietățile (din aplicație, per brand)
 
-În pagina site-ului, cardul **Google Analytics 4** (respectiv **Search Console**) → pasul 2.
+În pagina site-ului, cardul **Google Analytics 4** (respectiv **Search Console**) → pasul 2. Cu cheia salvată, pasul 2 e un **selector**: aplicația cere Google lista proprietăților pe care le vede service account-ul și propune proprietatea site-ului (după nume la GA4, după domeniu la Search Console). Dacă proprietatea lipsește din listă, service account-ul nu are încă acces la ea (pasul 2 de mai sus). „Nu e în listă? Introdu manual” rămâne disponibil, cu valorile din tabel.
 
 | Sursă | Cont sau proiect | Unde îl găsești |
 |---|---|---|

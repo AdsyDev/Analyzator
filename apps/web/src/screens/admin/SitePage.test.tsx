@@ -117,11 +117,15 @@ describe('pagina site-ului: sursele, fiecare conectată pe site (fixtures de pre
     expect(await within(card).findByText(/Folosește cheia clientului STADA România/)).toBeInTheDocument()
     expect(document.body.textContent).not.toContain('pln_secret123')
 
+    // Pasul 2: workspace-ul se alege din lista văzută de token, cu cel al site-ului propus.
     const form = within(card).getByRole('form', { name: 'Adaugă conexiunea Planable' })
-    expect(within(form).getByLabelText('Workspace Planable')).toHaveAttribute('placeholder', 'ID-ul workspace-ului Planable')
-    await userEvent.type(within(form).getByLabelText('Workspace Planable'), 'ws-urinal')
+    const select = await within(form).findByLabelText('Workspace-ul Planable')
+    expect(select).toHaveValue('ws-brand-urinal')
+    expect(within(form).getByText(/Propus după numele sau domeniul site-ului/)).toBeInTheDocument()
+    expect(within(form).getByLabelText('Nume afișat (opțional)')).toHaveValue('Urinal')
     await userEvent.click(within(form).getByRole('button', { name: 'Adaugă conexiunea' }))
-    const conn = await within(card).findByRole('article', { name: 'Conexiune Planable' })
+    const conn = await within(card).findByRole('article', { name: 'Conexiune Planable · Urinal' })
+    expect(within(conn).getByText('ws-brand-urinal')).toBeInTheDocument()
     expect(within(conn).getByText(/folosește tokenul Planable al clientului \(pasul 1\)/)).toBeInTheDocument()
 
     // Alt site al aceluiași client: tokenul nu se mai cere.
@@ -132,7 +136,53 @@ describe('pagina site-ului: sursele, fiecare conectată pe site (fixtures de pre
     card = await open('Planable')
     expect(within(card).getByText(/Folosește cheia clientului STADA România/)).toBeInTheDocument()
     expect(within(card).queryByLabelText('Token API')).toBeNull()
-    expect(within(card).getByRole('form', { name: 'Adaugă conexiunea Planable' })).toBeInTheDocument()
+    expect(await within(card).findByLabelText('Workspace-ul Planable')).toHaveValue('ws-brand-proenzi')
+  })
+
+  it('selectorul: altă alegere din listă sau introducere manuală', async () => {
+    renderApp({ route: site('brand-proenzi') })
+    await pageReady('Site și surse')
+    const card = await open('Meta Ads')
+    const account = within(card).getByRole('article', { name: 'Contul Meta Ads al clientului' })
+    await userEvent.type(within(account).getByLabelText('Business Manager'), 'BM AdSymphony')
+    await userEvent.type(within(account).getByLabelText('Token API'), 'EAAG-secret')
+    await userEvent.click(within(account).getByRole('button', { name: 'Salvează' }))
+    const select = await within(card).findByRole('combobox', { name: 'Contul de ads Meta' })
+    expect(select).toHaveValue('act_1002')
+    await userEvent.selectOptions(select, 'act_1001')
+    expect(within(card).getByLabelText('Nume afișat (opțional)')).toHaveValue('Minimartieni RO')
+    const form = within(card).getByRole('form', { name: 'Adaugă conexiunea Meta Ads' })
+    await userEvent.click(within(form).getByRole('button', { name: 'Nu e în listă? Introdu manual' }))
+    const manual = within(form).getByLabelText('Contul de ads Meta')
+    expect(manual.tagName).toBe('INPUT')
+    await userEvent.type(manual, 'act_999')
+    await userEvent.click(within(form).getByRole('button', { name: 'Adaugă conexiunea' }))
+    expect(await within(card).findByText('act_999')).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('EAAG-secret')
+  })
+
+  it('lista nu poate fi citită: motivul, „Reîncarcă lista” și câmpul manual', async () => {
+    renderApp({
+      route: site('brand-urinal'),
+      wrap: (b) => ({
+        ...b,
+        sources: { ...b.sources, listAccounts: async () => ({ kind: 'ready' as const, data: { outcome: 'api_disabled' as const, credential_status: 'valid' as const, accounts: [], truncated: false, message: 'Google Analytics Admin API nu e activat în proiectul Google Cloud al cheii.' } }) },
+      }),
+    })
+    await pageReady('Site și surse')
+    const card = await open('SEOmonitor')
+    expect(await within(card).findByRole('alert')).toHaveTextContent('Google Analytics Admin API nu e activat')
+    expect(within(card).getByRole('button', { name: 'Reîncarcă' })).toBeInTheDocument()
+  })
+
+  it('SEOmonitor: campaniile văzute de token, cu cea a domeniului site-ului marcată', async () => {
+    renderApp({ route: site('brand-urinal') })
+    await pageReady('Site și surse')
+    const card = await open('SEOmonitor')
+    const list = await within(card).findByRole('region', { name: 'Campaniile SEOmonitor ale clientului' })
+    expect(within(list).getByText(/Tokenul funcționează și vede 3 campanii/)).toBeInTheDocument()
+    const match = within(list).getByText('Domeniul site-ului').closest('li')!
+    expect(match).toHaveTextContent('urinal.example')
   })
 
   it('SEOmonitor: contul clientului e refolosit; „Schimbă cheia” rotește tokenul; grupurile se mapează în Configurare', async () => {

@@ -14,7 +14,7 @@
 ## 1. Obține tokenul și ID-ul companiei
 
 1. În SEOmonitor: **Account Settings → Edit Profile → API Token**. Copiază tokenul. Tokenul e legat de utilizatorul tău; ideal folosește un utilizator dedicat agenției, ca să nu se oprească colectarea când pleacă cineva.
-2. **ID-ul companiei** (`company_id`): îl afli de la SEOmonitor sau din contul tău. Analyzator îl folosește doar ca etichetă a conexiunii (unică per client); colectarea vede toate campaniile la care are acces tokenul.
+2. **Numele contului**: o etichetă liberă (de ex. numele clientului), ca să recunoști contul. Colectarea vede toate campaniile la care are acces tokenul.
 3. Notează, pentru fiecare campanie a clientului, **ID-ul campaniei** și **grupurile de keywords** (ID-ul fiecărui grup). Le găsești în Rank Tracker → grupuri. Echipa tehnică le poate lista și prin API, la cerere.
 
 ## 2. Conectează contul (din aplicație)

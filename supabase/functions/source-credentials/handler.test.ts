@@ -282,3 +282,63 @@ describe('validate: SEOmonitor și Planable', () => {
     assert.equal(provider.headers.Authorization, `Bearer ${SECRET}`)
   })
 })
+
+describe('list_accounts (selectorul din pagina site-ului)', () => {
+  const tenantPlanable = () => ({ id: CONN, tenant_id: T1, brand_id: null, provider: 'planable_account', status: 'active', credential_status: 'unverified' })
+
+  test('admin: lista vine de la furnizor, se contorizează ca „discover”, confirmă cheia; tokenul nu apare în răspuns', async () => {
+    state.connection = tenantPlanable()
+    const r = await call({ action: 'list_accounts', connection_id: CONN, kind: 'planable' })
+    assert.equal(r.status, 200)
+    assert.equal(r.body.outcome, 'ok')
+    assert.equal(r.body.credential_status, 'valid')
+    assert.doesNotMatch(r.text, /CLARITY-SECRET/)
+    const planable = state.calls.find((c) => c.url.startsWith('https://api.planable.io/'))!
+    assert.equal(planable.headers.Authorization, `Bearer ${SECRET}`)
+    const counted = restCalls('provider_api_calls').find((c) => c.method === 'POST')!
+    assert.equal((counted.body as { purpose: string }).purpose, 'discover')
+    assert.equal(restCalls('audit_events').length, 1)
+  })
+
+  test('strategist: 403, cheia nu e citită', async () => {
+    state.connection = tenantPlanable()
+    const r = await call({ action: 'list_accounts', connection_id: CONN, kind: 'planable' }, 'jwt-strategist')
+    assert.equal(r.status, 403)
+    assert.equal(restCalls('rpc/get_source_token').length, 0)
+  })
+
+  test('o conexiune de brand sau a altui furnizor: 422, fără apel la furnizor', async () => {
+    const r = await call({ action: 'list_accounts', connection_id: CONN, kind: 'planable' })
+    assert.equal(r.status, 422)
+    state.connection = tenantPlanable()
+    assert.equal((await call({ action: 'list_accounts', connection_id: CONN, kind: 'meta_ads' })).status, 422)
+    assert.equal(restCalls('rpc/get_source_token').length, 0)
+  })
+
+  test('tip necunoscut: 400', async () => {
+    state.connection = tenantPlanable()
+    assert.equal((await call({ action: 'list_accounts', connection_id: CONN, kind: 'tiktok' })).status, 400)
+  })
+
+  test('limita zilnică atinsă: nicio cerere, mesaj cu varianta manuală', async () => {
+    state.connection = tenantPlanable()
+    state.callsToday = 30
+    const r = await call({ action: 'list_accounts', connection_id: CONN, kind: 'planable' })
+    assert.equal(r.body.outcome, 'budget_exhausted')
+    assert.match(String(r.body.message), /manual/)
+    assert.equal(restCalls('rpc/get_source_token').length, 0)
+  })
+
+  test('tokenul refuzat (401): cheia se marchează invalid', async () => {
+    state.connection = tenantPlanable()
+    state.clarityStatus = 401
+    const r = await call({ action: 'list_accounts', connection_id: CONN, kind: 'planable' })
+    assert.equal(r.body.outcome, 'invalid')
+    assert.equal(r.body.credential_status, 'invalid')
+  })
+
+  test('cheie lipsă: 409', async () => {
+    state.connection = { ...tenantPlanable(), credential_status: 'missing' }
+    assert.equal((await call({ action: 'list_accounts', connection_id: CONN, kind: 'planable' })).status, 409)
+  })
+})

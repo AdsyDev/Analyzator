@@ -1,4 +1,4 @@
-import { failed, ready, TENANT_PROVIDERS, type CredentialStatus, type ProviderResult, type SourceConnection, type SourcesProvider, type TenantConnection, type TenantProviderId, type TokenSaved, type ValidationOutcome, type ValidationOutcomeKind } from '../../contracts'
+import { failed, ready, TENANT_PROVIDERS, type AccountList, type AccountListOutcome, type CredentialStatus, type DiscoveredAccount, type ProviderResult, type SourceConnection, type SourcesProvider, type TenantConnection, type TenantProviderId, type TokenSaved, type ValidationOutcome, type ValidationOutcomeKind } from '../../contracts'
 import type { DataClient } from './dataClient'
 import { QUERY_FAILED } from './dataClient'
 import { deriveStatuses, mapConnection, mapSyncRun, SourceContractError, type ConnectionRow, type ImportBatchRow, type SyncRunRow } from './mapSources'
@@ -10,6 +10,12 @@ const RUN_LIMIT = 50
 const FUNCTION = 'source-credentials'
 const OUTCOMES: readonly ValidationOutcomeKind[] = ['valid', 'invalid', 'rate_limited', 'provider_error', 'budget_exhausted']
 const CREDENTIALS = ['missing', 'unverified', 'valid', 'invalid']
+const LIST_OUTCOMES: readonly AccountListOutcome[] = ['ok', 'invalid', 'api_disabled', 'rate_limited', 'provider_error', 'budget_exhausted']
+
+const isAccount = (a: unknown): a is DiscoveredAccount => {
+  const v = a as Record<string, unknown> | null
+  return !!v && typeof v.id === 'string' && typeof v.name === 'string' && (v.detail === null || typeof v.detail === 'string')
+}
 
 const utcDay = (d: Date) => d.toISOString().slice(0, 10)
 const TENANT_COLUMNS = 'id, tenant_id, provider, external_account_id, display_name, credential_status, credential_updated_at'
@@ -167,6 +173,33 @@ export function createSupabaseSources(client: DataClient, now: () => Date = () =
           daily_limit: d.daily_limit,
           outcome: d.outcome as ValidationOutcomeKind,
           message: d.message,
+        }
+      }),
+
+    listAccounts: (connectionId, kind) =>
+      guarded(async (): Promise<AccountList> => {
+        const { data, error } = await client.functions.invoke(FUNCTION, { body: { action: 'list_accounts', connection_id: connectionId, kind } })
+        if (error) throw new Error(await functionError(error))
+        const d = data as Record<string, unknown> | null
+        if (
+          !d ||
+          typeof d.outcome !== 'string' ||
+          !LIST_OUTCOMES.includes(d.outcome as AccountListOutcome) ||
+          typeof d.credential_status !== 'string' ||
+          !CREDENTIALS.includes(d.credential_status) ||
+          !Array.isArray(d.accounts) ||
+          !d.accounts.every(isAccount) ||
+          typeof d.truncated !== 'boolean' ||
+          !(d.message === null || typeof d.message === 'string')
+        ) {
+          throw new SourceContractError('Răspuns list_accounts invalid')
+        }
+        return {
+          outcome: d.outcome as AccountListOutcome,
+          credential_status: d.credential_status as CredentialStatus,
+          accounts: d.accounts,
+          truncated: d.truncated,
+          message: d.message as string | null,
         }
       }),
 

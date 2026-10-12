@@ -2,10 +2,12 @@
 //
 // POST { action: "set_token", connection_id, token }  → scrie tokenul în Vault (doar agency_admin)
 // POST { action: "validate", connection_id }           → un singur apel la furnizor; consumă din bugetul zilnic
+// POST { action: "list_accounts", connection_id, kind } → conturile pe care le vede cheia clientului (doar ID și nume)
 //
 // Tokenul nu apare niciodată în răspuns sau în loguri.
 
 import { ALLOWED_HEADERS } from '../_shared/cors.ts'
+import { DISCOVER, DISCOVER_DAILY_LIMIT, discover, type DiscoverKind } from './discover.ts'
 
 export type HandlerEnv = {
   supabaseUrl: string
@@ -102,7 +104,7 @@ export async function handle(req: Request, deps: HandlerDeps): Promise<Response>
   try {
     const userId = await authenticate(req, deps)
 
-    let body: { action?: unknown; connection_id?: unknown; token?: unknown }
+    let body: { action?: unknown; connection_id?: unknown; token?: unknown; kind?: unknown }
     try {
       body = (await req.json()) as typeof body
     } catch {
@@ -118,6 +120,10 @@ export async function handle(req: Request, deps: HandlerDeps): Promise<Response>
     }
     if (body.action === 'validate') {
       return json(env, 200, await validate(deps, userId, body.connection_id))
+    }
+    if (body.action === 'list_accounts') {
+      if (typeof body.kind !== 'string' || !(body.kind in DISCOVER)) throw new HttpError(400, 'Tip de cont necunoscut.')
+      return json(env, 200, await listAccounts(deps, userId, body.connection_id, body.kind as DiscoverKind))
     }
     throw new HttpError(400, 'Acțiune necunoscută.')
   } catch (err) {
@@ -323,5 +329,83 @@ async function validate(deps: HandlerDeps, userId: string, connectionId: string)
     daily_limit: limit,
     outcome,
     message,
+  }
+}
+
+/**
+ * Conturile pe care le vede cheia clientului, pentru selectorul din pagina site-ului. Doar conexiunile de client
+ * (`brand_id` NULL) ale furnizorului potrivit; rezultatul are doar ID-ul, numele și un detaliu, niciodată cheia.
+ * O listare reușită confirmă cheia (`valid`); un refuz al furnizorului o marchează `invalid`.
+ */
+async function listAccounts(deps: HandlerDeps, userId: string, connectionId: string, kind: DiscoverKind) {
+  const conn = await loadConnection(deps, connectionId)
+  await assertAgencyAdmin(deps, userId, conn.tenant_id)
+  if (conn.brand_id !== null || conn.provider !== DISCOVER[kind].tenantProvider) {
+    throw new HttpError(422, 'Conexiunea nu e cheia clientului pentru această sursă.')
+  }
+  if (conn.credential_status === 'missing') throw new HttpError(409, 'Cheia clientului nu e salvată.')
+
+  const day = utcDay(deps.now())
+  const rows = await rest<Array<{ calls: number }>>(
+    deps,
+    `provider_api_calls?select=calls&source_connection_id=eq.${connectionId}&call_date_utc=eq.${day}&purpose=eq.discover`,
+  )
+  const used = rows.reduce((sum, r) => sum + r.calls, 0)
+  if (used >= DISCOVER_DAILY_LIMIT) {
+    return {
+      connection_id: connectionId,
+      kind,
+      outcome: 'budget_exhausted',
+      credential_status: conn.credential_status,
+      accounts: [],
+      truncated: false,
+      message: `Limita de ${DISCOVER_DAILY_LIMIT} listări pe zi e atinsă pentru această cheie. Poți introduce contul manual.`,
+    }
+  }
+
+  const token = await rest<string>(deps, 'rpc/get_source_token', {
+    method: 'POST',
+    body: JSON.stringify({ p_connection_id: connectionId }),
+  })
+  // Listarea se contorizează înainte de a fi făcută, ca testul.
+  await rest(deps, 'provider_api_calls', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ tenant_id: conn.tenant_id, brand_id: null, source_connection_id: connectionId, call_date_utc: day, purpose: 'discover', calls: 1, actor_user_id: userId }),
+  })
+
+  const result = await discover(kind, token, deps.fetch, deps.now())
+
+  let credentialStatus = conn.credential_status
+  if (result.ok || result.reason === 'invalid') {
+    credentialStatus = await rest<string>(deps, 'rpc/record_source_validation', {
+      method: 'POST',
+      body: JSON.stringify({ p_connection_id: connectionId, p_ok: result.ok, p_error: result.ok ? null : result.status ? `HTTP ${result.status}` : 'cheie invalidă' }),
+    })
+  }
+
+  await rest(deps, 'audit_events', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      tenant_id: conn.tenant_id,
+      brand_id: null,
+      actor_user_id: userId,
+      actor_type: 'user',
+      action: 'accounts_listed',
+      entity_type: 'source_connections',
+      entity_id: connectionId,
+      after: { kind, outcome: result.ok ? 'ok' : result.reason, accounts: result.ok ? result.accounts.length : 0, credential_status: credentialStatus },
+    }),
+  })
+
+  return {
+    connection_id: connectionId,
+    kind,
+    outcome: result.ok ? 'ok' : result.reason,
+    credential_status: credentialStatus,
+    accounts: result.ok ? result.accounts : [],
+    truncated: result.ok ? result.truncated : false,
+    message: result.ok ? null : result.message,
   }
 }

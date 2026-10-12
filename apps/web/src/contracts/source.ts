@@ -117,3 +117,26 @@ export interface ValidationOutcome {
   outcome: ValidationOutcomeKind
   message: string
 }
+
+/** Sursele cu selector de cont: lista vine din cheia clientului (funcția server, `list_accounts`). */
+export type DiscoverKind = 'ga4' | 'gsc' | 'planable' | 'meta_ads' | 'seomonitor'
+
+/** Un cont văzut de cheia clientului: doar ID-ul, numele și un detaliu (contul GA4, fusul orar, moneda, domeniul). */
+export interface DiscoveredAccount {
+  id: string
+  name: string
+  detail: string | null
+}
+
+export type AccountListOutcome = 'ok' | 'invalid' | 'api_disabled' | 'rate_limited' | 'provider_error' | 'budget_exhausted'
+
+export interface AccountList {
+  outcome: AccountListOutcome
+  /** Starea cheii după listare: o listare reușită o confirmă, un refuz o marchează `invalid`. */
+  credential_status: CredentialStatus
+  accounts: DiscoveredAccount[]
+  /** Lista e tăiată la plafonul de pagini. */
+  truncated: boolean
+  /** Motivul, în română, când `outcome` nu e `ok`. */
+  message: string | null
+}

@@ -142,6 +142,24 @@ describe('sources.setToken / validate (funcția server)', () => {
   })
 })
 
+describe('sources.listAccounts (funcția server)', () => {
+  const ok = { connection_id: 'c-1', kind: 'ga4', outcome: 'ok', credential_status: 'valid', accounts: [{ id: '412', name: 'Minimartieni', detail: 'STADA' }], truncated: false, message: null }
+
+  it('trimite acțiunea și tipul, parsează lista', async () => {
+    const fake = fakeDataClient({ invoke: () => ({ data: ok }) })
+    const r = await createSupabaseSources(fake.client, NOW).listAccounts('c-1', 'ga4')
+    expect(r).toEqual({ kind: 'ready', data: { outcome: 'ok', credential_status: 'valid', accounts: ok.accounts, truncated: false, message: null } })
+    expect(fake.invocations).toEqual([{ name: 'source-credentials', body: { action: 'list_accounts', connection_id: 'c-1', kind: 'ga4' } }])
+  })
+
+  it('un cont fără nume sau un rezultat necunoscut încalcă contractul', async () => {
+    for (const data of [{ ...ok, accounts: [{ id: '1' }] }, { ...ok, outcome: 'altceva' }]) {
+      const r = await createSupabaseSources(fakeDataClient({ invoke: () => ({ data }) }).client, NOW).listAccounts('c-1', 'ga4')
+      expect(r.kind).toBe('error')
+    }
+  })
+})
+
 describe('sources.createConnection (supabase)', () => {
   it('ia tenant_id din brand, nu de la utilizator; duplicat → mesaj clar', async () => {
     const { client, calls } = fakeDataClient({ tables: { brands: [{ id: BRAND, tenant_id: 't-1' }] } })
