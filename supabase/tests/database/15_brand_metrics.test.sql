@@ -25,6 +25,8 @@ select is((public.brand_metrics('20000000-0000-0000-0000-000000000011', array['m
   70::numeric, 'L1: costul pe 7 zile vine calculat din SQL');
 select is(public.brand_metrics('20000000-0000-0000-0000-000000000011', array['meta_ads_spend'], current_date - 7, current_date - 1) -> 'data' -> 0 ->> 'currency',
   'RON', 'L1: moneda vine cu valoarea');
+select is(public.brand_metrics('20000000-0000-0000-0000-000000000011', array['meta_ads_spend', 'metrica_inexistenta'], current_date - 7, current_date - 1) -> 'meta' -> 'sources',
+  '["meta_ads"]'::jsonb, 'L1: meta.sources are doar text (o metrică fără sursă nu adaugă null)');
 select is(public.brand_metrics('20000000-0000-0000-0000-000000000011', array['meta_ads_spend', 'metrica_inexistenta'], current_date - 7, current_date - 1) -> 'data' -> 1 ->> 'status',
   'not_connected', 'L1: o metrică fără sursă de observații e „Sursă neconectată”, fără valoare');
 select is(public.brand_metrics('20000000-0000-0000-0000-000000000011', array['gsc_clicks'], current_date - 7, current_date - 1) -> 'data' -> 0 ->> 'status',
