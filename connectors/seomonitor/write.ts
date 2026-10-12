@@ -20,6 +20,30 @@ export const KEYS = {
 export type TableName = keyof typeof KEYS
 
 const BATCH = 500
+/**
+ * Plafon de mărime per cerere (aprox. JSON). Răspunsurile AI originale au textul complet (zeci–sute de KB fiecare):
+ * 500 într-o cerere depășeau `statement_timeout` (57014) pe date reale.
+ */
+export const MAX_BATCH_BYTES = 1_000_000
+
+/** Loturi de cel mult `BATCH` rânduri și cel mult `MAX_BATCH_BYTES`; un rând mai mare decât plafonul merge singur. */
+export function batches(rows: Row[], maxRows = BATCH, maxBytes = MAX_BATCH_BYTES): Row[][] {
+  const out: Row[][] = []
+  let cur: Row[] = []
+  let size = 0
+  for (const r of rows) {
+    const bytes = JSON.stringify(r).length
+    if (cur.length > 0 && (cur.length >= maxRows || size + bytes > maxBytes)) {
+      out.push(cur)
+      cur = []
+      size = 0
+    }
+    cur.push(r)
+    size += bytes
+  }
+  if (cur.length) out.push(cur)
+  return out
+}
 
 export function dedupe(rows: Row[], key: readonly string[]): Row[] {
   const byKey = new Map<string, Row>()
@@ -46,8 +70,7 @@ export async function upsertRows(
   const unique = dedupe(rows, KEYS[table])
   for (const r of unique) check(r, 'trimis')
   const out: Row[] = []
-  for (let i = 0; i < unique.length; i += BATCH) {
-    const batch = unique.slice(i, i + BATCH)
+  for (const batch of batches(unique)) {
     const returned = await db.upsert<Row>(table, batch, [...KEYS[table]])
     if (returned.length !== batch.length) throw new Error(`${table}: upsert a întors ${returned.length} din ${batch.length} rânduri.`)
     for (const r of returned) check(r, 'întors')

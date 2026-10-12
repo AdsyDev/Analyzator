@@ -125,7 +125,17 @@ export const AisStatsSchema = z.looseObject({
       }),
     )
     .default([]),
-  stats: z.record(
+  // Pe date reale (12 oct 2026) `stats` vine și ca listă: `[]` când nu sunt statistici (obiect gol serializat de PHP)
+  // sau elemente cu motorul în câmp. Ambele forme devin un obiect pe motoare; o listă fără motor nu inventează chei.
+  stats: z.preprocess((v) => {
+    if (!Array.isArray(v)) return v
+    const out: Record<string, unknown> = {}
+    for (const item of v) {
+      const engine = item && typeof item === 'object' ? ((item as Record<string, unknown>).engine ?? (item as Record<string, unknown>).ai_search_llm) : undefined
+      if (typeof engine === 'string') out[engine] = item
+    }
+    return out
+  }, z.record(
     z.string(),
     z.looseObject({
       presence_rate: num,
@@ -139,7 +149,7 @@ export const AisStatsSchema = z.looseObject({
       missing_data_reason: z.string().nullable().optional(),
       calculated_from: z.string().nullable().optional(),
     }),
-  ).default({}),
+  ).default({})),
 })
 
 const AioEntry = z.looseObject({

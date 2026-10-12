@@ -3,7 +3,8 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { collectSeomonitorConnection } from './collect-core.ts'
 import { FIXTURE_FILES, seoFixture, type FixtureName } from './docs-fixtures.ts'
-import { parseAioRank, parseRank, sanitizeContent, aiStatus, toNumber } from './normalize.ts'
+import { parseAioRank, parseRank, sanitizeContent, aiStatus, toNumber, enabledEngines } from './normalize.ts'
+import { batches, MAX_BATCH_BYTES } from './write.ts'
 import { AUTO_NOTE, autoMappings, currentMappings, resolveGroups, flattenGroups, type FlatGroup, type MappingRow } from './mapping.ts'
 import { FakeDb, noSleep, type FakeResponse } from '../shared/test-helpers.ts'
 import type { TenantConnection } from '../shared/connections.ts'
@@ -406,6 +407,27 @@ describe('maparea automată (D-19)', () => {
     const db = makeDb()
     const { api } = await run(db)
     assert.ok(api.calls.filter((u) => u.pathname.endsWith('/campaigns/tracked')).every((u) => !u.searchParams.has('company_id')))
+  })
+})
+
+describe('forme reale ale răspunsurilor (12 oct 2026)', () => {
+  test('ais/stats cu `stats: []` (obiect gol din PHP): motoarele activate se citesc, fără eroare', () => {
+    const r = enabledEngines({ engines: [{ engine: 'openai', enabled: true }, { engine: 'gemini', enabled: false }], stats: [] })
+    assert.deepEqual(r, { engines: ['openai'], issues: [] })
+  })
+
+  test('ais/stats cu `stats` listă de obiecte cu motorul în câmp: devine obiect pe motoare', () => {
+    const r = enabledEngines({ engines: [{ engine: 'openai', enabled: true }], stats: [{ engine: 'openai', presence_rate: 2 }] })
+    assert.deepEqual(r.issues, [])
+  })
+
+  test('loturile de scriere: cel mult 500 de rânduri și cel mult ~1 MB; un rând uriaș merge singur', () => {
+    const big = (n: number) => ({ answer_id: String(n), raw: 'x'.repeat(300_000) })
+    const sizes = batches(Array.from({ length: 10 }, (_, i) => big(i))).map((b) => b.length)
+    assert.deepEqual(sizes, [3, 3, 3, 1])
+    assert.ok(batches(Array.from({ length: 10 }, (_, i) => big(i))).every((b) => b.length === 1 || JSON.stringify(b).length <= MAX_BATCH_BYTES + 100))
+    assert.deepEqual(batches(Array.from({ length: 1200 }, (_, i) => ({ id: i }))).map((b) => b.length), [500, 500, 200])
+    assert.deepEqual(batches([{ raw: 'y'.repeat(2_000_000) }]).map((b) => b.length), [1])
   })
 })
 
