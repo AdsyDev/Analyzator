@@ -14,7 +14,7 @@ describe('Paid Media fără import', () => {
   it('„Sursă neconectată", motivul din design, „Importă CSV" pentru agency_admin; nicio cifră', async () => {
     renderApp({ route: '/brands/brand-urinal/paid' })
     expect(await screen.findByRole('heading', { name: 'Sursă neconectată' })).toBeInTheDocument()
-    expect(screen.getByText(/Google Ads și Meta Ads nu sunt conectate pentru Urinal/)).toBeInTheDocument()
+    expect(screen.getByText(/Google Ads, Meta Ads și TikTok Ads nu sunt conectate pentru Urinal/)).toBeInTheDocument()
     expect(screen.getByText(/importă un export CSV/)).toBeInTheDocument()
     expect(screen.queryByTestId('paid-kpis')).toBeNull()
     expect(screen.queryByRole('table')).toBeNull()
@@ -31,7 +31,7 @@ describe('Paid Media fără import', () => {
   it('cu providerul real (neconectat) pagina arată aceeași stare', async () => {
     renderApp({ route: MINI, wrap: (b) => ({ ...b, paid: createSupabaseProviders().paid }) })
     expect(await screen.findByRole('heading', { name: 'Sursă neconectată' })).toBeInTheDocument()
-    expect(screen.getByText(/Google Ads și Meta Ads nu sunt conectate pentru Minimartieni/)).toBeInTheDocument()
+    expect(screen.getByText(/Google Ads, Meta Ads și TikTok Ads nu sunt conectate pentru Minimartieni/)).toBeInTheDocument()
   })
 
   it('eroare la poartă: mesaj cu „Reîncearcă", nu „Sursă neconectată"', async () => {

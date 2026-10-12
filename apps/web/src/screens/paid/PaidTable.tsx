@@ -5,7 +5,7 @@ import { formatCurrency, formatDate, formatInteger, formatMetricValue } from '..
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
 
-const PLATFORM: Record<PaidPlatform, string> = { google_ads: 'Google Ads', meta_ads: 'Meta Ads' }
+const PLATFORM: Record<PaidPlatform, string> = { google_ads: 'Google Ads', meta_ads: 'Meta Ads', tiktok_ads: 'TikTok Ads' }
 const dash = <span className="text-text-3">Fără date</span>
 const n = (v: number | null) => (v === null ? dash : formatInteger(v))
 

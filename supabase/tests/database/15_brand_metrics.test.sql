@@ -69,5 +69,30 @@ select throws_ok($$ select public.brand_metrics('20000000-0000-0000-0000-0000000
   '22023', 'Perioadă invalidă', 'L4: perioadă inversată respinsă');
 reset role;
 
+-- L5. Paid Media (brand_paid): KPI-uri din SQL, rânduri, monede amestecate ----------------------------------
+select tests.authenticate_as('30000000-0000-0000-0000-000000000004');
+select is((select (k ->> 'value')::numeric from jsonb_array_elements(public.brand_paid('20000000-0000-0000-0000-000000000011', current_date - 7, current_date - 1) -> 'kpis') k where k ->> 'key' = 'spend'),
+  70::numeric, 'L5: costul total pentru client');
+select is((select (k ->> 'value')::numeric from jsonb_array_elements(public.brand_paid('20000000-0000-0000-0000-000000000011', current_date - 7, current_date - 1) -> 'kpis') k where k ->> 'key' = 'ctr'),
+  4::numeric, 'L5: CTR din totaluri (28 / 700 × 100)');
+select is((select k ->> 'status' from jsonb_array_elements(public.brand_paid('20000000-0000-0000-0000-000000000011', current_date - 7, current_date - 1) -> 'kpis') k where k ->> 'key' = 'cpa'),
+  'cannot_compute', 'L5: fără conversii raportate, CPA nu se calculează (nu 0)');
+select is(jsonb_array_length(public.brand_paid('20000000-0000-0000-0000-000000000011', current_date - 7, current_date - 1) -> 'rows'), 7,
+  'L5: un rând pe zi și campanie');
+select is(public.brand_paid('20000000-0000-0000-0000-000000000011', current_date - 7, current_date - 1, 'custom', 'google_ads') ->> 'connected', 'false',
+  'L5: platformă neconectată = connected false');
+reset role;
+insert into public.paid_daily (tenant_id, brand_id, source, account_id, campaign_id, date, spend, currency, collected_at, collection_method, payload_hash, source_timezone, schema_version, source_id, sync_run_id)
+values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', 'meta_ads', '515', 'c-eur', current_date - 2, 5, 'EUR', now(), 'api', repeat('f', 64), 'Europe/Bucharest', 't',
+        (select v from ctx where k = 'conn'), (select v from ctx where k = 'run'));
+select tests.authenticate_as('30000000-0000-0000-0000-000000000001');
+select is((select k ->> 'status' from jsonb_array_elements(public.brand_paid('20000000-0000-0000-0000-000000000011', current_date - 7, current_date - 1) -> 'kpis') k where k ->> 'key' = 'spend'),
+  'unavailable', 'L5: monede diferite nu se adună: costul e indisponibil');
+select is((select (k ->> 'value')::numeric from jsonb_array_elements(public.brand_paid('20000000-0000-0000-0000-000000000011', current_date - 7, current_date - 1) -> 'kpis') k where k ->> 'key' = 'clicks'),
+  28::numeric, 'L5: clickurile (fără monedă) rămân calculabile');
+select tests.authenticate_as('30000000-0000-0000-0000-000000000005');
+select throws_ok($$ select public.brand_paid('20000000-0000-0000-0000-000000000011', current_date - 7, current_date - 1) $$, '42501', null, 'L5: fără acces, refuzat');
+reset role;
+
 select * from finish();
 rollback;

@@ -144,7 +144,7 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
   it('Paid Media fără import: „Sursă neconectată", motivul din design și acțiunea „Importă CSV"', async () => {
     setup('/brands/brand-urinal/paid')
     expect(await screen.findByRole('heading', { name: 'Sursă neconectată' })).toBeInTheDocument()
-    expect(screen.getByText(/Google Ads și Meta Ads nu sunt conectate pentru Urinal. Până la conectare nu afișăm cifre, nici estimate./)).toBeInTheDocument()
+    expect(screen.getByText(/Google Ads, Meta Ads și TikTok Ads nu sunt conectate pentru Urinal. Până la conectare nu afișăm cifre, nici estimate./)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Importă CSV' })).toBeInTheDocument()
   })
 

@@ -6,7 +6,7 @@ import type { MetricStatus, TrendPoint } from './metric'
  * server nici unitate monetară în registrul de metrici; tipurile sunt cerințele UI-ului. Costurile se afișează
  * cu moneda lângă valoare; nu se convertesc și nu se amestecă monede (spec 2.3). CTR, CPC, CPA, pacing vin calculate.
  */
-export const PAID_PLATFORMS = ['google_ads', 'meta_ads'] as const
+export const PAID_PLATFORMS = ['google_ads', 'meta_ads', 'tiktok_ads'] as const
 export type PaidPlatform = (typeof PAID_PLATFORMS)[number]
 
 export interface PaidFilters {

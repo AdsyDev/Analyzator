@@ -64,6 +64,7 @@ export const PAID_PLATFORM_FILTER: FilterDef = {
     { value: 'all', label: 'Toate platformele' },
     { value: 'google_ads', label: 'Google Ads' },
     { value: 'meta_ads', label: 'Meta Ads' },
+    { value: 'tiktok_ads', label: 'TikTok Ads' },
   ],
 }
 
@@ -127,7 +128,7 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
     subtitle: () => '',
     sources: ['google_ads', 'meta_ads'],
     filters: [PAID_PLATFORM_FILTER],
-    disconnected: (b) => `Google Ads și Meta Ads nu sunt conectate pentru ${b}. Până la conectare nu afișăm cifre, nici estimate.`,
+    disconnected: (b) => `Google Ads, Meta Ads și TikTok Ads nu sunt conectate pentru ${b}. Până la conectare nu afișăm cifre, nici estimate.`,
   },
   social: {
     segment: 'social',
