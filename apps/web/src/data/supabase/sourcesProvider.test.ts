@@ -95,6 +95,21 @@ describe('sources.statuses (supabase)', () => {
     expect((await get({ source_connections: [conn({ credential_status: 'missing' })], sync_runs: [], import_batches: [] })).clarity).toMatchObject({ state: 'not_connected', note: 'Token neconfigurat.' })
   })
 
+  it('SEOmonitor: contul e al clientului; site-ul cu rulări e conectat fără conexiune proprie, fără rulări rămâne neconectat', async () => {
+    const withRuns = await get({ source_connections: [], sync_runs: [run({ source: 'seomonitor', period_end: '2026-10-11' })], import_batches: [] })
+    expect(withRuns.seomonitor).toMatchObject({ state: 'connected', data_as_of: '2026-10-11' })
+    expect((await get({ source_connections: [], sync_runs: [], import_batches: [] })).seomonitor).toMatchObject({ state: 'not_connected' })
+    // Doar SEOmonitor: o sursă pe site fără conexiune nu devine conectată din rulări rămase.
+    expect((await get({ source_connections: [], sync_runs: [run({ source: 'gsc' })], import_batches: [] })).gsc?.state).toBe('not_connected')
+  })
+
+  it('Planable: rulările Analytics și Listening contează pentru card; cheia clientului nu e „token neconfigurat”', async () => {
+    const pl = conn({ provider: 'planable', credential_status: 'missing' })
+    const s = await get({ source_connections: [pl], sync_runs: [run({ source: 'planable_analytics', period_end: '2026-10-11' }), run({ id: 'r-l', source: 'planable_listening', status: 'partial', created_at: '2026-10-07T03:00:01Z' })], import_batches: [] })
+    expect(s.planable).toMatchObject({ state: 'partial', data_as_of: '2026-10-06' })
+    expect((await get({ source_connections: [pl], sync_runs: [], import_batches: [] })).planable?.note).not.toBe('Token neconfigurat.')
+  })
+
   it('Import CSV: conectat doar cu un lot încheiat', async () => {
     const s = await get({ source_connections: [], sync_runs: [], import_batches: [{ brand_id: BRAND, status: 'imported', updated_at: '2026-10-05T09:00:00Z' }] })
     expect(s.csv_import).toMatchObject({ state: 'connected', imported_at: '2026-10-05T09:00:00Z' })
