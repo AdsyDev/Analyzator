@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { CallBudget, fetchWithRetry, parseRetryAfter } from './http-budget.ts'
+import { CallBudget, fetchWithRetry, parseRetryAfter, providerDetail } from './http-budget.ts'
 import { fakeFetch, noSleep } from './test-helpers.ts'
 
 const URL_ = 'https://example.test/api'
@@ -171,4 +171,13 @@ describe('fetchWithRetry cu program explicit (SEOmonitor: 1, 5, 15 minute)', () 
       assert.deepEqual(s.delays, [])
     })
   }
+})
+
+describe('providerDetail', () => {
+  test('mesajul din JSON, scurtat; HTML scos; corp gol → nimic', () => {
+    assert.equal(providerDetail('{"error":{"message":"The date range cannot exceed 30 days"}}'), 'Furnizorul: „The date range cannot exceed 30 days”.')
+    assert.equal(providerDetail('<html><b>Bad</b> input</html>'), 'Furnizorul: „Bad input”.')
+    assert.equal(providerDetail(''), '')
+    assert.equal(providerDetail('x'.repeat(500)).length, 'Furnizorul: „”.'.length + 200)
+  })
 })

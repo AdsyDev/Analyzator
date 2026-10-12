@@ -83,6 +83,20 @@ function isRetryable(status: number): boolean {
   return status === 429 || status >= 500
 }
 
+/** Un fragment scurt din corpul unei erori: `message` / `error` din JSON, altfel textul fără HTML, maximum 200 de caractere. */
+export function providerDetail(body: string): string {
+  let text = body
+  try {
+    const j = JSON.parse(body) as Record<string, unknown>
+    const pick = (v: unknown): string | null => (typeof v === 'string' ? v : v && typeof v === 'object' ? pick((v as Record<string, unknown>).message ?? (v as Record<string, unknown>).error) : null)
+    text = pick(j.message ?? j.error ?? j.errors) ?? body
+  } catch {
+    // nu e JSON
+  }
+  const clean = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  return clean ? `Furnizorul: „${clean.slice(0, 200)}”.` : ''
+}
+
 function failureFor(status: number): { kind: HttpFailureKind; message: string } {
   if (status === 401 || status === 403) {
     return { kind: 'access_denied', message: `Acces refuzat (${status}): token invalid, expirat sau fără drept pe proiect.` }
@@ -127,11 +141,14 @@ export async function fetchWithRetry(url: string, init: RequestInit, options: Re
       const res = await doFetch(url, init)
       lastStatus = res.status
       if (res.ok) return { ok: true, status: res.status, body: await res.text(), attempts }
-      await res.body?.cancel()
       lastFailure = failureFor(res.status)
       if (!isRetryable(res.status)) {
-        return { ok: false, ...lastFailure, status: res.status, attempts }
+        // 400 / 422: motivul furnizorului (scurt, fără HTML), ca o cerere respinsă să se poată corecta din log.
+        // Nu și pentru 401/403: acolo răspunsul nu ajută și nu-l păstrăm.
+        const detail = res.status === 400 || res.status === 422 ? providerDetail(await res.text().catch(() => '')) : (await res.body?.cancel(), '')
+        return { ok: false, ...lastFailure, message: detail ? `${lastFailure.message} ${detail}` : lastFailure.message, status: res.status, attempts }
       }
+      await res.body?.cancel()
       retryAfterMs = parseRetryAfter(res.headers.get('retry-after'), now())
     } catch (err) {
       lastStatus = null
