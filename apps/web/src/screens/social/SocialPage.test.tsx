@@ -16,7 +16,7 @@ describe('Social fără import', () => {
     expect(screen.getByText(/vin din Planable, care nu e încă conectat/)).toBeInTheDocument()
     expect(screen.queryByTestId('social-kpis')).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Importă CSV' }))
-    await waitFor(() => expect(where()).toBe('/admin/sources'))
+    await waitFor(() => expect(where()).toBe('/admin/clients/brand-urinal?source=csv_import'))
   })
 
   it('clientul nu primește acțiunea', async () => {

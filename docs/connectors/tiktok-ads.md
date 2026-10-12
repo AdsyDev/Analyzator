@@ -17,8 +17,8 @@
 
 ## Pentru fiecare client (din aplicație)
 
-1. Administrare → **Surse** → **„Conturile clientului”** → **TikTok Ads** → **Conectează cu TikTok**.
-2. Te loghezi în TikTok for Business, bifezi **advertiserii clientului** și confirmi. Revii în Surse cu „TikTok Ads a fost conectat”; cardul arată câte conturi au fost autorizate.
+1. Pagina site-ului (Administrare → Clienți și site-uri → **Editează și surse**) → cardul **TikTok Ads** → **Conectează** → pasul 1 → **Conectează cu TikTok**.
+2. Te loghezi în TikTok for Business, bifezi **advertiserii clientului** și confirmi. Revii în pagina site-ului cu „TikTok Ads a fost conectat”; cardul arată câte conturi au fost autorizate.
 
 ## Pentru fiecare brand
 

@@ -26,14 +26,13 @@ export const BRAND_NAV: readonly NavItem[] = [
 
 /**
  * Spec cap. 28: clienții, brandurile, invitațiile, sursele și drepturile sunt ale lui Agency admin;
- * `docs/design/screens.md`: Surse e doar pentru `agency_admin`. Strategist și account lucrează cu datele
+ * `docs/design/screens.md`: sursele (în pagina fiecărui site) sunt doar pentru `agency_admin`. Strategist și account lucrează cu datele
  * și analizele brandurilor alocate, nu cu Administrarea.
  */
 const ADMIN_ONLY: readonly Role[] = ['agency_admin']
 
 export const ADMIN_NAV: readonly AdminNavItem[] = [
   { segment: 'clients', label: 'Clienți și site-uri', icon: 'Buildings', roles: ADMIN_ONLY },
-  { segment: 'sources', label: 'Surse', icon: 'PlugsConnected', roles: ADMIN_ONLY },
   { segment: 'users', label: 'Utilizatori', icon: 'UserList', roles: ADMIN_ONLY },
   { segment: 'config', label: 'Configurare', icon: 'SlidersHorizontal', roles: ADMIN_ONLY },
 ]
@@ -50,3 +49,5 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export const brandPath = (brandId: string, segment: string) => `/brands/${brandId}/${segment}`
 export const adminPath = (segment: string) => `/admin/${segment}`
+/** Pagina unui site în Administrare: detaliile și sursele lui. */
+export const sitePath = (brandId: string) => `/admin/clients/${brandId}`

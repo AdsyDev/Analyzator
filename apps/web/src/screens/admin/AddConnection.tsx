@@ -4,11 +4,19 @@ import { Button } from '../../components/ui/Button'
 import { useProviders } from '../../data/DataProvidersContext'
 import { PROVIDER_LABELS } from '../../lib/sources'
 
-/**
- * Sursele cu conexiune pe brand; Import CSV nu are conexiune, ci fișiere. SEOmonitor și cheia Google sunt la nivel
- * de client (Conturile clientului), nu pe brand.
- */
-export const CONNECTABLE: readonly SourceProviderId[] = ['ga4', 'gsc', 'clarity', 'planable', 'meta_ads', 'google_ads', 'tiktok_ads']
+/** Sursele cu token propriu pe conexiune; restul folosesc cheia clientului. */
+const NEEDS_OWN_TOKEN: readonly SourceProviderId[] = ['clarity']
+
+/** Eticheta câmpului de cont, per sursă. */
+const ACCOUNT_LABEL: Partial<Record<SourceProviderId, string>> = {
+  ga4: 'Property ID GA4',
+  gsc: 'Proprietatea Search Console',
+  clarity: 'Project ID Clarity',
+  planable: 'Workspace Planable',
+  meta_ads: 'Contul de ads Meta',
+  google_ads: 'Customer ID Google Ads',
+  tiktok_ads: 'Advertiser ID TikTok',
+}
 
 /** Ce se completează la „Cont sau proiect”, per sursă (docs/connectors). */
 const ACCOUNT_HINT: Partial<Record<SourceProviderId, string>> = {
@@ -23,14 +31,14 @@ const ACCOUNT_HINT: Partial<Record<SourceProviderId, string>> = {
 
 interface Props {
   brandId: string
-  initialProvider?: SourceProviderId
+  /** Sursa conexiunii: formularul e în cardul sursei din pagina site-ului, deci sursa nu se alege. */
+  provider: SourceProviderId
   onCreated: () => void
 }
 
-export function AddConnection({ brandId, initialProvider, onCreated }: Props) {
+export function AddConnection({ brandId, provider, onCreated }: Props) {
   const providers = useProviders()
-  const ids = [useId(), useId(), useId()] as const
-  const [provider, setProvider] = useState<SourceProviderId>(initialProvider ?? 'clarity')
+  const ids = [useId(), useId()] as const
   const [account, setAccount] = useState('')
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
@@ -56,31 +64,23 @@ export function AddConnection({ brandId, initialProvider, onCreated }: Props) {
 
   const field = 'h-9 rounded-[10px] border border-border-strong bg-surface px-3 text-[13px]'
   return (
-    <form onSubmit={submit} aria-label="Adaugă conexiune" className="flex flex-col gap-3 rounded-xl border border-dashed border-border-strong p-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+    <form onSubmit={submit} aria-label={`Adaugă conexiunea ${PROVIDER_LABELS[provider].name}`} className="flex flex-col gap-3 rounded-xl border border-dashed border-border-strong p-4">
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
-          <label htmlFor={ids[0]} className="text-[12.5px] font-semibold">Sursă</label>
-          <select id={ids[0]} value={provider} onChange={(e) => setProvider(e.target.value as SourceProviderId)} className={field}>
-            {CONNECTABLE.map((p) => (
-              <option key={p} value={p}>{PROVIDER_LABELS[p].name}</option>
-            ))}
-          </select>
+          <label htmlFor={ids[0]} className="text-[12.5px] font-semibold">{ACCOUNT_LABEL[provider] ?? 'Cont sau proiect'}</label>
+          <input id={ids[0]} value={account} onChange={(e) => setAccount(e.target.value)} placeholder={ACCOUNT_HINT[provider] ?? 'de ex. ID-ul proiectului'} className={`${field} font-mono`} />
         </div>
         <div className="flex flex-col gap-1">
-          <label htmlFor={ids[1]} className="text-[12.5px] font-semibold">Cont sau proiect</label>
-          <input id={ids[1]} value={account} onChange={(e) => setAccount(e.target.value)} placeholder={ACCOUNT_HINT[provider] ?? 'de ex. ID-ul proiectului'} className={`${field} font-mono`} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor={ids[2]} className="text-[12.5px] font-semibold">Nume afișat (opțional)</label>
-          <input id={ids[2]} value={name} onChange={(e) => setName(e.target.value)} className={field} />
+          <label htmlFor={ids[1]} className="text-[12.5px] font-semibold">Nume afișat (opțional)</label>
+          <input id={ids[1]} value={name} onChange={(e) => setName(e.target.value)} className={field} />
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" variant="primary" loading={busy} disabled={account.trim() === ''}>Adaugă conexiunea</Button>
-        <span className="text-[12px] text-text-3">Tokenul se setează după ce conexiunea există.</span>
+        {NEEDS_OWN_TOKEN.includes(provider) && <span className="text-[12px] text-text-3">Tokenul se setează după ce conexiunea există.</span>}
       </div>
       <div aria-live="polite">
-        {done && <p className="text-[12.5px] text-pos-text">Conexiune adăugată. Setează acum tokenul.</p>}
+        {done && <p className="text-[12.5px] text-pos-text">{NEEDS_OWN_TOKEN.includes(provider) ? 'Conexiune adăugată. Setează acum tokenul.' : 'Conexiune adăugată.'}</p>}
         {error && <p role="alert" className="text-[12.5px] text-neg-text">{error}</p>}
       </div>
     </form>

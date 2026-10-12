@@ -50,7 +50,7 @@ npm run test:db    # teste pgTAP de izolare (RLS)
 
 Seed-ul de test rulează doar local. Migrațiile ajung pe staging prin CI.
 
-## Tokenul unei surse (până există ecranul Administrare → Surse)
+## Tokenul unei surse din linia de comandă (alternativa la pagina site-ului)
 
 Tokenul ajunge în Supabase Vault prin Edge Function `source-credentials`, ca `agency_admin`:
 

@@ -72,7 +72,7 @@ describe('AppShell', () => {
   it('agency_admin vede Administrare', () => {
     setup()
     const admin = screen.getByRole('navigation', { name: 'Administrare' })
-    expect(within(admin).getAllByRole('link').map((a) => a.textContent)).toEqual(['Clienți și site-uri', 'Surse', 'Utilizatori', 'Configurare'])
+    expect(within(admin).getAllByRole('link').map((a) => a.textContent)).toEqual(['Clienți și site-uri', 'Utilizatori', 'Configurare'])
   })
 
   it('strategist și account nu văd Administrare (spec cap. 28: e a lui Agency admin)', () => {

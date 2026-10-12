@@ -8,7 +8,8 @@ import { StatusChip } from '../../components/ui/Chip'
 import { InfoTip } from '../../components/ui/InfoTip'
 import type { AsyncState } from '../../data/useAsync'
 import { formatDate, formatMetricValue } from '../../lib/format'
-import { adminPath } from '../../lib/navigation'
+import { sitePath } from '../../lib/navigation'
+import { useLayout } from '../../routing/AppLayout'
 import { metricView } from '../../lib/metricView'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
@@ -40,6 +41,7 @@ interface Props {
  */
 export function BehaviorSection({ devices, items, definitions, source, canManageSources, onRetry }: Props) {
   const navigate = useNavigate()
+  const { brand } = useLayout()
   const problem = source && (source.state === 'error' || source.state === 'stale')
 
   return (
@@ -51,8 +53,8 @@ export function BehaviorSection({ devices, items, definitions, source, canManage
             Sincronizarea Clarity are probleme{source?.note ? `: ${source.note}` : ''}
             {source?.data_as_of ? ` Date până la ${formatDate(source.data_as_of)}.` : ''} Afișăm ultimele date importate.
           </p>
-          {canManageSources && (
-            <Button onClick={() => navigate(adminPath('sources'))}>Reconectează în Surse</Button>
+          {canManageSources && brand && (
+            <Button onClick={() => navigate(`${sitePath(brand.id)}?source=clarity`)}>Reconectează în Surse</Button>
           )}
         </div>
       )}

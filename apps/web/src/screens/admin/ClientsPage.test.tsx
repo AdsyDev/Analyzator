@@ -19,7 +19,7 @@ describe('Administrare → Clienți și site-uri (fixtures de previzualizare)', 
     expect(within(table).getAllByText('Activ')).toHaveLength(3)
   })
 
-  it('„Adaugă client” creează clientul și primul site, apoi trimite spre Surse', async () => {
+  it('„Adaugă client” creează clientul și primul site, apoi trimite spre sursele site-ului', async () => {
     renderApp({ route: URL })
     await pageReady('Clienți și site-uri')
     await userEvent.click(screen.getByRole('button', { name: 'Adaugă client' }))
@@ -35,7 +35,9 @@ describe('Administrare → Clienți și site-uri (fixtures de previzualizare)', 
     const card = await client('Farma Nouă')
     expect(within(card).getByText('vitaminax.ro')).toBeInTheDocument()
     await userEvent.click(within(panel).getByRole('button', { name: 'Conectează sursele' }))
-    await waitFor(() => expect(where()).toBe('/admin/sources'))
+    await waitFor(() => expect(where()).toMatch(/^\/admin\/clients\/[^/?]+$/))
+    await pageReady('Site și surse')
+    expect(screen.getByRole('heading', { level: 2, name: 'Vitamina X' })).toBeInTheDocument()
   })
 
   it('domeniul invalid blochează crearea și explică de ce', async () => {
@@ -50,19 +52,24 @@ describe('Administrare → Clienți și site-uri (fixtures de previzualizare)', 
     expect(within(panel).getByRole('button', { name: 'Creează site-ul' })).toBeDisabled()
   })
 
-  it('un site se arhivează și se restaurează din „Editează”', async () => {
+  it('un site se arhivează și se restaurează din pagina lui („Editează și surse”)', async () => {
     renderApp({ route: URL })
     await pageReady('Clienți și site-uri')
-    const card = await client('STADA România')
-    await userEvent.click(within(card).getByRole('button', { name: 'Editează Proenzi' }))
-    let dialog = await screen.findByRole('dialog', { name: 'Editează Proenzi' })
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Arhivează' }))
-    await waitFor(() => expect(within(card).getByText('2 spații active')).toBeInTheDocument())
+    let card = await client('STADA România')
+    await userEvent.click(within(card).getByRole('button', { name: 'Editează Proenzi și sursele lui' }))
+    await pageReady('Site și surse')
+    expect(where()).toBe('/admin/clients/brand-proenzi')
+    await userEvent.click(screen.getByRole('button', { name: 'Arhivează' }))
+    expect(await screen.findByRole('button', { name: 'Restaurează' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('link', { name: 'Înapoi la clienți și site-uri' }))
+    await pageReady('Clienți și site-uri')
+    card = await client('STADA România')
+    expect(within(card).getByText('2 spații active')).toBeInTheDocument()
     expect(within(card).queryByRole('button', { name: 'Deschide Proenzi' })).toBeNull()
-    await userEvent.click(within(card).getByRole('button', { name: 'Editează Proenzi' }))
-    dialog = await screen.findByRole('dialog', { name: 'Editează Proenzi' })
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Restaurează' }))
-    await waitFor(() => expect(within(card).getByText('3 spații active')).toBeInTheDocument())
+    await userEvent.click(within(card).getByRole('button', { name: 'Editează Proenzi și sursele lui' }))
+    await pageReady('Site și surse')
+    await userEvent.click(screen.getByRole('button', { name: 'Restaurează' }))
+    expect(await screen.findByRole('button', { name: 'Arhivează' })).toBeInTheDocument()
   })
 
   it('clientul se redenumește; arhivarea clientului nu e oferită', async () => {

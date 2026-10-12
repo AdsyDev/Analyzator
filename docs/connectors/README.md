@@ -16,7 +16,7 @@ Ghiduri pas cu pas pentru agenție (rolul `agency_admin`): de unde obții cheia,
 ## Înainte de prima sursă (o singură dată)
 
 1. **Clientul și brandurile există în aplicație.** Administrare → **Clienți și site-uri** → „Adaugă client” (clientul și primul site) sau „Adaugă site” pe cardul unui client existent. Cine creează clientul devine administratorul lui.
-2. **Ești `agency_admin`** pe clientul respectiv. Doar acest rol vede Administrare → Surse.
+2. **Ești `agency_admin`** pe clientul respectiv. Doar acest rol vede sursele, în pagina fiecărui site (Administrare → Clienți și site-uri → „Editează și surse”).
 3. **Aplicația are voie să vorbească cu funcțiile server.** Salvarea tokenului din aplicație trece prin funcția `source-credentials`, care acceptă doar domeniul aplicației. În Supabase → Edge Functions → Secrets trebuie setat `ANALYZATOR_APP_ORIGIN` = adresa exactă a aplicației (de ex. `https://analyzator.exemplu.ro`, fără `/` la final). Fără ea, butonul „Salvează tokenul” dă eroare de rețea.
 4. **Colectarea automată e pornită.** Conectorii rulează din GitHub Actions. În repo → Settings → Secrets and variables → Actions:
    - **Secrets** (environment `staging`): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`;
@@ -27,10 +27,10 @@ Ghiduri pas cu pas pentru agenție (rolul `agency_admin`): de unde obții cheia,
 ## Drumul comun pentru orice sursă cu API
 
 1. **Obții cheia** de la furnizor (fiecare ghid spune unde).
-2. **Creezi conexiunea:** Administrare → Surse → alegi brandul din bara de sus → „Adaugă conexiune” → sursa și ID-ul contului sau al proiectului.
+2. **Creezi conexiunea:** în pagina site-ului, cardul sursei → **Conectează**. Pasul 1 e cheia clientului (doar dacă sursa o folosește; o salvezi o dată, celelalte site-uri ale clientului o refolosesc), pasul 2 e contul sau proiectul site-ului.
 3. **Salvezi tokenul** pe cardul conexiunii. Tokenul intră în seiful serverului (Supabase Vault) și **nu se mai poate citi** din aplicație; dacă îl pierzi, generezi unul nou.
 4. **Testezi** cu „Testează conexiunea” (Clarity, SEOmonitor, Planable, Meta), altfel rulezi manual workflow-ul sursei.
-5. **Verifici rezultatul** în Administrare → Surse → „Istoricul sincronizărilor”.
+5. **Verifici rezultatul** în pagina site-ului → „Istoricul sincronizărilor”.
 
 ## Ce înseamnă stările
 

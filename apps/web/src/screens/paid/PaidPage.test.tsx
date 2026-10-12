@@ -19,7 +19,7 @@ describe('Paid Media fără import', () => {
     expect(screen.queryByTestId('paid-kpis')).toBeNull()
     expect(screen.queryByRole('table')).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Importă CSV' }))
-    await waitFor(() => expect(where()).toBe('/admin/sources'))
+    await waitFor(() => expect(where()).toBe('/admin/clients/brand-urinal?source=csv_import'))
   })
 
   it.each(['strategist', 'account', 'client_viewer'] as const)('%s nu primește o acțiune care nu funcționează', async (role) => {

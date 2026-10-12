@@ -96,7 +96,7 @@ describe('Trafic: comportament (Clarity)', () => {
     expect(alert).toHaveTextContent('Sincronizarea Clarity are probleme: Tokenul API a expirat.')
     expect(alert).toHaveTextContent(/Afișăm ultimele date importate/)
     await userEvent.click(within(alert).getByRole('button', { name: 'Reconectează în Surse' }))
-    await waitFor(() => expect(where()).toBe('/admin/sources'))
+    await waitFor(() => expect(where()).toBe('/admin/clients/brand-urinal?source=clarity'))
   })
 
   it('strategistul vede bannerul, dar nu acțiunea spre Surse', async () => {

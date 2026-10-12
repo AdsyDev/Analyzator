@@ -5,11 +5,11 @@
 **Timp:** ~20 de minute per client, plus maparea grupurilor.
 
 **Ce se face unde:**
-- tokenul se obține din SEOmonitor și se pune **din aplicație** (Administrare → Surse → „Conturile clientului”);
+- tokenul se obține din SEOmonitor și se pune **din aplicație**, în pagina site-ului (Administrare → Clienți și site-uri → **Editează și surse**) → cardul SEOmonitor → pasul 1;
 - maparea grupurilor pe branduri se face deocamdată din **SQL**;
 - testul înseamnă o **rulare manuală** (nu există buton de test).
 
-**De ce e diferit de Clarity:** un cont SEOmonitor acoperă **toate brandurile unui client**. Brandurile se despart prin grupurile de keywords din SEOmonitor, de aceea conexiunea e la nivel de client, nu de brand: apare în Surse, la „Conturile clientului”, pentru oricare brand al clientului.
+**De ce e diferit de Clarity:** un cont SEOmonitor acoperă **toate brandurile unui client**. Brandurile se despart prin grupurile de keywords din SEOmonitor, de aceea conexiunea e la nivel de client, nu de brand: se salvează din pagina oricărui site al clientului și e refolosită de celelalte.
 
 ## 1. Obține tokenul și ID-ul companiei
 
@@ -19,7 +19,7 @@
 
 ## 2. Conectează contul (din aplicație)
 
-1. Administrare → **Surse** (cu oricare brand al clientului ales sus) → **„Conturile clientului”** → cardul **SEOmonitor**.
+1. Pagina site-ului (Administrare → Clienți și site-uri → **Editează și surse**) al oricărui site al clientului → cardul **SEOmonitor** → **Conectează** → pasul 1.
 2. Completează **ID-ul companiei** și **tokenul**, apoi **Salvează**. Tokenul nu se mai afișează după salvare.
 3. Pentru un token nou (rotire): același card → „Rotește tokenul”.
 
@@ -69,7 +69,7 @@ Maparea curentă apare în Administrare → **Configurare** → „Grupuri SEOmo
 
 GitHub → Actions → **seomonitor-weekly** → Run workflow. Durează câteva minute.
 
-Verifică în Administrare → Surse (pe fiecare brand mapat) → „Istoricul sincronizărilor”: câte o rulare SEOmonitor per brand.
+Verifică în pagina fiecărui site mapat → „Istoricul sincronizărilor”: câte o rulare SEOmonitor per brand.
 
 După test, colectarea automată rulează **marțea la 04:00 UTC** (06:00 vara, 05:00 iarna, ora României), după ce `CONNECTOR_SEOMONITOR_ENABLED = true`.
 

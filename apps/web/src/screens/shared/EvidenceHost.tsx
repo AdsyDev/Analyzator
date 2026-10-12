@@ -4,7 +4,7 @@ import { EvidenceDrawer } from '../../components/EvidenceDrawer'
 import { useToast } from '../../components/ui/Toast'
 import { useProviders } from '../../data/DataProvidersContext'
 import { useAsync } from '../../data/useAsync'
-import { adminPath } from '../../lib/navigation'
+import { sitePath } from '../../lib/navigation'
 
 export interface EvidenceTarget {
   /** Pagina din care s-a deschis (de ex. „Overview"). */
@@ -21,7 +21,7 @@ interface Props {
   brand: Brand
   target: EvidenceTarget | null
   onClose: () => void
-  /** Doar `agency_admin` are acces la Surse. */
+  /** Doar `agency_admin` are acces la sursele site-ului. */
   canManageSources: boolean
 }
 
@@ -61,6 +61,7 @@ export function EvidenceHost({ brand, target, onClose, canManageSources }: Props
     }
   }
 
+  const brandId = target?.query.brand_id ?? null
   // Fără țintă, drawerul nu se montează (la demontare, Dialog restituie focusul elementului care l-a deschis).
   if (!target) return null
 
@@ -76,7 +77,7 @@ export function EvidenceHost({ brand, target, onClose, canManageSources }: Props
       evidence={ev}
       onRetry={evidence.reload}
       onCopyHash={copy}
-      connectAction={canManageSources ? { label: 'Vezi sursele', onClick: () => navigate(adminPath('sources')) } : undefined}
+      connectAction={canManageSources && brandId ? { label: 'Vezi sursele', onClick: () => navigate(`${sitePath(brandId)}${meta?.item?.source ? `?source=${meta.item.source}` : ''}`) } : undefined}
     />
   )
 }

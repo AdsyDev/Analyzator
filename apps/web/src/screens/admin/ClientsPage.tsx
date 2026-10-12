@@ -11,7 +11,7 @@ import { useToast } from '../../components/ui/Toast'
 import { useProviders } from '../../data/DataProvidersContext'
 import { useAsync } from '../../data/useAsync'
 import { formatDate } from '../../lib/format'
-import { adminPath, brandPath } from '../../lib/navigation'
+import { adminPath, brandPath, sitePath } from '../../lib/navigation'
 import { todayBucharest } from '../../lib/period'
 import { normalizeDomain, slugify, SLUG_PATTERN } from '../../lib/slug'
 import { useLayout } from '../../routing/AppLayout'
@@ -21,7 +21,7 @@ import { Section } from '../shared/Section'
 const HOW_TO: Array<{ icon: ReactNode; title: string; text: string }> = [
   { icon: <BuildingsIcon size={17} />, title: 'Creezi clientul', text: 'Numele companiei. Tu devii administratorul lui și poți invita restul echipei.' },
   { icon: <GlobeIcon size={17} />, title: 'Adaugi site-ul', text: 'Fiecare site devine un spațiu de brand, cu domeniul lui. Competitorii se configurează separat, cu versiune.' },
-  { icon: <PlugsConnectedIcon size={17} />, title: 'Conectezi sursele și inviți echipa', text: 'Din Surse și Utilizatori, pentru fiecare spațiu. Ghidurile pe surse sunt în docs/connectors.' },
+  { icon: <PlugsConnectedIcon size={17} />, title: 'Conectezi sursele și inviți echipa', text: 'Sursele, din pagina fiecărui site („Surse”); echipa, din Utilizatori. Ghidurile pe surse sunt în docs/connectors.' },
 ]
 
 const field = 'h-9 w-full rounded-[10px] border border-border-strong bg-surface px-3 text-[13px]'
@@ -33,7 +33,6 @@ export function ClientsPage() {
   const { reloadBrands } = useLayout()
   const list = useAsync(() => providers.clients.list(), [providers])
   const [setup, setSetup] = useState<SetupTarget | null>(null)
-  const [editing, setEditing] = useState<ClientSpace | null>(null)
   const [renaming, setRenaming] = useState<Client | null>(null)
 
   function changed() {
@@ -64,7 +63,7 @@ export function ClientsPage() {
           ) : (
             <div className="flex flex-col gap-5">
               {clients.map((c) => (
-                <ClientCard key={c.id} client={c} onAddSite={() => setSetup({ mode: 'site', tenantId: c.id, clientName: c.name })} onRename={() => setRenaming(c)} onEdit={setEditing} />
+                <ClientCard key={c.id} client={c} onAddSite={() => setSetup({ mode: 'site', tenantId: c.id, clientName: c.name })} onRename={() => setRenaming(c)} />
               ))}
             </div>
           )
@@ -72,13 +71,12 @@ export function ClientsPage() {
       </Resolved>
 
       {setup && <SetupPanel key={setup.mode + (setup.tenantId ?? '')} target={setup} onClose={() => setSetup(null)} onChanged={changed} />}
-      {editing && <EditSpaceDialog key={editing.id} space={editing} onClose={() => setEditing(null)} onChanged={changed} />}
       {renaming && <RenameClientDialog key={renaming.id} client={renaming} onClose={() => setRenaming(null)} onChanged={changed} />}
     </div>
   )
 }
 
-function ClientCard({ client, onAddSite, onRename, onEdit }: { client: Client; onAddSite: () => void; onRename: () => void; onEdit: (s: ClientSpace) => void }) {
+function ClientCard({ client, onAddSite, onRename }: { client: Client; onAddSite: () => void; onRename: () => void }) {
   const navigate = useNavigate()
   const active = client.spaces.filter((s) => s.status === 'active').length
   const columns: Column<ClientSpace>[] = [
@@ -109,7 +107,7 @@ function ClientCard({ client, onAddSite, onRename, onEdit }: { client: Client; o
       align: 'right',
       render: (s) => (
         <span className="flex justify-end gap-1.5">
-          <Button variant="ghost" icon={<PencilSimpleIcon size={14} />} onClick={() => onEdit(s)} aria-label={`Editează ${s.name}`}>Editează</Button>
+          <Button variant="ghost" icon={<PlugsConnectedIcon size={14} />} onClick={() => navigate(sitePath(s.id))} aria-label={`Editează ${s.name} și sursele lui`}>Editează și surse</Button>
           {s.status === 'active' && (
             <Button onClick={() => navigate(brandPath(s.id, 'overview'))} aria-label={`Deschide ${s.name}`}>
               Deschide <ArrowRightIcon size={12} aria-hidden="true" />
@@ -171,7 +169,6 @@ function useSlug() {
 function SetupPanel({ target, onClose, onChanged }: { target: SetupTarget; onClose: () => void; onChanged: () => void }) {
   const providers = useProviders()
   const navigate = useNavigate()
-  const { selectBrand } = useLayout()
   const ids = [useId(), useId(), useId(), useId(), useId()] as const
   // După crearea clientului, panoul continuă în modul „site” pentru clientul nou (o eroare la site nu recreează clientul).
   const [tenant, setTenant] = useState<{ id: TenantId; name: string } | null>(target.tenantId ? { id: target.tenantId, name: target.clientName ?? '' } : null)
@@ -243,7 +240,7 @@ function SetupPanel({ target, onClose, onChanged }: { target: SetupTarget; onClo
     <Dialog open onClose={onClose} title={title} placement="right" footer={footer}>
       <div className="flex flex-col gap-5">
         <p className="text-[13px] leading-snug text-text-2">
-          {target.mode === 'client' ? 'Clientul și primul lui site. Sursele și persoanele cu acces le adaugi apoi din Surse și Utilizatori.' : `Un spațiu de brand nou pentru ${target.clientName}.`}
+          {target.mode === 'client' ? 'Clientul și primul lui site. Sursele le conectezi apoi din pagina site-ului, iar persoanele cu acces din Utilizatori.' : `Un spațiu de brand nou pentru ${target.clientName}.`}
         </p>
         <ol className="flex items-center gap-2" aria-label="Pași">
           {steps.map((s, i) => (
@@ -298,9 +295,9 @@ function SetupPanel({ target, onClose, onChanged }: { target: SetupTarget; onClo
             <div className="flex flex-wrap gap-2">
               <Button
                 icon={<PlugsConnectedIcon size={14} />}
+                disabled={!createdSpace}
                 onClick={() => {
-                  if (createdSpace) selectBrand(createdSpace)
-                  navigate(adminPath('sources'))
+                  if (createdSpace) navigate(sitePath(createdSpace))
                 }}
               >
                 Conectează sursele
@@ -312,71 +309,6 @@ function SetupPanel({ target, onClose, onChanged }: { target: SetupTarget; onClo
         )}
         <div aria-live="polite">{error && <p role="alert" className="text-[12.5px] text-neg-text">{error}</p>}</div>
       </div>
-    </Dialog>
-  )
-}
-
-function EditSpaceDialog({ space, onClose, onChanged }: { space: ClientSpace; onClose: () => void; onChanged: () => void }) {
-  const providers = useProviders()
-  const toast = useToast()
-  const ids = [useId(), useId()] as const
-  const [name, setName] = useState(space.name)
-  const [domain, setDomain] = useState(space.domain ?? '')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const domainValue = normalizeDomain(domain)
-  const ok = name.trim().length >= 2 && domainValue !== undefined
-  const archived = space.status === 'archived'
-
-  async function save(patch: Parameters<typeof providers.clients.updateSpace>[1], message: string) {
-    setBusy(true)
-    setError(null)
-    const r = await providers.clients.updateSpace(space.id, patch)
-    setBusy(false)
-    if (r.kind !== 'ready') return setError(r.kind === 'error' ? r.message : r.reason)
-    toast(message)
-    onChanged()
-    onClose()
-  }
-
-  return (
-    <Dialog
-      open
-      onClose={onClose}
-      title={`Editează ${space.name}`}
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Anulează</Button>
-          <Button variant="primary" type="submit" form="edit-space" loading={busy} disabled={!ok}>Salvează</Button>
-        </>
-      }
-    >
-      <form id="edit-space" onSubmit={(e) => { e.preventDefault(); if (ok) void save({ name, domain: domainValue ?? null }, 'Modificările au fost salvate.') }} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <label htmlFor={ids[0]} className="text-[12.5px] font-semibold">Numele site-ului</label>
-          <input id={ids[0]} value={name} onChange={(e) => setName(e.target.value)} className={field} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label htmlFor={ids[1]} className="text-[12.5px] font-semibold">Domeniu</label>
-          <input id={ids[1]} value={domain} onChange={(e) => setDomain(e.target.value)} className={`${field} font-mono`} aria-invalid={domainValue === undefined} />
-          {domainValue === undefined && <span className="text-[12px] text-neg-text">Domeniul nu pare valid. Exemplu: exemplu.ro</span>}
-        </div>
-        <p className="text-[12px] text-text-3">Identificator: <span className="font-mono">{space.slug}</span> (nu se schimbă).</p>
-        <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
-          <span className="text-[13px] font-semibold">{archived ? 'Site arhivat' : 'Arhivează site-ul'}</span>
-          <span className="text-[12.5px] leading-snug text-text-2">
-            {archived
-              ? 'Nu apare în selectorul de brand. Datele și istoricul sunt păstrate; îl poți restaura oricând.'
-              : 'Dispare din selectorul de brand pentru toată lumea. Datele, conexiunile și istoricul rămân; îl poți restaura oricând.'}
-          </span>
-          <span>
-            <Button disabled={busy} onClick={() => void save({ status: archived ? 'active' : 'archived' }, archived ? `${space.name} a fost restaurat.` : `${space.name} a fost arhivat.`)}>
-              {archived ? 'Restaurează' : 'Arhivează'}
-            </Button>
-          </span>
-        </div>
-        <div aria-live="polite">{error && <p role="alert" className="text-[12.5px] text-neg-text">{error}</p>}</div>
-      </form>
     </Dialog>
   )
 }

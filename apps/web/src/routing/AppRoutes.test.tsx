@@ -157,8 +157,8 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
   it('agency_admin primește „Importă CSV", care duce la Surse (intrarea în flux)', async () => {
     setup('/brands/brand-urinal/paid')
     await userEvent.click(await screen.findByRole('button', { name: 'Importă CSV' }))
-    await waitFor(() => expect(where()).toBe('/admin/sources'))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Surse' })).toBeInTheDocument()
+    await waitFor(() => expect(where()).toBe('/admin/clients/brand-urinal?source=csv_import'))
+    expect(await screen.findByRole('heading', { level: 1, name: 'Site și surse' })).toBeInTheDocument()
   })
 
   it.each(['strategist', 'client_viewer'] as const)('%s nu primește o acțiune de import (nu are acces la Surse)', async (role) => {
@@ -188,18 +188,18 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
     }
   })
 
-  it('starea surselor din Administrare are eroare cu „Reîncearcă"', async () => {
+  it('conexiunile site-ului au eroare cu „Reîncearcă"', async () => {
     let broken = true
-    setup('/admin/sources', {
+    setup('/admin/clients/brand-urinal', {
       providers: (auth) => {
         const base = createFixtureProviders({ now: () => NOW, getRole: () => auth.preview?.role ?? 'agency_admin' })
-        return { ...base, sources: { ...base.sources, statuses: async (id) => (broken ? failed('Serverul nu a răspuns.') : base.sources.statuses(id)) } }
+        return { ...base, sources: { ...base.sources, connections: async (id) => (broken ? failed('Serverul nu a răspuns.') : base.sources.connections(id)) } }
       },
     })
     expect(await screen.findByText('Serverul nu a răspuns.')).toBeInTheDocument()
     broken = false
-    await userEvent.click(screen.getAllByRole('button', { name: 'Reîncearcă' })[0]!)
-    expect(await screen.findByRole('article', { name: 'SEOmonitor' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Reîncearcă' }))
+    expect(await screen.findByRole('article', { name: 'Google Analytics 4' })).toBeInTheDocument()
   })
 })
 
@@ -319,6 +319,12 @@ describe('Administrare: acces pe roluri', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Clienți și site-uri' })).toBeInTheDocument()
   })
 
+  it.each(['client_viewer', 'strategist', 'account'] as const)('%s e redirecționat din pagina unui site la Overview, fără să vadă sursele', async (role) => {
+    setup('/admin/clients/brand-urinal', { role })
+    await waitFor(() => expect(where()).toBe('/brands/brand-urinal/overview'))
+    expect(screen.queryByRole('heading', { level: 1, name: 'Site și surse' })).toBeNull()
+  })
+
   it.each(['client_viewer', 'strategist', 'account'] as const)('%s e redirecționat din /admin/sources la Overview, fără să vadă ecranul', async (role) => {
     setup('/admin/sources', { role })
     await waitFor(() => expect(where()).toBe('/brands/brand-urinal/overview'))
@@ -341,13 +347,16 @@ describe('Administrare: acces pe roluri', () => {
     await waitFor(() => expect(where()).toBe('/brands/brand-urinal/overview'))
   })
 
-  it('Surse: subtitlul poartă brandul curent, iar schimbarea brandului nu navighează', async () => {
-    setup('/admin/sources')
-    expect(await screen.findByText('Conexiunile de date ale spațiului Urinal și istoricul sincronizărilor.')).toBeInTheDocument()
-    await userEvent.click(await screen.findByRole('button', { name: 'Spațiu de brand' }))
-    await userEvent.click(screen.getByRole('menuitemradio', { name: /Minimartieni/ }))
-    expect(await screen.findByText('Conexiunile de date ale spațiului Minimartieni și istoricul sincronizărilor.')).toBeInTheDocument()
-    expect(where()).toBe('/admin/sources')
+  it('/admin/sources (vechea pagină și întoarcerea OAuth) duce la site-ul ales, cu parametrii păstrați', async () => {
+    window.sessionStorage.setItem('az-brand', 'brand-minimartieni')
+    try {
+      setup('/admin/sources?oauth=tiktok_ads&result=ok')
+      expect(await screen.findByText('TikTok Ads a fost conectat.')).toBeInTheDocument()
+      await waitFor(() => expect(where()).toBe('/admin/clients/brand-minimartieni?source=tiktok_ads'))
+      expect(screen.getByRole('heading', { level: 2, name: 'Minimartieni' })).toBeInTheDocument()
+    } finally {
+      window.sessionStorage.removeItem('az-brand')
+    }
   })
 
   it('Configurare are conținutul real: competitori, aliasuri, maparea SEOmonitor', async () => {
@@ -356,8 +365,8 @@ describe('Administrare: acces pe roluri', () => {
   })
 
   it('FilterBar lipsește pe paginile de administrare', async () => {
-    setup('/admin/sources')
-    await screen.findByRole('heading', { level: 1, name: 'Surse' })
+    setup('/admin/clients/brand-urinal')
+    await screen.findByRole('heading', { level: 1, name: 'Site și surse' })
     expect(screen.queryByRole('region', { name: 'Filtre' })).toBeNull()
   })
 })

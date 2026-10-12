@@ -20,9 +20,9 @@ Cât timp aplicația OAuth e în modul „Testing”, Google permite până la 1
 
 ## Pentru fiecare client (din aplicație)
 
-1. Administrare → **Surse** (cu un brand al clientului ales sus) → **„Conturile clientului”** → **Google Ads**.
+1. Pagina site-ului (Administrare → Clienți și site-uri → **Editează și surse**) al unui site al clientului → cardul **Google Ads** → **Conectează** → pasul 1.
 2. Completează **ID-ul contului de manager (MCC)**, de exemplu `123-456-7890`, apoi **Conectează cu Google**.
-3. Te loghezi cu un cont Google care are acces la MCC și accepți accesul la Google Ads. Revii în Surse cu mesajul „Google Ads a fost conectat”.
+3. Te loghezi cu un cont Google care are acces la MCC și accepți accesul la Google Ads. Revii în pagina site-ului cu mesajul „Google Ads a fost conectat”; la pasul 2 pui Customer ID-ul site-ului.
 
 ## Pentru fiecare brand
 

@@ -29,7 +29,7 @@ Pentru un cont de ads nou, revii doar la pasul 4. Tokenul rămâne același.
 
 ## 2. Salvează tokenul în Analyzator (o dată per client)
 
-1. Administrare → **Surse** (cu oricare brand al clientului ales sus) → **„Conturile clientului”** → cardul **Meta Ads**.
+1. Pagina site-ului (Administrare → Clienți și site-uri → **Editează și surse**) al oricărui site al clientului → cardul **Meta Ads** → **Conectează** → pasul 1.
 2. **Business Manager** (o etichetă) și **tokenul** → **Salvează**.
 3. **Testează conexiunea:**
    - verde = Meta acceptă tokenul;
@@ -40,7 +40,7 @@ Același token poate servi mai mulți clienți: îl salvezi pe fiecare client.
 ## 3. Leagă fiecare brand de contul lui de ads
 
 1. ID-ul contului apare în Ads Manager, în selectorul de cont sau în adresă (`act=1234567890`), și în Business Settings → Accounts → Ad accounts.
-2. Analyzator: brandul ales sus → Surse → **„Adaugă conexiune”** → **Meta Ads** → `act_1234567890` (sau doar cifrele).
+2. Analyzator: pagina site-ului → cardul **Meta Ads** → pasul 2 → `act_1234567890` (sau doar cifrele).
 3. Cardul conexiunii arată „Cheia clientului”: folosește tokenul de la pasul 2.
 
 ## 4. Pornește colectarea
@@ -48,7 +48,7 @@ Același token poate servi mai mulți clienți: îl salvezi pe fiecare client.
 - **Manual:** GitHub → Actions → **meta-weekly** → Run workflow.
 - **Automat:** marțea la 04:00 UTC, după ce `CONNECTOR_META_ENABLED = true`.
 
-Verifici în Administrare → Surse → „Istoricul sincronizărilor”: o rulare **Meta Ads** per brand. Pe pagina **Paid Media**, cifrele apar când ecranul citește datele (legarea datelor la ecrane e o etapă separată).
+Verifici în pagina site-ului → „Istoricul sincronizărilor”: o rulare **Meta Ads** per site. Pe pagina **Paid Media**, cifrele apar când ecranul citește datele (legarea datelor la ecrane e o etapă separată).
 
 ## Prima rulare
 

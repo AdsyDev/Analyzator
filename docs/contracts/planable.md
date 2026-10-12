@@ -17,7 +17,7 @@ Sursa: specificația OpenAPI 3.1 publică, `https://api.planable.io/api/v1/opena
 | `planable_account` | NULL (per client) | etichetă liberă (de ex. numele companiei Planable) | **da**: tokenul `pln_…` |
 | `planable` | brandul | ID-ul **workspace-ului** Planable al brandului | nu |
 
-- Tokenul se setează din Administrare → Surse → „Conturile clientului”; workspace-ul, din „Adaugă conexiune” pe brand.
+- Tokenul și workspace-ul se setează din pagina site-ului → cardul Planable: pasul 1 (tokenul clientului, refolosit de toate site-urile lui) și pasul 2 (workspace-ul site-ului).
 - Fără token (lipsă sau invalid), conexiunile `planable` ale clientului raportează `not_connected`, fără `sync_run` și fără cereri.
 - 401 pe `GET /workspaces` marchează tokenul `invalid`. Un 403 pe un workspace înseamnă „tokenul nu are acces la workspace-ul acesta”: tokenul nu se marchează invalid.
 

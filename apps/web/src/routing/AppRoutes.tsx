@@ -7,7 +7,7 @@ import { AdminPlaceholder, NotFoundPage } from './pages'
 import { RequireAuth } from './RequireAuth'
 import { ClientsPage } from '../screens/admin/ClientsPage'
 import { ConfigPage } from '../screens/admin/ConfigPage'
-import { SourcesPage } from '../screens/admin/SourcesPage'
+import { SitePage, SourcesRedirect } from '../screens/admin/SitePage'
 import { UsersPage } from '../screens/admin/UsersPage'
 import { InsightsPage } from '../screens/insights/InsightsPage'
 import { AiPage } from '../screens/ai/AiPage'
@@ -56,13 +56,21 @@ function AdminModulePage() {
   const { segment } = useParams()
   const { user } = useLayout()
   const module = segment ? ADMIN_MODULES[segment] : undefined
+  // Vechea pagină Surse (și ținta întoarcerii OAuth): sursele stau acum în pagina fiecărui site.
+  if (segment === 'sources') return canAccessAdmin(user.role, 'clients') ? <SourcesRedirect /> : <Navigate to="/" replace />
   // Fără acces la Administrare (sau la această pagină): redirect, fără să confirmi dacă pagina există.
   if (adminItemsFor(user.role).length === 0 || (module && !canAccessAdmin(user.role, module.segment))) return <Navigate to="/" replace />
   if (module?.segment === 'clients') return <ClientsPage />
-  if (module?.segment === 'sources') return <SourcesPage />
   if (module?.segment === 'users') return <UsersPage />
   if (module?.segment === 'config') return <ConfigPage />
   return module ? <AdminPlaceholder module={module} /> : <NotFoundPage />
+}
+
+/** Pagina unui site: aceeași gardă ca „Clienți și site-uri”. */
+function AdminSitePage() {
+  const { user } = useLayout()
+  if (!canAccessAdmin(user.role, 'clients')) return <Navigate to="/" replace />
+  return <SitePage />
 }
 
 function AdminIndexRedirect() {
@@ -82,6 +90,7 @@ export function AppRoutes() {
           <Route path="brands/:brandId/:segment" element={<BrandModulePage />} />
           <Route path="admin" element={<AdminIndexRedirect />} />
           <Route path="admin/:segment" element={<AdminModulePage />} />
+          <Route path="admin/clients/:brandId" element={<AdminSitePage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>

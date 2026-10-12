@@ -194,7 +194,7 @@ describe('Overview: dovezi (EvidenceDrawer)', () => {
     const dlg = await screen.findByRole('dialog', { name: 'Dovezi' })
     expect((await within(dlg).findAllByText(/Nu afișăm valori estimate/)).length).toBeGreaterThan(0)
     await userEvent.click(within(dlg).getByRole('button', { name: 'Vezi sursele' }))
-    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/admin/sources'))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/admin/clients/brand-urinal'))
   })
 
   it('pentru strategist nu apare acțiunea spre Surse', async () => {

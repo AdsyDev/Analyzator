@@ -29,7 +29,7 @@ export interface LayoutContext {
   changeFilters: (change: FilterBarChange) => void
   /** Reîncarcă lista de branduri (de ex. după ce Administrarea a creat sau a arhivat un site). */
   reloadBrands: () => void
-  /** Alege spațiul din topbar (de ex. site-ul tocmai creat, înainte de a deschide Surse). */
+  /** Alege spațiul din topbar (de ex. site-ul deschis în pagina lui de surse). */
   selectBrand: (id: string) => void
 }
 
@@ -62,6 +62,7 @@ export function AppLayout() {
   const brandMatch = useMatch('/brands/:brandId/:segment')
   const brandOnly = useMatch('/brands/:brandId')
   const adminMatch = useMatch('/admin/:segment')
+  const siteMatch = useMatch('/admin/clients/:brandId')
   const urlBrandId = brandMatch?.params.brandId ?? brandOnly?.params.brandId ?? null
   const segment = brandMatch?.params.segment ?? null
   const module = segment ? BRAND_MODULES[segment] : undefined
@@ -120,8 +121,8 @@ export function AppLayout() {
     return { dataAsOf: dates[0] ?? null, lastRefreshAt: imports[imports.length - 1] ?? null }
   }, [sourcesState])
 
-  const title = module?.title ?? adminModule?.title ?? 'Analyzator'
-  const subtitle = module?.subtitle(shellBrand?.name ?? '') ?? adminModule?.subtitle(shellBrand?.name ?? null)
+  const title = module?.title ?? adminModule?.title ?? (siteMatch ? 'Site și surse' : 'Analyzator')
+  const subtitle = module?.subtitle(shellBrand?.name ?? '') ?? adminModule?.subtitle(shellBrand?.name ?? null) ?? (siteMatch ? 'Detaliile site-ului, sursele lui de date și istoricul sincronizărilor.' : undefined)
   useEffect(() => {
     document.title = [title, shellBrand?.name, 'Analyzator'].filter(Boolean).join(' · ')
   }, [title, shellBrand?.name])
@@ -132,7 +133,8 @@ export function AppLayout() {
     if (urlBrandId) navigate({ pathname: brandPath(id, segment ?? 'overview'), search: sharedSearch(params) })
   }
 
-  const needsBrand = urlBrandId !== null || isHome
+  // `/admin/sources` trimite la site-ul ales în topbar, deci așteaptă lista de branduri.
+  const needsBrand = urlBrandId !== null || isHome || location.pathname === '/admin/sources'
   let content
   if (needsBrand && brandsResult === null) {
     content = <div role="status" aria-label="Se încarcă spațiile de brand" className="h-64 rounded-xl bg-skeleton" />

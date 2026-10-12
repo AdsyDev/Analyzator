@@ -19,7 +19,7 @@ Tokenul e o parolă: nu îl trimite pe email sau chat și nu îl pune în docume
 ## 2. Conectează în Analyzator
 
 1. Alege brandul din bara de sus.
-2. Administrare → **Surse** → „Adaugă conexiune”:
+2. Pagina site-ului (Administrare → Clienți și site-uri → **Editează și surse**) → cardul **Microsoft Clarity** → **Conectează**:
    - **Sursă:** Microsoft Clarity
    - **Cont sau proiect:** ID-ul proiectului de la pasul 1
    - **Nume afișat:** opțional (de ex. „Clarity site principal”)
@@ -45,7 +45,7 @@ Apasă **Testează conexiunea**.
 
 ## 5. Verifică
 
-Administrare → Surse → „Istoricul sincronizărilor”: o rulare **Microsoft Clarity** cu status „Reușit” sau „Parțial” și numărul de rânduri.
+Pagina site-ului → „Istoricul sincronizărilor”: o rulare **Microsoft Clarity** cu status „Reușit” sau „Parțial” și numărul de rânduri.
 
 ## Prima rulare
 

@@ -128,7 +128,7 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 - `access_denied` / `credential_invalid`: tokenul sau service account-ul a fost refuzat. Setează unul nou (`npm run set-source-token`), apoi „Testează conexiunea”; refresh-ul nu reîncearcă singur un credential invalid (`source_status.reason = credential_invalid`).
 - `orchestrator_exception`: a aruncat conectorul înainte să scrie `sync_runs` (de ex. baza sau API-ul furnizorului indisponibil). Reia doar acea sursă: Actions → `weekly-refresh` → Run workflow, `only = <sursă>` (sau `weekly-refresh` local: `npm run refresh:weekly -- --only gsc`).
 - `insufficient_budget` (SEOmonitor, Clarity): bugetul zilei s-a consumat; reia a doua zi (limita se resetează la 00:00 UTC, presupus).
-- `not_connected` nu e eroare: lipsește credentialul sau maparea; completează-le în Administrare → Surse.
+- `not_connected` nu e eroare: lipsește credentialul sau maparea; completează-le în pagina site-ului (Administrare → Clienți și site-uri → „Editează și surse”).
 - Reluare individuală: `npm run collect:seomonitor`, `npm run collect:google -- --only ga4`, `npm run collect:clarity`, sau workflow-urile per sursă.
 - Alertă netrimisă după ce ai rezolvat secretele/contactele: `npm run send:ops-notifications`.
 - Un lot `failed` rămâne în istoric; nu se șterge. Sursa se consideră rezolvată când `source_status.state` revine la `ok` după o rulare reușită.
@@ -139,7 +139,7 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 ## Colectare săptămânală Planable
 
 - Configurare și reguli: `docs/contracts/planable.md`; pași pentru agenție: `docs/connectors/planable.md`.
-- Conexiuni: `planable_account` per client (tokenul, din Administrare → Surse → „Conturile clientului”, cu test) și `planable` per brand (workspace-ul).
+- Conexiuni: `planable_account` per client (tokenul, din pagina oricărui site al clientului → cardul Planable → pasul 1, cu test) și `planable` per brand (workspace-ul).
 - Rulare: `.github/workflows/planable-weekly.yml`, marți 04:00 UTC, activ când `CONNECTOR_PLANABLE_ENABLED = true`; manual: Actions → planable-weekly → Run workflow, sau local `npm run collect:planable`.
 - Verificare: `sync_runs` (`source` = `planable_analytics` / `planable_listening`: `status`, `errors`, `coverage`), `provider_api_calls` (apelul `/workspaces` e pe conexiunea clientului, restul pe conexiunea brandului).
 - Mesaje: `access_denied` la `/workspaces` = token refuzat (marcat `invalid`; token nou din Planable). `workspace_not_found` = ID greșit sau token fără acces la workspace. `parser_note` = câmp invalid sau postare fără metrici; nu schimbă statusul.
@@ -148,7 +148,7 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 ## Colectare săptămânală Meta Ads
 
 - Configurare și reguli: `docs/contracts/meta-ads.md`; pași pentru agenție: `docs/connectors/meta-ads.md`.
-- Conexiuni: `meta_account` per client (tokenul system user, din „Conturile clientului”, cu test) și `meta_ads` per brand (`act_…`).
+- Conexiuni: `meta_account` per client (tokenul system user, din cardul Meta Ads al oricărui site al clientului → pasul 1, cu test) și `meta_ads` per brand (`act_…`).
 - Rulare: `.github/workflows/meta-weekly.yml`, marți 04:00 UTC, activ când `CONNECTOR_META_ENABLED = true`; manual din Actions sau `npm run collect:meta`.
 - Verificare: `sync_runs` (`source = meta_ads`), `paid_daily` (`collection_method = api`), `provider_api_calls`.
 - Mesaje: `access_denied` = token refuzat (marcat `invalid`, celelalte conturi ale clientului sărite); `permission_denied` = contul nu e atribuit system user-ului; `rate_limited` = limita de utilizare Meta (retry automat 10 s / 60 s / 5 min).

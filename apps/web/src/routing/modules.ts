@@ -150,8 +150,7 @@ export interface AdminModule {
 }
 
 export const ADMIN_MODULES: Record<string, AdminModule> = {
-  clients: { segment: 'clients', title: 'Clienți și site-uri', subtitle: () => 'Fiecare client are unul sau mai multe spații de brand. Un spațiu înseamnă un site, setul lui de competitori și sursele de date.' },
-  sources: { segment: 'sources', title: 'Surse', subtitle: (b) => (b ? `Conexiunile de date ale spațiului ${b} și istoricul sincronizărilor.` : 'Conexiunile de date și istoricul sincronizărilor.') },
+  clients: { segment: 'clients', title: 'Clienți și site-uri', subtitle: () => 'Fiecare client are unul sau mai multe spații de brand. Un spațiu înseamnă un site, setul lui de competitori și sursele de date; sursele se conectează din pagina site-ului.' },
   users: { segment: 'users', title: 'Utilizatori', subtitle: () => 'Persoanele cu acces la spațiile de brand.' },
   config: { segment: 'config', title: 'Configurare', subtitle: () => 'Competitori cu versiune și dată efectivă, aliasuri și maparea grupurilor SEOmonitor la branduri.' },
 }

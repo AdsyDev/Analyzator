@@ -4,7 +4,7 @@
 - **Ads:** cost, afișări, clicks și conversii pe zi, pe cont, campanie, grup și reclamă.
 - **Planable:** postări sociale și performanța lor (analytics), mențiuni (listening).
 
-**Status azi:** importul există pe server (funcția `csv-import`, cu validare și previzualizare), dar **ecranul de încărcare nu e gata**. Butonul „Importă CSV” din aplicație duce deocamdată la Administrare → Surse, fără formular. Până la ecran, fișierele pregătite după acest ghid se dau echipei tehnice, care le importă.
+**Status azi:** importul există pe server (funcția `csv-import`, cu validare și previzualizare), dar **ecranul de încărcare nu e gata**. Butonul „Importă CSV” din aplicație duce deocamdată la cardul **Import CSV** din pagina site-ului, fără formular. Până la ecran, fișierele pregătite după acest ghid se dau echipei tehnice, care le importă.
 
 ## Pregătirea fișierului
 

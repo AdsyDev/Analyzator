@@ -61,7 +61,7 @@ export interface SourcesProvider {
   createTenantConnection(tenantId: TenantId, input: NewTenantConnection): Promise<ProviderResult<TenantConnection>>
   /**
    * Funcția server `oauth`, `start`: adresa de autorizare la furnizor. Tokenul nu trece prin browser; furnizorul se
-   * întoarce la funcția server, care îl scrie în Vault și redirecționează în Administrare → Surse.
+   * întoarce la funcția server, care îl scrie în Vault și redirecționează spre pagina site-ului ales (prin `/admin/sources`).
    */
   startOAuth(tenantId: TenantId, provider: OAuthProvider, accountLabel: string | null): Promise<ProviderResult<{ authorize_url: string }>>
 }

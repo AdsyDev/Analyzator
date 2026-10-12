@@ -62,7 +62,7 @@ Starea sincronizării Clarity (bannerul „Sincronizarea Clarity are probleme") 
 
 ## Paid Media
 
-`summary` e poarta paginii: `not_connected` = niciun import pentru brand; pagina arată „Sursă neconectată" cu acțiunea „Importă CSV" (intrare în Administrare → Surse, doar `agency_admin`).
+`summary` e poarta paginii: `not_connected` = niciun import pentru brand; pagina arată „Sursă neconectată" cu acțiunea „Importă CSV" (intrare în cardul Import CSV din pagina site-ului, doar `agency_admin`).
 
 | Cerere | Răspuns | Note |
 |---|---|---|
@@ -110,7 +110,7 @@ KPI-urile `listening_mentions`, `listening_sov`, `listening_negative_share` nu s
 
 Filtre Listening în URL: `sentiment`, `source`.
 
-## Administrare → Surse și Analize (UI-6, seria 1)
+## Sursele unui site și Analize (UI-6, seria 1)
 
 ### Surse — `SourcesProvider` (implementare reală, prin sesiunea utilizatorului / RLS)
 

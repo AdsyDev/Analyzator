@@ -66,7 +66,7 @@ Perioadă, comparație, filtre de modul, chipuri active cu „x", „Resetează 
 Titlu, autor (avatar și rol), perioadă, rezumat, „Dovezi atașate" (linkuri la EvidenceDrawer), „Limite". Badge de status (Draft, În review, Publicat, Înlocuit) doar pentru agenție; clientul vede doar „Publicat" fără badge.
 
 ### SourceStatus
-Monogramă, nume, ce aduce, stare (Conectat, Parțial, Învechit, Eroare, Neconectat), „Date până la", „Importat la", acțiuni (Reîncearcă, Reconectează, Conectează) doar pentru agenție, notă de eroare. Starea credențialului pe baza `credential_status` (vezi `screens.md`, Administrare → Surse).
+Monogramă, nume, ce aduce, stare (Conectat, Parțial, Învechit, Eroare, Neconectat), „Date până la", „Importat la", acțiuni (Reîncearcă, Reconectează, Conectează) doar pentru agenție, notă de eroare. Starea credențialului pe baza `credential_status` (vezi `screens.md`, „Sursele unui site”).
 
 ### EmptyState
 Iconiță subțire, titlu, text cu motivul, acțiune opțională. Pentru module fără sursă: titlul „Sursă neconectată" și motivul concret (nu „În curând", nu mesaje despre stack); acțiunea „Conectează <sursă>" (agenție) sau „Cere conectarea" (client). Variantă „fără rezultate pentru filtre" cu „Resetează filtrele".

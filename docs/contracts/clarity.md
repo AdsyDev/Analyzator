@@ -6,7 +6,7 @@ Autentificare: `Authorization: Bearer {token}` (un token per proiect, doar serve
 ## Configurare
 
 - O conexiune per brand în `source_connections`: `provider = 'clarity'`, `tenant_id`, `brand_id`, `external_account_id` = ID-ul proiectului Clarity, `status`.
-- Tokenul e în **Supabase Vault** (secret `source_connection:<id>`). Se setează din Administrare → Surse (după ce există ecranul), iar până atunci cu `npm run set-source-token`. Ambele trec prin Edge Function `source-credentials`. Frontend-ul vede doar `credential_status` (`missing` / `unverified` / `valid` / `invalid`).
+- Tokenul e în **Supabase Vault** (secret `source_connection:<id>`). Se setează din pagina site-ului → cardul Microsoft Clarity, sau cu `npm run set-source-token`. Ambele trec prin Edge Function `source-credentials`. Frontend-ul vede doar `credential_status` (`missing` / `unverified` / `valid` / `invalid`).
 - Worker-ul citește conexiunile active cu service role. Le sare pe cele `missing` sau `invalid` și citește tokenul cu `get_source_token` doar după verificarea bugetului.
 - Proba (`npm run probe:clarity`) citește în continuare `CLARITY_PROJECTS` din `.env.local`, până există UI-ul.
 

@@ -2,7 +2,9 @@
 
 Note care trebuie păstrate până se construiește interfața. Textele sunt în română.
 
-## Administrare → Surse
+## Sursele unui site (`/admin/clients/:brandId`)
+
+Din 12 oct. 2026 sursele nu mai au o pagină comună: fiecare site are pagina lui (Administrare → Clienți și site-uri → „Editează și surse”), cu detaliile site-ului, un card per sursă și istoricul sincronizărilor. Cardul sursei are pașii: (1) cheia clientului, doar pentru sursele care o folosesc, salvată o dată și refolosită automat de celelalte site-uri ale clientului; (2) contul sau proiectul site-ului. `/admin/sources` rămâne doar ca redirecționare spre site-ul ales (e ținta întoarcerii OAuth). Restul secțiunii descrie conexiunile și testarea tokenului, valabile în cardurile surselor.
 
 Acces: doar `agency_admin`. Ceilalți utilizatori nu văd ecranul. Strategist și account văd starea surselor în pagina de status, dar fără acțiuni pe credențiale.
 
@@ -40,7 +42,7 @@ Extras din `docs/design/reference/Analyzator.dc.html` (referință vizuală, nu 
 
 ## Cadrul comun (shell)
 
-- **Sidebar** colapsabil (sticlă): Overview, AI Visibility, SEO și Search, Trafic și conversii, Paid Media, Social, Listening, Concurență, Analize și acțiuni. Secțiunea **Administrare** (doar agenție): Clienți și site-uri, Surse, Utilizatori, Configurare.
+- **Sidebar** colapsabil (sticlă): Overview, AI Visibility, SEO și Search, Trafic și conversii, Paid Media, Social, Listening, Concurență, Analize și acțiuni. Secțiunea **Administrare** (doar agenție): Clienți și site-uri (cu pagina fiecărui site și sursele lui), Utilizatori, Configurare.
 - **Topbar** (sticlă): selector de brand (lista „Spații de brand accesibile", cu categoria; linkul „Clienți și site-uri" doar pentru agenție), titlul paginii, comutator temă, meniul utilizatorului (nume, rol și organizație, email, „Vezi interfața ca" client/agenție doar în previzualizare, „Ieși din cont").
 - **FilterBar**: perioadă (Ultimele 7 zile, Ultimele 28 de zile, Luna curentă, Interval personalizat, cu intervalul afișat), comparație („vs perioada anterioară" implicit, „vs anul trecut"), filtre specifice modulului (Trafic: Device și Canal), chipuri pentru filtrele active și „Resetează filtrele".
 - **Linia de proveniență**: „Date până la <data>" · „Ultimul refresh <acum 2 ore>".
@@ -90,7 +92,7 @@ Taburi (agenție: „Flux editorial" și vederea publicată; client: doar public
 ## Administrare (doar agenție)
 
 - **Clienți și site-uri** (`/admin/clients`): carduri de client (status, industrie, număr de spații, utilizatori, contacte PV, „Client din <data>"), tabel de spații de brand (domeniu, surse, utilizatori, ultimul import, status, acțiune „Deschis acum"/„Deschide"), „Adaugă client" și „Adaugă site" ca wizard cu pași (client, brand, competitori cu versiune v1, conectare surse „din 8 surse conectate", utilizatori).
-- **Surse** (`/admin/sources`): grila de SourceStatus (monogramă, nume, ce aduce, stare, „Date până la", „Importat la", acțiuni Reîncearcă / Reconectează / Conectează) și „Istoricul sincronizărilor" (sursă, dată, durată, rânduri, status). Specificația completă a conexiunilor și a testării tokenului e în secțiunea de la începutul acestui fișier și are prioritate față de design.
+- **Sursele unui site** (`/admin/clients/:brandId`, înlocuiește `/admin/sources`): un card per sursă (monogramă, nume, ce aduce, stare, „Date până la", „Importat la", acțiuni Reîncearcă / Reconectează / Conectează) și „Istoricul sincronizărilor" (sursă, dată, durată, rânduri, status). Specificația completă a conexiunilor și a testării tokenului e în secțiunea de la începutul acestui fișier și are prioritate față de design.
 - **Utilizatori** (`/admin/users`): „Persoane cu acces" (persoană cu avatar și email, rol, branduri, ultima activitate), „Trimite invitație" (invitațiile sunt valabile 7 zile; cititorii văd doar analizele publicate).
 - **Configurare** (`/admin/config`): în design doar EmptyState. Conținutul (competitori cu versiune și dată efectivă, aliasuri, grupuri SEOmonitor → brand) vine în UI-6.
 
@@ -108,14 +110,14 @@ EvidenceDrawer (sticlă): pagină, indicator, definiție, valoare, variație, su
 | `/` | autentificat | Duce la Overview-ul ultimului brand permis, sau al primului. Fără brand alocat: „Nu ai acces la niciun spațiu de brand". |
 | `/brands/:brandId` | autentificat | Duce la `/brands/:brandId/overview`. |
 | `/brands/:brandId/<modul>` | autentificat, doar branduri permise | Module: `overview`, `ai`, `seo`, `traffic`, `paid`, `social`, `listening`, `competition`, `insights`. Un brand din afara listei permise (sau inexistent) arată același mesaj „Spațiu de brand indisponibil" și nu declanșează nicio cerere de date pentru el. |
-| `/admin/clients`, `/admin/sources`, `/admin/users`, `/admin/config` | doar `agency_admin` | Spec cap. 28 pune clienții, brandurile, invitațiile, sursele și drepturile la Agency admin; Surse e doar pentru `agency_admin`. Orice alt rol (inclusiv `strategist` și `account`) e redirecționat la `/`, fără să afle dacă pagina există. |
+| `/admin/clients`, `/admin/clients/:brandId`, `/admin/users`, `/admin/config` (și redirecționarea `/admin/sources`) | doar `agency_admin` | Spec cap. 28 pune clienții, brandurile, invitațiile, sursele și drepturile la Agency admin; Surse e doar pentru `agency_admin`. Orice alt rol (inclusiv `strategist` și `account`) e redirecționat la `/`, fără să afle dacă pagina există. |
 | orice altceva | autentificat | „Pagina nu există". |
 
 - Brandul și filtrele vin din URL: `period` (`7d`, `28d`, `month`, `custom` cu `from` și `to`), `compare`, plus filtrele din allowlist-ul modulului (Trafic: `device`). Valorile implicite nu se scriu în URL; valorile necunoscute cad pe implicit.
 - Schimbarea modulului păstrează perioada și comparația, nu și filtrele modulului. Schimbarea brandului păstrează modulul și parametrii comuni.
 - Gărzile din UI sunt comoditate: autoritatea e RLS pe server. Un user client care cunoaște adresa unei pagini de administrare nu o poate folosi, fiindcă datele ei nu sunt expuse lui.
 - În previzualizare, utilizatorul e fictiv, cu rol comutabil din meniul contului („Vezi interfața ca"); la comutare, ecranele se reîncarcă cu datele noului rol.
-- „Conectează <sursă>" (Paid, Social) apare doar pentru `agency_admin` și duce la Surse. Pentru ceilalți nu există acțiune: nu există încă un canal real de cerere a conectării, iar designul arăta un toast care ar fi pretins o trimitere inexistentă.
+- „Conectează <sursă>" (Paid, Social) apare doar pentru `agency_admin` și duce la sursele site-ului. Pentru ceilalți nu există acțiune: nu există încă un canal real de cerere a conectării, iar designul arăta un toast care ar fi pretins o trimitere inexistentă.
 
 ---
 
@@ -177,7 +179,7 @@ Ce s-a implementat diferit de designul din `docs/design/reference/` și de ce. N
 | Comportament Clarity cu valori pe device | Coloana „Toate" din registru, device din provider; definițiile `draft` marcate „Provizoriu"; banner când sursa are probleme | Registrul are doar agregatul pe brand; defalcarea cere un view nou. Valorile Clarity rămân neconfirmate (`docs/contracts/clarity.md`). |
 | „Reconectează în Surse" | Doar pentru `agency_admin` | Surse e doar pentru `agency_admin`. |
 | Paid: „Observații" și „Creatives" | Lipsesc | Fără contract; creatives după lansare, iar designul cere fără galerie. |
-| Paid/Social fără import: „Conectează Google Ads / Planable" | „Sursă neconectată" cu „Importă CSV" (agency_admin) | Cerința UI-4: modulele sunt pe bază de import; acțiunea doar intră în flux (Administrare → Surse), fără logica importului. Clientul și ceilalți nu primesc acțiune (nu există canal de cerere). |
+| Paid/Social fără import: „Conectează Google Ads / Planable" | „Sursă neconectată" cu „Importă CSV" (agency_admin) | Cerința UI-4: modulele sunt pe bază de import; acțiunea doar intră în flux (cardul Import CSV din pagina site-ului), fără logica importului. Clientul și ceilalți nu primesc acțiune (nu există canal de cerere). |
 | Pacing cu stare „în ritm / în urmă" | Două bare (spend față de buget, zile trecute din plan) și nota „reper, nu verdict" | Spec cap. 15: progresul liniar e un reper; nu emitem o judecată automată. |
 | Postări cu preview imagine | Text scurt, platformă, format, topic, link validat | Nu există imagini autorizate; fără dependențe externe în interfață. |
 | Social: clasarea postărilor | Postările sub 7 zile marcate „date incomplete"; mediana doar din cele mature | Spec cap. 17: nu clasăm o postare de ieri împotriva uneia cu trei luni de expunere fără avertizare. |

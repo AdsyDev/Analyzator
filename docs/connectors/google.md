@@ -10,7 +10,7 @@ Ultimele 35 de zile se reimportă la fiecare rulare.
 
 **Ce se face unde:**
 - contul tehnic se creează în Google Cloud;
-- cheia și proprietățile GA4 și Search Console se pun **din aplicație** (Administrare → Surse);
+- cheia și proprietățile GA4 și Search Console se pun **din aplicație**, în pagina site-ului (Administrare → Clienți și site-uri → **Editează și surse**);
 - testul înseamnă o **rulare manuală**.
 
 ## Cum funcționează accesul
@@ -41,7 +41,7 @@ Analyzator nu se loghează cu contul tău Google. Folosește un **service accoun
 
 ## 3. Încarcă cheia în Analyzator (o dată per client)
 
-1. Administrare → **Surse** (cu oricare brand al clientului ales sus) → secțiunea **„Conturile clientului”** → cardul **Google (GA4 și Search Console)**.
+1. Pagina site-ului (Administrare → Clienți și site-uri → **Editează și surse**) al oricărui site al clientului → cardul **Google Analytics 4** sau **Search Console** → **Conectează** → pasul 1, „Cheia Google (service account) a clientului”. Cheia e una pentru ambele surse și pentru toate site-urile clientului.
 2. **Încarcă cheia JSON** → alege fișierul descărcat la pasul 1. Aplicația verifică fișierul în browser și îți arată adresa service account-ului; un fișier greșit (de ex. un „OAuth client”) e refuzat cu explicație.
 3. **Salvează cheia.** Starea devine „Token salvat, netestat”, iar adresa service account-ului apare pe card, cu butonul „Copiază adresa” (îți trebuie la pasul 2, dacă nu l-ai făcut).
 4. **Șterge fișierul `.json`** de pe calculator.
@@ -50,7 +50,7 @@ Cheia nu se mai poate citi din aplicație. Pentru o cheie nouă (rotire), încar
 
 ## 4. Adaugă proprietățile (din aplicație, per brand)
 
-Alege brandul din bara de sus → Administrare → **Surse** → „Adaugă conexiune”.
+În pagina site-ului, cardul **Google Analytics 4** (respectiv **Search Console**) → pasul 2.
 
 | Sursă | Cont sau proiect | Unde îl găsești |
 |---|---|---|
@@ -65,7 +65,7 @@ Fusul orar al conexiunii GA4 e implicit `Europe/Bucharest`. Dacă proprietatea G
 
 GitHub → Actions → **google-weekly** → Run workflow (opțional `only` = `ga4` sau `gsc`). Durează câteva minute.
 
-Verifică în Administrare → Surse → „Istoricul sincronizărilor”: rulări „Google Analytics 4” și „Search Console”.
+Verifică în pagina site-ului → „Istoricul sincronizărilor”: rulări „Google Analytics 4” și „Search Console”.
 
 Colectarea automată rulează **marțea la 04:00 UTC**, după ce `CONNECTOR_GOOGLE_ENABLED = true`.
 
@@ -73,7 +73,7 @@ Colectarea automată rulează **marțea la 04:00 UTC**, după ce `CONNECTOR_GOOG
 
 | Simptom | Cauză probabilă | Soluție |
 |---|---|---|
-| Rularea spune `not_connected`, fără date | Lipsește cheia clientului sau a fost refuzată | Pasul 3 (cardul Google din „Conturile clientului”). |
+| Rularea spune `not_connected`, fără date | Lipsește cheia clientului sau a fost refuzată | Pasul 3 (pasul 1 din cardul GA4 sau Search Console al site-ului). |
 | `access_denied` pe un brand | Service account-ul nu are acces la proprietatea acelui brand | Pasul 2 pentru acea proprietate. Cheia rămâne validă pentru celelalte branduri. |
 | GA4 nu găsește proprietatea | S-a pus Measurement ID (`G-…`) în loc de Property ID | Conexiune nouă cu Property ID-ul numeric. |
 | Search Console nu găsește site-ul | `site_url` nu e exact ca în Search Console | `sc-domain:` pentru domain property; URL complet cu `/` pentru URL prefix. |

@@ -1,42 +1,27 @@
 import { useId, useState, type ChangeEvent, type FormEvent } from 'react'
-import type { OAuthProvider, TenantConnection, TenantId, ValidationOutcome } from '../../contracts'
+import type { OAuthProvider, TenantConnection, TenantId, TenantProviderId, ValidationOutcome } from '../../contracts'
 import { Button } from '../../components/ui/Button'
 import { StatusChip } from '../../components/ui/Chip'
 import { useProviders } from '../../data/DataProvidersContext'
-import { useAsync } from '../../data/useAsync'
 import { formatDateTime } from '../../lib/format'
 import { checkServiceAccount, type ServiceAccountCheck } from '../../lib/serviceAccount'
-import { Resolved } from '../shared/Resolved'
 import { CREDENTIAL_LABELS, OUTCOME_TONE } from './labels'
 
 const field = 'h-9 rounded-[10px] border border-border-strong bg-surface px-3 text-[13px]'
 
 /**
- * Conturile la nivel de client (un cont pentru toate brandurile clientului): cheia Google pentru GA4 și Search
- * Console, contul SEOmonitor, tokenul Planable și Meta Ads, plus conturile Google Ads și TikTok conectate prin OAuth. Cheia și tokenul pleacă o singură dată spre funcția server `source-credentials`;
- * nu se afișează și nu rămân în interfață.
+ * Conturile la nivel de client (un cont pentru toate site-urile clientului): cheia Google pentru GA4 și Search
+ * Console, contul SEOmonitor, tokenul Planable și Meta Ads, plus conturile Google Ads și TikTok conectate prin OAuth.
+ * Apar în pagina fiecărui site, la sursa care le folosește. Cheia și tokenul pleacă o singură dată spre funcția
+ * server `source-credentials`; nu se afișează și nu rămân în interfață.
  */
-export function TenantAccounts({ tenantId, onChanged }: { tenantId: TenantId; onChanged: () => void }) {
-  const providers = useProviders()
-  const list = useAsync(() => providers.sources.tenantConnections(tenantId), [providers, tenantId])
-  function changed() {
-    list.reload()
-    onChanged()
-  }
-  return (
-    <Resolved state={list.state} onRetry={list.reload} loadingLabel="Se încarcă conturile clientului" skeletonClass="h-40">
-      {(conns) => (
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-          <GoogleKeyCard tenantId={tenantId} connection={conns.find((c) => c.provider === 'google_service_account') ?? null} onChanged={changed} />
-          <TokenAccountCard spec={SEOMONITOR} tenantId={tenantId} connection={conns.find((c) => c.provider === 'seomonitor') ?? null} onChanged={changed} />
-          <TokenAccountCard spec={PLANABLE} tenantId={tenantId} connection={conns.find((c) => c.provider === 'planable_account') ?? null} onChanged={changed} />
-          <TokenAccountCard spec={META} tenantId={tenantId} connection={conns.find((c) => c.provider === 'meta_account') ?? null} onChanged={changed} />
-          <OAuthAccountCard spec={GOOGLE_ADS} tenantId={tenantId} connection={conns.find((c) => c.provider === 'google_ads_account') ?? null} onChanged={changed} />
-          <OAuthAccountCard spec={TIKTOK} tenantId={tenantId} connection={conns.find((c) => c.provider === 'tiktok_account') ?? null} onChanged={changed} />
-        </div>
-      )}
-    </Resolved>
-  )
+/** Contul de client necesar unei surse a site-ului; aceeași cheie e refolosită de toate site-urile clientului. */
+export function TenantAccountCard({ tenantId, provider, connection, onChanged }: { tenantId: TenantId; provider: TenantProviderId; connection: TenantConnection | null; onChanged: () => void }) {
+  if (provider === 'google_service_account') return <GoogleKeyCard tenantId={tenantId} connection={connection} onChanged={onChanged} />
+  if (provider === 'google_ads_account') return <OAuthAccountCard spec={GOOGLE_ADS} tenantId={tenantId} connection={connection} onChanged={onChanged} />
+  if (provider === 'tiktok_account') return <OAuthAccountCard spec={TIKTOK} tenantId={tenantId} connection={connection} onChanged={onChanged} />
+  const spec = provider === 'seomonitor' ? SEOMONITOR : provider === 'planable_account' ? PLANABLE : META
+  return <TokenAccountCard spec={spec} tenantId={tenantId} connection={connection} onChanged={onChanged} />
 }
 
 function CardHeader({ title, subtitle, connection }: { title: string; subtitle: string; connection: TenantConnection | null }) {
@@ -116,7 +101,7 @@ function GoogleKeyCard({ tenantId, connection, onChanged }: { tenantId: TenantId
 
   return (
     <article aria-label="Cheia Google a clientului" className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 shadow-1">
-      <CardHeader title="Google (GA4 și Search Console)" subtitle="O cheie de service account pentru toate brandurile clientului." connection={connection} />
+      <CardHeader title="Google (GA4 și Search Console)" subtitle="O cheie de service account pentru toate site-urile clientului." connection={connection} />
       {email && (
         <div className="flex flex-col gap-1.5 rounded-lg bg-surface-2 px-3 py-2.5">
           <span className="text-[12px] text-text-3">Service account</span>
@@ -125,7 +110,7 @@ function GoogleKeyCard({ tenantId, connection, onChanged }: { tenantId: TenantId
             <Button variant="ghost" onClick={() => void copy()}>{copied ? 'Copiat' : 'Copiază adresa'}</Button>
           </span>
           <span className="text-[12px] leading-snug text-text-2">
-            Adaug-o ca <strong>Viewer</strong> în GA4 (Property access management) și ca <strong>Restricted</strong> în Search Console (Users and permissions), pentru fiecare brand. Apoi adaugă proprietățile mai jos, pe fiecare brand.
+            Adaug-o ca <strong>Viewer</strong> în GA4 (Property access management) și ca <strong>Restricted</strong> în Search Console (Users and permissions), pentru fiecare brand. Apoi adaugă proprietatea fiecărui site, la pasul 2.
           </span>
           {connection?.credential_updated_at && <span className="font-mono text-[11.5px] text-text-3">Cheie salvată {formatDateTime(connection.credential_updated_at)}</span>}
         </div>
@@ -174,13 +159,13 @@ const SEOMONITOR: TokenAccountSpec = {
   provider: 'seomonitor',
   aria: 'Contul SEOmonitor al clientului',
   title: 'SEOmonitor',
-  subtitle: 'Un cont pentru toate brandurile clientului; brandurile se despart prin grupurile de keywords.',
+  subtitle: 'Un cont pentru toate site-urile clientului; site-urile se despart prin grupurile de keywords.',
   idLabel: 'ID-ul companiei (company_id)',
   idPlaceholder: 'de ex. 4821',
   idPattern: /^\d+$/,
   idHint: 'Doar cifre.',
   tokenPlaceholder: 'Account Settings → Edit Profile → API Token',
-  footnote: 'Datele intră pe branduri doar după maparea grupurilor SEOmonitor (Configurare → Grupuri SEOmonitor → brand). Ghid: docs/connectors/seomonitor.md.',
+  footnote: 'Datele intră pe site doar după maparea grupurilor SEOmonitor (Configurare → Grupuri SEOmonitor → brand). Ghid: docs/connectors/seomonitor.md.',
   savedNote: 'Token salvat. Testează conexiunea sau așteaptă prima rulare SEOmonitor.',
 }
 
@@ -188,7 +173,7 @@ const PLANABLE: TokenAccountSpec = {
   provider: 'planable_account',
   aria: 'Contul Planable al clientului',
   title: 'Planable (social și Listening)',
-  subtitle: 'Un token pentru toate workspace-urile clientului; workspace-ul fiecărui brand se adaugă mai jos, pe brand.',
+  subtitle: 'Un token pentru toate workspace-urile clientului; workspace-ul site-ului se adaugă la pasul 2.',
   idLabel: 'Numele companiei în Planable',
   idPlaceholder: 'de ex. STADA România',
   idPattern: /^.{2,120}$/,
@@ -208,7 +193,7 @@ const META: TokenAccountSpec = {
   idPattern: /^.{2,120}$/,
   idHint: 'O etichetă, ca să recunoști contul.',
   tokenPlaceholder: 'Token system user (Business Settings → System users, ads_read)',
-  footnote: 'Contul de ads al fiecărui brand (act_…) se adaugă mai jos, pe brand. Ghid: docs/connectors/meta-ads.md.',
+  footnote: 'Contul de ads al site-ului (act_…) se adaugă la pasul 2. Ghid: docs/connectors/meta-ads.md.',
   savedNote: 'Token salvat. Testează conexiunea pentru a confirma că funcționează.',
 }
 
@@ -325,7 +310,7 @@ const GOOGLE_ADS: OAuthSpec = {
   provider: 'google_ads',
   aria: 'Contul Google Ads al clientului',
   title: 'Google Ads',
-  subtitle: 'Conectare cu contul Google care are acces la contul de manager (MCC); conturile brandurilor se adaugă mai jos.',
+  subtitle: 'Conectare cu contul Google care are acces la contul de manager (MCC); contul site-ului se adaugă la pasul 2.',
   button: 'Conectează cu Google',
   needsManagerId: true,
   footnote: 'Se deschide pagina Google de autorizare; tokenul ajunge direct în seiful serverului. Ghid: docs/connectors/google-ads.md.',

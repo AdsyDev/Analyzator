@@ -7,14 +7,14 @@ import { formatDateTime } from '../../lib/format'
 import { PROVIDER_LABELS } from '../../lib/sources'
 import { BUDGET_RESET_NOTE, CREDENTIAL_LABELS, OUTCOME_TONE, VALIDATABLE } from './labels'
 
-/** GA4 și Search Console folosesc cheia Google a clientului, Planable tokenul clientului (Conturile clientului), nu un token pe conexiune. */
+/** Conexiunile care folosesc cheia clientului (pasul 1 din cardul sursei), nu un token pe conexiune. */
 const TENANT_KEY_NOTE: Record<string, string> = {
-  ga4: 'Nu are token propriu: folosește cheia Google din „Conturile clientului”. Service account-ul trebuie să aibă acces la această proprietate.',
-  gsc: 'Nu are token propriu: folosește cheia Google din „Conturile clientului”. Service account-ul trebuie să aibă acces la această proprietate.',
-  planable: 'Nu are token propriu: folosește tokenul Planable din „Conturile clientului”. Tokenul trebuie să aibă acces la acest workspace.',
-  meta_ads: 'Nu are token propriu: folosește tokenul Meta din „Conturile clientului”. System user-ul trebuie să aibă contul de ads atribuit.',
-  google_ads: 'Nu are token propriu: folosește contul Google Ads conectat în „Conturile clientului”. Contul trebuie să fie sub MCC-ul conectat.',
-  tiktok_ads: 'Nu are token propriu: folosește contul TikTok conectat în „Conturile clientului”. Advertiserul trebuie să fie printre cele autorizate.',
+  ga4: 'Nu are token propriu: folosește cheia Google a clientului (pasul 1). Service account-ul trebuie să aibă acces la această proprietate.',
+  gsc: 'Nu are token propriu: folosește cheia Google a clientului (pasul 1). Service account-ul trebuie să aibă acces la această proprietate.',
+  planable: 'Nu are token propriu: folosește tokenul Planable al clientului (pasul 1). Tokenul trebuie să aibă acces la acest workspace.',
+  meta_ads: 'Nu are token propriu: folosește tokenul Meta al clientului (pasul 1). System user-ul trebuie să aibă contul de ads atribuit.',
+  google_ads: 'Nu are token propriu: folosește contul Google Ads conectat la pasul 1. Contul trebuie să fie sub MCC-ul conectat.',
+  tiktok_ads: 'Nu are token propriu: folosește contul TikTok conectat la pasul 1. Advertiserul trebuie să fie printre cele autorizate.',
 }
 const USES_TENANT_KEY: readonly string[] = Object.keys(TENANT_KEY_NOTE)
 

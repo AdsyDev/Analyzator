@@ -25,7 +25,7 @@ Ultimele 35 de zile se reimportă la fiecare rulare.
 
 ## 2. Salvează tokenul în Analyzator
 
-1. Administrare → **Surse** (cu oricare brand al clientului ales sus) → **„Conturile clientului”** → cardul **Planable**.
+1. Pagina site-ului (Administrare → Clienți și site-uri → **Editează și surse**) al oricărui site al clientului → cardul **Planable** → **Conectează** → pasul 1, „Tokenul Planable al clientului”.
 2. Completează **numele companiei** (doar o etichetă) și **tokenul**, apoi **Salvează**.
 3. Apasă **Testează conexiunea**:
 
@@ -45,7 +45,7 @@ Testul e limitat la 20 pe zi pentru fiecare cont.
    - rulează **GET /workspaces**.
 
    Fiecare workspace are un `id` și un `name`.
-2. În Analyzator: alege brandul din bara de sus → Surse → **„Adaugă conexiune”** → Sursă **Planable** → la „Cont sau proiect” pune **ID-ul workspace-ului**.
+2. În Analyzator: pagina site-ului → cardul **Planable** → pasul 2 → la „Workspace Planable” pune **ID-ul workspace-ului**.
 3. Cardul conexiunii arată „Cheia clientului”: nu are token propriu, ci folosește tokenul de la pasul 2.
 
 Repetă pasul 3 pentru fiecare brand.
@@ -57,7 +57,7 @@ Repetă pasul 3 pentru fiecare brand.
 
 ## 5. Verifică
 
-Administrare → Surse → „Istoricul sincronizărilor”: pentru fiecare brand apar două rulări, **Planable** (social) și **Listening**, cu status și număr de rânduri.
+Pagina site-ului → „Istoricul sincronizărilor”: pentru fiecare site apar două rulări, **Planable** (social) și **Listening**, cu status și număr de rânduri.
 
 ## Prima rulare
 
