@@ -208,6 +208,20 @@ describe('pagina site-ului: sursele, fiecare conectată pe site (fixtures de pre
     expect(within(otherMapping).getAllByText('Mapat pe Urinal')).toHaveLength(2)
   })
 
+  it('SEOmonitor: maparea automată apare bifată, „Automat”, ca grup principal, fără schimbări false', async () => {
+    const auto = { campaign_id: '500', group_id: '5002', version: 1, effective_from: '2026-10-11', kind: 'brand' as const, brand_id: 'brand-urinal', brand_type: null, is_primary_visibility: true, note: 'Automat: domeniul campaniei = domeniul site-ului; grupul „All keywords” e principal.' }
+    renderApp({ route: site('brand-urinal'), wrap: (b) => ({ ...b, config: { ...b.config, seomonitorMappings: async () => ({ kind: 'ready' as const, data: [auto] }) } }) })
+    await pageReady('Site și surse')
+    const card = await open('SEOmonitor')
+    const mapping = await within(card).findByRole('region', { name: 'Maparea SEOmonitor a site-ului' })
+    await within(mapping).findByRole('list', { name: 'Grupurile campaniei' })
+    expect(within(mapping).getByRole('checkbox', { name: 'Urinal generic pe Urinal' })).toBeChecked()
+    expect(within(mapping).getByText('Automat')).toBeInTheDocument()
+    expect(within(mapping).getByRole('combobox', { name: 'Tipul grupului Urinal generic' })).toHaveValue('mixed')
+    expect(within(mapping).getByRole('radio', { name: 'Urinal generic e grupul principal' })).toBeChecked()
+    expect(within(mapping).getByText('Nicio schimbare față de maparea salvată.')).toBeInTheDocument()
+  })
+
   it('SEOmonitor: un grup scos de pe site devine exclus (versiune nouă, nimic șters)', async () => {
     const saved: unknown[] = []
     renderApp({

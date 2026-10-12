@@ -45,6 +45,8 @@ Pentru `keywords/ais` documentația nu spune ce numără `limit`: folosim conser
   - un grup descoperit fără mapare (`unmapped`) nu intră în niciun brand;
   - un grup `multi_brand` (`multi_brand`) rămâne neatribuit;
   - un grup mapat care nu mai apare în SEOmonitor (`mapped_group_missing`), iar run-ul brandului devine `partial`.
+- **Mapare automată (D-19):** după descoperire, un brand activ cu domeniu, fără niciun rând de mapare în istoric, primește versiunea 1 pentru grupul `All keywords` (tip `group`) al singurei campanii cu același domeniu (`normalizeDomain`): `brand`, `brand_type` null, `is_primary_visibility` true, `effective_from` = ultima zi a intervalului, `created_by` null, nota „Automat: …”. Brandul își pornește `sync_run` în aceeași rulare. Un grup deja mapat (orice tip) nu se remapează.
+- `company_id` nu se trimite: eticheta conexiunii nu e un ID SEOmonitor; tokenul vede doar campaniile lui.
 - Datele se cer **per grup mapat** (`group_id=…`), deci un rând aparține brandului prin grupul lui (`attributed_group_id`, `mapping_version`).
 - `keyword_groups.brand_type` vine din mapare. `keywords.is_branded` vine din listarea `group_id=-1` (Brand folder, documentat).
 

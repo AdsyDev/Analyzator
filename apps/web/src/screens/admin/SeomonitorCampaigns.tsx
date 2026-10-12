@@ -19,7 +19,9 @@ interface Props {
   spaces: ClientSpace[]
 }
 
-type Row = { on: boolean; type: 'branded' | 'nonbranded' }
+/** `mixed` = `brand_type` null: grupul are și keywords branded, și nonbranded (de ex. „All keywords”). */
+type Row = { on: boolean; type: 'branded' | 'nonbranded' | 'mixed' }
+const toDb = (t: Row['type']) => (t === 'mixed' ? null : t)
 
 /**
  * Maparea grupurilor SEOmonitor pe site, din cardul sursei: campania (propusă după domeniu) și grupurile ei, citite
@@ -95,7 +97,7 @@ function GroupMapping({ tenantId, tenantConnectionId, campaignId, site, spaces }
     for (const g of groupList) {
       const m = mapList.find((x) => x.campaign_id === campaignId && x.group_id === g.id)
       const mine = m?.kind === 'brand' && m.brand_id === site.id
-      init[g.id] = { on: mine, type: m?.brand_type ?? (/brand/i.test(g.name) ? 'branded' : 'nonbranded') }
+      init[g.id] = { on: mine, type: mine ? (m.brand_type ?? 'mixed') : /^all keywords$/i.test(g.name) ? 'mixed' : /brand/i.test(g.name) ? 'branded' : 'nonbranded' }
       if (mine && m.is_primary_visibility) p = g.id
     }
     setRows(init)
@@ -130,8 +132,8 @@ function GroupMapping({ tenantId, tenantConnectionId, campaignId, site, spaces }
     const mine = m?.kind === 'brand' && m.brand_id === site.id
     if (r.on) {
       const isPrimary = effectivePrimary === g.id
-      if (!mine || m.brand_type !== r.type || m.is_primary_visibility !== isPrimary) {
-        changes.push({ campaign_id: campaignId, group_id: g.id, kind: 'brand', brand_id: site.id, brand_type: r.type, is_primary_visibility: isPrimary })
+      if (!mine || m.brand_type !== toDb(r.type) || m.is_primary_visibility !== isPrimary) {
+        changes.push({ campaign_id: campaignId, group_id: g.id, kind: 'brand', brand_id: site.id, brand_type: toDb(r.type), is_primary_visibility: isPrimary })
       }
     } else if (mine) {
       changes.push({ campaign_id: campaignId, group_id: g.id, kind: 'excluded', brand_id: null, brand_type: null, is_primary_visibility: false })
@@ -156,12 +158,14 @@ function GroupMapping({ tenantId, tenantConnectionId, campaignId, site, spaces }
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-[12.5px] leading-snug text-text-2">
-        Bifează grupurile de keywords ale lui {site.name}. Alege grupul principal: din el vine indicatorul „Visibility SEOmonitor”.
+        Bifează grupurile de keywords ale lui {site.name}. Alege grupul principal: din el vine indicatorul „Visibility SEOmonitor”. La prima colectare, un site fără mapare primește automat grupul „All keywords” al campaniei cu domeniul lui; orice schimbare salvată aici are prioritate.
       </p>
       <ul aria-label="Grupurile campaniei" className="flex flex-col divide-y divide-border rounded-lg border border-border">
         {groupList.map((g) => {
           const other = otherSite(current(g))
           const r = rows[g.id] ?? { on: false, type: 'nonbranded' as const }
+          const m = current(g)
+          const auto = m?.kind === 'brand' && m.brand_id === site.id && (m.note ?? '').startsWith('Automat')
           const sub = g.detail?.includes(' în ') ?? false
           return (
             <li key={g.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2 text-[12.5px] ${sub ? 'pl-8' : ''}`}>
@@ -169,6 +173,7 @@ function GroupMapping({ tenantId, tenantConnectionId, campaignId, site, spaces }
                 <input type="checkbox" checked={r.on} disabled={other !== null} onChange={(e) => set(g.id, { on: e.target.checked })} aria-label={`${g.name} pe ${site.name}`} />
                 <span className="font-medium">{g.name}</span>
                 <span className="text-[11.5px] text-text-3">{g.detail}</span>
+                {auto && <StatusChip tone="accent">Automat</StatusChip>}
               </label>
               {other !== null ? (
                 <StatusChip tone="neutral">Mapat pe {other}</StatusChip>
@@ -178,6 +183,7 @@ function GroupMapping({ tenantId, tenantConnectionId, campaignId, site, spaces }
                     <select value={r.type} onChange={(e) => set(g.id, { type: e.target.value as Row['type'] })} aria-label={`Tipul grupului ${g.name}`} className={field}>
                       <option value="branded">Branded</option>
                       <option value="nonbranded">Nonbranded</option>
+                      <option value="mixed">Mixt (branded și nonbranded)</option>
                     </select>
                     <label className="flex items-center gap-1.5 text-[12px]">
                       <input type="radio" name={`primary-${campaignId}`} checked={effectivePrimary === g.id} onChange={() => setPrimary(g.id)} aria-label={`${g.name} e grupul principal`} />

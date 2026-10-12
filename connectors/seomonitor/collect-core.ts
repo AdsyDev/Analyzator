@@ -24,7 +24,7 @@ import {
   SPECIAL_GROUP_BRAND,
   type RouteKey,
 } from './config.ts'
-import { currentMappings, flattenGroups, mappedBrands, resolveGroups, type BrandGroup, type FlatGroup, type MappingRow, type QueueItem } from './mapping.ts'
+import { autoMappings, currentMappings, flattenGroups, mappedBrands, resolveGroups, type BrandGroup, type FlatGroup, type MappingRow, type QueueItem } from './mapping.ts'
 import {
   brandedKeywordIds,
   enabledEngines,
@@ -104,21 +104,24 @@ export async function collectSeomonitorConnection(deps: SeomonitorDeps, connecti
   if (mappingRows.some((m) => m.tenant_id !== tenant_id || m.source_id !== connection.id)) {
     throw new Error('seomonitor_group_mappings: rând din alt tenant sau altă conexiune; opresc rularea.')
   }
-  const mappings = currentMappings(mappingRows, rangeEnd)
-  const brands = mappedBrands(mappings)
-  if (brands.length === 0) notes.push('nicio mapare de grup → brand: nu se scrie nicio observație (grupurile intră în coadă)')
+  let mappings = currentMappings(mappingRows, rangeEnd)
+  const brands: string[] = []
+  if (mappedBrands(mappings).length === 0) notes.push('nicio mapare de grup → brand înainte de rulare (se încearcă maparea automată după descoperire)')
 
-  // Sync runs per brand (pornite înainte de orice apel, ca orice eșec să fie vizibil).
+  // Sync runs per brand (pornite înainte de orice apel, ca orice eșec să fie vizibil). Un brand mapat automat în
+  // această rulare își pornește run-ul imediat după mapare.
   const handles = new Map<string, SyncRunHandle>()
   const errors = new Map<string, SyncRunError[]>()
   const written = new Map<string, number>()
-  for (const brand_id of brands) {
+  const startBrand = async (brand_id: string) => {
     handles.set(brand_id, await startSyncRun(db, {
       tenant_id, brand_id, source: 'seomonitor', source_connection_id: connection.id, period_start: rangeStart, period_end: rangeEnd,
     }, now))
     errors.set(brand_id, [])
     written.set(brand_id, 0)
+    brands.push(brand_id)
   }
+  for (const brand_id of mappedBrands(mappings)) await startBrand(brand_id)
   const pushError = (brand: string | null, e: SyncRunError) => {
     for (const b of brand ? [brand] : brands) errors.get(b)?.push(e)
   }
@@ -169,7 +172,8 @@ export async function collectSeomonitorConnection(deps: SeomonitorDeps, connecti
   }
 
   // validateAccess -------------------------------------------------------------------------------
-  const access = await client.get('campaigns', { company_id: /^\d+$/.test(connection.external_account_id) ? connection.external_account_id : undefined, limit: 1 })
+  // Fără `company_id`: eticheta contului din aplicație nu e un ID SEOmonitor; tokenul vede doar campaniile lui.
+  const access = await client.get('campaigns', { limit: 1 })
   if (!access.ok) {
     if (access.kind === 'access_denied') {
       await db.rpc('record_source_validation', { p_connection_id: connection.id, p_ok: false, p_error: `HTTP ${access.status}` }).catch(() => undefined)
@@ -201,9 +205,7 @@ export async function collectSeomonitorConnection(deps: SeomonitorDeps, connecti
   try {
     // discoverResources ------------------------------------------------------------------------------
     const campaigns = new Map<string, Campaign>()
-    const campaignsResult = await fetchAll('campaigns', {
-      company_id: /^\d+$/.test(connection.external_account_id) ? connection.external_account_id : undefined,
-    }, 'until_short_page', SEOMONITOR_CAMPAIGN_PAGE_SIZE)
+    const campaignsResult = await fetchAll('campaigns', {}, 'until_short_page', SEOMONITOR_CAMPAIGN_PAGE_SIZE)
     if (stopOn(campaignsResult, 'campaigns', null)) throw new AbortRun('discovery_failed', 'Campaniile nu au putut fi citite.')
     for (const page of campaignsResult.pages) {
       const { items, issues } = parseItems('campaigns', CampaignSchema, page.payload,
@@ -238,6 +240,30 @@ export async function collectSeomonitorConnection(deps: SeomonitorDeps, connecti
         for (const e of issuesToErrors(issues)) pushError(null, e)
         engines.set(campaign.id, enabled)
       }
+    }
+
+    // Maparea automată (D-19): site-urile fără nicio mapare primesc „All keywords” din campania cu domeniul lor.
+    const sites = await db.select<{ id: string; domain: string | null }>('brands', `select=id,domain&tenant_id=eq.${tenant_id}&status=eq.active`)
+    const auto = autoMappings({
+      sites: sites.filter((b) => b.domain).map((b) => ({ id: b.id, domain: normalizeDomain(b.domain) })),
+      campaigns: [...campaigns.values()].map((c) => ({ id: c.id, domain: c.domain })),
+      discovered,
+      existing: mappingRows,
+      effectiveFrom: rangeEnd,
+    })
+    notes.push(...auto.notes)
+    for (const row of auto.rows) {
+      try {
+        const [saved] = await db.insert<MappingRow>('seomonitor_group_mappings', { tenant_id, source_id: connection.id, ...row, created_by: null })
+        mappingRows.push(saved ?? { id: '', tenant_id, source_id: connection.id, ...row })
+        notes.push(`mapare automată: campania ${row.campaign_id}, grupul ${row.group_id} → brandul ${row.brand_id}`)
+      } catch (err) {
+        notes.push(`mapare automată eșuată pentru brandul ${row.brand_id}: ${(err as Error).message}`)
+      }
+    }
+    if (auto.rows.length) {
+      mappings = currentMappings(mappingRows, rangeEnd)
+      for (const brand_id of mappedBrands(mappings)) if (!brands.includes(brand_id)) await startBrand(brand_id)
     }
 
     const resolution = resolveGroups(discovered, mappings)

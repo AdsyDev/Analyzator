@@ -26,6 +26,10 @@
 
 Fără mapare **nu se colectează nimic** pentru site: conectorul cere datele doar pentru grupurile mapate.
 
+**Automat:** la fiecare colectare, un site activ fără nicio mapare primește grupul **„All keywords”** al campaniei cu același domeniu, ca grup principal și „Mixt” (branded și nonbranded). Apare în card cu eticheta „Automat”. Ce schimbi și salvezi în card are prioritate: regula nu atinge niciodată un site care are deja o mapare, nici una exclusă. Două campanii cu același domeniu sau o campanie fără „All keywords” înseamnă că nu se mapează nimic automat, iar rularea notează motivul.
+
+Pentru o mapare mai fină, de mână:
+
 1. Cardul **SEOmonitor** al site-ului → pasul 2. Aplicația listează campaniile tokenului și o propune pe cea cu domeniul site-ului.
 2. Apar grupurile campaniei (cu folderele și subgrupurile lor). Bifezi grupurile site-ului și alegi, pentru fiecare:
    - **Branded**: keywords cu numele brandului; **Nonbranded**: restul. Aplicația propune Branded pentru grupurile cu „brand” în nume.

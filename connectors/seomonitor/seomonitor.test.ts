@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { collectSeomonitorConnection } from './collect-core.ts'
 import { FIXTURE_FILES, seoFixture, type FixtureName } from './docs-fixtures.ts'
 import { parseAioRank, parseRank, sanitizeContent, aiStatus, toNumber } from './normalize.ts'
-import { currentMappings, resolveGroups, flattenGroups, type MappingRow } from './mapping.ts'
+import { AUTO_NOTE, autoMappings, currentMappings, resolveGroups, flattenGroups, type FlatGroup, type MappingRow } from './mapping.ts'
 import { FakeDb, noSleep, type FakeResponse } from '../shared/test-helpers.ts'
 import type { TenantConnection } from '../shared/connections.ts'
 import type { FetchLike } from '../shared/http-budget.ts'
@@ -337,6 +337,75 @@ describe('conectorul SEOmonitor pe fixtures docs-derived', () => {
     db.select = async <T extends Record<string, unknown>>(table: string, query: string) =>
       (table === 'seomonitor_group_mappings' ? (db.tables[table] as T[]) : select<T>(table, query))
     await assert.rejects(collectSeomonitorConnection({ db, fetch: fakeApi().fetch, sleep: noSleep().sleep, now }, connection), /alt tenant/)
+  })
+})
+
+describe('maparea automată (D-19)', () => {
+  const g = (campaign_id: string, group_id: string, name: string, type = 'group'): FlatGroup => ({ campaign_id, group_id, name, type, parent_group_id: null })
+  const base = {
+    sites: [{ id: 'b1', domain: 'brand1a.test' }],
+    campaigns: [{ id: '102933', domain: 'brand1a.test' }, { id: '200', domain: 'altul.test' }],
+    discovered: [g('102933', '9001', 'All keywords'), g('102933', '5001', 'Brand', 'folder'), g('200', '9100', 'All keywords')],
+    existing: [] as MappingRow[],
+    effectiveFrom: '2026-10-05',
+  }
+
+  test('site nemapat: „All keywords” din campania cu același domeniu, principal, brand_type null', () => {
+    assert.deepEqual(autoMappings(base).rows, [{ campaign_id: '102933', group_id: '9001', version: 1, effective_from: '2026-10-05', mapping_kind: 'brand', brand_id: 'b1', brand_type: null, is_primary_visibility: true, note: AUTO_NOTE }])
+  })
+
+  test('orice mapare a site-ului (și o excludere manuală, în istoric) oprește regula: alegerea din aplicație nu se suprascrie', () => {
+    assert.equal(autoMappings({ ...base, existing: [mapping({ campaign_id: '102933', group_id: '6001', brand_id: 'b1' })] }).rows.length, 0)
+    // Grupul deja mapat (aici exclus) nu se remapează, chiar dacă site-ul nu are alt rând.
+    const excluded = mapping({ campaign_id: '102933', group_id: '9001', mapping_kind: 'excluded', brand_id: null, brand_type: null })
+    assert.equal(autoMappings({ ...base, existing: [excluded] }).rows.length, 0)
+  })
+
+  test('două campanii cu același domeniu sau fără „All keywords”: nimic automat, doar o notă', () => {
+    const two = autoMappings({ ...base, campaigns: [...base.campaigns, { id: '300', domain: 'brand1a.test' }] })
+    assert.equal(two.rows.length, 0)
+    assert.match(two.notes[0]!, /2 campanii/)
+    const none = autoMappings({ ...base, discovered: [g('102933', '5001', 'Brand', 'folder')] })
+    assert.equal(none.rows.length, 0)
+    assert.match(none.notes[0]!, /All keywords/)
+  })
+
+  test('un grup smart numit „All keywords” nu e ales (doar grupul obișnuit)', () => {
+    assert.equal(autoMappings({ ...base, discovered: [g('102933', '9001', 'All keywords', 'smart')] }).rows.length, 0)
+  })
+
+  const withAllKeywords = (): Override => (url) =>
+    url.pathname === '/v3/rank-tracker/v3.0/groups'
+      ? { status: 200, body: JSON.stringify([...(seoFixture('groups').payload as unknown[]), { group_id: 9001, name: 'All keywords', type: 'group', subgroups: [] }]) }
+      : undefined
+
+  test('în conector: site-ul nemapat e mapat automat și colectat în aceeași rulare; a doua rulare nu mai scrie nimic', async () => {
+    const db = makeDb([])
+    db.tables.brands = [{ id: B1A, tenant_id: T1, domain: 'www.brand1a.test', status: 'active' }, { id: B1B, tenant_id: T1, domain: 'fara-campanie.test', status: 'active' }]
+    const { outcome } = await run(db, fakeApi(withAllKeywords()))
+    const saved = rows(db, 'seomonitor_group_mappings')
+    assert.equal(saved.length, 1)
+    assert.deepEqual(
+      { group: saved[0]!.group_id, brand: saved[0]!.brand_id, type: saved[0]!.brand_type, primary: saved[0]!.is_primary_visibility, from: saved[0]!.effective_from, by: saved[0]!.created_by, tenant: saved[0]!.tenant_id, source: saved[0]!.source_id },
+      { group: '9001', brand: B1A, type: null, primary: true, from: '2026-10-05', by: null, tenant: T1, source: CONN },
+    )
+    assert.deepEqual(outcome.runs.map((r) => r.brand_id), [B1A])
+    assert.ok(outcome.notes.some((n) => n.startsWith('mapare automată: campania 102933')))
+    await run(db, fakeApi(withAllKeywords()))
+    assert.equal(rows(db, 'seomonitor_group_mappings').length, 1)
+  })
+
+  test('în conector: un site cu mapare manuală nu primește nimic automat', async () => {
+    const db = makeDb()
+    db.tables.brands = [{ id: B1A, tenant_id: T1, domain: 'brand1a.test', status: 'active' }]
+    await run(db, fakeApi(withAllKeywords()))
+    assert.equal(rows(db, 'seomonitor_group_mappings').length, defaultMappings().length)
+  })
+
+  test('campaniile se cer fără company_id: eticheta contului nu e un ID SEOmonitor', async () => {
+    const db = makeDb()
+    const { api } = await run(db)
+    assert.ok(api.calls.filter((u) => u.pathname.endsWith('/campaigns/tracked')).every((u) => !u.searchParams.has('company_id')))
   })
 })
 

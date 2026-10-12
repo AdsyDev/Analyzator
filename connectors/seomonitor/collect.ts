@@ -1,5 +1,5 @@
 // Conectorul săptămânal SEOmonitor. Rulare: npm run collect:seomonitor
-// Conexiunile: source_connections cu provider = 'seomonitor' (la nivel de client, external_account_id = company_id);
+// Conexiunile: source_connections cu provider = 'seomonitor' (la nivel de client; external_account_id e doar eticheta contului);
 // tokenurile din Vault. Maparea grupurilor → branduri: seomonitor_group_mappings. Contract: docs/contracts/seomonitor.md.
 
 import { loadActiveConnections } from '../shared/connections.ts'

@@ -107,3 +107,58 @@ export function resolveGroups(discovered: FlatGroup[], mappings: Map<string, Map
 export function mappedBrands(mappings: Map<string, MappingRow>): string[] {
   return [...new Set([...mappings.values()].filter((m) => m.mapping_kind === 'brand' && m.brand_id).map((m) => m.brand_id!))]
 }
+
+/** Rândul unei mapări automate (versiunea 1, scrisă de conector, fără autor uman). */
+export type AutoMapping = Omit<MappingRow, 'id' | 'tenant_id' | 'source_id'> & { note: string }
+
+export const AUTO_NOTE = 'Automat: domeniul campaniei = domeniul site-ului; grupul „All keywords” e principal.'
+
+const isAllKeywords = (g: FlatGroup) => g.type === 'group' && g.name.trim().toLowerCase() === 'all keywords'
+
+/**
+ * Maparea automată (D-19): un site activ cu domeniu, fără nicio mapare în istoric (nici automată, nici manuală), primește
+ * grupul „All keywords” al singurei campanii cu același domeniu, ca grup principal (`brand_type` null: conține și
+ * keywords branded, și nonbranded). Orice mapare existentă a site-ului, inclusiv o excludere, oprește regula: o alegere
+ * făcută în aplicație nu se suprascrie niciodată. Două campanii cu același domeniu → nimic automat, doar o notă.
+ */
+export function autoMappings(input: {
+  sites: Array<{ id: string; domain: string }>
+  campaigns: Array<{ id: string; domain: string }>
+  discovered: FlatGroup[]
+  existing: MappingRow[]
+  effectiveFrom: string
+}): { rows: AutoMapping[]; notes: string[] } {
+  const rows: AutoMapping[] = []
+  const notes: string[] = []
+  const touchedSites = new Set(input.existing.map((m) => m.brand_id).filter((b): b is string => b !== null))
+  const touchedGroups = new Set(input.existing.map((m) => key(m.campaign_id, m.group_id)))
+  for (const site of input.sites) {
+    if (site.domain === 'unknown' || touchedSites.has(site.id)) continue
+    const matches = input.campaigns.filter((c) => c.domain === site.domain)
+    if (matches.length === 0) continue
+    if (matches.length > 1) {
+      notes.push(`mapare automată sărită pentru ${site.domain}: ${matches.length} campanii cu același domeniu`)
+      continue
+    }
+    const campaign = matches[0]!
+    const group = input.discovered.find((g) => g.campaign_id === campaign.id && isAllKeywords(g))
+    if (!group) {
+      notes.push(`mapare automată sărită pentru ${site.domain}: campania ${campaign.id} nu are grupul „All keywords”`)
+      continue
+    }
+    if (touchedGroups.has(key(campaign.id, group.group_id))) continue
+    rows.push({
+      campaign_id: campaign.id,
+      group_id: group.group_id,
+      version: 1,
+      effective_from: input.effectiveFrom,
+      mapping_kind: 'brand',
+      brand_id: site.id,
+      brand_type: null,
+      is_primary_visibility: true,
+      note: AUTO_NOTE,
+    })
+    touchedGroups.add(key(campaign.id, group.group_id))
+  }
+  return { rows, notes }
+}
