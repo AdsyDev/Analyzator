@@ -12,6 +12,7 @@
 import { isSource, templateCsv } from '../_shared/csv-import/contracts.ts'
 import { restImportDb } from '../_shared/csv-import/rest-db.ts'
 import { assertUuid, batchReport, confirmImport, ImportError, loadBatch, previewImport, type ImportDb } from '../_shared/csv-import/service.ts'
+import { ALLOWED_HEADERS } from '../_shared/cors.ts'
 
 export type HandlerEnv = { supabaseUrl: string; serviceRoleKey: string; anonKey: string; allowedOrigin?: string }
 export type HandlerDeps = { env: HandlerEnv; fetch: (input: string, init?: RequestInit) => Promise<Response>; now: () => Date; db?: ImportDb }
@@ -22,7 +23,7 @@ function cors(env: HandlerEnv): Record<string, string> {
   if (!env.allowedOrigin) return {}
   return {
     'Access-Control-Allow-Origin': env.allowedOrigin,
-    'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
+    'Access-Control-Allow-Headers': ALLOWED_HEADERS,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     Vary: 'Origin',
   }

@@ -6,6 +6,8 @@
 //   → schimbă codul pe token, îl scrie în Vault (set_source_token, cu utilizatorul care a pornit conectarea)
 //     și redirecționează înapoi în aplicație, la Administrare → Surse, cu rezultatul. Tokenul nu apare în răspuns.
 
+import { ALLOWED_HEADERS } from '../_shared/cors.ts'
+
 export type OAuthProvider = 'google_ads' | 'tiktok_ads'
 
 export type HandlerEnv = {
@@ -59,7 +61,7 @@ class CallbackError extends Error {
 
 function cors(env: HandlerEnv): Record<string, string> {
   if (!env.allowedOrigin) return {}
-  return { 'Access-Control-Allow-Origin': env.allowedOrigin, 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' }
+  return { 'Access-Control-Allow-Origin': env.allowedOrigin, 'Access-Control-Allow-Headers': ALLOWED_HEADERS, 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' }
 }
 
 function json(env: HandlerEnv, status: number, body: unknown): Response {

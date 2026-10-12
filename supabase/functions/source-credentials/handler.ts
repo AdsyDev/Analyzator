@@ -5,6 +5,8 @@
 //
 // Tokenul nu apare niciodată în răspuns sau în loguri.
 
+import { ALLOWED_HEADERS } from '../_shared/cors.ts'
+
 export type HandlerEnv = {
   supabaseUrl: string
   serviceRoleKey: string
@@ -79,7 +81,7 @@ function corsHeaders(env: HandlerEnv): Record<string, string> {
   if (!env.allowedOrigin) return {}
   return {
     'Access-Control-Allow-Origin': env.allowedOrigin,
-    'Access-Control-Allow-Headers': 'authorization, apikey, content-type',
+    'Access-Control-Allow-Headers': ALLOWED_HEADERS,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     Vary: 'Origin',
   }

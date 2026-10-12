@@ -7,6 +7,7 @@
 
 import { restImportDb } from '../_shared/csv-import/rest-db.ts'
 import { dispatchPvNotifications, type NotifyEnv } from '../_shared/notifications/queue.ts'
+import { ALLOWED_HEADERS } from '../_shared/cors.ts'
 
 export type HandlerEnv = { supabaseUrl: string; serviceRoleKey: string; anonKey: string; allowedOrigin?: string } & NotifyEnv
 export type HandlerDeps = { env: HandlerEnv; fetch: (input: string, init?: RequestInit) => Promise<Response>; now: () => Date; db?: ReturnType<typeof restImportDb> }
@@ -15,7 +16,7 @@ const AGENCY = new Set(['agency_admin', 'strategist', 'account'])
 
 function cors(env: HandlerEnv): Record<string, string> {
   if (!env.allowedOrigin) return {}
-  return { 'Access-Control-Allow-Origin': env.allowedOrigin, 'Access-Control-Allow-Headers': 'authorization, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' }
+  return { 'Access-Control-Allow-Origin': env.allowedOrigin, 'Access-Control-Allow-Headers': ALLOWED_HEADERS, 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' }
 }
 const json = (env: HandlerEnv, status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors(env) } })

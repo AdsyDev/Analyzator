@@ -113,6 +113,15 @@ describe('autentificare și validarea cererii', () => {
   })
 })
 
+describe('CORS', () => {
+  test('preflight-ul permite antetele trimise de supabase-js (inclusiv x-client-info)', async () => {
+    const res = await handle(new Request('http://fn.test/x', { method: 'OPTIONS' }), { env: { ...env, allowedOrigin: 'https://app.analyzator.ro' }, fetch: fakeFetch(), now: () => new Date() })
+    assert.equal(res.status, 204)
+    const allowed = (res.headers.get('Access-Control-Allow-Headers') ?? '').split(',').map((h) => h.trim())
+    for (const h of ['authorization', 'x-client-info', 'apikey', 'content-type']) assert.ok(allowed.includes(h), h)
+  })
+})
+
 describe('set_token', () => {
   test('admin: tokenul ajunge la RPC cu actorul, răspunsul nu conține tokenul', async () => {
     const r = await call({ action: 'set_token', connection_id: CONN, token: SECRET })
