@@ -63,5 +63,22 @@ select throws_ok($$ select public.brand_ai_answers('20000000-0000-0000-0000-0000
 select throws_ok($$ select public.brand_ai_answer('20000000-0000-0000-0000-000000000011', gen_random_uuid()) $$, '42501', null, 'N3: detaliul, fără acces, refuzat');
 reset role;
 
+-- N4. Concurență: același numitor pentru toate entitățile; N/A cu motiv unde sursa nu oferă date -----------------------
+select tests.authenticate_as('30000000-0000-0000-0000-000000000004');
+select is(jsonb_array_length(public.brand_competition('20000000-0000-0000-0000-000000000011', current_date - 6, current_date) -> 'entities'), 4, 'N4: brandul + C1–C3');
+select is(round((public.brand_competition('20000000-0000-0000-0000-000000000011', current_date - 6, current_date) -> 'groups' -> 0 -> 'rows' -> 0 -> 'cells'
+  -> ((select m.id::text from public.competitor_set_members m where m.domain = 'competitor1.test' and m.brand_id = '20000000-0000-0000-0000-000000000011')) ->> 'value')::numeric, 2),
+  22.22::numeric, 'N4: Mention Rate C1 = 2 / 9 răspunsuri valide (același numitor ca brandul)');
+select is(round((public.brand_competition('20000000-0000-0000-0000-000000000011', current_date - 6, current_date) -> 'groups' -> 0 -> 'rows' -> 0 -> 'cells'
+  -> '20000000-0000-0000-0000-000000000011' ->> 'value')::numeric, 2), 44.44::numeric, 'N4: Mention Rate brand = 4 / 9');
+select isnt((public.brand_competition('20000000-0000-0000-0000-000000000011', current_date - 6, current_date) -> 'groups' -> 1 -> 'rows' -> 0 -> 'cells'
+  -> ((select m.id::text from public.competitor_set_members m where m.domain = 'competitor1.test' and m.brand_id = '20000000-0000-0000-0000-000000000011')) ->> 'reason'), null,
+  'N4: SEO pentru competitori = N/A cu motiv, nu zero');
+select is(jsonb_array_length(public.brand_competition_gaps('20000000-0000-0000-0000-000000000011', current_date - 6, current_date) -> 'gaps'), 1,
+  'N4: un gol: întrebarea în care C1 apare și brandul lipsește');
+select tests.authenticate_as('30000000-0000-0000-0000-000000000005');
+select throws_ok($$ select public.brand_competition('20000000-0000-0000-0000-000000000011', current_date - 6, current_date) $$, '42501', null, 'N4: fără acces, refuzat');
+reset role;
+
 select * from finish();
 rollback;

@@ -28,6 +28,7 @@ import { createSupabasePaid } from './paidProvider'
 import { createSupabaseInsights, createSupabaseMentions } from './listeningProvider'
 import { createSupabaseSearch, createSupabaseTraffic } from './trafficSearchProvider'
 import { createSupabaseAi } from './aiProvider'
+import { createSupabaseCompetition } from './competitionProvider'
 import { comparisonRange } from '../../lib/period'
 
 const NO_SOURCE = 'Sursa nu este conectată pentru acest brand. Nu afișăm valori estimate până la conectare.'
@@ -200,7 +201,7 @@ export function createSupabaseProviders(deps?: SupabaseProvidersDeps): DataProvi
     traffic: deps ? createSupabaseTraffic(deps.client) : traffic,
     paid: deps ? createSupabasePaid(deps.client) : paid,
     social,
-    competition,
+    competition: deps ? createSupabaseCompetition(deps.client) : competition,
     users: deps ? createSupabaseUsers(deps.client) : users,
     config: deps ? createSupabaseConfig(deps.client, now) : config,
     clients: deps ? createSupabaseClients(deps.client) : clients,
