@@ -123,6 +123,15 @@ Migrația `20261012180000_brand_metrics_rpc.sql`, decizia D-11.
 - Același regim pentru ecranele de brand care au urmat (D-12 … D-15): `brand_paid`, `brand_mentions`, `brand_mention_sentiment`, `brand_insights`, `brand_traffic_channels`, `brand_clarity_devices`, `brand_search_keywords`, `brand_landing_pages`, `brand_ai_*`, `brand_competition`, `brand_competition_gaps`, plus utilitarele private INVOKER `competition_registry_cell`, `ai_check`, `ai_scope`, `ai_engine_db`, `ai_engine_ui`, `ai_outcome`.
 - Garda A10/A11 le listează explicit și verifică faptul că sunt INVOKER. Teste: `15_brand_metrics.test.sql`, `16_brand_listening_insights.test.sql`, `17_brand_traffic_seo.test.sql`, `18_ai_visibility.test.sql` (L1–L4: valori calculate în SQL, clientul vede aceleași cifre ca agenția, refuzuri identice, serii cu null pe zilele fără date).
 
+### E9. Acces la brand evaluat o dată pe interogare (aprobată 12 oct 2026)
+
+Migrația `20261012290000_rls_brand_access_once_per_query.sql`, decizia D-20.
+
+- Cele 21 de politici SELECT ale tabelelor de date (GA4, GSC, Clarity, SEOmonitor, AI, paid, social, mențiuni, competitori) folosesc `brand_id in (select private.accessible_brand_ids())` în loc de `private.has_brand_access(brand_id)`. Regula de acces e aceeași; diferă doar costul: funcția SECURITY DEFINER era evaluată pe fiecare rând (pe Minimartieni, cardurile SEO cereau 5,7 s și prima încărcare depășea limita de timp).
+- `private.accessible_brand_ids()`: **SECURITY INVOKER**, executabilă de `authenticated`, nu de `anon`. Citește `brands` prin RLS-ul apelantului, a cărui politică este `has_brand_access(id)`; deci întoarce exact brandurile pe care apelantul le vede oricum. Nu ocolește nimic.
+- Politicile cu condiții compuse (analize, recomandări, acțiuni, dovezi, `brands`) rămân pe `has_brand_access`.
+- Teste: `19_rls_brand_access_once.test.sql` (R1: toate cele 21 de politici; R2: aceeași mulțime ca `has_brand_access` pentru strategist, client fără acces, alt tenant și admin; R3: INVOKER, fără `anon`), plus izolarea existentă (01–03) și lista A10.
+
 ## Inventar la 7 oct 2026
 
 | Tip | Ce există | Acoperit de |

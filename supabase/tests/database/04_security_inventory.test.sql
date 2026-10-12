@@ -158,14 +158,15 @@ select is_empty(
      where n.nspname = 'private' and has_function_privilege('anon', p.oid, 'execute') $$,
   'A10: anon nu execută nicio funcție din private'
 );
--- Lista exactă a funcțiilor private executabile de authenticated. Cele de autorizare primesc doar ID-ul
+-- Lista exactă a funcțiilor private executabile de authenticated. accessible_brand_ids (E9) e SECURITY INVOKER: citește
+-- brands prin RLS-ul apelantului (= has_brand_access), pentru politici evaluate o dată pe interogare. Cele de autorizare primesc doar ID-ul
 -- brandului/tenantului și răspund pentru auth.uid(); brand_source_* (E8) întorc boolean și răspund false fără acces;
 -- compute_metric_snapshot, metric_observations și utilitarele AI ai_* (E8) sunt SECURITY INVOKER: citesc prin RLS-ul apelantului.
 select results_eq(
   $$ select p.proname::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'private' and has_function_privilege('authenticated', p.oid, 'execute')
      order by 1 $$,
-  $$ values ('ai_check'::text collate "C"), ('ai_engine_db'), ('ai_engine_ui'), ('ai_outcome'), ('ai_scope'),
+  $$ values ('accessible_brand_ids'::text collate "C"), ('ai_check'), ('ai_engine_db'), ('ai_engine_ui'), ('ai_outcome'), ('ai_scope'),
             ('brand_source_connected'), ('brand_source_query_ok'), ('can_see_tenant'), ('competition_registry_cell'), ('compute_metric_snapshot'),
             ('has_brand_access'), ('has_brand_role'), ('has_role'), ('metric_observations') $$,
   'A10: doar funcțiile aprobate (autorizare + E8) sunt executabile de authenticated'
