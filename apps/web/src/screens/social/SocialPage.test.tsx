@@ -66,7 +66,7 @@ describe('Social cu import', () => {
     }
     expect(within(table).getAllByText(/date incomplete/).length).toBeGreaterThan(0) // postările de sub 7 zile
     await userEvent.click(within(s).getByRole('button', { name: 'Înainte' }))
-    expect(await within(s).findAllByText('Indisponibil')).toHaveLength(2) // reach + interacțiuni pentru postarea fără analytics
+    expect(await within(s).findAllByText('Indisponibil')).toHaveLength(3) // afișări + reach + interacțiuni pentru postarea fără analytics
   })
 
   it('un permalink nesigur nu devine link', async () => {
@@ -78,16 +78,16 @@ describe('Social cu import', () => {
     expect(s.querySelector('a[href^="javascript"]')).toBeNull()
   })
 
-  it('filtrele de platformă și format din URL', async () => {
+  it('filtrul de platformă din URL; formatul nu e filtru (Planable nu îl trimite, D-23)', async () => {
     renderApp({ route: `${MINI}?platform=instagram&format=video` })
     await open()
     const chips = await screen.findByRole('group', { name: 'Filtre active' })
     expect(within(chips).getByText('Platformă: Instagram')).toBeInTheDocument()
-    expect(within(chips).getByText('Format: Video')).toBeInTheDocument()
+    expect(within(chips).queryByText(/Format:/)).toBeNull()
     const s = await section('Performanța conținutului')
     const rows = within(await within(s).findByRole('table')).getAllByRole('row').slice(1)
     expect(rows.length).toBeGreaterThan(0)
-    for (const r of rows) expect(r).toHaveTextContent(/Instagram · Video/)
+    for (const r of rows) expect(r).toHaveTextContent(/Instagram/)
   })
 
   it('valori necunoscute ale filtrelor sunt ignorate', async () => {

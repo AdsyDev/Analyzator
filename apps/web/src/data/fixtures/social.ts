@@ -11,6 +11,7 @@ interface PostDef {
   label: string | null
   excerpt: string
   reach: number | null
+  impressions: number | null
   interactions: number | null
 }
 interface BrandSocial {
@@ -53,6 +54,7 @@ export function createSocialFixtures({ allowed, now }: { allowed: Set<string>; n
           age_days: p.days_ago,
           mature: p.days_ago >= MATURITY_DAYS,
           reach: p.reach,
+          impressions: p.impressions,
           interactions: p.interactions,
         }
       })

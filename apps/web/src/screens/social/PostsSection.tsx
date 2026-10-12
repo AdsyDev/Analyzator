@@ -22,7 +22,7 @@ const columns: Column<SocialPost>[] = [
         <span className="flex flex-col gap-0.5">
           <span className="max-w-[44ch] text-[13px] leading-snug text-text">{p.excerpt}</span>
           <span className="flex flex-wrap items-center gap-2 text-[11.5px] text-text-2">
-            {PLATFORM_LABELS[p.platform]} · {FORMAT_LABELS[p.format]} · {p.topic ?? 'Fără topic'}
+            {PLATFORM_LABELS[p.platform]}{p.format && ` · ${FORMAT_LABELS[p.format]}`}{p.topic && ` · ${p.topic}`}
             {p.label && <StatusChip tone="lav">{p.label}</StatusChip>}
             {href ? (
               <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">
@@ -37,6 +37,7 @@ const columns: Column<SocialPost>[] = [
     },
   },
   { key: 'age', header: 'Vârstă', align: 'right', sortValue: (p) => p.age_days, render: (p) => (p.mature ? <span>{p.age_days} zile</span> : <span title="Sub fereastra comună de maturizare (7 zile): metricile pot fi incomplete"><StatusChip tone="warn">{p.age_days} {p.age_days === 1 ? 'zi' : 'zile'}, date incomplete</StatusChip></span>) },
+  { key: 'impressions', header: 'Afișări', align: 'right', sortValue: (p) => p.impressions, render: (p) => (p.impressions === null ? NO_PERF : formatInteger(p.impressions)) },
   { key: 'reach', header: 'Reach', align: 'right', sortValue: (p) => p.reach, render: (p) => (p.reach === null ? NO_PERF : formatInteger(p.reach)) },
   { key: 'interactions', header: 'Interacțiuni', align: 'right', sortValue: (p) => p.interactions, render: (p) => (p.interactions === null ? NO_PERF : formatInteger(p.interactions)) },
 ]

@@ -68,11 +68,14 @@ export const PAID_PLATFORM_FILTER: FilterDef = {
   ],
 }
 
+const SOCIAL_PLATFORM_NAMES: Record<string, string> = {
+  facebook: 'Facebook', instagram: 'Instagram', linkedin: 'LinkedIn', tiktok: 'TikTok', youtube: 'YouTube', x: 'X', threads: 'Threads', google_business: 'Google Business',
+}
 export const SOCIAL_PLATFORM_FILTER: FilterDef = {
   key: 'platform',
   label: 'Platformă',
   defaultValue: 'all',
-  options: [{ value: 'all', label: 'Toate platformele' }, ...SOCIAL_PLATFORMS.map((p) => ({ value: p, label: p === 'linkedin' ? 'LinkedIn' : p[0]!.toUpperCase() + p.slice(1) }))],
+  options: [{ value: 'all', label: 'Toate platformele' }, ...SOCIAL_PLATFORMS.map((p) => ({ value: p, label: SOCIAL_PLATFORM_NAMES[p] ?? p }))],
 }
 
 const FORMAT_LABELS: Record<string, string> = { image: 'Imagine', video: 'Video', carousel: 'Carusel', story: 'Story' }
@@ -147,7 +150,8 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
     title: 'Social',
     subtitle: () => '',
     sources: ['planable'],
-    filters: [SOCIAL_PLATFORM_FILTER, SOCIAL_FORMAT_FILTER],
+    // Fără filtru de format: Planable nu trimite formatul postărilor (D-23).
+    filters: [SOCIAL_PLATFORM_FILTER],
     disconnected: (b) => `Datele despre postările ${b} vin din Planable, care nu e încă conectat. Pentru comparația publică cu competitorii, vezi Concurență.`,
   },
   listening: { segment: 'listening', title: 'Listening', subtitle: () => 'Mențiunile publice despre brand, cu sentiment revizuit de echipa AdSymphony.', sources: [], filters: [SENTIMENT_FILTER, AUTHOR_FILTER], dynamicFilter: MENTION_SOURCES },

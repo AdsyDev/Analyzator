@@ -25,6 +25,7 @@ import { createSupabaseSources } from './sourcesProvider'
 import { createSupabaseClients } from './clientsProvider'
 import { createSupabaseMetrics } from './metricsProvider'
 import { createSupabasePaid } from './paidProvider'
+import { createSupabaseSocial } from './socialProvider'
 import { createSupabaseInsights, createSupabaseMentions } from './listeningProvider'
 import { createSupabaseSearch, createSupabaseTraffic } from './trafficSearchProvider'
 import { createSupabaseAi } from './aiProvider'
@@ -202,7 +203,7 @@ export function createSupabaseProviders(deps?: SupabaseProvidersDeps): DataProvi
     search: deps ? createSupabaseSearch(deps.client) : search,
     traffic: deps ? createSupabaseTraffic(deps.client) : traffic,
     paid: deps ? createSupabasePaid(deps.client) : paid,
-    social,
+    social: deps ? createSupabaseSocial(deps.client) : social,
     competition: deps ? createSupabaseCompetition(deps.client) : competition,
     users: deps ? createSupabaseUsers(deps.client) : users,
     config: deps ? createSupabaseConfig(deps.client, now) : config,

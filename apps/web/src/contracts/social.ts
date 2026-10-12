@@ -3,10 +3,11 @@ import type { MetricStatus } from './metric'
 import type { DateRange } from './period'
 
 /**
- * Social propriu (spec cap. 17). Date din Planable (import). Nu există încă un contract de server; tipurile
- * sunt cerințele UI-ului. Ratele și medianele vin calculate. Concurența publică nu include reach privat.
+ * Social propriu (spec cap. 17). Date din Planable (API sau import), calculate în SQL (`brand_social`, D-23).
+ * Formatul și subiectul postărilor nu există în datele Planable: rămân `null`, nu se deduc.
  */
-export const SOCIAL_PLATFORMS = ['facebook', 'instagram', 'linkedin'] as const
+/** Platformele pe care le mapează conectorul Planable (docs/contracts/planable.md). */
+export const SOCIAL_PLATFORMS = ['facebook', 'instagram', 'linkedin', 'tiktok', 'youtube', 'x', 'threads', 'google_business'] as const
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number]
 
 export const SOCIAL_FORMATS = ['image', 'video', 'carousel', 'story'] as const
@@ -39,7 +40,8 @@ export interface SocialPost {
   id: string
   published_at: IsoDateTime
   platform: SocialPlatform
-  format: SocialFormat
+  /** `null`: formatul nu vine din Planable. */
+  format: SocialFormat | null
   topic: string | null
   /** Eticheta de campanie din Planable. */
   label: string | null
@@ -52,6 +54,8 @@ export interface SocialPost {
   mature: boolean
   /** `null` = date de performanță indisponibile (nu zero); postarea rămâne în calendar. */
   reach: number | null
+  /** Afișări (Facebook raportează afișări, nu reach). `null` = indisponibil. */
+  impressions: number | null
   interactions: number | null
 }
 
