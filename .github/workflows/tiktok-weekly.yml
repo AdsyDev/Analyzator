@@ -1,0 +1,77 @@
+# Colectarea săptămânală TikTok Ads (Business API v1.3): cost, afișări, clickuri și conversii pe zi și campanie.
+#
+# Programare: marți la 04:00 UTC = 06:00 ora României vara (EEST), 05:00 iarna (EET); vezi nota DST din docs/runbook.md.
+# Reimportă ultimele 35 de zile (până ieri, în fusul contului de ads).
+#
+# Rularea programată e DEZACTIVATĂ până când variabila CONNECTOR_TIKTOK_ENABLED = "true"
+# (Settings → Secrets and variables → Actions → Variables). workflow_dispatch funcționează oricând.
+#
+# Secrete în environment-ul GitHub ales (implicit „staging"): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+# Tokenurile (conectate prin OAuth) stau în Supabase Vault și se reînnoiesc la fiecare rulare. Aplicația: TIKTOK_APP_ID,
+# TIKTOK_APP_SECRET, ca secrete în același environment.
+
+name: tiktok-weekly
+
+on:
+  schedule:
+    - cron: '0 4 * * 2'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment GitHub cu secretele Supabase'
+        type: choice
+        options: [staging]
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tiktok-weekly
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: github.event_name == 'workflow_dispatch' || vars.CONNECTOR_TIKTOK_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dependențe
+        run: npm ci
+
+      - name: Teste conector (fără rețea)
+        run: node --experimental-strip-types --test 'connectors/tiktok/**/*.test.ts' 'connectors/shared/**/*.test.ts'
+
+      - name: Colectare TikTok Ads
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          TIKTOK_APP_ID: ${{ secrets.TIKTOK_APP_ID }}
+          TIKTOK_APP_SECRET: ${{ secrets.TIKTOK_APP_SECRET }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Lipsesc secretele SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY în environment-ul ${{ inputs.environment || 'staging' }}."
+            exit 1
+          fi
+          node --experimental-strip-types connectors/tiktok/collect.ts | tee collect.log
+
+      - name: Rezumat
+        if: always()
+        run: |
+          {
+            echo "### TikTok Ads: $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo
+            echo '```'
+            [ -f collect.log ] && cat collect.log || echo "fără output"
+            echo '```'
+            echo
+            echo "Detalii: sync_runs (source = tiktok_ads), paid_daily, provider_api_calls."
+          } >> "$GITHUB_STEP_SUMMARY"

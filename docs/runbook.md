@@ -153,3 +153,12 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 - Verificare: `sync_runs` (`source = meta_ads`), `paid_daily` (`collection_method = api`), `provider_api_calls`.
 - Mesaje: `access_denied` = token refuzat (marcat `invalid`, celelalte conturi ale clientului sărite); `permission_denied` = contul nu e atribuit system user-ului; `rate_limited` = limita de utilizare Meta (retry automat 10 s / 60 s / 5 min).
 - Meta nu e încă în orchestratorul `weekly-refresh` (workflow propriu, la aceeași oră).
+
+## Google Ads și TikTok Ads (OAuth)
+
+- Conectare: `docs/contracts/oauth.md`; pași: `docs/connectors/google-ads.md`, `docs/connectors/tiktok-ads.md`.
+- Secrete Supabase (funcția `oauth`): `APP_BASE_URL`, `ANALYZATOR_APP_ORIGIN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `TIKTOK_APP_ID`, `TIKTOK_APP_SECRET`. Funcția se publică cu `verify_jwt = false` (din `supabase/config.toml`).
+- Secrete GitHub (`staging`): aceleași ID și secrete OAuth, plus `GOOGLE_ADS_DEVELOPER_TOKEN`.
+- Rulare: `google-ads-weekly.yml` (`CONNECTOR_GOOGLE_ADS_ENABLED`), `tiktok-weekly.yml` (`CONNECTOR_TIKTOK_ENABLED`); local `npm run collect:google-ads`, `npm run collect:tiktok`.
+- Diagnostic: întoarcerea OAuth are `reason` în adresă (`state_invalid`, `exchange_failed`, `no_refresh_token`…); `oauth_states` (service role) arată pornirile și `used_at`. Reînnoirile TikTok apar în `audit_events` ca `credential_refreshed` (`actor_type = worker`).
+- `not_connected` cu „Reconectează” = refresh token refuzat; conectarea se face din nou din aplicație.
