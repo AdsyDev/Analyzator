@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createEnvironment } from '../environment'
 import { PreviewBanner } from './PreviewBanner'
 
@@ -12,8 +12,13 @@ describe('PreviewBanner', () => {
 })
 
 describe('createEnvironment', () => {
+  // Fără configurare Supabase, indiferent de `.env.local` al dezvoltatorului: testul verifică doar alegerea providerului.
+  afterEach(() => vi.unstubAllEnvs())
+
   it('fără flag la build, alege providerul supabase și nicio sesiune fictivă', async () => {
     expect(__DESIGN_PREVIEW__).toBe(false)
+    vi.stubEnv('VITE_SUPABASE_URL', '')
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', '')
     const env = await createEnvironment()
     expect(env.providers.kind).toBe('supabase')
     expect(env.auth.getSnapshot()).toEqual({ status: 'signed_out' })
