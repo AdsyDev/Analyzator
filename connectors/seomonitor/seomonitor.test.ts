@@ -139,13 +139,13 @@ describe('conectorul SEOmonitor pe fixtures docs-derived', () => {
     assert.deepEqual(kwCalls.map((u) => u.searchParams.get('offset')), ['0', '1000'])
     assert.ok(kwCalls.every((u) => u.searchParams.get('limit') === '1000'))
     assert.equal(rows(db, 'keywords').filter((k) => k.status === 'active').length, 1003)
-    // AI Overview: pagini de 100 (1.000 cu conținut complet → 422 pe date reale), până la o pagină goală (documentat).
+    // AI Overview: pagini de 20 (1.000 și 100 cu conținut complet → 422 pe date reale), până la o pagină goală (documentat).
     const aio = api.calls.filter((u) => u.pathname.endsWith('/keywords/aio'))
-    // Ferestre de 7 zile care acoperă exact 1 sep – 5 oct; fiecare fereastră: offset 0, apoi 100 (pagină goală).
+    // Ferestre de 7 zile care acoperă exact 1 sep – 5 oct; fiecare fereastră: offset 0, apoi 20 (pagină goală).
     const windows = [...new Set(aio.map((u) => `${u.searchParams.get('start_date')}..${u.searchParams.get('end_date')}`))]
     assert.deepEqual(windows, ['2026-09-01..2026-09-07', '2026-09-08..2026-09-14', '2026-09-15..2026-09-21', '2026-09-22..2026-09-28', '2026-09-29..2026-10-05'])
-    for (const w of windows) assert.deepEqual(aio.filter((u) => `${u.searchParams.get('start_date')}..${u.searchParams.get('end_date')}` === w).map((u) => u.searchParams.get('offset')), ['0', '100'], w)
-    assert.ok(aio.every((u) => u.searchParams.get('limit') === '100'))
+    for (const w of windows) assert.deepEqual(aio.filter((u) => `${u.searchParams.get('start_date')}..${u.searchParams.get('end_date')}` === w).map((u) => u.searchParams.get('offset')), ['0', '20'], w)
+    assert.ok(aio.every((u) => u.searchParams.get('limit') === '20'))
     // Fără HTML-ul snapshot-ului la AIO (422 „Request too large” pe date reale); AI Search îl cere în continuare.
     assert.ok(aio.every((u) => !u.searchParams.has('include_raw_content')))
     assert.ok(api.calls.filter((u) => u.pathname.endsWith('/keywords/ais')).every((u) => u.searchParams.get('include_raw_content') === 'true'))

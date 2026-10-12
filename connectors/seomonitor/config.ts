@@ -9,8 +9,11 @@ export const SEOMONITOR_SCHEMA_VERSION = 'docs-2026-10-08'
 export const SEOMONITOR_DAILY_QUOTA = 10_000
 export const SEOMONITOR_MIN_INTERVAL_MS = 110
 export const SEOMONITOR_PAGE_SIZE = 1000
-/** keywords/aio: 1.000 cu conținut complet → 422 „Request too large to return AI Overview content” (date reale). */
-export const SEOMONITOR_AIO_PAGE_SIZE = 100
+/**
+ * keywords/aio: 1.000 și 100 cu conținut complet → 422 „Request too large to return AI Overview content” (date reale,
+ * 12 oct 2026); la 100 × 7 zile × 2 device doar campania cea mai mică a trecut. 20 de keywords pe pagină.
+ */
+export const SEOMONITOR_AIO_PAGE_SIZE = 20
 /** keywords/aio: și fără HTML, 35 de zile într-o cerere dau 422 pe date reale; se cere pe ferestre de 7 zile. */
 export const SEOMONITOR_AIO_WINDOW_DAYS = 7
 export const SEOMONITOR_CAMPAIGN_PAGE_SIZE = 100
