@@ -329,12 +329,18 @@ export async function collectSeomonitorConnection(deps: SeomonitorDeps, connecti
           }
         }
 
-        // Rankuri zilnice: active, apoi arhivate.
+        // Rankuri zilnice: active, apoi arhivate. Pe date reale (12 oct 2026), `get_archive=true` întoarce și keywords
+        // active: un keyword din lista activă sau din trecerea activă nu se marchează niciodată arhivat.
+        const activeIds = new Set(keywordInfo.keys())
         for (const status of ['active', 'archived'] as const) {
           const r = await fetchAll('dailyRanks', { ...base, group_id: bg.group.group_id, get_archive: status === 'archived' ? 'true' : undefined }, 'until_short_page')
           if (stopOn(r, `daily-ranks:${status}`, brand_id)) continue
           for (const page of r.pages) {
-            const n = normalizeDailyRanks(page.payload, ctx, page.payloadHash, keywordInfo, status)
+            const raw = normalizeDailyRanks(page.payload, ctx, page.payloadHash, keywordInfo, status)
+            const n = status === 'active'
+              ? raw
+              : { ...raw, rows: raw.rows.filter((row) => !activeIds.has(String(row.keyword_id))), archivedKeywords: raw.archivedKeywords.filter((k) => !activeIds.has(k.keyword_id)) }
+            if (status === 'active') for (const row of n.rows) activeIds.add(String(row.keyword_id))
             for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
             if (n.archivedKeywords.length) {
               add((await upsertRows(db, 'keywords', n.archivedKeywords.map((k) => ({

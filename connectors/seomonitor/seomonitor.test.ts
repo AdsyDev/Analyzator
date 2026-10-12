@@ -421,6 +421,19 @@ describe('forme reale ale răspunsurilor (12 oct 2026)', () => {
     assert.deepEqual(r.issues, [])
   })
 
+  test('daily-ranks cu get_archive=true întoarce și keywords active: ele rămân active (keywords și rank_observations)', async () => {
+    const db = makeDb()
+    const archiveEchoesActive: Override = (url) =>
+      url.pathname === '/v3/rank-tracker/v3.0/keywords/daily-ranks' && url.searchParams.get('get_archive') === 'true' && Number(url.searchParams.get('offset') ?? 0) === 0
+        ? { status: 200, body: JSON.stringify(seoFixture('daily-ranks').payload) }
+        : undefined
+    await run(db, fakeApi(archiveEchoesActive))
+    const active = new Set(rows(db, 'rank_observations').filter((r) => r.keyword_status === 'active').map((r) => r.keyword_id))
+    assert.ok(active.size > 0)
+    for (const k of rows(db, 'keywords').filter((k) => active.has(k.keyword_id))) assert.equal(k.status, 'active', `keyword ${k.keyword_id}`)
+    for (const r of rows(db, 'rank_observations').filter((r) => active.has(r.keyword_id))) assert.equal(r.keyword_status, 'active')
+  })
+
   test('loturile de scriere: cel mult 500 de rânduri și cel mult ~1 MB; un rând uriaș merge singur', () => {
     const big = (n: number) => ({ answer_id: String(n), raw: 'x'.repeat(300_000) })
     const sizes = batches(Array.from({ length: 10 }, (_, i) => big(i))).map((b) => b.length)
