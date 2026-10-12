@@ -1,0 +1,14 @@
+// Worker cu static assets pentru aplicația web (apps/web), servit pe app.analyzator.ro.
+// Build-ul și deploy-ul rulează în Workers Builds, din git; pașii sunt în docs/runbook.md, „Hosting".
+// Fără secrete aici: VITE_SUPABASE_URL și VITE_SUPABASE_ANON_KEY sunt variabile de build în Cloudflare.
+{
+  "name": "analyzator-web",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./apps/web/dist",
+    // Rutele sunt în browser: orice cale fără fișier primește index.html cu 200.
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [{ "pattern": "app.analyzator.ro", "custom_domain": true }],
+  "observability": { "enabled": true }
+}
