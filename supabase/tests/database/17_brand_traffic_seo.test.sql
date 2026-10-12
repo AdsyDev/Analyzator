@@ -44,6 +44,24 @@ select is((public.brand_traffic_channels('20000000-0000-0000-0000-000000000011',
 select is((public.brand_traffic_channels('20000000-0000-0000-0000-000000000011', current_date - 3, current_date - 1) -> 'channels' -> 0 ->> 'change_pct')::numeric, 0::numeric, 'T1: variația față de perioada anterioară');
 select is(public.brand_traffic_channels('20000000-0000-0000-0000-000000000011', current_date - 3, current_date - 1) -> 'channels' -> 0 -> 'key_events', 'null'::jsonb, 'T1: key events lipsă = null, nu 0');
 
+-- T1b. GA4 trimite keyEvents = 0 și pentru o proprietate fără evenimente cheie: fără web_key_events în perioadă → null.
+reset role;
+update public.web_daily set key_events = 0 where brand_id = '20000000-0000-0000-0000-000000000011';
+select tests.authenticate_as('30000000-0000-0000-0000-000000000004');
+select is(public.brand_traffic_channels('20000000-0000-0000-0000-000000000011', current_date - 3, current_date - 1) -> 'channels' -> 0 -> 'key_events', 'null'::jsonb,
+  'T1b: keyEvents 0 fără raport de evenimente cheie = null, nu 0');
+reset role;
+insert into public.web_key_events (tenant_id, brand_id, date, event_name, key_events, source_id, collected_at, payload_hash, source_timezone, schema_version, window_days)
+values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', current_date - 2, 'purchase', 0,
+        '50000000-0000-0000-0000-000000000011', now(), repeat('a', 64), 'Europe/Bucharest', 't', 1);
+select tests.authenticate_as('30000000-0000-0000-0000-000000000004');
+select is((public.brand_traffic_channels('20000000-0000-0000-0000-000000000011', current_date - 3, current_date - 1) -> 'channels' -> 0 ->> 'key_events')::numeric, 0::numeric,
+  'T1b: cu evenimente cheie raportate, 0 pe canal rămâne 0');
+reset role;
+update public.web_daily set key_events = null where brand_id = '20000000-0000-0000-0000-000000000011';
+delete from public.web_key_events where brand_id = '20000000-0000-0000-0000-000000000011';
+select tests.authenticate_as('30000000-0000-0000-0000-000000000004');
+
 -- T2. Clarity pe device: conectat, fără rânduri pe device → indisponibil, nu 0 -------------------------------
 select is(public.brand_clarity_devices('20000000-0000-0000-0000-000000000011', current_date - 3, current_date - 1) -> 'rows' -> 0 -> 'cells' -> 'mobile' ->> 'status', 'unavailable',
   'T2: fără date pe device, celula e indisponibilă');
