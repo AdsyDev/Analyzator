@@ -159,6 +159,7 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
         sentiment: m.sentiment as Sentiment | null,
         reviewed_by: m.reviewed_by,
         pv_flag: flags.get(flagKey({ kind: 'mention', id: m.id })) ?? null,
+        owned_account: (m as { owned_account?: boolean | null }).owned_account ?? false,
       }))
   const inPeriod = (ctx: QueryContext, brandId: string) =>
     mentionsFor(brandId).filter((m) => m.published_at.slice(0, 10) >= ctx.period.from && m.published_at.slice(0, 10) <= addDays(ctx.period.to, 1))
@@ -180,6 +181,7 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
       const filtered = inPeriod(ctx, ctx.brandId)
         .filter((m) => (q.sentiment === 'unreviewed' ? m.sentiment === null : q.sentiment ? m.sentiment === q.sentiment : true))
         .filter((m) => (q.source ? m.source_name === q.source : true))
+        .filter((m) => (q.author === 'owned' ? m.owned_account === true : q.author === 'external' ? m.owned_account !== true : true))
         .sort((a, b) => b.published_at.localeCompare(a.published_at))
       const start = (q.page - 1) * q.page_size
       return ready({ items: filtered.slice(start, start + q.page_size), total: filtered.length, page: q.page, page_size: q.page_size })
@@ -192,7 +194,8 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
     sentiment: async (ctx) => {
       const denied = guard<never>(ctx.brandId)
       if (denied) return denied
-      const all = inPeriod(ctx, ctx.brandId)
+      const inRange = inPeriod(ctx, ctx.brandId)
+      const all = inRange.filter((m) => m.owned_account !== true)
       const reviewed = all.filter((m) => m.sentiment !== null)
       const count = (s: Sentiment) => reviewed.filter((m) => m.sentiment === s).length
       // Procentele sunt stand-in pentru calculul serverului (doar fixtures).
@@ -203,6 +206,7 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
         neutral: count('neutral'),
         negative: count('negative'),
         unreviewed: all.length - reviewed.length,
+        owned_excluded: inRange.length - all.length,
         shares: { positive: share(count('positive')), neutral: share(count('neutral')), negative: share(count('negative')) },
       })
     },

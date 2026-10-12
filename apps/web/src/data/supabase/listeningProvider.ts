@@ -34,12 +34,12 @@ export function createSupabaseMentions(client: DataClient): MentionsProvider {
     async list(ctx, q) {
       const { data, error } = await client.rpc('brand_mentions', {
         p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to,
-        p_sentiment: q.sentiment, p_source: q.source, p_page: q.page, p_page_size: q.page_size,
+        p_sentiment: q.sentiment, p_source: q.source, p_page: q.page, p_page_size: q.page_size, p_author: q.author ?? 'all',
       })
       if (error) return failed(rpcError(error))
       const d = data as Page<Mention> | null
       if (!d || !Array.isArray(d.items) || typeof d.total !== 'number') return failed(CONTRACT)
-      if (d.total === 0 && q.page === 1 && !q.sentiment && !q.source) {
+      if (d.total === 0 && q.page === 1 && !q.sentiment && !q.source && !q.author) {
         const s = await this.sentiment(ctx)
         if (s.kind === 'not_connected') return s
       }
@@ -50,7 +50,7 @@ export function createSupabaseMentions(client: DataClient): MentionsProvider {
       const { data, error } = await client.rpc('brand_mention_sentiment', { p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to })
       if (error) return failed(rpcError(error))
       const d = data as (SentimentDistribution & { connected?: boolean }) | null
-      if (!d || typeof d.total !== 'number') return failed(CONTRACT)
+      if (!d || typeof d.total !== 'number' || typeof d.owned_excluded !== 'number') return failed(CONTRACT)
       if (d.connected === false) return notConnected(NO_LISTENING)
       const { connected: _c, ...dist } = d
       return ready(dist as SentimentDistribution)

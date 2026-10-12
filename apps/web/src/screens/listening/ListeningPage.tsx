@@ -17,9 +17,11 @@ const SENTIMENTS: readonly Sentiment[] = ['positive', 'neutral', 'negative']
 export function mentionFiltersFrom(ctx: QueryContext): MentionFilters {
   const s = ctx.filters.sentiment
   const src = ctx.filters.source
+  const author = ctx.filters.author
   return {
     sentiment: s === 'unreviewed' || (SENTIMENTS as readonly string[]).includes(s ?? '') ? (s as SentimentFilter) : null,
     source: src && src !== 'all' ? src : null,
+    author: author === 'external' || author === 'owned' ? author : null,
   }
 }
 

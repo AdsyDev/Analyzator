@@ -36,6 +36,24 @@ select tests.authenticate_as('30000000-0000-0000-0000-000000000005');
 select throws_ok($$ select public.brand_mentions('20000000-0000-0000-0000-000000000011', current_date - 7, current_date) $$, '42501', null, 'M2: fără acces, refuzat');
 reset role;
 
+-- M2b. Cont propriu (D-22): eticheta în feed, filtrul de autor, exclus din distribuția sentimentului --------------
+update public.mentions set author_is_owned = case native_id when 'h:1' then true when 'h:2' then false end
+where brand_id = '20000000-0000-0000-0000-000000000011' and native_id in ('h:1', 'h:2');
+select tests.authenticate_as('30000000-0000-0000-0000-000000000004');
+select is((public.brand_mentions('20000000-0000-0000-0000-000000000011', current_date - 7, current_date, p_author => 'owned') ->> 'total')::int, 1, 'M2b: filtrul „cont propriu”');
+select is((public.brand_mentions('20000000-0000-0000-0000-000000000011', current_date - 7, current_date, p_author => 'external') ->> 'total')::int, 2,
+  'M2b: „externi” = fals + necunoscut (un autor necunoscut nu e tratat ca propriu)');
+select is(public.brand_mentions('20000000-0000-0000-0000-000000000011', current_date - 7, current_date, p_author => 'owned') -> 'items' -> 0 -> 'owned_account', 'true'::jsonb,
+  'M2b: marcajul vine în feed');
+select is((public.brand_mention_sentiment('20000000-0000-0000-0000-000000000011', current_date - 7, current_date) ->> 'total')::int, 1,
+  'M2b: postarea proprie revizuită nu intră în distribuție');
+select is((public.brand_mention_sentiment('20000000-0000-0000-0000-000000000011', current_date - 7, current_date) -> 'shares' ->> 'negative')::numeric, 100::numeric,
+  'M2b: procentele sunt doar din autorii externi');
+select is((public.brand_mention_sentiment('20000000-0000-0000-0000-000000000011', current_date - 7, current_date) ->> 'owned_excluded')::int, 1, 'M2b: câte au fost excluse');
+select throws_ok($$ select public.brand_mentions('20000000-0000-0000-0000-000000000011', current_date - 7, current_date, p_author => 'oricine') $$, '22023', null, 'M2b: filtru necunoscut refuzat');
+reset role;
+update public.mentions set author_is_owned = null where brand_id = '20000000-0000-0000-0000-000000000011';
+
 -- M3. Analize: clientul doar publicate --------------------------------------------------------------------------
 select tests.authenticate_as('30000000-0000-0000-0000-000000000002');
 insert into public.insights (tenant_id, brand_id, title, period_start, period_end, summary, author_id)

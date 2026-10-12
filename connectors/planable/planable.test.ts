@@ -161,6 +161,22 @@ describe('collectPlanable', () => {
     assert.ok(!JSON.stringify(db.tables).includes('SECRET-TOKEN'), 'tokenul nu ajunge în baza de date')
   })
 
+  test('cont propriu (D-22): autorul = o pagină a workspace-ului pe aceeași platformă; extern = false; fără autor = null', async () => {
+    const { db } = setup()
+    const own = { platform: 'instagram', publishedAt: '2026-10-05T12:00:00Z', engagement: 1, url: 'https://ig.test/own', text: 'postarea noastră', author: { name: 'Pagina PG-IG', username: null, profileImageUrl: null } }
+    const ext = { ...own, url: 'https://ig.test/ext', author: { name: 'Ana Popescu', username: 'ana.p', profileImageUrl: null } }
+    const otherPlatform = { ...own, platform: 'tiktok', url: 'https://tt.test/x' }
+    const noAuthor = { platform: 'instagram', publishedAt: '2026-10-05T12:00:00Z', engagement: 1, url: 'https://ig.test/none', text: 'x' }
+    const f = routes({ '/api/v1/keywords/k1/mentions': json({ data: [own, ext, otherPlatform, noAuthor], pagination: { nextCursor: null, total: 4 } }) })
+    await collectPlanable({ db, fetch: f.fetch, sleep: noSleep().sleep, now: () => NOW })
+    const by = (u: string) => db.tables.mentions!.find((m) => m.url === u)!.author_is_owned
+    assert.equal(by('https://ig.test/own'), true)
+    assert.equal(by('https://ig.test/ext'), false)
+    assert.equal(by('https://tt.test/x'), false, 'același nume pe altă platformă nu e contul propriu')
+    assert.equal(by('https://ig.test/none'), null)
+    assert.ok(db.tables.mentions!.every((m) => !('author' in m) && !JSON.stringify(m).includes('Ana Popescu')), 'numele autorilor nu se salvează')
+  })
+
   test('sentimentul revizuit de om nu se suprascrie; un rând CSV cu aceeași cheie devine rând API', async () => {
     const reviewedId = mentionNativeId('https://x.com/a/1')
     const { db } = setup({

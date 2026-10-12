@@ -14,6 +14,8 @@ export interface Mention {
   sentiment: Sentiment | null
   reviewed_by: string | null
   pv_flag: PvFlag | null
+  /** „Cont propriu” (D-22): autorul e o pagină a brandului; `null` = necunoscut. Calculat la colectare, nu în UI. */
+  owned_account: boolean | null
 }
 
 /** Obiectul care poate fi marcat pentru farmacovigilență: o mențiune sau un răspuns AI. */
@@ -47,9 +49,13 @@ export interface PvSnapshot {
 /** Filtrul de sentiment: o valoare, `unreviewed` (încă fără etichetă umană) sau `null` = toate. */
 export type SentimentFilter = Sentiment | 'unreviewed'
 
+/** Filtrul de autor: doar autorii externi (inclusiv necunoscuți), doar conturile proprii, sau `null` = toți. */
+export type AuthorFilter = 'external' | 'owned'
+
 export interface MentionQuery {
   sentiment: SentimentFilter | null
   source: string | null
+  author: AuthorFilter | null
   page: number
   page_size: number
 }
@@ -73,6 +79,8 @@ export interface SentimentDistribution {
   negative: number
   /** Mențiuni eligibile încă fără etichetă umană. */
   unreviewed: number
+  /** Postări din conturile proprii, excluse din distribuție (D-22). */
+  owned_excluded: number
   /** Procente din `total`; `null` când `total` e 0. */
   shares: { positive: number | null; neutral: number | null; negative: number | null }
 }

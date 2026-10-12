@@ -65,7 +65,7 @@ describe('providerul supabase (gol)', () => {
   })
 
   it('listele întorc not_connected cu motiv, nu listă goală', async () => {
-    const r = await p.mentions.list(ctx, { sentiment: null, source: null, page: 1, page_size: 20 })
+    const r = await p.mentions.list(ctx, { sentiment: null, source: null, author: null, page: 1, page_size: 20 })
     expect(r.kind).toBe('not_connected')
     if (r.kind === 'not_connected') expect(r.reason.length).toBeGreaterThan(0)
     expect((await p.insights.list(ctx)).kind).toBe('not_connected')

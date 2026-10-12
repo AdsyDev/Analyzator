@@ -264,20 +264,20 @@ describe('fixtures: surse și mențiuni', () => {
 
   it('mențiunile se filtrează pe sentiment, pe „nerevizuit" și pe sursă, și se paginează', async () => {
     const p = make()
-    const neg = await p.mentions.list(ctx('brand-urinal'), { sentiment: 'negative', source: null, page: 1, page_size: 10 })
+    const neg = await p.mentions.list(ctx('brand-urinal'), { sentiment: 'negative', source: null, author: null, page: 1, page_size: 10 })
     expect(neg.kind === 'ready' && neg.data.items.every((m) => m.sentiment === 'negative')).toBe(true)
-    const un = await p.mentions.list(ctx('brand-urinal'), { sentiment: 'unreviewed', source: null, page: 1, page_size: 10 })
+    const un = await p.mentions.list(ctx('brand-urinal'), { sentiment: 'unreviewed', source: null, author: null, page: 1, page_size: 10 })
     expect(un.kind === 'ready' && un.data.items.length).toBe(2)
     expect(un.kind === 'ready' && un.data.items.every((m) => m.sentiment === null && m.reviewed_by === null)).toBe(true)
-    const src = await p.mentions.list(ctx('brand-urinal'), { sentiment: null, source: 'Reddit', page: 1, page_size: 10 })
+    const src = await p.mentions.list(ctx('brand-urinal'), { sentiment: null, source: 'Reddit', author: null, page: 1, page_size: 10 })
     expect(src.kind === 'ready' && src.data.items.every((m) => m.source_name === 'Reddit')).toBe(true)
-    const page = await p.mentions.list(ctx('brand-urinal'), { sentiment: null, source: null, page: 3, page_size: 4 })
+    const page = await p.mentions.list(ctx('brand-urinal'), { sentiment: null, source: null, author: null, page: 3, page_size: 4 })
     expect(page.kind === 'ready' && page.data.items.length).toBe(2)
     expect(page.kind === 'ready' && page.data.total).toBe(10)
   })
 
   it('sentimentul rămâne null până la revizuirea umană: etichetă și revizor merg împreună', async () => {
-    const r = await make().mentions.list(ctx('brand-urinal'), { sentiment: null, source: null, page: 1, page_size: 50 })
+    const r = await make().mentions.list(ctx('brand-urinal'), { sentiment: null, source: null, author: null, page: 1, page_size: 50 })
     if (r.kind !== 'ready') throw new Error('list')
     expect(r.data.items.every((m) => (m.sentiment === null) === (m.reviewed_by === null))).toBe(true)
     expect(r.data.items.some((m) => m.sentiment === null)).toBe(true)
@@ -301,7 +301,7 @@ describe('fixtures: surse și mențiuni', () => {
 
   it('farmacovigilență: marcaj preexistent, previzualizare exactă, marcare nouă și jurnal (doar agency_admin)', async () => {
     const p = createFixtureProviders({ now: () => NOW, getRole: () => 'agency_admin' })
-    const list0 = await p.mentions.list(ctx('brand-urinal'), { sentiment: null, source: null, page: 1, page_size: 50 })
+    const list0 = await p.mentions.list(ctx('brand-urinal'), { sentiment: null, source: null, author: null, page: 1, page_size: 50 })
     expect(list0.kind === 'ready' && list0.data.items.find((m) => m.id === 'm-u-5')?.pv_flag).not.toBeNull()
     expect(list0.kind === 'ready' && list0.data.items.find((m) => m.id === 'm-u-1')?.pv_flag).toBeNull()
 

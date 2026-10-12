@@ -56,7 +56,11 @@ export const KeywordSchema = z.object({ keywordId: z.string(), text: z.string(),
 export const KeywordsSchema = z.object({ data: z.array(KeywordSchema) }).passthrough()
 
 export const MentionSchema = z
-  .object({ platform: z.string(), publishedAt: z.string(), url: z.string(), text: z.string().nullable().optional(), sentiment: z.string().nullable().optional() })
+  .object({
+    platform: z.string(), publishedAt: z.string(), url: z.string(), text: z.string().nullable().optional(), sentiment: z.string().nullable().optional(),
+    // Documentat (OpenAPI 2026-10-12): author { name, username, profileImageUrl }. Nu se salvează: servește doar la „cont propriu”.
+    author: z.object({ name: z.string().nullable().optional(), username: z.string().nullable().optional() }).passthrough().nullable().optional(),
+  })
   .passthrough()
 export const MentionsSchema = z.object({ data: z.array(MentionSchema), pagination: z.object({ nextCursor: z.number().nullable() }).passthrough() }).passthrough()
 
@@ -206,7 +210,36 @@ export function mentionNativeId(url: string): string {
 
 const SENTIMENTS = ['positive', 'neutral', 'negative'] as const
 
-export function mentionRow(m: Mention, p: Provenance) {
+/** Nume comparabil: fără diacritice, majuscule, spații și semne („Minimarțieni România” = „minimartieniromania”). */
+export const accountKey = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+
+/** Conturile proprii ale workspace-ului, pe platformă: cheile numelor paginilor Planable. */
+export type OwnAccounts = Map<string, Set<string>>
+export function ownAccounts(pages: Array<{ name: string; platform: string }>): OwnAccounts {
+  const out: OwnAccounts = new Map()
+  for (const pg of pages) {
+    const key = accountKey(pg.name)
+    if (!key) continue
+    const platform = platformOf(pg.platform)
+    if (!out.has(platform)) out.set(platform, new Set())
+    out.get(platform)!.add(key)
+  }
+  return out
+}
+
+/**
+ * „Cont propriu” (D-22): autorul mențiunii are numele sau username-ul unei pagini Planable a brandului, pe aceeași platformă.
+ * `null` = nu se știe (fără autor în payload sau fără paginile workspace-ului); `false` = autor extern.
+ */
+export function authorIsOwned(m: Mention, own: OwnAccounts | null): boolean | null {
+  if (!own || !m.author) return null
+  const keys = [m.author.name, m.author.username].filter((v): v is string => typeof v === 'string' && v.trim() !== '').map(accountKey).filter(Boolean)
+  if (keys.length === 0) return null
+  const set = own.get(platformOf(m.platform))
+  return set ? keys.some((k) => set.has(k)) : false
+}
+
+export function mentionRow(m: Mention, p: Provenance, own: OwnAccounts | null = null) {
   const s = (m.sentiment ?? '').toLowerCase()
   return {
     ...common(p),
@@ -216,6 +249,7 @@ export function mentionRow(m: Mention, p: Provenance) {
     published_at: m.publishedAt,
     text: m.text ? m.text.slice(0, 20_000) : null,
     sentiment: (SENTIMENTS as readonly string[]).includes(s) ? s : 'unknown',
+    author_is_owned: authorIsOwned(m, own),
     language: null,
     country: null,
   }

@@ -83,6 +83,18 @@ export const SOCIAL_FORMAT_FILTER: FilterDef = {
   options: [{ value: 'all', label: 'Toate formatele' }, ...SOCIAL_FORMATS.map((f) => ({ value: f, label: FORMAT_LABELS[f] ?? f }))],
 }
 
+/** Tip autor (spec cap. 18, D-22): conturile proprii ale brandului față de autorii externi. */
+export const AUTHOR_FILTER: FilterDef = {
+  key: 'author',
+  label: 'Autor',
+  defaultValue: 'all',
+  options: [
+    { value: 'all', label: 'Toți' },
+    { value: 'external', label: 'Externi' },
+    { value: 'owned', label: 'Cont propriu' },
+  ],
+}
+
 export const SENTIMENT_FILTER: FilterDef = {
   key: 'sentiment',
   label: 'Sentiment',
@@ -138,7 +150,7 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
     filters: [SOCIAL_PLATFORM_FILTER, SOCIAL_FORMAT_FILTER],
     disconnected: (b) => `Datele despre postările ${b} vin din Planable, care nu e încă conectat. Pentru comparația publică cu competitorii, vezi Concurență.`,
   },
-  listening: { segment: 'listening', title: 'Listening', subtitle: () => 'Mențiunile publice despre brand, cu sentiment revizuit de echipa AdSymphony.', sources: [], filters: [SENTIMENT_FILTER], dynamicFilter: MENTION_SOURCES },
+  listening: { segment: 'listening', title: 'Listening', subtitle: () => 'Mențiunile publice despre brand, cu sentiment revizuit de echipa AdSymphony.', sources: [], filters: [SENTIMENT_FILTER, AUTHOR_FILTER], dynamicFilter: MENTION_SOURCES },
   competition: { segment: 'competition', title: 'Concurență', subtitle: () => 'Brandul față de setul de competitori, pe aceleași surse și aceeași perioadă.', sources: [], filters: [] },
   insights: { segment: 'insights', title: 'Analize și acțiuni', subtitle: () => 'Interpretările echipei AdSymphony și acțiunile care decurg din ele.', sources: [], filters: [] },
 }

@@ -62,6 +62,8 @@ Aceleași tabele și chei ca importul CSV (`docs/contracts/csv-planable-analytic
 
 **Postări:** `impressions`, `engagement` → `engagements`, `reactions` → `likes`. Câmpurile pe platformă ale postării nu sunt descrise în specificație (obiecte fără proprietăți): rămân NULL.
 
+**Cont propriu (D-22):** `author.name` / `author.username` ale mențiunii se compară cu numele paginilor workspace-ului (`GET /pages`, aceeași platformă); se salvează doar `author_is_owned`, nu și numele autorului.
+
 **Sentiment:** `positive` / `negative` / `neutral` din API; lipsă → `unknown`. **Corecțiile umane (`sentiment_reviewed_by`) au prioritate** și nu se suprascriu (ca la CSV).
 
 ## Rulare

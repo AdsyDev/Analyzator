@@ -33,6 +33,7 @@ import {
   PostsSchema,
   WorkspacesSchema,
   mentionRow,
+  ownAccounts,
   socialDailyRows,
   socialPostRow,
   type Mention,
@@ -295,6 +296,13 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
 
     const collectedAt = now().toISOString()
     const provenance = { ...scope, source_id: conn.id, sync_run_id: handle.id, collected_at: collectedAt, source_timezone: tz }
+    // Paginile workspace-ului = conturile proprii ale brandului; fără ele, „cont propriu” rămâne necunoscut (null), nu fals.
+    const pages = await paginate<Page>(client, '/pages', { workspaceId: conn.external_account_id }, PLANABLE_PAGE_SIZE, (p) => {
+      const r = PagesSchema.safeParse(p)
+      return r.success ? { items: r.data.data, hasMore: r.data.pagination.hasMore } : null
+    }, 'pages')
+    if (pages.error) errors.push(pages.error)
+    const own = pages.error && pages.items.length === 0 ? null : ownAccounts(pages.items.map(({ item }) => item).filter((pg) => pg.workspaceId === conn.external_account_id))
     const mentions: Row[] = []
     for (const k of keywords.data.data) {
       let cursor: number | undefined
@@ -316,7 +324,7 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
             errors.push({ code: 'parser_note', status: null, message: 'mențiune fără URL sau dată validă, sărită' })
             continue
           }
-          mentions.push(mentionRow(m, { ...provenance, payload_hash: r.payloadHash }))
+          mentions.push(mentionRow(m, { ...provenance, payload_hash: r.payloadHash }, own))
         }
         const next = parsed.data.pagination.nextCursor
         if (next === null || next === cursor || parsed.data.data.length === 0) break

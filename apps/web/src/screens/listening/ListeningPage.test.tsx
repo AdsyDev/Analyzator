@@ -59,4 +59,33 @@ describe('Listening', () => {
     expect(screen.queryByRole('heading', { name: 'Jurnal de farmacovigilență' })).toBeNull()
     expect(pvLog).not.toHaveBeenCalled()
   })
+
+  it('cont propriu (D-22): eticheta în feed, filtrul „Autor” din URL ajunge la provider, nota din distribuție', async () => {
+    const seen: Array<string | null> = []
+    renderApp({
+      route: `${URINAL}?author=owned`,
+      wrap: (b) => ({
+        ...b,
+        mentions: {
+          ...b.mentions,
+          list: async (ctx, q) => {
+            seen.push(q.author)
+            const r = await b.mentions.list(ctx, { ...q, author: null })
+            return r.kind === 'ready' ? { kind: 'ready' as const, data: { ...r.data, items: r.data.items.slice(0, 1).map((m) => ({ ...m, owned_account: true })), total: 1 } } : r
+          },
+          sentiment: async (ctx) => {
+            const r = await b.mentions.sentiment(ctx)
+            return r.kind === 'ready' ? { kind: 'ready' as const, data: { ...r.data, owned_excluded: 2 } } : r
+          },
+        },
+      }),
+    })
+    await pageReady('Listening')
+    const feed = (await screen.findByRole('heading', { level: 2, name: 'Mențiuni' })).closest('section')!
+    expect(await within(feed).findByText('Cont propriu')).toBeInTheDocument()
+    expect(seen).toContain('owned')
+    const dist = (await screen.findByRole('heading', { level: 2, name: 'Distribuția sentimentului' })).closest('section')!
+    expect(await within(dist).findByText(/2 postări din conturile proprii ale brandului nu sunt incluse/)).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Autor:\s*Cont propriu/ }).length).toBeGreaterThan(0)
+  })
 })

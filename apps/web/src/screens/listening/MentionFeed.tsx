@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Brand, Mention, QueryContext, SentimentFilter } from '../../contracts'
+import type { Brand, Mention, QueryContext, SentimentFilter, AuthorFilter } from '../../contracts'
 import { EmptyState } from '../../components/EmptyState'
 import { PharmacovigilanceButton } from '../../components/PharmacovigilanceButton'
 import { Button } from '../../components/ui/Button'
@@ -18,6 +18,7 @@ const PAGE_SIZE = 6
 export interface MentionFilters {
   sentiment: SentimentFilter | null
   source: string | null
+  author: AuthorFilter | null
 }
 
 function SentimentBadge({ m }: { m: Mention }) {
@@ -39,7 +40,7 @@ function SentimentBadge({ m }: { m: Mention }) {
 export function MentionFeed({ brand, ctx, filters, onChanged }: { brand: Brand; ctx: QueryContext; filters: MentionFilters; onChanged: () => void }) {
   const providers = useProviders()
   const [page, setPage] = useState(1)
-  const state = useAsync(() => providers.mentions.list(ctx, { sentiment: filters.sentiment, source: filters.source, page, page_size: PAGE_SIZE }), [providers, ctxKey(ctx), page])
+  const state = useAsync(() => providers.mentions.list(ctx, { sentiment: filters.sentiment, source: filters.source, author: filters.author, page, page_size: PAGE_SIZE }), [providers, ctxKey(ctx), page])
 
   return (
     <Section id="feed" title="Mențiuni" description="Cele mai recente mențiuni eligibile. Sentimentul e etichetat de un om; „Nerevizuit” înseamnă că încă nu a fost verificat.">
@@ -58,6 +59,7 @@ export function MentionFeed({ brand, ctx, filters, onChanged }: { brand: Brand; 
                         <header className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-text-2">
                           <span className="font-semibold text-text">{m.source_name}</span>
                           {m.author && <span>{m.author}</span>}
+                          {m.owned_account === true && <StatusChip tone="accent">Cont propriu</StatusChip>}
                           <span className="font-mono text-[12px]">{formatDateTime(m.published_at)}</span>
                           <span className="flex-1" />
                           <SentimentBadge m={m} />
