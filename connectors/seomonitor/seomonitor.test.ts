@@ -1,7 +1,7 @@
 // Conectorul SEOmonitor pe fixtures docs-derived (neconfirmate), cu API simulat și bază în memorie.
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { collectSeomonitorConnection } from './collect-core.ts'
+import { collectSeomonitorConnection, dayWindows } from './collect-core.ts'
 import { FIXTURE_FILES, seoFixture, type FixtureName } from './docs-fixtures.ts'
 import { parseAioRank, parseRank, sanitizeContent, aiStatus, toNumber, enabledEngines } from './normalize.ts'
 import { batches, MAX_BATCH_BYTES } from './write.ts'
@@ -141,7 +141,10 @@ describe('conectorul SEOmonitor pe fixtures docs-derived', () => {
     assert.equal(rows(db, 'keywords').filter((k) => k.status === 'active').length, 1003)
     // AI Overview: pagini de 100 (1.000 cu conținut complet → 422 pe date reale), până la o pagină goală (documentat).
     const aio = api.calls.filter((u) => u.pathname.endsWith('/keywords/aio'))
-    assert.deepEqual(aio.map((u) => u.searchParams.get('offset')), ['0', '100'])
+    // Ferestre de 7 zile care acoperă exact 1 sep – 5 oct; fiecare fereastră: offset 0, apoi 100 (pagină goală).
+    const windows = [...new Set(aio.map((u) => `${u.searchParams.get('start_date')}..${u.searchParams.get('end_date')}`))]
+    assert.deepEqual(windows, ['2026-09-01..2026-09-07', '2026-09-08..2026-09-14', '2026-09-15..2026-09-21', '2026-09-22..2026-09-28', '2026-09-29..2026-10-05'])
+    for (const w of windows) assert.deepEqual(aio.filter((u) => `${u.searchParams.get('start_date')}..${u.searchParams.get('end_date')}` === w).map((u) => u.searchParams.get('offset')), ['0', '100'], w)
     assert.ok(aio.every((u) => u.searchParams.get('limit') === '100'))
     // Fără HTML-ul snapshot-ului la AIO (422 „Request too large” pe date reale); AI Search îl cere în continuare.
     assert.ok(aio.every((u) => !u.searchParams.has('include_raw_content')))
@@ -436,6 +439,12 @@ describe('forme reale ale răspunsurilor (12 oct 2026)', () => {
     assert.ok(active.size > 0)
     for (const k of rows(db, 'keywords').filter((k) => active.has(k.keyword_id))) assert.equal(k.status, 'active', `keyword ${k.keyword_id}`)
     for (const r of rows(db, 'rank_observations').filter((r) => active.has(r.keyword_id))) assert.equal(r.keyword_status, 'active')
+  })
+
+  test('dayWindows: ferestre consecutive, fără goluri și fără suprapuneri; ultima scurtată la capăt', () => {
+    assert.deepEqual(dayWindows('2026-09-01', '2026-09-10', 7), [{ start: '2026-09-01', end: '2026-09-07' }, { start: '2026-09-08', end: '2026-09-10' }])
+    assert.deepEqual(dayWindows('2026-09-01', '2026-09-01', 7), [{ start: '2026-09-01', end: '2026-09-01' }])
+    assert.deepEqual(dayWindows('2026-09-29', '2026-10-05', 7), [{ start: '2026-09-29', end: '2026-10-05' }])
   })
 
   test('loturile de scriere: cel mult 500 de rânduri și cel mult ~1 MB; un rând uriaș merge singur', () => {

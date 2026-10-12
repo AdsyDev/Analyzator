@@ -27,7 +27,7 @@ Sursa: [SEOmonitor API 3.0](https://api-docs.seomonitor.com), paginile markdown 
 | `GET /rank-tracker/v3.0/groups/daily-visibility/ais-mentions` | — | visibility pe mențiuni de brand |
 | `GET /rank-tracker/v3.0/groups/daily-visibility/ais-citations` | — | visibility pe citări |
 | `GET /rank-tracker/v3.0/ais/stats` | — | motoarele activate (fără `gpt_provider`) și statistici per motor (`gpt_provider=<motor>`) |
-| `GET /rank-tracker/v3.0/keywords/aio` | limit **100**, **până la pagină goală**, fără `include_raw_content` | răspunsuri Google AI Overview desktop și mobile; pe date reale (12 oct 2026) 1.000 sau HTML-ul snapshot-ului dau 422 „Request too large”, deci originalul păstrat e markdown |
+| `GET /rank-tracker/v3.0/keywords/aio` | limit **100**, **până la pagină goală**, fără `include_raw_content`, pe **ferestre de 7 zile** | răspunsuri Google AI Overview desktop și mobile; pe date reale (12 oct 2026) 1.000 sau HTML-ul snapshot-ului dau 422 „Request too large”, deci originalul păstrat e markdown |
 
 Pentru `keywords/ais` documentația nu spune ce numără `limit`: folosim conservator „până la pagină goală" (un apel în plus).
 

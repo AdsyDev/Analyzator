@@ -21,6 +21,7 @@ import {
   SEOMONITOR_MIN_BUDGET_TO_START,
   SEOMONITOR_PAGE_SIZE,
   SEOMONITOR_AIO_PAGE_SIZE,
+  SEOMONITOR_AIO_WINDOW_DAYS,
   SEOMONITOR_SCHEMA_VERSION,
   SPECIAL_GROUP_BRAND,
   type RouteKey,
@@ -80,6 +81,16 @@ function addDays(day: string, delta: number): string {
   const d = new Date(`${day}T00:00:00Z`)
   d.setUTCDate(d.getUTCDate() + delta)
   return d.toISOString().slice(0, 10)
+}
+
+/** Ferestre consecutive de cel mult `size` zile care acoperă exact [start, end] (zile ISO, inclusiv). */
+export function dayWindows(start: string, end: string, size: number): Array<{ start: string; end: string }> {
+  const out: Array<{ start: string; end: string }> = []
+  for (let s = start; s <= end; s = addDays(s, size)) {
+    const e = addDays(s, size - 1)
+    out.push({ start: s, end: e < end ? e : end })
+  }
+  return out
 }
 
 function issuesToErrors(issues: ParseIssue[]): SyncRunError[] {
@@ -416,8 +427,11 @@ export async function collectSeomonitorConnection(deps: SeomonitorDeps, connecti
         // Pe date reale, AIO răspunde 422 „Request too large to return AI Overview content” cu HTML-ul snapshot-ului
         // (`include_raw_content`), chiar și la 100 de keywords pe pagină: cerem doar conținutul markdown, păstrat ca original
         // (`raw_format = 'markdown'`). AI Search rămâne cu HTML (nu dă eroare).
-        const aio = await fetchAll('aio', { ...base, group_id: bg.group.group_id, content_format: 'markdown' }, 'until_empty_page', SEOMONITOR_AIO_PAGE_SIZE)
-        if (!stopOn(aio, 'keywords/aio', brand_id)) {
+        // Și fără HTML, 35 de zile × desktop și mobile într-o cerere tot dau 422: AIO se cere pe ferestre de câte
+        // SEOMONITOR_AIO_WINDOW_DAYS zile (cheia răspunsurilor e pe zi și device, deci ferestrele nu se suprapun în date).
+        for (const w of dayWindows(rangeStart, rangeEnd, SEOMONITOR_AIO_WINDOW_DAYS)) {
+          const aio = await fetchAll('aio', { ...base, start_date: w.start, end_date: w.end, group_id: bg.group.group_id, content_format: 'markdown' }, 'until_empty_page', SEOMONITOR_AIO_PAGE_SIZE)
+          if (stopOn(aio, `keywords/aio:${w.start}`, brand_id)) continue
           for (const page of aio.pages) {
             const n = normalizeAio(page.payload, ctx, page.payloadHash)
             for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
