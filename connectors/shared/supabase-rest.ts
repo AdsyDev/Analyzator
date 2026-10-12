@@ -104,7 +104,8 @@ export class SupabaseRest implements Db {
   async upsert<T extends Row>(table: string, rows: Row[], onConflict: string[]): Promise<T[]> {
     if (rows.length === 0) return []
     for (const col of onConflict) {
-      if (!/^[a-z_]+$/.test(col)) throw new Error(`coloană on_conflict invalidă: ${col}`)
+      // Identificator Postgres simplu (și cu cifre, de ex. landing_page_md5); nimic altceva nu ajunge în URL.
+      if (!/^[a-z_][a-z0-9_]*$/.test(col)) throw new Error(`coloană on_conflict invalidă: ${col}`)
     }
     return (
       (await this.#request<T[] | null>(

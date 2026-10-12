@@ -38,4 +38,13 @@ describe('SupabaseRest: reîncercare doar pentru cereri repetabile', () => {
     await assert.rejects(rest.upsert('t', [{ id: 1 }], ['id']), /HTTP 400/)
     assert.equal(calls.length, 1)
   })
+
+  test('on_conflict: coloane cu cifre (landing_page_md5) acceptate; orice altceva refuzat fără cerere', async () => {
+    const { rest, calls } = db([{ status: 200, body: '[{"id":1}]' }])
+    await rest.upsert('web_daily', [{ id: 1 }], ['tenant_id', 'landing_page_md5'])
+    assert.ok(calls[0]!.url.endsWith('on_conflict=tenant_id,landing_page_md5'))
+    await assert.rejects(rest.upsert('t', [{ id: 1 }], ['id,x']), /on_conflict invalidă/)
+    await assert.rejects(rest.upsert('t', [{ id: 1 }], ['5id']), /on_conflict invalidă/)
+    assert.equal(calls.length, 1)
+  })
 })
