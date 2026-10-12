@@ -105,6 +105,14 @@ Decizia D-1 din `docs/decisions.md`. Până la 12 oct, `tenants_insert` era `wit
 - **Riscul acceptat:** un `agency_admin` al oricărui client (de regulă oameni AdSymphony) poate crea clienți noi, goi, în care doar el are acces. Nu poate vedea sau modifica alți clienți. Ștergerea nu există (doar arhivare prin `status`).
 - **Teste:** `11_tenant_creation.test.sql` (H1–H6): roluri respinse, anon, status impus, creare și membership, unicitatea slug-ului, izolare față de alți admini, admin revocat, service role, audit, arhivarea și restaurarea brandurilor.
 
+### E6. `rotate_source_token` (aprobată 12 oct 2026)
+
+Funcție `SECURITY DEFINER` în `public`, executabilă **doar de service_role** (verificat în corp cu `assert_service_role`, ca E1). Workerul salvează tokenul reînnoit de furnizor (TikTok). Restricții: doar conexiunile `google_ads_account` și `tiktok_account`; starea credențialului nu se schimbă; auditul e `actor_type = worker`, `action = credential_refreshed`. Lista aprobată din `04_security_inventory.test.sql` o include explicit. Teste: `14_oauth.test.sql` (K2).
+
+### E7. Funcția `oauth` fără verificarea JWT la poartă (aprobată 12 oct 2026)
+
+Întoarcerea de la Google / TikTok nu are JWT, deci `verify_jwt = false`. Compensări: pornirea verifică sesiunea și rolul `agency_admin` în handler; `state` aleatoriu de 32 de octeți, păstrat doar ca hash, legat de client, furnizor și utilizator, valabil 10 minute și revendicat atomic o singură dată; PKCE la Google; rolul se reverifică la întoarcere; răspunsul e doar un redirect fix spre `APP_BASE_URL`, fără token. `oauth_states` nu e accesibil lui `authenticated` sau `anon` (K1). Teste: `supabase/functions/oauth/handler.test.ts`.
+
 ## Inventar la 7 oct 2026
 
 | Tip | Ce există | Acoperit de |

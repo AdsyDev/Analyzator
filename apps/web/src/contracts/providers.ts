@@ -10,7 +10,7 @@ import type { PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from '
 import type { ContentGap, LandingPage, SearchFilters, SearchKeyword } from './search'
 import type { SocialCalendarItem, SocialCompetitor, SocialFilters, SocialGroups, SocialPost, SocialSummary } from './social'
 import type { ClientsProvider, ConfigProvider, UsersProvider } from './admin'
-import type { NewConnection, NewTenantConnection, SourceConnection, SourceStatusInfo, SyncRun, TenantConnection, TokenSaved, ValidationOutcome } from './source'
+import type { NewConnection, NewTenantConnection, OAuthProvider, SourceConnection, SourceStatusInfo, SyncRun, TenantConnection, TokenSaved, ValidationOutcome } from './source'
 import type { AiReferrals, ClarityDevices, Device, TrackingQuality, TrafficChannels } from './traffic'
 
 /**
@@ -59,6 +59,11 @@ export interface SourcesProvider {
   tenantConnections(tenantId: TenantId): Promise<ProviderResult<TenantConnection[]>>
   /** Doar `agency_admin` (RLS). Tokenul se setează apoi cu `setToken`. */
   createTenantConnection(tenantId: TenantId, input: NewTenantConnection): Promise<ProviderResult<TenantConnection>>
+  /**
+   * Funcția server `oauth`, `start`: adresa de autorizare la furnizor. Tokenul nu trece prin browser; furnizorul se
+   * întoarce la funcția server, care îl scrie în Vault și redirecționează în Administrare → Surse.
+   */
+  startOAuth(tenantId: TenantId, provider: OAuthProvider, accountLabel: string | null): Promise<ProviderResult<{ authorize_url: string }>>
 }
 
 export interface BrandsProvider {

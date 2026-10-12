@@ -8,7 +8,7 @@ import { PROVIDER_LABELS } from '../../lib/sources'
  * Sursele cu conexiune pe brand; Import CSV nu are conexiune, ci fișiere. SEOmonitor și cheia Google sunt la nivel
  * de client (Conturile clientului), nu pe brand.
  */
-export const CONNECTABLE: readonly SourceProviderId[] = ['ga4', 'gsc', 'clarity', 'planable', 'meta_ads']
+export const CONNECTABLE: readonly SourceProviderId[] = ['ga4', 'gsc', 'clarity', 'planable', 'meta_ads', 'google_ads', 'tiktok_ads']
 
 /** Ce se completează la „Cont sau proiect”, per sursă (docs/connectors). */
 const ACCOUNT_HINT: Partial<Record<SourceProviderId, string>> = {
@@ -17,6 +17,8 @@ const ACCOUNT_HINT: Partial<Record<SourceProviderId, string>> = {
   clarity: 'Project ID Clarity',
   planable: 'ID-ul workspace-ului Planable',
   meta_ads: 'Contul de ads: act_1234567890',
+  google_ads: 'Customer ID Google Ads: 123-456-7890',
+  tiktok_ads: 'Advertiser ID TikTok (cifre)',
 }
 
 interface Props {

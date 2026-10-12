@@ -8,6 +8,7 @@ export const SOURCE_PROVIDERS = [
   'planable',
   'google_ads',
   'meta_ads',
+  'tiktok_ads',
   'csv_import',
 ] as const
 export type SourceProviderId = (typeof SOURCE_PROVIDERS)[number]
@@ -75,9 +76,13 @@ export interface NewConnection {
  * clientului. `google_service_account` = cheia Google pentru GA4 și Search Console (docs/contracts/google.md);
  * `seomonitor` = contul SEOmonitor, cu grupurile mapate pe branduri (docs/contracts/seomonitor.md);
  * `planable_account` = tokenul Planable, cu workspace-ul pe fiecare brand (docs/contracts/planable.md);
- * `meta_account` = tokenul system user Meta, cu contul de ads pe fiecare brand (docs/contracts/meta-ads.md).
+ * `meta_account` = tokenul system user Meta, cu contul de ads pe fiecare brand (docs/contracts/meta-ads.md);
+ * `google_ads_account` și `tiktok_account` = conectate prin OAuth (docs/contracts/oauth.md).
  */
-export const TENANT_PROVIDERS = ['google_service_account', 'seomonitor', 'planable_account', 'meta_account'] as const
+export const TENANT_PROVIDERS = ['google_service_account', 'seomonitor', 'planable_account', 'meta_account', 'google_ads_account', 'tiktok_account'] as const
+
+/** Conturile care se conectează prin OAuth (funcția server `oauth`, D-8): provider-ul fluxului → contul creat. */
+export type OAuthProvider = 'google_ads' | 'tiktok_ads'
 export type TenantProviderId = (typeof TENANT_PROVIDERS)[number]
 
 export interface TenantConnection {

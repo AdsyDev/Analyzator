@@ -13,6 +13,8 @@ const TENANT_KEY_NOTE: Record<string, string> = {
   gsc: 'Nu are token propriu: folosește cheia Google din „Conturile clientului”. Service account-ul trebuie să aibă acces la această proprietate.',
   planable: 'Nu are token propriu: folosește tokenul Planable din „Conturile clientului”. Tokenul trebuie să aibă acces la acest workspace.',
   meta_ads: 'Nu are token propriu: folosește tokenul Meta din „Conturile clientului”. System user-ul trebuie să aibă contul de ads atribuit.',
+  google_ads: 'Nu are token propriu: folosește contul Google Ads conectat în „Conturile clientului”. Contul trebuie să fie sub MCC-ul conectat.',
+  tiktok_ads: 'Nu are token propriu: folosește contul TikTok conectat în „Conturile clientului”. Advertiserul trebuie să fie printre cele autorizate.',
 }
 const USES_TENANT_KEY: readonly string[] = Object.keys(TENANT_KEY_NOTE)
 

@@ -227,4 +227,35 @@ describe('Administrare → Surse cu providerul real (client fals)', () => {
     const conn = await article('Conexiune Meta Ads')
     expect(within(conn).getByText(/folosește tokenul Meta din „Conturile clientului”/)).toBeInTheDocument()
   })
+
+  it('OAuth Google Ads: MCC-ul e obligatoriu; în previzualizare conectarea e simulată', async () => {
+    useBrand('brand-urinal')
+    renderApp({ route: URL })
+    await pageReady('Surse')
+    const card = await article('Contul Google Ads al clientului')
+    const button = within(card).getByRole('button', { name: 'Conectează cu Google' })
+    expect(button).toBeDisabled()
+    await userEvent.type(within(card).getByLabelText('ID-ul contului de manager (MCC)'), '123-456-7890')
+    await userEvent.click(button)
+    expect(await within(card).findByText('Previzualizare: conectarea e simulată, fără furnizor real.')).toBeInTheDocument()
+    expect(await within(card).findByText('Conexiune funcțională')).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Reconectează' })).toBeInTheDocument()
+    const tiktok = await article('Contul TikTok Ads al clientului')
+    expect(within(tiktok).queryByLabelText(/MCC/)).toBeNull()
+  })
+
+  it('întoarcerea OAuth: mesajul în română, fără parametri rămași în adresă', async () => {
+    useBrand('brand-urinal')
+    renderApp({ route: `${URL}?oauth=google_ads&result=error&reason=state_invalid` })
+    await pageReady('Surse')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Google Ads nu a fost conectat. Link de conectare expirat sau deja folosit.')
+    await waitFor(() => expect(where()).toBe(URL))
+  })
+
+  it('întoarcerea OAuth reușită', async () => {
+    useBrand('brand-urinal')
+    renderApp({ route: `${URL}?oauth=tiktok_ads&result=ok` })
+    await pageReady('Surse')
+    expect(await screen.findByText('TikTok Ads a fost conectat.')).toBeInTheDocument()
+  })
 })

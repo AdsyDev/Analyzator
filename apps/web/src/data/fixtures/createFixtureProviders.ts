@@ -377,6 +377,17 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
           }),
       )
     },
+    // Previzualizare: nu se deschide furnizorul; contul apare conectat, iar adresa e goală (UI-ul afișează simularea).
+    startOAuth: async (tenantId, provider, accountLabel) => {
+      if (getRole() !== 'agency_admin') return failed('Doar agency_admin al clientului poate conecta conturi.')
+      const accountProvider = provider === 'google_ads' ? 'google_ads_account' : 'tiktok_account'
+      const label = provider === 'google_ads' ? (accountLabel ?? '').replace(/-/g, '') : 'TikTok Business (2 conturi)'
+      if (provider === 'google_ads' && !/^\d{10}$/.test(label)) return failed('ID-ul contului de manager Google Ads (MCC) are 10 cifre, de ex. 123-456-7890.')
+      const existing = tenantConnectionsMem.find((c) => c.tenant_id === tenantId && c.provider === accountProvider)
+      if (existing) Object.assign(existing, { external_account_id: label, credential_status: 'valid', credential_updated_at: now().toISOString() })
+      else tenantConnectionsMem.push({ id: `00000000-0000-4000-9000-${String(100000000000 + tenantConnectionsMem.length).slice(-12)}`, tenant_id: tenantId, provider: accountProvider, external_account_id: label, display_name: null, credential_status: 'valid', credential_updated_at: now().toISOString() })
+      return ready({ authorize_url: '' })
+    },
     createTenantConnection: async (tenantId, input) => {
       if (getRole() !== 'agency_admin') return failed('Doar administratorii agenției pot adăuga conexiuni.')
       if (tenantConnectionsMem.some((c) => c.tenant_id === tenantId && c.provider === input.provider && c.external_account_id === input.external_account_id)) return failed('Există deja o conexiune pentru acest cont.')

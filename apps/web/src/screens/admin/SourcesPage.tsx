@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { Brand, SourceProviderId, SourceStatusInfo, SyncRun } from '../../contracts'
 import { EmptyState } from '../../components/EmptyState'
 import { SourceStatus, type SourceAction } from '../../components/SourceStatus'
@@ -58,6 +59,41 @@ export function SourcesPage() {
   return <SourcesContent key={activeBrand.id} brand={activeBrand} />
 }
 
+/** Motivele din întoarcerea OAuth (funcția server `oauth`), în română. */
+export const OAUTH_REASONS: Record<string, string> = {
+  state_invalid: 'Link de conectare expirat sau deja folosit. Pornește din nou conectarea.',
+  denied: 'Autorizarea a fost refuzată la furnizor.',
+  forbidden: 'Doar agency_admin al clientului poate conecta conturi.',
+  code_missing: 'Furnizorul nu a trimis codul de autorizare.',
+  exchange_failed: 'Furnizorul a refuzat schimbul codului pe token. Reîncearcă; dacă persistă, verifică aplicația (ID, secret, redirect URI).',
+  no_refresh_token: 'Google nu a dat acces permanent (refresh token). Reîncearcă și acceptă toate permisiunile.',
+  scope_missing: 'Permisiunea Google Ads nu a fost acordată. Reîncearcă și bifează accesul la Google Ads.',
+  internal: 'Conectarea nu a reușit din cauza unei erori a serverului. Reîncearcă.',
+}
+const OAUTH_NAMES: Record<string, string> = { google_ads: 'Google Ads', tiktok_ads: 'TikTok Ads' }
+
+/** Mesajul de la întoarcerea OAuth; parametrii se scot din adresă după afișare. */
+function OAuthReturn() {
+  const [params, setParams] = useSearchParams()
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
+  useEffect(() => {
+    const provider = params.get('oauth')
+    const result = params.get('result')
+    if (!provider || !result || !(provider in OAUTH_NAMES)) return
+    const name = OAUTH_NAMES[provider]
+    setMessage(result === 'ok' ? { ok: true, text: `${name} a fost conectat.` } : { ok: false, text: `${name} nu a fost conectat. ${OAUTH_REASONS[params.get('reason') ?? ''] ?? OAUTH_REASONS.internal}` })
+    const next = new URLSearchParams(params)
+    for (const k of ['oauth', 'result', 'reason']) next.delete(k)
+    setParams(next, { replace: true })
+  }, [params, setParams])
+  if (!message) return null
+  return (
+    <p role={message.ok ? 'status' : 'alert'} className={message.ok ? 'rounded-lg bg-pos-soft px-3 py-2 text-[13px] text-pos-text' : 'rounded-lg bg-neg-soft px-3 py-2 text-[13px] text-neg-text'}>
+      {message.text}
+    </p>
+  )
+}
+
 function SourcesContent({ brand }: { brand: Brand }) {
   const providers = useProviders()
   const toast = useToast()
@@ -80,6 +116,7 @@ function SourcesContent({ brand }: { brand: Brand }) {
 
   return (
     <div className="flex flex-col gap-5">
+      <OAuthReturn />
       <Section id="status" title="Starea surselor" description={`Pentru ${brand.name}. Starea vine din conexiuni și din sincronizările înregistrate; nu estimăm date lipsă.`}>
         <Resolved state={statuses.state} onRetry={statuses.reload} loadingLabel="Se încarcă starea surselor" skeletonClass="h-48">
           {(list) => (

@@ -1,5 +1,5 @@
 import { useId, useState, type ChangeEvent, type FormEvent } from 'react'
-import type { TenantConnection, TenantId, ValidationOutcome } from '../../contracts'
+import type { OAuthProvider, TenantConnection, TenantId, ValidationOutcome } from '../../contracts'
 import { Button } from '../../components/ui/Button'
 import { StatusChip } from '../../components/ui/Chip'
 import { useProviders } from '../../data/DataProvidersContext'
@@ -13,7 +13,7 @@ const field = 'h-9 rounded-[10px] border border-border-strong bg-surface px-3 te
 
 /**
  * Conturile la nivel de client (un cont pentru toate brandurile clientului): cheia Google pentru GA4 și Search
- * Console, contul SEOmonitor, tokenul Planable și tokenul Meta Ads. Cheia și tokenul pleacă o singură dată spre funcția server `source-credentials`;
+ * Console, contul SEOmonitor, tokenul Planable și Meta Ads, plus conturile Google Ads și TikTok conectate prin OAuth. Cheia și tokenul pleacă o singură dată spre funcția server `source-credentials`;
  * nu se afișează și nu rămân în interfață.
  */
 export function TenantAccounts({ tenantId, onChanged }: { tenantId: TenantId; onChanged: () => void }) {
@@ -31,6 +31,8 @@ export function TenantAccounts({ tenantId, onChanged }: { tenantId: TenantId; on
           <TokenAccountCard spec={SEOMONITOR} tenantId={tenantId} connection={conns.find((c) => c.provider === 'seomonitor') ?? null} onChanged={changed} />
           <TokenAccountCard spec={PLANABLE} tenantId={tenantId} connection={conns.find((c) => c.provider === 'planable_account') ?? null} onChanged={changed} />
           <TokenAccountCard spec={META} tenantId={tenantId} connection={conns.find((c) => c.provider === 'meta_account') ?? null} onChanged={changed} />
+          <OAuthAccountCard spec={GOOGLE_ADS} tenantId={tenantId} connection={conns.find((c) => c.provider === 'google_ads_account') ?? null} onChanged={changed} />
+          <OAuthAccountCard spec={TIKTOK} tenantId={tenantId} connection={conns.find((c) => c.provider === 'tiktok_account') ?? null} onChanged={changed} />
         </div>
       )}
     </Resolved>
@@ -302,6 +304,94 @@ function TokenAccountCard({ spec, tenantId, connection, onChanged }: { spec: Tok
             <span>{outcome.message}</span>
           </p>
         )}
+        {error && <p role="alert" className="text-[12.5px] text-neg-text">{error}</p>}
+      </div>
+    </article>
+  )
+}
+
+interface OAuthSpec {
+  provider: OAuthProvider
+  aria: string
+  title: string
+  subtitle: string
+  button: string
+  /** Google Ads: ID-ul contului de manager (MCC) sub care sunt conturile clienților. */
+  needsManagerId: boolean
+  footnote: string
+}
+
+const GOOGLE_ADS: OAuthSpec = {
+  provider: 'google_ads',
+  aria: 'Contul Google Ads al clientului',
+  title: 'Google Ads',
+  subtitle: 'Conectare cu contul Google care are acces la contul de manager (MCC); conturile brandurilor se adaugă mai jos.',
+  button: 'Conectează cu Google',
+  needsManagerId: true,
+  footnote: 'Se deschide pagina Google de autorizare; tokenul ajunge direct în seiful serverului. Ghid: docs/connectors/google-ads.md.',
+}
+
+const TIKTOK: OAuthSpec = {
+  provider: 'tiktok_ads',
+  aria: 'Contul TikTok Ads al clientului',
+  title: 'TikTok Ads',
+  subtitle: 'Conectare cu contul TikTok for Business care are acces la advertiserii clientului.',
+  button: 'Conectează cu TikTok',
+  needsManagerId: false,
+  footnote: 'Se deschide pagina TikTok de autorizare; tokenul ajunge direct în seiful serverului. Ghid: docs/connectors/tiktok-ads.md.',
+}
+
+/** Un cont conectat prin OAuth: aplicația nu vede niciun token, doar starea și eticheta contului. */
+function OAuthAccountCard({ spec, tenantId, connection, onChanged }: { spec: OAuthSpec; tenantId: TenantId; connection: TenantConnection | null; onChanged: () => void }) {
+  const providers = useProviders()
+  const id = useId()
+  const [manager, setManager] = useState(connection?.external_account_id ?? '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [simulated, setSimulated] = useState(false)
+  const managerOk = !spec.needsManagerId || /^\d{3}-?\d{3}-?\d{4}$/.test(manager.trim())
+
+  async function connect(e: FormEvent) {
+    e.preventDefault()
+    if (!managerOk || busy) return
+    setBusy(true)
+    setError(null)
+    const r = await providers.sources.startOAuth(tenantId, spec.provider, spec.needsManagerId ? manager.trim() : null)
+    setBusy(false)
+    if (r.kind !== 'ready') return setError(r.kind === 'error' ? r.message : r.reason)
+    // Previzualizare: nu există furnizor real; contul apare conectat.
+    if (r.data.authorize_url === '') {
+      setSimulated(true)
+      return onChanged()
+    }
+    window.location.assign(r.data.authorize_url)
+  }
+
+  return (
+    <article aria-label={spec.aria} className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 shadow-1">
+      <CardHeader title={spec.title} subtitle={spec.subtitle} connection={connection} />
+      {connection && (
+        <p className="text-[12.5px] text-text-2">
+          <span className="font-mono text-[12px]">{connection.external_account_id}</span>
+          {connection.credential_updated_at && <span className="font-mono text-[11.5px] text-text-3"> · conectat {formatDateTime(connection.credential_updated_at)}</span>}
+        </p>
+      )}
+      <form onSubmit={connect} className="flex flex-col gap-3">
+        {spec.needsManagerId && (
+          <div className="flex flex-col gap-1">
+            <label htmlFor={id} className="text-[12.5px] font-semibold">ID-ul contului de manager (MCC)</label>
+            <input id={id} value={manager} onChange={(e) => setManager(e.target.value)} placeholder="123-456-7890" inputMode="numeric" className={`${field} font-mono`} aria-invalid={manager !== '' && !managerOk} />
+          </div>
+        )}
+        <span>
+          <Button type="submit" variant={connection ? 'secondary' : 'primary'} loading={busy} disabled={!managerOk}>
+            {connection ? 'Reconectează' : spec.button}
+          </Button>
+        </span>
+        <p className="text-[12px] leading-snug text-text-3">{spec.footnote}</p>
+      </form>
+      <div aria-live="polite">
+        {simulated && <p className="text-[12.5px] text-pos-text">Previzualizare: conectarea e simulată, fără furnizor real.</p>}
         {error && <p role="alert" className="text-[12.5px] text-neg-text">{error}</p>}
       </div>
     </article>

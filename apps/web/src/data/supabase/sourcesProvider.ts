@@ -194,5 +194,14 @@ export function createSupabaseSources(client: DataClient, now: () => Date = () =
         }
         return mapTenantConnection(data as unknown as TenantConnectionRow)
       }),
+
+    startOAuth: (tenantId, provider, accountLabel) =>
+      guarded(async () => {
+        const { data, error } = await client.functions.invoke('oauth', { body: { action: 'start', provider, tenant_id: tenantId, account_label: accountLabel } })
+        if (error) throw new Error(await functionError(error))
+        const url = (data as { authorize_url?: unknown } | null)?.authorize_url
+        if (typeof url !== 'string' || !/^https:\/\/(accounts\.google\.com|business-api\.tiktok\.com)\//.test(url)) throw new SourceContractError('Răspuns oauth invalid')
+        return { authorize_url: url }
+      }),
   }
 }
