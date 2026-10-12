@@ -104,7 +104,7 @@ select is_empty(
 -- O funcție nouă în public trebuie adăugată explicit în lista de mai jos, după revizuire.
 create temporary table allowed_public_functions (name text primary key) on commit drop;
 insert into allowed_public_functions values
-  ('brand_metric_trends'), ('brand_metrics'), ('brand_paid'), ('create_competitor_set_version'), ('get_source_token'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token');
+  ('brand_insights'), ('brand_mention_sentiment'), ('brand_mentions'), ('brand_metric_trends'), ('brand_metrics'), ('brand_paid'), ('create_competitor_set_version'), ('get_source_token'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token');
 
 select is_empty(
   $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -127,7 +127,7 @@ select is_empty(
 select results_eq(
   $$ select p.proname::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and has_function_privilege('service_role', p.oid, 'execute') order by 1 $$,
-  $$ values ('brand_metric_trends'::text collate "C"), ('brand_metrics'), ('brand_paid'), ('create_competitor_set_version'), ('get_source_token'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token') $$,
+  $$ values ('brand_insights'::text collate "C"), ('brand_mention_sentiment'), ('brand_mentions'), ('brand_metric_trends'), ('brand_metrics'), ('brand_paid'), ('create_competitor_set_version'), ('get_source_token'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token') $$,
   'A10: funcțiile aprobate sunt executabile de service_role'
 );
 select is_empty(
@@ -181,12 +181,12 @@ select is_empty(
   $$ select p.proname || ' → ' || r from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      cross join unnest(array['anon', 'authenticated']) r
      where n.nspname = 'public' and has_function_privilege(r, p.oid, 'execute')
-       and not (r = 'authenticated' and p.proname in ('create_competitor_set_version', 'brand_metrics', 'brand_metric_trends', 'brand_paid')) $$,
+       and not (r = 'authenticated' and p.proname in ('create_competitor_set_version', 'brand_metrics', 'brand_metric_trends', 'brand_paid', 'brand_mentions', 'brand_mention_sentiment', 'brand_insights')) $$,
   'A11: nicio funcție din public executabilă de anon sau authenticated, în afara excepțiilor E4 și E8'
 );
 select is_empty(
   $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'public' and p.proname in ('brand_metrics', 'brand_metric_trends', 'brand_paid') and p.prosecdef $$,
+     where n.nspname = 'public' and p.proname like 'brand\_%' and p.prosecdef $$,
   'A11/E8: brand_metrics și brand_metric_trends sunt SECURITY INVOKER (RLS rămâne autoritatea)'
 );
 select ok(has_function_privilege('authenticated', 'public.create_competitor_set_version(uuid, date, text, jsonb)', 'execute'),

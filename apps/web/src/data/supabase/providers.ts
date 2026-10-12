@@ -25,6 +25,7 @@ import { createSupabaseSources } from './sourcesProvider'
 import { createSupabaseClients } from './clientsProvider'
 import { createSupabaseMetrics } from './metricsProvider'
 import { createSupabasePaid } from './paidProvider'
+import { createSupabaseInsights, createSupabaseMentions } from './listeningProvider'
 import { comparisonRange } from '../../lib/period'
 
 const NO_SOURCE = 'Sursa nu este conectată pentru acest brand. Nu afișăm valori estimate până la conectare.'
@@ -188,8 +189,8 @@ export function createSupabaseProviders(deps?: SupabaseProvidersDeps): DataProvi
   return {
     kind: 'supabase',
     metrics: deps ? createSupabaseMetrics(deps.client) : metrics,
-    insights,
-    mentions,
+    insights: deps ? createSupabaseInsights(deps.client) : insights,
+    mentions: deps ? createSupabaseMentions(deps.client) : mentions,
     sources: deps ? createSupabaseSources(deps.client, now) : sources,
     brands: deps ? createSupabaseBrands(deps.client, now) : brands,
     ai,
