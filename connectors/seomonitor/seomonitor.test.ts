@@ -139,9 +139,10 @@ describe('conectorul SEOmonitor pe fixtures docs-derived', () => {
     assert.deepEqual(kwCalls.map((u) => u.searchParams.get('offset')), ['0', '1000'])
     assert.ok(kwCalls.every((u) => u.searchParams.get('limit') === '1000'))
     assert.equal(rows(db, 'keywords').filter((k) => k.status === 'active').length, 1003)
-    // AI Overview: se avansează până la o pagină goală (documentat).
-    const aioOffsets = api.calls.filter((u) => u.pathname.endsWith('/keywords/aio')).map((u) => u.searchParams.get('offset'))
-    assert.deepEqual(aioOffsets, ['0', '1000'])
+    // AI Overview: pagini de 100 (1.000 cu conținut complet → 422 pe date reale), până la o pagină goală (documentat).
+    const aio = api.calls.filter((u) => u.pathname.endsWith('/keywords/aio'))
+    assert.deepEqual(aio.map((u) => u.searchParams.get('offset')), ['0', '100'])
+    assert.ok(aio.every((u) => u.searchParams.get('limit') === '100'))
   })
 
   test('rulare dublă: nimic dublat, aceleași valori', async () => {

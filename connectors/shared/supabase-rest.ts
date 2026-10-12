@@ -38,13 +38,33 @@ export class SupabaseRest implements Db {
   readonly #key: string
   readonly #fetch: FetchLike
 
-  constructor(config: SupabaseRestConfig) {
+  readonly #retryDelaysMs: number[] | undefined
+
+  constructor(config: SupabaseRestConfig & { retryDelaysMs?: number[] }) {
     this.#url = config.url
     this.#key = config.serviceRoleKey
     this.#fetch = config.fetch ?? globalThis.fetch
+    this.#retryDelaysMs = config.retryDelaysMs
   }
 
-  async #request<T>(method: string, path: string, body?: unknown, prefer = 'return=representation'): Promise<T> {
+  /**
+   * Reîncercare doar pentru cereri care pot fi repetate fără efecte duble: citiri și upsert-uri (cheie naturală).
+   * Pe o rulare reală (12 oct 2026) un `fetch failed` izolat oprea colectarea tuturor brandurilor.
+   */
+  async #request<T>(method: string, path: string, body?: unknown, prefer = 'return=representation', idempotent = method === 'GET'): Promise<T> {
+    const delays = idempotent ? (this.#retryDelaysMs ?? [2_000, 8_000]) : []
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.#once<T>(method, path, body, prefer)
+      } catch (err) {
+        const transient = err instanceof DbError ? [429, 502, 503, 504].includes(err.status) : true
+        if (!transient || attempt >= delays.length) throw err
+        await new Promise((r) => setTimeout(r, delays[attempt]))
+      }
+    }
+  }
+
+  async #once<T>(method: string, path: string, body: unknown, prefer: string): Promise<T> {
     const res = await this.#fetch(`${this.#url}/rest/v1/${path}`, {
       method,
       headers: {
@@ -92,6 +112,7 @@ export class SupabaseRest implements Db {
         `${table}?on_conflict=${onConflict.join(',')}`,
         rows,
         'resolution=merge-duplicates,return=representation',
+        true,
       )) ?? []
     )
   }

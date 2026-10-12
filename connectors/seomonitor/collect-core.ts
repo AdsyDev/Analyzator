@@ -20,6 +20,7 @@ import {
   SEOMONITOR_LOOKBACK_DAYS,
   SEOMONITOR_MIN_BUDGET_TO_START,
   SEOMONITOR_PAGE_SIZE,
+  SEOMONITOR_AIO_PAGE_SIZE,
   SEOMONITOR_SCHEMA_VERSION,
   SPECIAL_GROUP_BRAND,
   type RouteKey,
@@ -412,7 +413,8 @@ export async function collectSeomonitorConnection(deps: SeomonitorDeps, connecti
         }
 
         // Google AI Overview.
-        const aio = await fetchAll('aio', { ...base, group_id: bg.group.group_id, content_format: 'markdown', include_raw_content: 'true' }, 'until_empty_page')
+        // Pagini mici: cu 1.000 de keywords și conținutul complet, SEOmonitor răspunde 422 „Request too large”.
+        const aio = await fetchAll('aio', { ...base, group_id: bg.group.group_id, content_format: 'markdown', include_raw_content: 'true' }, 'until_empty_page', SEOMONITOR_AIO_PAGE_SIZE)
         if (!stopOn(aio, 'keywords/aio', brand_id)) {
           for (const page of aio.pages) {
             const n = normalizeAio(page.payload, ctx, page.payloadHash)
