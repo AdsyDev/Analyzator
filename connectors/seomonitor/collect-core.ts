@@ -413,8 +413,10 @@ export async function collectSeomonitorConnection(deps: SeomonitorDeps, connecti
         }
 
         // Google AI Overview.
-        // Pagini mici: cu 1.000 de keywords și conținutul complet, SEOmonitor răspunde 422 „Request too large”.
-        const aio = await fetchAll('aio', { ...base, group_id: bg.group.group_id, content_format: 'markdown', include_raw_content: 'true' }, 'until_empty_page', SEOMONITOR_AIO_PAGE_SIZE)
+        // Pe date reale, AIO răspunde 422 „Request too large to return AI Overview content” cu HTML-ul snapshot-ului
+        // (`include_raw_content`), chiar și la 100 de keywords pe pagină: cerem doar conținutul markdown, păstrat ca original
+        // (`raw_format = 'markdown'`). AI Search rămâne cu HTML (nu dă eroare).
+        const aio = await fetchAll('aio', { ...base, group_id: bg.group.group_id, content_format: 'markdown' }, 'until_empty_page', SEOMONITOR_AIO_PAGE_SIZE)
         if (!stopOn(aio, 'keywords/aio', brand_id)) {
           for (const page of aio.pages) {
             const n = normalizeAio(page.payload, ctx, page.payloadHash)

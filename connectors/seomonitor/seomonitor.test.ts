@@ -143,6 +143,9 @@ describe('conectorul SEOmonitor pe fixtures docs-derived', () => {
     const aio = api.calls.filter((u) => u.pathname.endsWith('/keywords/aio'))
     assert.deepEqual(aio.map((u) => u.searchParams.get('offset')), ['0', '100'])
     assert.ok(aio.every((u) => u.searchParams.get('limit') === '100'))
+    // Fără HTML-ul snapshot-ului la AIO (422 „Request too large” pe date reale); AI Search îl cere în continuare.
+    assert.ok(aio.every((u) => !u.searchParams.has('include_raw_content')))
+    assert.ok(api.calls.filter((u) => u.pathname.endsWith('/keywords/ais')).every((u) => u.searchParams.get('include_raw_content') === 'true'))
   })
 
   test('rulare dublă: nimic dublat, aceleași valori', async () => {
