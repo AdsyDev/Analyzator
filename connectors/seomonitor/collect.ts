@@ -15,10 +15,12 @@ async function main(): Promise<void> {
   for (const connection of connections) {
     try {
       const o = await collectSeomonitorConnection({ db }, connection)
-      console.log(`${connection.id} (company ${connection.external_account_id}): acces ${o.access}, ${o.calls} apeluri, ${o.queue.length} grupuri în coada de verificare`)
+      console.log(`${connection.id} (${connection.external_account_id}): acces ${o.access}, ${o.calls} apeluri, ${o.queue.length} grupuri în coada de verificare`)
       for (const note of o.notes) console.log(`  notă: ${note}`)
       for (const r of o.runs) {
         console.log(`  brand ${r.brand_id}: ${r.status}, ${r.rows_written} rânduri, ${r.errors.length} erori/note`)
+        // Codul, ruta și mesajul (texte ale conectorului, fără token), ca o rulare eșuată să se poată citi din Actions.
+        for (const e of r.errors.slice(0, 10)) console.log(`    ${e.code}${e.dimension ? ` [${e.dimension}]` : ''}${e.status ? ` HTTP ${e.status}` : ''}: ${String(e.message).slice(0, 300)}`)
         if (r.status === 'failed') failed++
       }
     } catch (err) {
