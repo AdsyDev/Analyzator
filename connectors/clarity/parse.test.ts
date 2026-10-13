@@ -81,11 +81,11 @@ describe('toleranță și jurnalizare (date sintetice)', () => {
     const { rows, notes } = parseClarityPayload(payload, ctx('all'))
     assert.equal(rows.length, 1)
     assert.equal(rows[0]!.sessions, 10)
-    assert.equal(rows[0]!.dead_click_count, null, 'câmpurile nedocumentate nu se ghicesc')
+    assert.equal(rows[0]!.dead_click_count, null, 'fără procent, sessionsCount nu se poate verifica și nu se ghicește')
     const codes = notes.map((n) => `${n.code}:${n.field ?? n.metric_name}`).sort()
     assert.deepEqual(codes, [
+      'behavior_unverified:sessionsCount',
       'ignored_breakdown_block:Popular Pages',
-      'unconfirmed_field:sessionsCount',
       'unconfirmed_field:subTotal',
       'unknown_block:Brand New Metric',
       'unknown_block_key:extraKey',
@@ -166,9 +166,50 @@ describe('numele reale din API (12 oct 2026)', () => {
     ]
     const all = parseClarityPayload(payload, ctx('all'))
     assert.equal(all.rows[0]!.scroll_depth, 47.3)
-    assert.equal(all.rows[0]!.rage_click_count, null, 'rage clicks rămân NULL până la confirmare')
-    assert.ok(all.notes.some((n) => n.field === 'sessionsCount' && /= 12/.test(n.message)))
+    // 12 / 200 = 6% = procentul raportat: sessionsCount sunt sesiunile cu rage clicks (D-24).
+    assert.equal(all.rows[0]!.rage_click_count, 12)
+    assert.ok(all.notes.some((n) => n.field === 'sessionsWithMetricPercentage' && /= 6/.test(n.message)))
     const dev = parseClarityPayload(payload.map((b) => ({ ...b, information: b.information.map((i) => ({ ...i, Device: 'PC' })) })), ctx('device'))
     assert.ok(dev.notes.every((n) => !/ = /.test(n.message)), 'pe defalcări nu se notează valori')
+  })
+})
+
+describe('blocurile de comportament: sessionsCount doar cu dovada din payload (D-24)', () => {
+  const traffic = { metricName: 'Traffic', information: [{ totalSessionCount: '400' }] }
+  const parse = (info: Record<string, unknown>, metricName = 'DeadClickCount') => parseClarityPayload([traffic, { metricName, information: [info] }], ctx('all'))
+
+  test('sessionsCount / totalSessionCount ≈ procent: valoarea Clarity intră în coloană, nemodificată', () => {
+    const r = parse({ sessionsCount: '31', sessionsWithMetricPercentage: 7.75, subTotal: '58' })
+    assert.equal(r.rows[0]!.dead_click_count, 31)
+    for (const [block, col] of [['RageClickCount', 'rage_click_count'], ['QuickbackClick', 'quickback_click'], ['ExcessiveScroll', 'excessive_scroll'], ['ScriptErrorCount', 'script_error_count'], ['ErrorClickCount', 'error_click_count']] as const) {
+      assert.equal(parse({ sessionsCount: '8', sessionsWithMetricPercentage: 2 }, block).rows[0]![col], 8, block)
+    }
+  })
+
+  test('zero real: 0 sesiuni și 0% dau 0, nu NULL', () => {
+    assert.equal(parse({ sessionsCount: '0', sessionsWithMetricPercentage: 0 }).rows[0]!.dead_click_count, 0)
+  })
+
+  test('sessionsCount egal cu totalul sesiunilor: NULL, cu motivul și valorile în notă', () => {
+    const r = parse({ sessionsCount: '400', sessionsWithMetricPercentage: 7.75 })
+    assert.equal(r.rows[0]!.dead_click_count, null)
+    const n = r.notes.find((x) => x.code === 'behavior_count_is_total')
+    assert.ok(n && /sessionsCount = 400, totalSessionCount = 400, procent = 7.75/.test(n.message), JSON.stringify(r.notes))
+  })
+
+  test('nepotrivire sau Traffic lipsă: NULL, nu o estimare din procent', () => {
+    assert.equal(parse({ sessionsCount: '90', sessionsWithMetricPercentage: 7.75 }).rows[0]!.dead_click_count, null)
+    assert.ok(parse({ sessionsCount: '90', sessionsWithMetricPercentage: 7.75 }).notes.some((n) => n.code === 'behavior_inconsistent'))
+    const noTraffic = parseClarityPayload([{ metricName: 'DeadClickCount', information: [{ sessionsCount: '31', sessionsWithMetricPercentage: 7.75 }] }], ctx('all'))
+    assert.equal(noTraffic.rows[0]!.dead_click_count, null)
+    assert.ok(noTraffic.notes.some((n) => n.code === 'behavior_unverified'))
+  })
+
+  test('pe defalcări, verificarea se face pe rândul aceleiași valori', () => {
+    const r = parseClarityPayload([
+      { metricName: 'Traffic', information: [{ totalSessionCount: '100', Device: 'PC' }, { totalSessionCount: '50', Device: 'Mobile' }] },
+      { metricName: 'RageClickCount', information: [{ sessionsCount: '5', sessionsWithMetricPercentage: 5, Device: 'PC' }, { sessionsCount: '5', sessionsWithMetricPercentage: 10, Device: 'Mobile' }] },
+    ], ctx('device'))
+    assert.deepEqual(r.rows.map((x) => [x.dimension_value, x.rage_click_count]), [['PC', 5], ['Mobile', 5]])
   })
 })

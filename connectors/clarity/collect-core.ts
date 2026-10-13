@@ -157,23 +157,26 @@ export async function collectConnection<TRow>(
       const result = await fetchWithRetry(
         clarityUrl(call),
         { headers: { Authorization: `Bearer ${token}` } },
-        { budget, fetch: deps.fetch, sleep: deps.sleep },
+        // 429 la Clarity = limita zilnică a proiectului: fără reîncercări, care ar consuma apelurile zilei următoare.
+        { budget, fetch: deps.fetch, sleep: deps.sleep, retryRateLimited: false },
       )
 
       if (!result.ok) {
         notCollected.push(call.key)
         errors.push({ code: result.kind, dimension: call.key, status: result.status, message: result.message })
-        // Buget epuizat sau acces refuzat: celelalte apeluri nu au cum să reușească.
-        if (result.kind === 'budget_exhausted' || result.kind === 'access_denied') {
+        // Buget epuizat, limită atinsă sau acces refuzat: celelalte apeluri nu au cum să reușească.
+        if (result.kind === 'budget_exhausted' || result.kind === 'access_denied' || result.kind === 'rate_limited') {
           for (const skipped of CLARITY_CALLS.slice(index + 1)) {
             notCollected.push(skipped.key)
             errors.push({
-              code: result.kind === 'budget_exhausted' ? 'budget_exhausted' : 'skipped_after_access_denied',
+              code: result.kind === 'budget_exhausted' ? 'budget_exhausted' : result.kind === 'rate_limited' ? 'skipped_after_rate_limit' : 'skipped_after_access_denied',
               dimension: skipped.key,
               status: null,
               message:
                 result.kind === 'budget_exhausted'
                   ? 'Necolectat: bugetul zilnic de apeluri s-a epuizat.'
+                  : result.kind === 'rate_limited'
+                  ? 'Necolectat: Clarity a răspuns 429 (limita zilnică a proiectului) la un apel anterior.'
                   : 'Necolectat: acces refuzat la un apel anterior cu același token.',
             })
           }

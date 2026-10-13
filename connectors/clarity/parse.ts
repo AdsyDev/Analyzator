@@ -51,6 +51,23 @@ export const FIELD_MAP: Record<string, Partial<Record<string, MetricColumn>>> = 
   'Error Click Count': {},
 }
 
+/**
+ * Blocurile de comportament (D-24): `sessionsCount` intră în coloană doar când payload-ul arată că înseamnă sesiunile
+ * CU metrica: pe același rând, sessionsCount / totalSessionCount (Traffic) ≈ sessionsWithMetricPercentage.
+ * Dacă e egal cu totalul sesiunilor sau nu se potrivește, coloana rămâne NULL și se notează motivul. Nimic nu se
+ * calculează din procent: valoarea scrisă e exact cea trimisă de Clarity.
+ */
+export const BEHAVIOR_BLOCKS: Record<string, MetricColumn> = {
+  deadclickcount: 'dead_click_count',
+  rageclickcount: 'rage_click_count',
+  quickbackclick: 'quickback_click',
+  excessivescroll: 'excessive_scroll',
+  scripterrorcount: 'script_error_count',
+  errorclickcount: 'error_click_count',
+}
+/** Diferența maximă, în puncte procentuale, între procentul implicit și cel raportat (rotunjiri). */
+export const BEHAVIOR_TOLERANCE_PP = 0.5
+
 /** Blocuri listate în documentație care sunt defalcări (liste), nu metrici numerice pe rând. Se ignoră explicit. */
 export const BREAKDOWN_BLOCKS = new Set([
   'Popular Pages',
@@ -127,6 +144,8 @@ export function parseClarityPayload(payload: unknown, ctx: ParseContext): ParseR
   }
 
   const byValue = new Map<string, ClarityDailyRow>()
+  /** Candidații din blocurile de comportament, verificați după ce se citește și blocul Traffic. */
+  const behavior: Array<{ value: string; block: string; column: MetricColumn; count: number | null; pct: number | null }> = []
   const rowFor = (value: string): ClarityDailyRow => {
     let row = byValue.get(value)
     if (!row) {
@@ -185,8 +204,17 @@ export function parseClarityPayload(payload: unknown, ctx: ParseContext): ParseR
       const row = rowFor(value)
 
       const dimField = dimensionKey ? dimensionValue(info, dimensionKey)?.field : undefined
+      const behaviorColumn = BEHAVIOR_BLOCKS[canon(block.metricName)]
+      if (behaviorColumn) {
+        const pick = (key: string) => {
+          const v = toNumber(dimensionValue(info, key)?.raw)
+          return v === 'invalid' ? null : v
+        }
+        behavior.push({ value, block: block.metricName, column: behaviorColumn, count: pick('sessionsCount'), pct: pick('sessionsWithMetricPercentage') })
+      }
       for (const [field, raw] of Object.entries(info)) {
         if (field === dimField) continue
+        if (behaviorColumn && canon(field) === 'sessionscount') continue
         const column = columnFor(mapping, field)
         if (!column) {
           // Pe dimensiunea agregată („all”), valoarea câmpurilor de comportament nedocumentate intră în notă: totaluri
@@ -207,6 +235,23 @@ export function parseClarityPayload(payload: unknown, ctx: ParseContext): ParseR
         }
         row[column] = num
       }
+    }
+  }
+
+  for (const b of behavior) {
+    const row = byValue.get(b.value)
+    const total = row?.sessions ?? null
+    const ctxMsg = `„${b.block}”${dimension === 'all' ? ` (sessionsCount = ${b.count ?? '—'}, totalSessionCount = ${total ?? '—'}, procent = ${b.pct ?? '—'})` : ''}`
+    if (!row || b.count === null || b.pct === null || total === null) {
+      note({ code: 'behavior_unverified', metric_name: b.block, field: 'sessionsCount', message: `${ctxMsg}: lipsește sessionsCount, procentul sau totalul sesiunilor; rămâne NULL` })
+      continue
+    }
+    const implied = total === 0 ? (b.count === 0 ? b.pct : Number.POSITIVE_INFINITY) : (b.count / total) * 100
+    if (Math.abs(implied - b.pct) <= BEHAVIOR_TOLERANCE_PP) {
+      row[b.column] = b.count
+    } else {
+      const code = b.count === total ? 'behavior_count_is_total' : 'behavior_inconsistent'
+      note({ code, metric_name: b.block, field: 'sessionsCount', message: `${ctxMsg}: sessionsCount nu e numărul sesiunilor cu metrica; rămâne NULL` })
     }
   }
 

@@ -62,6 +62,8 @@ export type RetryOptions = {
   delaysMs?: number[]
   /** Jitter aplicat întârzierilor din program (nu și lui Retry-After); întoarce întârzierea finală. */
   jitter?: (delayMs: number) => number
+  /** `false`: 429 nu se reîncearcă (limită zilnică, nu de ritm: o nouă încercare doar consumă bugetul). Implicit `true`. */
+  retryRateLimited?: boolean
   fetch?: FetchLike
   sleep?: Sleep
   now?: () => number
@@ -118,6 +120,7 @@ export async function fetchWithRetry(url: string, init: RequestInit, options: Re
     fetch: doFetch = globalThis.fetch,
     sleep = defaultSleep,
     now = Date.now,
+    retryRateLimited = true,
   } = options
 
   let attempts = 0
@@ -142,6 +145,10 @@ export async function fetchWithRetry(url: string, init: RequestInit, options: Re
       lastStatus = res.status
       if (res.ok) return { ok: true, status: res.status, body: await res.text(), attempts }
       lastFailure = failureFor(res.status)
+      if (res.status === 429 && !retryRateLimited) {
+        await res.body?.cancel()
+        return { ok: false, ...lastFailure, status: res.status, attempts }
+      }
       if (!isRetryable(res.status)) {
         // 400 / 422: motivul furnizorului (scurt, fără HTML), ca o cerere respinsă să se poată corecta din log.
         // Nu și pentru 401/403: acolo răspunsul nu ajută și nu-l păstrăm.

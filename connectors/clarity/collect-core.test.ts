@@ -142,6 +142,16 @@ describe('collectConnection', () => {
     assert.equal(recorded[0]!.calls, 1)
   })
 
+  test('429 (limita zilnică Clarity): fără retry, fără alte apeluri, run failed', async () => {
+    const { outcome, f, run, recorded } = await collect([{ status: 429 }, OK, OK, OK])
+    assert.equal(f.calls.length, 1)
+    assert.equal(outcome.status, 'failed')
+    const errors = run.errors as Array<{ code: string }>
+    assert.equal(errors[0]!.code, 'rate_limited')
+    assert.deepEqual(errors.slice(1).map((e) => e.code), Array(3).fill('skipped_after_rate_limit'))
+    assert.equal(recorded[0]!.calls, 1)
+  })
+
   test('nume de dimensiune respins (400): dimensiunea se pierde, restul continuă', async () => {
     const { outcome, f } = await collect([OK, OK, { status: 400 }, OK])
     assert.equal(f.calls.length, 4)

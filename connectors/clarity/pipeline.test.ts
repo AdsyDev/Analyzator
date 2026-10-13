@@ -170,7 +170,7 @@ describe('worker Clarity cu fixtures docs-derived', () => {
       assert.equal(outcome.status, 'succeeded')
       const errors = db.tables.sync_runs![0]!.errors as Array<{ code: string }>
       assert.ok(errors.some((e) => e.code === 'parser_unknown_field'))
-      assert.ok(errors.some((e) => e.code === 'parser_unconfirmed_field'))
+      assert.ok(errors.some((e) => e.code === 'parser_behavior_unverified'))
       assert.ok(warn.mock.calls.some((c) => String(c.arguments[0]).includes('brandNewField')))
       assert.equal(clarityRows(db).find((r) => r.dimension === 'all')!.rage_click_count, null)
     } finally {

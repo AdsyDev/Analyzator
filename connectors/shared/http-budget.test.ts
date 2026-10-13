@@ -5,7 +5,7 @@ import { fakeFetch, noSleep } from './test-helpers.ts'
 
 const URL_ = 'https://example.test/api'
 
-function run(responses: Parameters<typeof fakeFetch>[0], budgetLimit = 10, extra: { maxDelayMs?: number } = {}) {
+function run(responses: Parameters<typeof fakeFetch>[0], budgetLimit = 10, extra: { maxDelayMs?: number; retryRateLimited?: boolean } = {}) {
   const f = fakeFetch(responses)
   const s = noSleep()
   const budget = new CallBudget(budgetLimit)
@@ -99,6 +99,15 @@ describe('fetchWithRetry', () => {
     const { promise } = run([{ status: 429 }, { status: 429 }, { status: 429 }])
     const r = await promise
     assert.equal(!r.ok && r.kind, 'rate_limited')
+  })
+
+  test('retryRateLimited: false — 429 se întoarce imediat, un singur apel din buget', async () => {
+    const { promise, f, s, budget } = run([{ status: 429 }, { status: 200 }], 10, { retryRateLimited: false })
+    const r = await promise
+    assert.equal(!r.ok && r.kind, 'rate_limited')
+    assert.equal(f.calls.length, 1)
+    assert.equal(budget.used, 1)
+    assert.deepEqual(s.delays, [])
   })
 
   test('Retry-After peste limită: nu așteaptă, nu reîncearcă', async () => {
