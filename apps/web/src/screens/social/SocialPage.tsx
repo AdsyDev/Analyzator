@@ -58,7 +58,7 @@ function SocialContent({ brand, ctx, canImport }: { brand: Brand; ctx: QueryCont
         <span>Sursă <strong className="font-semibold text-text">Planable</strong></span>
       </p>
       <SocialKpis kpis={s.kpis} ctx={ctx} />
-      <PostsSection state={posts.state} onRetry={posts.reload} />
+      <PostsSection state={posts.state} onRetry={posts.reload} brandName={brand.name} />
       <GroupsSection state={groups.state} onRetry={groups.reload} />
       <CalendarSection state={calendar.state} onRetry={calendar.reload} />
       <CompetitorsSection state={competitors.state} onRetry={competitors.reload} />

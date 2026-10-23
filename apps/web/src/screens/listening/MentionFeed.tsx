@@ -2,12 +2,13 @@ import { useState } from 'react'
 import type { Brand, Mention, QueryContext, SentimentFilter, AuthorFilter } from '../../contracts'
 import { EmptyState } from '../../components/EmptyState'
 import { PharmacovigilanceButton } from '../../components/PharmacovigilanceButton'
+import { SocialPostCard } from '../../components/SocialPostCard'
 import { Button } from '../../components/ui/Button'
 import { StatusChip } from '../../components/ui/Chip'
 import { useProviders } from '../../data/DataProvidersContext'
 import { ctxKey } from '../../data/hooks'
 import { useAsync } from '../../data/useAsync'
-import { formatDateTime } from '../../lib/format'
+import { platformOf } from '../../lib/platform'
 import { safeUrl } from '../../lib/safeUrl'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
@@ -34,8 +35,9 @@ function SentimentBadge({ m }: { m: Mention }) {
 }
 
 /**
- * Feed-ul de mențiuni: sursă, dată, text, sentiment cu starea validării (revizuit de un om sau nerevizuit) și
- * butonul de marcare pentru farmacovigilență. Starea „marcat" vine de la provider, deci rămâne după reîncărcare.
+ * Feed-ul de mențiuni, cu fiecare mențiune ca o postare (E-3): platforma, autorul (cont propriu sau extern, fără nume
+ * inventate), data, textul complet, sentimentul cu starea validării și butonul de marcare pentru farmacovigilență.
+ * Starea „marcat" vine de la provider, deci rămâne după reîncărcare.
  */
 export function MentionFeed({ brand, ctx, filters, onChanged }: { brand: Brand; ctx: QueryContext; filters: MentionFilters; onChanged: () => void }) {
   const providers = useProviders()
@@ -50,43 +52,37 @@ export function MentionFeed({ brand, ctx, filters, onChanged }: { brand: Brand; 
             <EmptyState compact title="Nicio mențiune pentru filtrele alese" text="Schimbă sentimentul, sursa sau perioada." />
           ) : (
             <div className="flex flex-col gap-3">
-              <ul className="flex flex-col gap-3">
+              <ul className="grid gap-3 lg:grid-cols-2">
                 {p.items.map((m) => {
-                  const href = safeUrl(m.url)
+                  const own = m.owned_account === true
                   return (
                     <li key={m.id} data-testid="mention" data-flagged={m.pv_flag ? 'true' : 'false'}>
-                      <article className="flex flex-col gap-2.5 rounded-xl border border-border bg-surface-2 p-4">
-                        <header className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-text-2">
-                          <span className="font-semibold text-text">{m.source_name}</span>
-                          {m.author && <span>{m.author}</span>}
-                          {m.owned_account === true && <StatusChip tone="accent">Cont propriu</StatusChip>}
-                          <span className="font-mono text-[12px]">{formatDateTime(m.published_at)}</span>
-                          <span className="flex-1" />
-                          <SentimentBadge m={m} />
-                        </header>
-                        <p className="text-[13.5px] leading-relaxed text-text">{m.text}</p>
-                        <footer className="flex flex-wrap items-center gap-3 text-[12.5px]">
-                          <span className="text-text-2">{m.reviewed_by ? `Revizuit de ${m.reviewed_by}` : 'Fără revizuire umană încă'}</span>
-                          {href ? (
-                            <a href={href} target="_blank" rel="noopener noreferrer" className="font-medium text-accent-text hover:underline">
-                              Deschide sursa
-                            </a>
-                          ) : (
-                            <span className="text-text-3">URL indisponibil</span>
-                          )}
-                          <span className="flex-1" />
-                          <PharmacovigilanceButton
-                            item={{ kind: 'mention', id: m.id }}
-                            flag={m.pv_flag}
-                            loadSnapshot={(i) => providers.mentions.pvPreview(brand.id, i)}
-                            onConfirm={(i) => providers.mentions.pvFlag(brand.id, i)}
-                            onFlagged={() => {
-                              state.reload()
-                              onChanged()
-                            }}
-                          />
-                        </footer>
-                      </article>
+                      <SocialPostCard
+                        platform={platformOf(m.url, m.source_name)}
+                        author={own ? brand.name : (m.author ?? 'Autor extern')}
+                        own={own}
+                        source={m.source_name}
+                        publishedAt={m.published_at}
+                        text={m.text}
+                        href={safeUrl(m.url)}
+                        aside={<SentimentBadge m={m} />}
+                        tags={own ? <StatusChip tone="accent">Cont propriu</StatusChip> : undefined}
+                        footer={<span className="text-text-2">{m.reviewed_by ? `Revizuit de ${m.reviewed_by}` : 'Fără revizuire umană încă'}</span>}
+                        actions={
+                          <>
+                            <PharmacovigilanceButton
+                              item={{ kind: 'mention', id: m.id }}
+                              flag={m.pv_flag}
+                              loadSnapshot={(i) => providers.mentions.pvPreview(brand.id, i)}
+                              onConfirm={(i) => providers.mentions.pvFlag(brand.id, i)}
+                              onFlagged={() => {
+                                state.reload()
+                                onChanged()
+                              }}
+                            />
+                          </>
+                        }
+                      />
                     </li>
                   )
                 })}

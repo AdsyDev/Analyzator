@@ -53,10 +53,32 @@ describe('Social cu import', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent(/ultima observație validă\), nu o sumă pe zile/)
   })
 
-  it('postările: linkuri validate, lipsa performanței = „Indisponibil", nemature marcate', async () => {
+  it('postările ca pe rețea (E-3): carduri implicit, linkuri validate, „Indisponibil", nemature marcate, „Mai multe postări"', async () => {
     renderApp({ route: MINI })
     await open()
     const s = await section('Performanța conținutului')
+    expect(within(s).getByRole('tab', { name: 'Carduri' })).toHaveAttribute('aria-selected', 'true')
+    const cards = await within(s).findAllByTestId('post')
+    expect(cards).toHaveLength(8)
+    for (const c of cards) {
+      const a = within(c).getByRole('link', { name: /^Vezi pe / })
+      expect(a.getAttribute('href')).toMatch(/^https:\/\//)
+      expect(a).toHaveAttribute('rel', expect.stringContaining('noopener'))
+      expect(within(c).getByRole('article')).toHaveAccessibleName(/^Postare .+, Minimartieni$/)
+    }
+    expect(within(s).getAllByText(/date incomplete/).length).toBeGreaterThan(0)
+    await userEvent.click(within(s).getByRole('button', { name: 'Mai multe postări' }))
+    const all = within(s).getAllByTestId('post')
+    expect(all.length).toBeGreaterThan(8)
+    // Postarea fără analytics: afișări, reach și interacțiuni „Indisponibil”, nu zero.
+    expect(all.filter((c) => within(c).queryAllByText('Indisponibil').length === 3)).toHaveLength(1)
+  })
+
+  it('postările în tabel: linkuri validate, lipsa performanței = „Indisponibil", nemature marcate', async () => {
+    renderApp({ route: MINI })
+    await open()
+    const s = await section('Performanța conținutului')
+    await userEvent.click(within(s).getByRole('tab', { name: 'Tabel' }))
     const table = await within(s).findByRole('table')
     expect(within(table).getAllByRole('row').slice(1)).toHaveLength(8)
     const links = within(table).getAllByRole('link', { name: 'Deschide postarea' })
@@ -73,6 +95,10 @@ describe('Social cu import', () => {
     renderApp({ route: MINI, wrap: (b) => ({ ...b, social: { ...b.social, posts: async (c, f) => { const r = await b.social.posts(c, f); return r.kind === 'ready' ? ready(r.data.map((p, i) => ({ ...p, permalink: i === 0 ? 'javascript:alert(1)' : p.permalink }))) : r } } }) })
     await open()
     const s = await section('Performanța conținutului')
+    await within(s).findAllByTestId('post')
+    expect(within(s).getByText('Link indisponibil')).toBeInTheDocument()
+    expect(s.querySelector('a[href^="javascript"]')).toBeNull()
+    await userEvent.click(within(s).getByRole('tab', { name: 'Tabel' }))
     await within(s).findByRole('table')
     expect(within(s).getByText('Link indisponibil')).toBeInTheDocument()
     expect(s.querySelector('a[href^="javascript"]')).toBeNull()
@@ -85,9 +111,9 @@ describe('Social cu import', () => {
     expect(within(chips).getByText('Platformă: Instagram')).toBeInTheDocument()
     expect(within(chips).queryByText(/Format:/)).toBeNull()
     const s = await section('Performanța conținutului')
-    const rows = within(await within(s).findByRole('table')).getAllByRole('row').slice(1)
-    expect(rows.length).toBeGreaterThan(0)
-    for (const r of rows) expect(r).toHaveTextContent(/Instagram/)
+    const cards = await within(s).findAllByTestId('post')
+    expect(cards.length).toBeGreaterThan(0)
+    for (const c of cards) expect(within(c).getByRole('article')).toHaveAccessibleName(/^Postare Instagram,/)
   })
 
   it('valori necunoscute ale filtrelor sunt ignorate', async () => {

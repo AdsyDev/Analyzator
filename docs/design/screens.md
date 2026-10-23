@@ -79,7 +79,7 @@ Filtre Device și Canal; „Canale" (sessions, pondere, variație); „AI referr
 
 ## Listening (`/brands/:id/listening`)
 
-„Distribuția sentimentului" (bară segmentată pozitiv/neutru/negativ, cu număr și procent; „Fiecare sentiment e verificat de un om din echipa AdSymphony"); filtre sentiment și sursă; feed de mențiuni (sursă, autor, dată, text, sentiment, „Revizuit de <nume>", „Deschide sursa", PharmacovigilanceButton cu stare „Marcat pentru farmacovigilență <data>"); stare goală „Nicio mențiune pentru filtrele alese"; „Jurnal de farmacovigilență" (marcat la, item, utilizator, notificat, status), vizibil doar agenției și contactelor PV.
+„Distribuția sentimentului" (bară segmentată pozitiv/neutru/negativ, cu număr și procent; „Fiecare sentiment e verificat de un om din echipa AdSymphony"); filtre sentiment și sursă; feed de mențiuni (sursă, autor, dată, text, sentiment, „Revizuit de <nume>", „Deschide sursa", PharmacovigilanceButton cu stare „Marcat pentru farmacovigilență <data>"); stare goală „Nicio mențiune pentru filtrele alese"; Mențiunile apar ca postări (E-3): carduri cu platforma, autorul (cont propriu sau extern), data, textul complet, sentimentul și linkul spre original. „Jurnal de farmacovigilență" (marcat la, item, utilizator, notificat, status), vizibil doar agenției și contactelor PV.
 
 ## Concurență (`/brands/:id/competition`)
 
@@ -181,7 +181,7 @@ Ce s-a implementat diferit de designul din `docs/design/reference/` și de ce. N
 | Paid: „Observații" și „Creatives" | Lipsesc | Fără contract; creatives după lansare, iar designul cere fără galerie. |
 | Paid/Social fără import: „Conectează Google Ads / Planable" | „Sursă neconectată" cu „Importă CSV" (agency_admin) | Cerința UI-4: modulele sunt pe bază de import; acțiunea doar intră în flux (cardul Import CSV din pagina site-ului), fără logica importului. Clientul și ceilalți nu primesc acțiune (nu există canal de cerere). |
 | Pacing cu stare „în ritm / în urmă" | Două bare (spend față de buget, zile trecute din plan) și nota „reper, nu verdict" | Spec cap. 15: progresul liniar e un reper; nu emitem o judecată automată. |
-| Postări cu preview imagine | Text scurt, platformă, format, topic, link validat | Nu există imagini autorizate; fără dependențe externe în interfață. |
+| Postări cu preview imagine | Card ca pe rețea (E-3): platformă, dată, text, format, topic, interacțiuni, link validat; fără imagine | Nu există imagini autorizate (nu se importă); fără dependențe externe în interfață. Tabelul rămâne ca a doua vizualizare, pentru sortare. |
 | Social: clasarea postărilor | Postările sub 7 zile marcate „date incomplete"; mediana doar din cele mature | Spec cap. 17: nu clasăm o postare de ieri împotriva uneia cu trei luni de expunere fără avertizare. |
 | Cardul KPI se deschide în EvidenceDrawer | Doar pentru metricile din registru (Trafic); Paid și Social au `StatCard` cu definiție în tooltip | Datele importate nu sunt `MetricResponse` și nu au `evidence_query`. |
 | Variație „−0 p.p." cu săgeată | „0 p.p." fără săgeată | Direcția se derivă din valoarea rotunjită, ca textul și săgeata să nu se contrazică. |
