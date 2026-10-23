@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { createSupabaseProviders } from '../../data/supabase/providers'
 import { createSupabaseUsers } from '../../data/supabase/adminProviders'
+import { generatePassword } from './UsersPage'
 import { fakeDataClient } from '../../test/fakeDataClient'
 import { pageReady, renderApp, where } from '../../test/renderApp'
 
@@ -77,7 +78,7 @@ describe('Administrare → Utilizatori (fixtures de previzualizare)', () => {
   it('invită o persoană: rolul non-admin cere un brand; după trimitere apare „Invitație neacceptată” și se poate retrimite', async () => {
     renderApp({ route: URL })
     await pageReady('Utilizatori')
-    const form = await screen.findByRole('form', { name: 'Trimite invitație' })
+    const form = await screen.findByRole('form', { name: 'Adaugă o persoană' })
     await userEvent.selectOptions(within(form).getByLabelText('Client'), 'STADA')
     await userEvent.type(within(form).getByLabelText('Email'), 'Ana.Noua@Stada.example')
     await userEvent.type(within(form).getByLabelText('Nume (opțional)'), 'Ana Nouă')
@@ -100,13 +101,62 @@ describe('Administrare → Utilizatori (fixtures de previzualizare)', () => {
   it('administratorul agenției nu cere branduri; persoana deja activă în listă primește mesajul serverului', async () => {
     renderApp({ route: URL })
     await pageReady('Utilizatori')
-    const form = await screen.findByRole('form', { name: 'Trimite invitație' })
+    const form = await screen.findByRole('form', { name: 'Adaugă o persoană' })
     await userEvent.selectOptions(within(form).getByLabelText('Client'), 'AdSymphony')
     await userEvent.selectOptions(within(form).getByLabelText('Rol'), 'agency_admin')
     expect(within(form).queryByRole('group', { name: 'Branduri pentru invitație' })).toBeNull()
     await userEvent.type(within(form).getByLabelText('Email'), 'maria.ilie@adsymphony.example')
     await userEvent.click(within(form).getByRole('button', { name: 'Trimite invitația' }))
     expect(await screen.findByText(/Persoana este deja în lista acestui client/)).toBeInTheDocument()
+  })
+
+  it('creează un cont cu parolă temporară: parola apare o singură dată, apoi persoana are „Parolă temporară”, fără retrimitere', async () => {
+    renderApp({ route: URL })
+    await pageReady('Utilizatori')
+    const form = await screen.findByRole('form', { name: 'Adaugă o persoană' })
+    expect(within(form).getByRole('radio', { name: /Trimite invitație pe email/ })).toBeChecked()
+    await userEvent.click(within(form).getByRole('radio', { name: /Creează contul cu parolă temporară/ }))
+    await userEvent.selectOptions(within(form).getByLabelText('Client'), 'STADA')
+    await userEvent.type(within(form).getByLabelText('Email'), 'Dan.Nou@Stada.example')
+    await userEvent.type(within(form).getByLabelText('Nume (opțional)'), 'Dan Nou')
+    await userEvent.click(within(within(form).getByRole('group', { name: 'Branduri pentru invitație' })).getByRole('button', { name: 'Urinal' }))
+    const create = within(form).getByRole('button', { name: 'Creează contul' })
+    expect(create).toBeDisabled()
+    await userEvent.type(within(form).getByLabelText('Parolă temporară'), 'scurt')
+    expect(create).toBeDisabled()
+    expect(within(form).getByText(/trebuie să aibă cel puțin 8 caractere/)).toBeInTheDocument()
+    await userEvent.clear(within(form).getByLabelText('Parolă temporară'))
+    await userEvent.click(within(form).getByRole('button', { name: 'Generează' }))
+    const password = (within(form).getByLabelText('Parolă temporară') as HTMLInputElement).value
+    expect(password).toHaveLength(16)
+    expect(create).toBeEnabled()
+    await userEvent.click(create)
+
+    const dialog = await screen.findByRole('dialog', { name: 'Contul a fost creat' })
+    expect(within(dialog).getByText(password)).toBeInTheDocument()
+    expect(within(dialog).getByText('dan.nou@stada.example')).toBeInTheDocument()
+    expect(within(form).getByLabelText('Parolă temporară')).toHaveValue('')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Am transmis parola' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.queryByText(password)).toBeNull()
+
+    const r = await row('Dan Nou')
+    expect(within(r).getByText('Parolă temporară')).toBeInTheDocument()
+    expect(within(r).queryByRole('button', { name: /Retrimite invitația/ })).toBeNull()
+  })
+
+  it('crearea pentru o adresă care are deja cont: mesajul serverului, fără cont nou', async () => {
+    renderApp({ route: URL })
+    await pageReady('Utilizatori')
+    const form = await screen.findByRole('form', { name: 'Adaugă o persoană' })
+    await userEvent.click(within(form).getByRole('radio', { name: /Creează contul cu parolă temporară/ }))
+    await userEvent.selectOptions(within(form).getByLabelText('Client'), 'AdSymphony')
+    await userEvent.selectOptions(within(form).getByLabelText('Rol'), 'agency_admin')
+    await userEvent.type(within(form).getByLabelText('Email'), 'maria.ilie@adsymphony.example')
+    await userEvent.type(within(form).getByLabelText('Parolă temporară'), 'Temporar#2026')
+    await userEvent.click(within(form).getByRole('button', { name: 'Creează contul' }))
+    expect(await screen.findByText(/Există deja un cont cu această adresă/)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('doar agency_admin: strategist e redirecționat', async () => {
@@ -134,11 +184,12 @@ describe('Administrare → Utilizatori cu providerul real (client fals)', () => 
     { tenant_id: 't-1', user_id: 'u-me', email: 'ioana@adsymphony.ro', full_name: 'Ioana Popescu', last_sign_in_at: '2026-10-22T08:00:00Z' },
     { tenant_id: 't-1', user_id: 'abcdef12-0000-4000-8000-000000000000', email: 'elena@stada.ro', full_name: null, last_sign_in_at: '2026-10-20T08:00:00Z' },
   ]
-  /** Funcția server `users`: `identities` cu persoanele de mai sus; `invite` cu răspunsul dat. */
-  const usersFn = (invite?: unknown) => (name: string, body: unknown) => {
+  /** Funcția server `users`: `identities` cu persoanele date; `invite` și `create` cu răspunsurile date. */
+  const usersFn = (invite?: unknown, create?: unknown, list: unknown[] = people) => (name: string, body: unknown) => {
     const action = name === 'users' ? (body as { action?: string }).action : undefined
-    if (action === 'identities') return { data: { people } }
+    if (action === 'identities') return { data: { people: list } }
     if (action === 'invite' && invite) return { data: invite }
+    if (action === 'create' && create) return { data: create }
     return { error: { message: 'necunoscut' } }
   }
 
@@ -159,7 +210,7 @@ describe('Administrare → Utilizatori cu providerul real (client fals)', () => 
     const fake = fakeDataClient({ userId: 'u-me', tables, invoke: usersFn({ status: 'access_granted', user_id: 'u-9' }) })
     renderApp({ route: URL, wrap: (b) => ({ ...b, users: createSupabaseUsers(fake.client) }) })
     await pageReady('Utilizatori')
-    const form = await screen.findByRole('form', { name: 'Trimite invitație' })
+    const form = await screen.findByRole('form', { name: 'Adaugă o persoană' })
     // Un singur client administrat: fără selector de client.
     expect(within(form).queryByLabelText('Client')).toBeNull()
     await userEvent.type(within(form).getByLabelText('Email'), ' Dan@Stada.ro ')
@@ -171,9 +222,40 @@ describe('Administrare → Utilizatori cu providerul real (client fals)', () => 
     ])
   })
 
+  it('contul creat cu providerul real ajunge la funcția users (create) cu parola; persoana cu parolă temporară nu are „Retrimite invitația”', async () => {
+    const temp = people.map((p) => (p.user_id === 'u-me' ? p : { ...p, last_sign_in_at: null, temporary_password: true }))
+    const fake = fakeDataClient({ userId: 'u-me', tables, invoke: usersFn(undefined, { status: 'created', user_id: 'u-10' }, temp) })
+    renderApp({ route: URL, wrap: (b) => ({ ...b, users: createSupabaseUsers(fake.client) }) })
+    await pageReady('Utilizatori')
+    const r = await row('elena@stada.ro')
+    expect(within(r).getByText('Parolă temporară')).toBeInTheDocument()
+    expect(within(r).queryByRole('button', { name: /Retrimite invitația/ })).toBeNull()
+
+    const form = await screen.findByRole('form', { name: 'Adaugă o persoană' })
+    await userEvent.click(within(form).getByRole('radio', { name: /Creează contul cu parolă temporară/ }))
+    await userEvent.type(within(form).getByLabelText('Email'), ' Dan@Stada.ro ')
+    await userEvent.selectOptions(within(form).getByLabelText('Rol'), 'agency_admin')
+    await userEvent.type(within(form).getByLabelText('Parolă temporară'), 'Temporar#2026')
+    await userEvent.click(within(form).getByRole('button', { name: 'Creează contul' }))
+    expect(await screen.findByRole('dialog', { name: 'Contul a fost creat' })).toBeInTheDocument()
+    expect(fake.invocations.filter((c) => (c.body as { action?: string }).action === 'create')).toEqual([
+      { name: 'users', body: { action: 'create', tenant_id: 't-1', email: 'dan@stada.ro', full_name: null, role: 'agency_admin', brand_ids: [], password: 'Temporar#2026' } },
+    ])
+  })
+
   it('fără client (neconfigurat): „Sursă neconectată" cu motiv', async () => {
     renderApp({ route: URL, wrap: (b) => ({ ...b, users: createSupabaseProviders().users }) })
     await pageReady('Utilizatori')
     expect((await screen.findAllByRole('heading', { name: 'Sursă neconectată' })).length).toBeGreaterThan(0)
+  })
+})
+
+describe('generatePassword', () => {
+  it('lungimea cerută, fără caractere ușor de confundat, din sursa aleatoare dată', () => {
+    const p = generatePassword(16, (n) => Uint32Array.from({ length: n }, (_, i) => i * 7919))
+    expect(p).toHaveLength(16)
+    expect(p).not.toMatch(/[0O1lI]/)
+    expect(generatePassword()).toHaveLength(16)
+    expect(generatePassword()).not.toBe(generatePassword())
   })
 })

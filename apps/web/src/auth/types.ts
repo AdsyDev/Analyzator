@@ -1,11 +1,12 @@
 import type { Role, SessionUser } from '../contracts'
 
-export type PasswordSetupKind = 'invite' | 'recovery'
+/** `temporary` = cont creat de administrator cu parolă temporară, schimbată obligatoriu la prima intrare (E-5). */
+export type PasswordSetupKind = 'invite' | 'recovery' | 'temporary'
 
 export type AuthState =
   | { status: 'loading' }
   | { status: 'signed_out' }
-  /** Invitație acceptată sau resetare cerută: există o sesiune temporară, dar utilizatorul trebuie să-și aleagă parola. */
+  /** Invitație acceptată, resetare cerută sau parolă temporară: există o sesiune, dar utilizatorul trebuie să-și aleagă parola. */
   | { status: 'password_setup'; kind: PasswordSetupKind; email: string }
   | { status: 'signed_in'; user: SessionUser }
 
@@ -17,8 +18,10 @@ export type AuthErrorCode =
   | 'invalid_credentials'
   | 'rate_limited'
   | 'weak_password'
+  | 'same_password'
   | 'no_access'
   | 'expired_link'
+  | 'session_expired'
   | 'network'
   | 'unavailable'
   | 'unknown'
@@ -53,7 +56,7 @@ export interface AuthSource {
   consumeNotice: () => AuthErrorCode | null
   signIn: (input: SignInInput) => Promise<AuthResult>
   requestPasswordReset: (email: string) => Promise<AuthResult>
-  /** Alegerea parolei după invitație sau resetare. */
+  /** Alegerea parolei după invitație, resetare sau parola temporară. */
   completePasswordSetup: (input: { fullName?: string; password: string }) => Promise<AuthResult>
   preview?: PreviewAuthControls
 }

@@ -147,6 +147,16 @@ Migrația `20261023090000_people_identity_invite.sql`, decizia E-4. Emailul și 
 - **Risc acceptat:** un `agency_admin` află, la invitație, dacă adresa avea deja un cont activ (răspunsul `access_granted`, fără email). Adresa e una pe care o adaugă chiar în clientul lui, unde persoana devine vizibilă oricum.
 - Teste: `21_people_invite.test.sql` (P1–P3), `supabase/functions/users/handler.test.ts`, `tests/security/edge-users.test.mjs` (H1–H2).
 
+**Extindere E-5 (23 oct 2026): contul creat direct, cu parolă temporară.** Migrația `20261023120000_people_create_account.sql` înlocuiește două funcții, cu aceleași nume și același regim (SECURITY DEFINER, doar service_role, `assert_service_role` în corp): `tenant_people_for` întoarce în plus `temporary_password`, iar `grant_invited_access` primește `p_audit_action` (`user_invited` implicit sau `user_created`; orice altă valoare e refuzată). Lista A10/A11 nu se schimbă.
+
+- Contul se creează prin API-ul de administrare GoTrue, cu `app_metadata.must_change_password = true`. GoTrue refuză scrierea `app_metadata` din client (403); marcajul îl șterge doar funcția, cu service role.
+- **Fără preluarea unui cont existent:** `create` refuză (409) orice adresă care are deja un cont, din orice client, fără să-i schimbe parola. Altfel, administratorul unui client ar putea prelua contul altcuiva.
+- `change_temporary_password` lucrează doar pentru propriul cont și doar cât timp marcajul există (citit din GoTrue, nu din JWT). Parola se schimbă prin `PUT /auth/v1/user` cu sesiunea persoanei, deci cu politica și verificarea „aceeași parolă” din GoTrue; abia apoi se șterge marcajul. Fără marcaj, calea e închisă (409), deci nu ocolește „Am uitat parola”.
+- Un cont creat, rămas fără acces (acordarea refuzată), se șterge imediat.
+- **Risc acceptat (ca la invitație):** răspunsul 409 de la `create` îi confirmă unui `agency_admin` că adresa are deja un cont, fără alte date despre el.
+- **Risc acceptat:** administratorul cunoaște parola temporară până la prima intrare. Ecranul de schimbare e o barieră a aplicației, nu a bazei de date: cu parola temporară, persoana are drepturile RLS ale rolului primit. Parola apare o singură dată în interfață și nu se păstrează nicăieri.
+- Teste: `22_people_create_account.test.sql` (C1–C2), `handler.test.ts`, `edge-users.test.mjs` (H3–H4).
+
 ## Inventar la 7 oct 2026
 
 | Tip | Ce există | Acoperit de |
@@ -381,5 +391,9 @@ Funcția server `users` (excepția E10). Rulează cu `npm run test:security`; co
 |---|---|---|
 | H1 | `identities` cerut de admin T1, admin T2, strategist, account, client cu și fără acces; fără sesiune, cheia anon, JWT semnat greșit; `tenant_people_for`, `find_user_for_invite`, `grant_invited_access` apelate direct prin REST de admin T1 | fiecare admin vede doar tenantul lui; ceilalți: listă goală; 401 fără sesiune validă; apelurile directe refuzate și nimic scris |
 | H2 | invitație fără sesiune / cu cheia anon; de strategist, client, admin T2 în T1; cu un brand din T2; invitație validă; cont activ existent; același cont a doua oară | 401 / 403 / 404 / 422 fără cont creat; invitația creează contul, rolul, accesul la brand și auditul cu actorul real, vizibile doar în T1; contul activ primește doar accesul; a doua oară 409, rolul neschimbat |
+| H3 | `create` fără sesiune / cu cheia anon; de strategist, client, admin T2 în T1; cu un brand din T2; pentru un cont existent din același client și din alt client; parolă scurtă; creare validă; autentificare cu parola temporară; încercarea clientului de a șterge marcajul prin `PUT /auth/v1/user` | 401 / 403 / 404 / 422 fără cont creat; cont existent: 409, parola veche merge, cea din cerere nu; creare validă: cont activ fără email (Mailpit), rol, brand, audit `user_created` fără parolă, `temporary_password` vizibil doar în T1; sesiunea poartă marcajul; `app_metadata` din client: 403, `user_metadata` nu atinge marcajul |
+| H4 | `change_temporary_password` pe un cont fără marcaj; fără sesiune; cu aceeași parolă; cu o parolă nouă; a doua oară | 409 `not_temporary`, parola neschimbată; 401; 422 `same_password`, marcajul rămâne; 200: marcajul dispare, sesiunea curentă se reîmprospătează fără marcaj, parola temporară nu mai merge, cea nouă da; a doua oară 409 |
 
 **Neverificat (E-4):** livrarea emailului de invitație în producție (local îl prinde Mailpit); șablonul și limita de emailuri ale serverului SMTP din proiectul Supabase; durata linkului din invitație în producție.
+
+**Neverificat (E-5):** politica de parole a proiectului Supabase din producție (local, minimum 6 caractere; aplicația cere 8). Dacă proiectul cere mai mult, GoTrue refuză cu `weak_password`, iar mesajul din interfață e cel generic. „Secure password change” din producție: dacă e activ, schimbarea parolei temporare merge doar într-o sesiune recentă, ceea ce e cazul la prima intrare.

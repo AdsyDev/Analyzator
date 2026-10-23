@@ -52,7 +52,7 @@ describe('readUrlLink', () => {
 describe('createSupabaseBackend (adaptor peste un client fals)', () => {
   afterEach(() => vi.useRealTimers())
 
-  function fakeClient() {
+  function fakeClient(invokeResult: { data?: unknown; error?: unknown } = { data: { status: 'password_changed' } }, refreshError: unknown = null) {
     const calls: Array<[string, ...unknown[]]> = []
     let cb: ((e: string, s: unknown) => void) | null = null
     let unsub = false
@@ -68,6 +68,10 @@ describe('createSupabaseBackend (adaptor peste un client fals)', () => {
         signOut: async () => (calls.push(['signOut']), { error: null }),
         resetPasswordForEmail: async (e: string, o: unknown) => (calls.push(['reset', e, o]), { data: {}, error: null }),
         updateUser: async (a: unknown) => (calls.push(['update', a]), { data: {}, error: null }),
+        refreshSession: async () => (calls.push(['refresh']), { data: {}, error: refreshError }),
+      },
+      functions: {
+        invoke: async (name: string, o: { body: unknown }) => (calls.push(['invoke', name, o.body]), invokeResult),
       },
       from: (t: string) => ({ select: (cols: string) => ({ is: async (c: string, v: unknown) => select(t, cols, c, v) }) }),
     }
@@ -78,7 +82,38 @@ describe('createSupabaseBackend (adaptor peste un client fals)', () => {
 
   it('mapează sesiunea și numele din metadate', async () => {
     const { client } = fakeClient()
-    expect(await createSupabaseBackend(client, store).getSession()).toEqual({ userId: 'u1', email: 'a@b.example', fullName: 'A B' })
+    expect(await createSupabaseBackend(client, store).getSession()).toEqual({ userId: 'u1', email: 'a@b.example', fullName: 'A B', mustChangePassword: false })
+  })
+
+  it('marcajul de parolă temporară vine doar din app_metadata, nu din user_metadata (pe care îl scrie utilizatorul)', async () => {
+    const { client, fire } = fakeClient()
+    const b = createSupabaseBackend(client, store)
+    const seen: unknown[] = []
+    b.onChange((_e, s) => seen.push(s))
+    vi.useFakeTimers()
+    fire('SIGNED_IN', { user: { id: 'u2', email: 'c@d.example', app_metadata: { must_change_password: true } } })
+    fire('SIGNED_IN', { user: { id: 'u3', email: 'e@f.example', user_metadata: { must_change_password: true }, app_metadata: { must_change_password: 'true' } } })
+    vi.runAllTimers()
+    expect(seen).toEqual([
+      { userId: 'u2', email: 'c@d.example', fullName: null, mustChangePassword: true },
+      { userId: 'u3', email: 'e@f.example', fullName: null, mustChangePassword: false },
+    ])
+  })
+
+  it('replaceTemporaryPassword: funcția users (change_temporary_password), apoi reîmprospătarea sesiunii', async () => {
+    const { client, calls } = fakeClient()
+    expect(await createSupabaseBackend(client, store).replaceTemporaryPassword('Parola-noua-1')).toBeNull()
+    expect(calls).toEqual([['invoke', 'users', { action: 'change_temporary_password', password: 'Parola-noua-1' }], ['refresh']])
+  })
+
+  it('replaceTemporaryPassword: eroarea funcției păstrează statusul și codul, fără reîmprospătare; fără răspuns = rețea', async () => {
+    const refused = fakeClient({ error: { context: { status: 422, json: async () => ({ error: 'Alege altă parolă.', code: 'same_password' }) } } })
+    expect(await createSupabaseBackend(refused.client, store).replaceTemporaryPassword('x')).toEqual({ status: 422, code: 'same_password', message: 'Funcția serverului a refuzat cererea.' })
+    expect(refused.calls.some((c) => c[0] === 'refresh')).toBe(false)
+    const down = fakeClient({ error: { message: 'Failed to send a request' } })
+    expect((await createSupabaseBackend(down.client, store).replaceTemporaryPassword('x'))?.status).toBeUndefined()
+    const stale = fakeClient(undefined, { status: 400, code: 'refresh_token_not_found', message: 'x' })
+    expect(await createSupabaseBackend(stale.client, store).replaceTemporaryPassword('x')).toMatchObject({ status: 400 })
   })
 
   it('mapează erorile fără textul serverului în codul de eroare și transmite parametrii', async () => {
@@ -107,7 +142,7 @@ describe('createSupabaseBackend (adaptor peste un client fals)', () => {
     fire('SIGNED_IN', { user: { id: 'u1', email: 'a@b.example', user_metadata: {} } })
     expect(handler).not.toHaveBeenCalled()
     vi.runAllTimers()
-    expect(handler).toHaveBeenCalledWith('SIGNED_IN', { userId: 'u1', email: 'a@b.example', fullName: null })
+    expect(handler).toHaveBeenCalledWith('SIGNED_IN', { userId: 'u1', email: 'a@b.example', fullName: null, mustChangePassword: false })
   })
 
   it('dezabonarea apelează unsubscribe', () => {

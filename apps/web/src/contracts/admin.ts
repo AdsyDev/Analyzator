@@ -22,8 +22,10 @@ export interface AccessPerson {
   since: IsoDateTime
   name: string | null
   email: string | null
-  /** Ultima autentificare; null = persoana nu a intrat încă (invitație neacceptată). */
+  /** Ultima autentificare; null = persoana nu a intrat încă (invitație neacceptată sau cont creat, nefolosit). */
   last_sign_in_at: IsoDateTime | null
+  /** Contul creat de administrator, cu parola temporară încă neschimbată (E-5). */
+  temporary_password: boolean
   brands: PersonBrandAccess[]
 }
 
@@ -45,6 +47,16 @@ export interface InviteResult {
   user_id: string
 }
 
+/** Contul creat direct, cu parolă temporară (funcția server `users`, acțiunea `create`). Fără email trimis. */
+export interface NewAccount extends NewInvite {
+  password: string
+}
+
+export interface AccountResult {
+  status: 'created'
+  user_id: string
+}
+
 export interface UsersProvider {
   /** Doar `agency_admin` (RLS pe `memberships` și `brand_access`). */
   people(): Promise<ProviderResult<AccessPerson[]>>
@@ -55,6 +67,8 @@ export interface UsersProvider {
   setBrandAccess(tenantId: TenantId, userId: string, brandId: BrandId, active: boolean): Promise<ProviderResult<null>>
   /** Invită o persoană (sau retrimite invitația uneia care nu și-a activat contul). Doar `agency_admin` al tenantului. */
   invite(input: NewInvite): Promise<ProviderResult<InviteResult>>
+  /** Creează contul unei persoane fără cont, cu parolă temporară, schimbată obligatoriu la prima intrare. Doar `agency_admin`. */
+  createAccount(input: NewAccount): Promise<ProviderResult<AccountResult>>
 }
 
 export interface CompetitorMember {

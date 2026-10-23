@@ -293,6 +293,29 @@ describe('invitație și resetare (alegerea parolei)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Activează contul' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(AUTH_MESSAGES.expired_link)
   })
+
+  it('parola temporară: titlu propriu, fără nume; parola nouă trece prin server și duce în aplicație', async () => {
+    const { auth, api } = real({ session: { ...session, fullName: 'Cont Creat', mustChangePassword: true }, memberships: [{ role: 'client_viewer', organization: 'STADA' }] })
+    renderLogin(auth)
+    expect(await screen.findByRole('heading', { name: 'Schimbă parola temporară' })).toHaveFocus()
+    expect(screen.getByText(/creat de un administrator cu o parolă temporară/)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Nume complet')).toBeNull()
+    await userEvent.type(screen.getByLabelText('Parolă nouă'), 'Parola-Mea-2026')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvează parola' }))
+    expect(await screen.findByText('în aplicație')).toBeInTheDocument()
+    expect(api.calls).toContainEqual(['replaceTemporary', 'Parola-Mea-2026'])
+    expect(api.calls.some((c) => c[0] === 'update')).toBe(false)
+  })
+
+  it('parola temporară refolosită: mesaj dedicat, rămâne pe ecranul de schimbare', async () => {
+    const { auth, api } = real({ session: { ...session, mustChangePassword: true }, memberships: [{ role: 'client_viewer', organization: 'STADA' }] })
+    api.replaceError = { status: 422, code: 'same_password', message: 'x' }
+    renderLogin(auth)
+    await userEvent.type(await screen.findByLabelText('Parolă nouă'), 'Temporar#2026')
+    await userEvent.click(screen.getByRole('button', { name: 'Salvează parola' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(AUTH_MESSAGES.same_password)
+    expect(screen.getByRole('heading', { name: 'Schimbă parola temporară' })).toBeInTheDocument()
+  })
 })
 
 describe('previzualizare', () => {

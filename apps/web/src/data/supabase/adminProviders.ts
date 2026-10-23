@@ -31,6 +31,7 @@ interface IdentityRow {
   email: string | null
   full_name: string | null
   last_sign_in_at: string | null
+  temporary_password?: boolean
 }
 
 async function currentUserId(client: DataClient): Promise<string | null> {
@@ -45,9 +46,9 @@ function writeError(code: string | undefined, fallback: string): string {
 
 /**
  * Utilizatorii: citire și modificare prin sesiunea utilizatorului. RLS decide cine poate scrie
- * (`agency_admin` al tenantului); nicio verificare din interfață nu înlocuiește asta. Numele, emailul și invitația trec
- * prin funcția server `users` (E10): ea autentifică sesiunea și citește `auth.users` cu cheia de service, doar pentru
- * tenanții în care apelantul e agency_admin, fără să expună cheia.
+ * (`agency_admin` al tenantului); nicio verificare din interfață nu înlocuiește asta. Numele, emailul, invitația și contul
+ * creat direct trec prin funcția server `users` (E10): ea autentifică sesiunea și citește `auth.users` cu cheia de
+ * service, doar pentru tenanții în care apelantul e agency_admin, fără să expună cheia.
  */
 export function createSupabaseUsers(client: DataClient): UsersProvider {
   async function guardSelf(userId: string): Promise<ProviderResult<null> | null> {
@@ -85,6 +86,7 @@ export function createSupabaseUsers(client: DataClient): UsersProvider {
           name: who?.full_name ?? null,
           email: who?.email ?? null,
           last_sign_in_at: who?.last_sign_in_at ?? null,
+          temporary_password: who?.temporary_password === true,
           brands: access.filter((x) => x.tenant_id === r.tenant_id && x.user_id === r.user_id).map((x) => ({ brand_id: x.brand_id, active: x.revoked_at === null })),
         })
       }
@@ -99,6 +101,16 @@ export function createSupabaseUsers(client: DataClient): UsersProvider {
       const d = data as { status?: unknown; user_id?: unknown } | null
       if (!d || typeof d.user_id !== 'string' || !INVITE_STATUSES.includes(d.status as InviteStatus)) return failed(CONTRACT)
       return ready({ status: d.status as InviteStatus, user_id: d.user_id })
+    },
+
+    async createAccount(input) {
+      const { data, error } = await client.functions.invoke('users', {
+        body: { action: 'create', tenant_id: input.tenant_id, email: input.email, full_name: input.full_name, role: input.role, brand_ids: input.brand_ids, password: input.password },
+      })
+      if (error) return failed(await functionError(error))
+      const d = data as { status?: unknown; user_id?: unknown } | null
+      if (!d || d.status !== 'created' || typeof d.user_id !== 'string') return failed(CONTRACT)
+      return ready({ status: 'created' as const, user_id: d.user_id })
     },
 
     async setRole(tenantId, userId, role) {

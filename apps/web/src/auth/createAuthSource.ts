@@ -5,6 +5,8 @@ export interface BackendSession {
   userId: string
   email: string
   fullName: string | null
+  /** Cont creat de administrator, cu parola temporară încă neschimbată (app_metadata, scris doar de server). */
+  mustChangePassword?: boolean
 }
 
 export interface BackendError {
@@ -32,6 +34,11 @@ export interface AuthBackend {
   resetPasswordForEmail: (email: string, redirectTo: string) => Promise<BackendError | null>
   /** `fullName` lipsește la resetarea parolei: numele existent nu se suprascrie. */
   updateUser: (input: { password: string; fullName?: string }) => Promise<BackendError | null>
+  /**
+   * Înlocuiește parola temporară prin funcția server `users`: doar ea șterge marcajul, după ce parola s-a schimbat.
+   * La succes, sesiunea e deja reîmprospătată (fără marcaj).
+   */
+  replaceTemporaryPassword: (password: string) => Promise<BackendError | null>
   /** Rândurile active din `memberships` ale utilizatorului curent (RLS: doar propriile). */
   memberships: () => Promise<Membership[]>
   /** Alege unde se păstrează sesiunea: persistent sau doar în fila curentă. */
@@ -47,6 +54,7 @@ export function pickMembership(rows: readonly Membership[]): Membership | null {
 }
 
 function toErrorCode(e: BackendError): AuthErrorCode {
+  if (e.code === 'same_password') return 'same_password'
   if (e.status === 429 || e.code === 'over_request_rate_limit' || e.code === 'over_email_send_rate_limit') return 'rate_limited'
   if (e.code === 'invalid_credentials' || e.code === 'user_not_found' || e.status === 400 || e.status === 401) return 'invalid_credentials'
   if (e.code === 'weak_password' || e.status === 422) return 'weak_password'
@@ -78,14 +86,18 @@ export function createAuthSource(backend: AuthBackend, options: AuthSourceOption
     listeners.forEach((l) => l())
   }
 
+  /** Parola de ales înainte de acces: din linkul de invitație/resetare sau parola temporară a contului creat direct. */
+  const setupKind = (s: BackendSession): PasswordSetupKind | null => pending ?? (s.mustChangePassword ? 'temporary' : null)
+
   async function resolve(s: BackendSession | null): Promise<AuthResult> {
     session = s
     if (!s) {
       set({ status: 'signed_out' })
       return { ok: true }
     }
-    if (pending) {
-      set({ status: 'password_setup', kind: pending, email: s.email })
+    const kind = setupKind(s)
+    if (kind) {
+      set({ status: 'password_setup', kind, email: s.email })
       return { ok: true }
     }
     let rows: Membership[]
@@ -170,15 +182,24 @@ export function createAuthSource(backend: AuthBackend, options: AuthSourceOption
       return { ok: true }
     },
     async completePasswordSetup({ fullName, password }): Promise<AuthResult> {
-      if (!session || !pending) return { ok: false, code: 'expired_link' }
+      if (!session || !setupKind(session)) return { ok: false, code: 'expired_link' }
       if (password.length < MIN_PASSWORD_LENGTH) return { ok: false, code: 'weak_password' }
+      // Cât timp contul are parola temporară (și la o resetare între timp), parola se schimbă prin server.
+      const temporary = session.mustChangePassword === true
       let err: BackendError | null
       try {
-        err = await backend.updateUser({ password, fullName })
+        err = temporary ? await backend.replaceTemporaryPassword(password) : await backend.updateUser({ password, fullName })
       } catch {
         return { ok: false, code: 'network' }
       }
-      if (err) return { ok: false, code: err.status === 401 || err.status === 403 ? 'expired_link' : toErrorCode(err) }
+      if (err && temporary && (err.status === 401 || err.status === 403 || err.code === 'not_temporary')) {
+        // Sesiune expirată sau parolă deja schimbată (de exemplu în altă filă): o autentificare nouă clarifică starea.
+        pending = null
+        await backend.signOut()
+        set({ status: 'signed_out' })
+        return { ok: false, code: 'session_expired' }
+      }
+      if (err) return { ok: false, code: !temporary && (err.status === 401 || err.status === 403) ? 'expired_link' : toErrorCode(err) }
       pending = null
       options.onLinkConsumed?.()
       return resolve(await backend.getSession())

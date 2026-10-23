@@ -12,6 +12,8 @@ export function fakeAuthBackend(init: { session?: BackendSession | null; members
     signInThrows: false,
     resetError: null as BackendError | null,
     updateError: null as BackendError | null,
+    /** Rezultatul funcției server la schimbarea parolei temporare; la succes, sesiunea pierde marcajul. */
+    replaceError: null as BackendError | null,
     membershipsThrows: false,
     sessionAfterSignIn: null as BackendSession | null,
     calls,
@@ -47,6 +49,12 @@ export function fakeAuthBackend(init: { session?: BackendSession | null; members
     updateUser: async (input) => {
       calls.push(['update', input])
       return api.updateError
+    },
+    replaceTemporaryPassword: async (password) => {
+      calls.push(['replaceTemporary', password])
+      if (api.replaceError) return api.replaceError
+      if (session) session = { ...session, mustChangePassword: false }
+      return null
     },
     memberships: async () => {
       if (api.membershipsThrows) throw new Error('rețea')

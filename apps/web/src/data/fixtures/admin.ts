@@ -28,6 +28,7 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
     name: p.name,
     email: p.email,
     last_sign_in_at: instantDaysAgo(1),
+    temporary_password: false,
     brands: p.brands.map((brand_id) => ({ brand_id, active: true })),
   }))
   let invited = 0
@@ -94,9 +95,38 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
         name: input.full_name,
         email,
         last_sign_in_at: null,
+        temporary_password: false,
         brands: input.brand_ids.map((brand_id) => ({ brand_id, active: true })),
       })
       return ready({ status: 'invited' as const, user_id })
+    },
+    // Fără cont real: persoana apare cu „Parolă temporară”, ca după funcția server. Parola nu se păstrează.
+    createAccount: async (input) => {
+      const denied = adminOnly()
+      if (denied) return denied
+      const email = input.email.trim().toLowerCase()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return failed('Adresa de email nu este validă.')
+      if (input.password.length < 8) return failed('Parola temporară trebuie să aibă cel puțin 8 caractere.')
+      if (input.brand_ids.some((b) => !allowed.has(b))) return failed('Unul dintre brandurile alese nu există, e arhivat sau aparține altui client.')
+      const organization = people.find((p) => p.tenant_id === input.tenant_id)?.organization
+      if (organization === undefined) return failed('Client inexistent.')
+      if (people.some((p) => p.email === email)) return failed('Există deja un cont cu această adresă. Folosește „Trimite invitație”: persoana primește doar accesul, iar parola ei nu se schimbă.')
+      invited += 1
+      const user_id = `preview-account-${invited}`
+      people.push({
+        user_id,
+        tenant_id: input.tenant_id,
+        organization,
+        role: input.role,
+        membership_active: true,
+        since: now().toISOString(),
+        name: input.full_name,
+        email,
+        last_sign_in_at: null,
+        temporary_password: true,
+        brands: input.brand_ids.map((brand_id) => ({ brand_id, active: true })),
+      })
+      return ready({ status: 'created' as const, user_id })
     },
   }
 

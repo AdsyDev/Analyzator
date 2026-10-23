@@ -55,6 +55,8 @@ Administrare → Utilizatori (doar `agency_admin`): numele și emailul fiecărei
 - **Durata linkului:** Authentication → Providers → Email → „Email OTP Expiration”. După expirare, persoana apare „Invitație neacceptată”, iar adminul apasă „Retrimite invitația”.
 - **Cine poate invita:** doar `agency_admin` activ al clientului. Persoana primește rolul și brandurile alese; un cont deja activ primește doar accesul, fără email. Fiecare invitație lasă în `audit_events` evenimentul `user_invited`, cu cine a invitat.
 - Revocarea, rolul și accesul la branduri se schimbă din același tabel, ca până acum.
+- **Cont creat direct, cu parolă temporară (E-5).** În „Adaugă o persoană”, varianta „Creează contul cu parolă temporară” creează contul activ, fără email (merge și fără SMTP). Administratorul alege parola sau apasă „Generează”; parola apare o singură dată, în fereastra de confirmare, și se transmite pe un canal sigur. La prima intrare, persoana e oprită pe „Schimbă parola temporară” până alege o parolă nouă, diferită de cea temporară; până atunci, în tabel apare „Parolă temporară”. Doar pentru adrese fără cont: pentru un cont existent se folosește invitația, care acordă doar accesul. Crearea lasă în `audit_events` evenimentul `user_created`, cu cine a creat contul.
+- **Parola temporară pierdută:** persoana folosește „Am uitat parola” (cere SMTP) sau un administrator șterge contul din Supabase → Authentication → Users și îl creează din nou din aplicație. Contul nu se poate recrea cât timp există.
 
 ## Colectare săptămânală SEOmonitor
 

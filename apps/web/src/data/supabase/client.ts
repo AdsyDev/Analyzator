@@ -46,12 +46,37 @@ interface UserLike {
   id: string
   email?: string | null
   user_metadata?: Record<string, unknown> | null
+  app_metadata?: Record<string, unknown> | null
 }
 const toSession = (s: { user: UserLike } | null): BackendSession | null =>
-  s ? { userId: s.user.id, email: s.user.email ?? '', fullName: typeof s.user.user_metadata?.full_name === 'string' ? (s.user.user_metadata.full_name as string) : null } : null
+  s
+    ? {
+        userId: s.user.id,
+        email: s.user.email ?? '',
+        fullName: typeof s.user.user_metadata?.full_name === 'string' ? (s.user.user_metadata.full_name as string) : null,
+        // app_metadata îl scrie doar serverul; user_metadata îl poate schimba oricine pentru propriul cont.
+        mustChangePassword: s.user.app_metadata?.must_change_password === true,
+      }
+    : null
 
 const toError = (e: { status?: number; code?: string; message: string } | null): BackendError | null =>
   e ? { status: e.status, code: e.code, message: e.message } : null
+
+/** Eroarea funcției server: statusul HTTP și codul stabil din corp (`{ error, code }`); fără status = rețea. */
+export async function functionBackendError(error: unknown): Promise<BackendError> {
+  const ctx = (error as { context?: { status?: unknown; json?: unknown } } | null)?.context
+  if (!ctx || typeof ctx.status !== 'number') return { message: 'Funcția serverului nu a răspuns.' }
+  let code: string | undefined
+  if (typeof ctx.json === 'function') {
+    try {
+      const body = (await (ctx.json as () => Promise<unknown>)()) as { code?: unknown } | null
+      if (typeof body?.code === 'string') code = body.code
+    } catch {
+      // corp ilizibil: doar statusul
+    }
+  }
+  return { status: ctx.status, code, message: 'Funcția serverului a refuzat cererea.' }
+}
 
 /** Adaptorul subțire peste supabase-js. Singurul loc care știe de clientul Supabase pentru autentificare. */
 export function createSupabaseBackend(client: SupabaseClient, storage: { setRemember: (r: boolean) => void }): AuthBackend {
@@ -81,6 +106,13 @@ export function createSupabaseBackend(client: SupabaseClient, storage: { setReme
     async updateUser({ password, fullName }) {
       const { error } = await client.auth.updateUser(fullName ? { password, data: { full_name: fullName } } : { password })
       return toError(error)
+    },
+    async replaceTemporaryPassword(password) {
+      const { error } = await client.functions.invoke('users', { body: { action: 'change_temporary_password', password } })
+      if (error) return functionBackendError(error)
+      // Sesiunea în care s-a schimbat parola rămâne validă; reîmprospătarea aduce app_metadata fără marcaj.
+      const { error: refreshError } = await client.auth.refreshSession()
+      return toError(refreshError)
     },
     async memberships(): Promise<Membership[]> {
       // RLS: utilizatorul vede doar propriile membership-uri; `revoked_at is null` exclude accesul revocat.

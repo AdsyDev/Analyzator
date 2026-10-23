@@ -43,6 +43,31 @@ describe('users (supabase)', () => {
     expect((await createSupabaseUsers(client).people()).kind).toBe('error')
   })
 
+  it('parola temporară vine din identitate doar ca true explicit; lipsa câmpului înseamnă false', async () => {
+    const fake = fakeDataClient({
+      tables: { memberships: [membership('u-1'), membership('u-2')], brand_access: [] },
+      invoke: identities([
+        { tenant_id: T, user_id: 'u-1', email: 'a@b.ro', full_name: null, last_sign_in_at: null, temporary_password: true },
+        { tenant_id: T, user_id: 'u-2', email: 'c@d.ro', full_name: null, last_sign_in_at: null },
+      ]),
+    })
+    const r = await createSupabaseUsers(fake.client).people()
+    if (r.kind !== 'ready') throw new Error('nu e ready')
+    expect(r.data.map((p) => [p.user_id, p.temporary_password])).toEqual([['u-1', true], ['u-2', false]])
+  })
+
+  it('contul creat direct trece prin funcția users (acțiunea create), cu parola; răspunsul în afara contractului e eroare', async () => {
+    const input = { tenant_id: T, email: 'dan@stada.ro', full_name: 'Dan', role: 'account' as const, brand_ids: ['b-1'], password: 'Temporar#2026' }
+    const fake = fakeDataClient({ userId: 'u-1', invoke: () => ({ data: { status: 'created', user_id: 'u-10' } }) })
+    expect(await createSupabaseUsers(fake.client).createAccount(input)).toEqual({ kind: 'ready', data: { status: 'created', user_id: 'u-10' } })
+    expect(fake.invocations).toEqual([{ name: 'users', body: { action: 'create', ...input } }])
+    expect(fake.calls).toEqual([])
+    const refused = fakeDataClient({ invoke: () => ({ error: { context: { json: async () => ({ error: 'Există deja un cont cu această adresă.' }) } } }) })
+    expect(await createSupabaseUsers(refused.client).createAccount(input)).toEqual({ kind: 'error', message: 'Există deja un cont cu această adresă.' })
+    const odd = fakeDataClient({ invoke: () => ({ data: { status: 'invited', user_id: 'u-10' } }) })
+    expect((await createSupabaseUsers(odd.client).createAccount(input)).kind).toBe('error')
+  })
+
   it('invitația trece prin funcția users (acțiunea invite), cu exact câmpurile din formular', async () => {
     const fake = fakeDataClient({ userId: 'u-1', invoke: () => ({ data: { status: 'invited', user_id: 'u-9' } }) })
     const input = { tenant_id: T, email: 'ana@stada.ro', full_name: 'Ana', role: 'client_viewer' as const, brand_ids: ['b-1'] }

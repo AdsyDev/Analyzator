@@ -102,12 +102,19 @@ export function LoginPage() {
   let card: ReactNode
   if (state.status === 'password_setup') {
     const invite = state.kind === 'invite'
+    const temporary = state.kind === 'temporary'
     card = (
       <form onSubmit={onSetup} className="flex flex-col gap-4" noValidate aria-describedby={error ? errId : undefined}>
         <h1 ref={heading} tabIndex={-1} className="font-display text-[22px] font-semibold tracking-[-0.01em] outline-none">
-          {invite ? 'Activează-ți contul' : 'Alege o parolă nouă'}
+          {invite ? 'Activează-ți contul' : temporary ? 'Schimbă parola temporară' : 'Alege o parolă nouă'}
         </h1>
-        <p className="text-[13.5px] leading-normal text-text-2">{invite ? 'Alege-ți parola ca să intri în Analyzator. Accesul tău a fost acordat prin invitație.' : 'Alege o parolă nouă pentru contul tău.'}</p>
+        <p className="text-[13.5px] leading-normal text-text-2">
+          {invite
+            ? 'Alege-ți parola ca să intri în Analyzator. Accesul tău a fost acordat prin invitație.'
+            : temporary
+              ? 'Contul tău a fost creat de un administrator cu o parolă temporară. Alege o parolă nouă, pe care doar tu o știi, ca să intri în Analyzator.'
+              : 'Alege o parolă nouă pentru contul tău.'}
+        </p>
         <Field label="Email" htmlFor={`${uid}-em`}>
           <input id={`${uid}-em`} type="email" value={state.email} readOnly className={INPUT} />
         </Field>

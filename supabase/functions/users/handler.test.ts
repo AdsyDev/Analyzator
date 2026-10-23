@@ -1,11 +1,12 @@
 import { test, describe, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { handle, parse, type HandlerDeps } from './handler.ts'
+import { handle, parse, parseAccount, type HandlerDeps } from './handler.ts'
 
 const ADMIN = '30000000-0000-0000-0000-000000000001'
 const STRATEGIST = '30000000-0000-0000-0000-000000000002'
 const NEW_USER = '30000000-0000-0000-0000-000000000099'
 const EXISTING = '30000000-0000-0000-0000-000000000012'
+const TEMP_USER = '30000000-0000-0000-0000-000000000098'
 const T1 = '10000000-0000-0000-0000-000000000001'
 const B1 = '20000000-0000-0000-0000-000000000011'
 const B2 = '20000000-0000-0000-0000-000000000021'
@@ -20,6 +21,10 @@ type State = {
   inTenant: Set<string>
   inviteStatus: number
   grantError?: { status: number; code: string }
+  /** Conturile cu marcajul `must_change_password` (parolă temporară). */
+  temporary: Set<string>
+  createResponse: { status: number; error_code?: string }
+  passwordResponse: { status: number; error_code?: string }
   calls: Array<{ url: string; method: string; body?: Record<string, unknown>; headers: Record<string, string> }>
 }
 
@@ -35,9 +40,26 @@ function fakeFetch(): HandlerDeps['fetch'] {
 
     if (url === `${env.supabaseUrl}/auth/v1/user`) {
       const id = state.users[(headers.Authorization ?? '').replace(/^Bearer /, '')]
-      return id ? ok({ id }) : ok({ msg: 'invalid' }, 401)
+      if (!id) return ok({ msg: 'invalid' }, 401)
+      if (method === 'PUT') {
+        const r = state.passwordResponse
+        return r.status === 200 ? ok({ id }) : ok({ code: r.status, error_code: r.error_code, msg: 'refuzat' }, r.status)
+      }
+      return ok({ id, app_metadata: { provider: 'email', ...(state.temporary.has(id) ? { must_change_password: true } : {}) } })
     }
     assert.equal(headers.Authorization, 'Bearer service-key', 'apelurile de administrare folosesc service role')
+    if (url === `${env.supabaseUrl}/auth/v1/admin/users` && method === 'POST') {
+      const r = state.createResponse
+      return r.status === 200 ? ok({ id: NEW_USER, email: body?.email }) : ok({ code: r.status, error_code: r.error_code, msg: 'refuzat' }, r.status)
+    }
+    if (url.startsWith(`${env.supabaseUrl}/auth/v1/admin/users/`)) {
+      const id = url.slice(`${env.supabaseUrl}/auth/v1/admin/users/`.length)
+      if (method === 'PUT') {
+        if ((body?.app_metadata as Record<string, unknown> | undefined)?.must_change_password === null) state.temporary.delete(id)
+        return ok({ id })
+      }
+      if (method === 'DELETE') return ok({})
+    }
     if (url.startsWith(`${env.supabaseUrl}/auth/v1/invite`)) {
       return state.inviteStatus === 200 ? ok({ id: NEW_USER, email: body?.email }) : ok({ msg: 'refuzat' }, state.inviteStatus)
     }
@@ -75,13 +97,16 @@ const valid = (over: Record<string, unknown> = {}) => ({ action: 'invite', tenan
 
 beforeEach(() => {
   state = {
-    users: { 'jwt-admin': ADMIN, 'jwt-strategist': STRATEGIST },
+    users: { 'jwt-admin': ADMIN, 'jwt-strategist': STRATEGIST, 'jwt-temp': TEMP_USER },
     admins: new Set([ADMIN]),
     members: new Set([ADMIN, STRATEGIST]),
     brands: new Set([B1]),
     account: null,
     inTenant: new Set(),
     inviteStatus: 200,
+    temporary: new Set([TEMP_USER]),
+    createResponse: { status: 200 },
+    passwordResponse: { status: 200 },
     calls: [],
   }
 })
@@ -122,7 +147,7 @@ describe('users: identitățile', () => {
   test('actorul autentificat (nu un id din corp) ajunge în tenant_people_for; răspunsul are doar câmpurile din contract', async () => {
     const res = await handle(request({ action: 'identities', p_actor_user_id: STRATEGIST }), deps())
     assert.equal(res.status, 200)
-    assert.deepEqual(await res.json(), { people: [{ tenant_id: T1, user_id: STRATEGIST, email: 'strategist.t1@test.local', full_name: null, last_sign_in_at: null }] })
+    assert.deepEqual(await res.json(), { people: [{ tenant_id: T1, user_id: STRATEGIST, email: 'strategist.t1@test.local', full_name: null, last_sign_in_at: null, temporary_password: false }] })
     const call = state.calls.find((c) => c.url.endsWith('rpc/tenant_people_for'))!
     assert.deepEqual(call.body, { p_actor_user_id: ADMIN })
   })
@@ -209,5 +234,115 @@ describe('users: invitația', () => {
     assert.equal(res.status, 403)
     const text = JSON.stringify(await res.json())
     assert.ok(!text.includes('service-key') && !text.includes('42501'))
+  })
+})
+
+const TEMP_PASSWORD = 'Temporar#2026'
+const account = (over: Record<string, unknown> = {}) => ({ ...valid(), action: 'create', password: TEMP_PASSWORD, ...over })
+const created = () => state.calls.filter((c) => c.url === `${env.supabaseUrl}/auth/v1/admin/users` && c.method === 'POST')
+
+describe('users: contul creat direct (E-5)', () => {
+  test('cont nou: activ, fără email, cu marcajul de schimbare; accesul cu auditul user_created; parola nu apare în răspuns', async () => {
+    const res = await handle(request(account()), deps())
+    assert.equal(res.status, 200)
+    const text = await res.text()
+    assert.deepEqual(JSON.parse(text), { status: 'created', user_id: NEW_USER })
+    assert.ok(!text.includes(TEMP_PASSWORD))
+    assert.deepEqual(created().map((c) => c.body), [
+      { email: 'ana.noua@stada.example', password: TEMP_PASSWORD, email_confirm: true, user_metadata: { full_name: 'Ana Nouă' }, app_metadata: { must_change_password: true } },
+    ])
+    assert.ok(!state.calls.some((c) => c.url.includes('/auth/v1/invite')), 'fără email de invitație')
+    const grant = state.calls.find((c) => c.url.endsWith('rpc/grant_invited_access'))!
+    assert.deepEqual(grant.body, { p_actor_user_id: ADMIN, p_tenant_id: T1, p_user_id: NEW_USER, p_role: 'client_viewer', p_brand_ids: [B1], p_audit_action: 'user_created' })
+  })
+
+  test('orice cont existent (activ sau invitat): 409, fără creare și fără schimbarea parolei', async () => {
+    for (const confirmed of [true, false]) {
+      state.calls = []
+      state.account = { user_id: EXISTING, confirmed }
+      const res = await handle(request(account()), deps())
+      assert.equal(res.status, 409, `confirmed=${confirmed}`)
+      assert.equal(created().length, 0)
+      assert.ok(!state.calls.some((c) => c.url.includes('/auth/v1/admin/users/') || c.url.endsWith('rpc/grant_invited_access')))
+    }
+  })
+
+  test('strategist (403), adminul altui client (404), brand străin (422), parolă scurtă (422): niciun cont creat', async () => {
+    assert.equal((await handle(request(account(), 'jwt-strategist'), deps())).status, 403)
+    assert.equal((await handle(request(account({ brand_ids: [B1, B2] })), deps())).status, 422)
+    const short = await handle(request(account({ password: 'scurta1' })), deps())
+    assert.equal(short.status, 422)
+    assert.equal(((await short.json()) as { code?: string }).code, 'weak_password')
+    state.members.delete(ADMIN)
+    state.admins.delete(ADMIN)
+    assert.equal((await handle(request(account()), deps())).status, 404)
+    assert.equal(created().length, 0)
+  })
+
+  test('validarea parolei: fără normalizare, cel mult 72 de octeți, fără caractere de control', () => {
+    assert.equal(parseAccount(account({ password: '  cu spații  ' })).password, '  cu spații  ')
+    assert.throws(() => parseAccount(account({ password: 'ă'.repeat(37) })))
+    assert.throws(() => parseAccount(account({ password: 'parola\nlunga' })))
+    assert.throws(() => parseAccount(account({ password: 12345678 })))
+  })
+
+  test('GoTrue: adresa apărută între timp (409), parolă refuzată de politică (422 weak_password)', async () => {
+    state.createResponse = { status: 422, error_code: 'email_exists' }
+    assert.equal((await handle(request(account()), deps())).status, 409)
+    state.createResponse = { status: 422, error_code: 'weak_password' }
+    const weak = await handle(request(account()), deps())
+    assert.equal(weak.status, 422)
+    assert.equal(((await weak.json()) as { code?: string }).code, 'weak_password')
+    assert.ok(!state.calls.some((c) => c.url.endsWith('rpc/grant_invited_access')))
+  })
+
+  test('accesul refuzat în SQL după creare: contul creat se șterge, eroarea rămâne', async () => {
+    state.grantError = { status: 403, code: '42501' }
+    const res = await handle(request(account()), deps())
+    assert.equal(res.status, 403)
+    assert.ok(state.calls.some((c) => c.method === 'DELETE' && c.url === `${env.supabaseUrl}/auth/v1/admin/users/${NEW_USER}`))
+  })
+})
+
+describe('users: schimbarea parolei temporare', () => {
+  const change = (password: unknown, jwt = 'jwt-temp') => handle(request({ action: 'change_temporary_password', password }, jwt), deps())
+
+  test('cu marcaj: parola se schimbă cu sesiunea persoanei, apoi marcajul se șterge cu service role', async () => {
+    const res = await change('ParolaMea#Noua1')
+    assert.equal(res.status, 200)
+    assert.deepEqual(await res.json(), { status: 'password_changed' })
+    const put = state.calls.findIndex((c) => c.method === 'PUT' && c.url === `${env.supabaseUrl}/auth/v1/user`)
+    const clear = state.calls.findIndex((c) => c.method === 'PUT' && c.url === `${env.supabaseUrl}/auth/v1/admin/users/${TEMP_USER}`)
+    assert.ok(put >= 0 && clear > put, 'întâi parola, apoi marcajul')
+    assert.equal(state.calls[put]!.headers.Authorization, 'Bearer jwt-temp', 'schimbarea folosește sesiunea persoanei, nu service role')
+    assert.deepEqual(state.calls[put]!.body, { password: 'ParolaMea#Noua1' })
+    assert.deepEqual(state.calls[clear]!.body, { app_metadata: { must_change_password: null } })
+    assert.ok(!state.temporary.has(TEMP_USER))
+  })
+
+  test('fără marcaj: 409 not_temporary, nicio schimbare (nu ocolește „Am uitat parola”)', async () => {
+    const res = await change('ParolaMea#Noua1', 'jwt-admin')
+    assert.equal(res.status, 409)
+    assert.equal(((await res.json()) as { code?: string }).code, 'not_temporary')
+    assert.ok(!state.calls.some((c) => c.method === 'PUT'))
+  })
+
+  test('aceeași parolă ca cea temporară: 422 same_password, marcajul rămâne', async () => {
+    state.passwordResponse = { status: 422, error_code: 'same_password' }
+    const res = await change(TEMP_PASSWORD)
+    assert.equal(res.status, 422)
+    assert.equal(((await res.json()) as { code?: string }).code, 'same_password')
+    assert.ok(state.temporary.has(TEMP_USER))
+    assert.ok(!state.calls.some((c) => c.url.includes('/auth/v1/admin/users/')))
+  })
+
+  test('parolă prea scurtă: 422 înainte de GoTrue; sesiune refuzată de GoTrue: 401 session_expired, marcajul rămâne', async () => {
+    assert.equal((await change('scurta')).status, 422)
+    assert.ok(!state.calls.some((c) => c.method === 'PUT'))
+    state.passwordResponse = { status: 403 }
+    const res = await change('ParolaMea#Noua1')
+    assert.equal(res.status, 401)
+    assert.equal(((await res.json()) as { code?: string }).code, 'session_expired')
+    assert.ok(state.temporary.has(TEMP_USER))
   })
 })

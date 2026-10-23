@@ -1,4 +1,5 @@
 import { useId, useMemo, useState, type FormEvent } from 'react'
+import { MIN_PASSWORD_LENGTH } from '../../auth/types'
 import { ROLES, type AccessPerson, type Brand, type InviteResult, type Role } from '../../contracts'
 import { EmptyState } from '../../components/EmptyState'
 import { Avatar } from '../../components/ui/Avatar'
@@ -31,7 +32,14 @@ export function inviteMessage(r: InviteResult, email: string): string {
   return `Invitația a fost trimisă la ${email}.`
 }
 
-/** Administrare → Utilizatori (doar `agency_admin`): roluri, acces la organizație și la branduri, invitații. */
+const PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!#%+?'
+
+/** Parolă temporară generată în browser (crypto), fără caractere ușor de confundat. Nu se păstrează nicăieri. */
+export function generatePassword(length = 16, random: (n: number) => Uint32Array = (n) => crypto.getRandomValues(new Uint32Array(n))): string {
+  return Array.from(random(length), (x) => PASSWORD_ALPHABET[x % PASSWORD_ALPHABET.length]).join('')
+}
+
+/** Administrare → Utilizatori (doar `agency_admin`): roluri, acces la organizație și la branduri, invitații și conturi noi. */
 export function UsersPage() {
   const { brands, user } = useLayout()
   const providers = useProviders()
@@ -44,9 +52,9 @@ export function UsersPage() {
           {(list) => <PeopleTable list={list} brands={brands} selfId={user.id} onChanged={people.reload} />}
         </Resolved>
       </Section>
-      <Section id="invite" title="Trimite invitație" description="Persoana primește pe email un link prin care își alege parola și intră în Analyzator.">
+      <Section id="invite" title="Adaugă o persoană" description="Prin invitație pe email sau direct, cu o parolă temporară pe care persoana o schimbă la prima intrare.">
         <Resolved state={people.state} onRetry={people.reload} loadingLabel="Se încarcă formularul" skeletonClass="h-40">
-          {(list) => <InviteForm list={list} brands={brands} selfId={user.id} onInvited={people.reload} />}
+          {(list) => <AddPersonForm list={list} brands={brands} selfId={user.id} onAdded={people.reload} />}
         </Resolved>
       </Section>
     </div>
@@ -67,46 +75,83 @@ function inviteTenants(list: AccessPerson[], selfId: string): Array<{ id: string
     .map(([id, rows]) => ({ id, name: rows[0]?.organization || id }))
 }
 
-function InviteForm({ list, brands, selfId, onInvited }: { list: AccessPerson[]; brands: Brand[]; selfId: string; onInvited: () => void }) {
+type AddMode = 'invite' | 'account'
+
+function AddPersonForm({ list, brands, selfId, onAdded }: { list: AccessPerson[]; brands: Brand[]; selfId: string; onAdded: () => void }) {
   const providers = useProviders()
   const toast = useToast()
-  const ids = [useId(), useId(), useId(), useId()] as const
+  const ids = [useId(), useId(), useId(), useId(), useId()] as const
   const tenants = useMemo(() => inviteTenants(list, selfId), [list, selfId])
   const [tenantId, setTenantId] = useState(() => tenants.find((t) => brands.some((b) => b.tenant_id === t.id))?.id ?? tenants[0]?.id ?? '')
+  const [mode, setMode] = useState<AddMode>('invite')
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
+  const [password, setPassword] = useState('')
   const [role, setRole] = useState<Role>('client_viewer')
   const [chosen, setChosen] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  // Doar până la închiderea ferestrei de confirmare: administratorul transmite parola, apoi ea dispare din pagină.
+  const [created, setCreated] = useState<{ email: string; password: string } | null>(null)
 
-  if (tenants.length === 0) return <EmptyState compact title="Niciun client de administrat" text="Invitațiile se trimit în clienții în care ai rolul de administrator al agenției." />
+  if (tenants.length === 0) return <EmptyState compact title="Niciun client de administrat" text="Persoanele se adaugă în clienții în care ai rolul de administrator al agenției." />
 
   const tenantBrands = brands.filter((b) => b.tenant_id === tenantId)
   const needsBrand = role !== 'agency_admin'
   const brandIds = needsBrand ? chosen.filter((id) => tenantBrands.some((b) => b.id === id)) : []
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())
-  const ok = emailOk && tenantId !== '' && (!needsBrand || brandIds.length > 0)
+  const passwordOk = mode === 'invite' || password.length >= MIN_PASSWORD_LENGTH
+  const ok = emailOk && passwordOk && tenantId !== '' && (!needsBrand || brandIds.length > 0)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     if (!ok || busy) return
     setBusy(true)
     const address = email.trim().toLowerCase()
-    const r = await providers.users.invite({ tenant_id: tenantId, email: address, full_name: fullName.trim() || null, role, brand_ids: brandIds })
+    const input = { tenant_id: tenantId, email: address, full_name: fullName.trim() || null, role, brand_ids: brandIds }
+    const r = mode === 'invite' ? await providers.users.invite(input) : await providers.users.createAccount({ ...input, password })
     setBusy(false)
     if (r.kind !== 'ready') {
       toast(r.kind === 'error' ? r.message : r.reason)
       return
     }
-    toast(inviteMessage(r.data, address))
+    if (r.data.status === 'created') setCreated({ email: address, password })
+    else toast(inviteMessage(r.data, address))
     setEmail('')
     setFullName('')
+    setPassword('')
     setChosen([])
-    onInvited()
+    onAdded()
+  }
+
+  async function copyPassword() {
+    if (!created) return
+    try {
+      await navigator.clipboard.writeText(created.password)
+      toast('Parola a fost copiată.')
+    } catch {
+      toast('Parola nu a putut fi copiată. Selecteaz-o și copiaz-o manual.')
+    }
   }
 
   return (
-    <form onSubmit={submit} aria-label="Trimite invitație" className="flex max-w-[640px] flex-col gap-4">
+    <form onSubmit={submit} aria-label="Adaugă o persoană" className="flex max-w-[640px] flex-col gap-4">
+      <fieldset className="flex flex-col gap-2">
+        <legend className="pb-1.5 text-[12.5px] font-semibold">Cum adaugi persoana</legend>
+        {(
+          [
+            ['invite', 'Trimite invitație pe email', 'Persoana primește un link și își alege singură parola.'],
+            ['account', 'Creează contul cu parolă temporară', 'Fără email. Îi transmiți tu parola, iar la prima intrare o schimbă obligatoriu.'],
+          ] as const
+        ).map(([value, label, hint]) => (
+          <label key={value} className="flex cursor-pointer items-start gap-2.5 text-[13px]">
+            <input type="radio" name={`${ids[4]}-mode`} value={value} checked={mode === value} onChange={() => setMode(value)} className="mt-0.5" />
+            <span className="leading-snug">
+              <span className="block font-medium">{label}</span>
+              <span className="block text-[12px] text-text-2">{hint}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
       {tenants.length > 1 && (
         <div className="flex flex-col gap-1.5">
           <label htmlFor={ids[0]} className="text-[12.5px] font-semibold">Client</label>
@@ -157,12 +202,58 @@ function InviteForm({ list, brands, selfId, onInvited }: { list: AccessPerson[];
       ) : (
         <p className="text-[12.5px] text-text-2">Administratorul agenției vede toate brandurile clientului și poate gestiona accesul celorlalți.</p>
       )}
+      {mode === 'account' && (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor={ids[4]} className="text-[12.5px] font-semibold">Parolă temporară</label>
+          <span className="flex flex-wrap items-center gap-2">
+            <input
+              id={ids[4]}
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={`Cel puțin ${MIN_PASSWORD_LENGTH} caractere`}
+              className={`${field} font-mono sm:max-w-[300px]`}
+              autoComplete="off"
+              spellCheck={false}
+              required
+            />
+            <Button variant="ghost" type="button" onClick={() => setPassword(generatePassword())}>Generează</Button>
+          </span>
+          {password.length > 0 && password.length < MIN_PASSWORD_LENGTH && <p className="text-[12px] text-text-2">Parola temporară trebuie să aibă cel puțin {MIN_PASSWORD_LENGTH} caractere.</p>}
+        </div>
+      )}
       <p className="text-[12px] leading-snug text-text-2">
-        Dacă persoana are deja cont în Analyzator, primește doar accesul, fără email nou. Linkul din invitație expiră; dacă persoana nu l-a folosit la timp, apasă „Retrimite invitația” în tabel.
+        {mode === 'invite'
+          ? 'Dacă persoana are deja cont în Analyzator, primește doar accesul, fără email nou. Linkul din invitație expiră; dacă persoana nu l-a folosit la timp, apasă „Retrimite invitația” în tabel.'
+          : 'Doar pentru adrese fără cont în Analyzator: pentru un cont existent folosește invitația, care acordă doar accesul. Transmite parola pe un canal sigur; după prima intrare, persoana își alege alta, pe care n-o mai știe nimeni.'}
       </p>
       <div>
-        <Button variant="primary" type="submit" loading={busy} disabled={!ok}>Trimite invitația</Button>
+        <Button variant="primary" type="submit" loading={busy} disabled={!ok}>{mode === 'invite' ? 'Trimite invitația' : 'Creează contul'}</Button>
       </div>
+      <Dialog
+        open={created !== null}
+        onClose={() => setCreated(null)}
+        title="Contul a fost creat"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => void copyPassword()}>Copiază parola</Button>
+            <Button variant="primary" onClick={() => setCreated(null)}>Am transmis parola</Button>
+          </>
+        }
+      >
+        {created && (
+          <div className="flex flex-col gap-3 text-[13.5px] leading-relaxed">
+            <p>Transmite-i persoanei adresa și parola temporară pe un canal sigur. La prima intrare va trebui să-și aleagă o parolă nouă.</p>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
+              <dt className="text-text-2">Email</dt>
+              <dd className="font-mono">{created.email}</dd>
+              <dt className="text-text-2">Parolă temporară</dt>
+              <dd className="select-all font-mono" aria-label="Parola temporară">{created.password}</dd>
+            </dl>
+            <p className="text-[12.5px] text-text-2">După ce închizi fereastra, parola nu mai poate fi afișată. Dacă se pierde, persoana folosește „Am uitat parola” la autentificare.</p>
+          </div>
+        )}
+      </Dialog>
     </form>
   )
 }
@@ -264,8 +355,16 @@ function PeopleTable({ list, brands, selfId, onChanged }: { list: AccessPerson[]
       render: (p) =>
         p.membership_active ? (
           <span className="inline-flex flex-wrap items-center gap-2">
-            {p.last_sign_in_at === null ? <StatusChip tone="warn">Invitație neacceptată</StatusChip> : <StatusChip tone="pos">Activ</StatusChip>}
-            {p.last_sign_in_at === null && p.email !== null && p.user_id !== selfId && (
+            {p.temporary_password ? (
+              <span title="Contul a fost creat cu o parolă temporară. Persoana o schimbă obligatoriu la prima intrare.">
+                <StatusChip tone="warn">Parolă temporară</StatusChip>
+              </span>
+            ) : p.last_sign_in_at === null ? (
+              <StatusChip tone="warn">Invitație neacceptată</StatusChip>
+            ) : (
+              <StatusChip tone="pos">Activ</StatusChip>
+            )}
+            {!p.temporary_password && p.last_sign_in_at === null && p.email !== null && p.user_id !== selfId && (
               <Button variant="ghost" disabled={busy === key(p)} onClick={() => void resend(p)} aria-label={`Retrimite invitația pentru ${personLabel(p)}`}>
                 Retrimite invitația
               </Button>

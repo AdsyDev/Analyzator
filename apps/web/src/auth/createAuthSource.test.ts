@@ -232,3 +232,68 @@ describe('createUnconfiguredAuth', () => {
     expect(a.preview).toBeUndefined()
   })
 })
+
+describe('createAuthSource: parola temporară (cont creat de administrator, E-5)', () => {
+  const temp = { userId: 'u7', email: 'creat@stada.example', fullName: 'Cont Creat', mustChangePassword: true }
+  const member = [{ role: 'client_viewer' as const, organization: 'STADA' }]
+
+  it('sesiunea cu marcaj duce la password_setup (temporary), nu în aplicație, chiar cu membership activ', async () => {
+    const { backend } = fakeAuthBackend({ session: temp, memberships: member })
+    const a = createAuthSource(backend, opts)
+    await flush()
+    expect(a.getSnapshot()).toEqual({ status: 'password_setup', kind: 'temporary', email: 'creat@stada.example' })
+  })
+
+  it('după autentificarea cu parola temporară, tot alegerea parolei urmează', async () => {
+    const { backend, api } = fakeAuthBackend({ memberships: member })
+    api.sessionAfterSignIn = temp
+    const a = createAuthSource(backend, opts)
+    await flush()
+    expect(await a.signIn({ email: temp.email, password: 'Temporar#1', remember: true })).toEqual({ ok: true })
+    expect(a.getSnapshot()).toMatchObject({ status: 'password_setup', kind: 'temporary' })
+  })
+
+  it('parola nouă trece prin server (nu prin updateUser), apoi intră în aplicație', async () => {
+    const { backend, api } = fakeAuthBackend({ session: temp, memberships: member })
+    const a = createAuthSource(backend, opts)
+    await flush()
+    expect(await a.completePasswordSetup({ password: 'scurta' })).toEqual({ ok: false, code: 'weak_password' })
+    expect(await a.completePasswordSetup({ password: 'Parola-mea-noua-1' })).toEqual({ ok: true })
+    expect(api.calls).toContainEqual(['replaceTemporary', 'Parola-mea-noua-1'])
+    expect(api.calls.some((c) => c[0] === 'update')).toBe(false)
+    expect(a.getSnapshot()).toMatchObject({ status: 'signed_in', user: { id: 'u7', role: 'client_viewer' } })
+  })
+
+  it('aceeași parolă ca cea temporară: same_password, rămâne la alegerea parolei', async () => {
+    const { backend, api } = fakeAuthBackend({ session: temp, memberships: member })
+    const a = createAuthSource(backend, opts)
+    await flush()
+    api.replaceError = { status: 422, code: 'same_password', message: 'x' }
+    expect(await a.completePasswordSetup({ password: 'Temporar#1-acelasi' })).toEqual({ ok: false, code: 'same_password' })
+    api.replaceError = { status: 422, code: 'weak_password', message: 'x' }
+    expect(await a.completePasswordSetup({ password: 'Temporar#1-acelasi' })).toEqual({ ok: false, code: 'weak_password' })
+    expect(a.getSnapshot()).toMatchObject({ status: 'password_setup', kind: 'temporary' })
+  })
+
+  it('sesiune expirată sau parolă deja schimbată (altă filă): ieșire din cont și session_expired', async () => {
+    for (const err of [{ status: 401, code: 'session_expired', message: 'x' }, { status: 409, code: 'not_temporary', message: 'x' }]) {
+      const { backend, api } = fakeAuthBackend({ session: temp, memberships: member })
+      const a = createAuthSource(backend, opts)
+      await flush()
+      api.replaceError = err
+      expect(await a.completePasswordSetup({ password: 'Parola-mea-noua-1' })).toEqual({ ok: false, code: 'session_expired' })
+      expect(a.getSnapshot()).toEqual({ status: 'signed_out' })
+      expect(api.calls).toContainEqual(['signOut'])
+    }
+  })
+
+  it('resetarea parolei unui cont care încă are marcajul trece tot prin server, ca marcajul să dispară', async () => {
+    const { backend, api } = fakeAuthBackend({ session: temp, memberships: member })
+    const a = createAuthSource(backend, { ...opts, initialLink: 'recovery' })
+    await flush()
+    expect(a.getSnapshot()).toMatchObject({ status: 'password_setup', kind: 'recovery' })
+    expect(await a.completePasswordSetup({ password: 'Parola-mea-noua-1' })).toEqual({ ok: true })
+    expect(api.calls).toContainEqual(['replaceTemporary', 'Parola-mea-noua-1'])
+    expect(a.getSnapshot().status).toBe('signed_in')
+  })
+})
