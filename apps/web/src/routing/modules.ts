@@ -111,6 +111,29 @@ export const SENTIMENT_FILTER: FilterDef = {
   ],
 }
 
+/** Farmacovigilență: starea marcajului și tipul itemului (mențiune sau răspuns AI). */
+export const PV_STATUS_FILTER: FilterDef = {
+  key: 'status',
+  label: 'Status',
+  defaultValue: 'all',
+  options: [
+    { value: 'all', label: 'Toate' },
+    { value: 'pending', label: 'În așteptare' },
+    { value: 'notified', label: 'Notificat' },
+    { value: 'acknowledged', label: 'Confirmat' },
+  ],
+}
+export const PV_ITEM_FILTER: FilterDef = {
+  key: 'item',
+  label: 'Tip',
+  defaultValue: 'all',
+  options: [
+    { value: 'all', label: 'Toate' },
+    { value: 'mention', label: 'Mențiuni' },
+    { value: 'ai_answer', label: 'Răspunsuri AI' },
+  ],
+}
+
 const MENTION_SOURCES: DynamicFilter = {
   key: 'source',
   label: 'Sursă',
@@ -136,7 +159,8 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
   overview: { segment: 'overview', title: 'Overview', subtitle: () => 'Starea brandului pe toate sursele. Apasă pe orice indicator ca să vezi înregistrările din spatele lui.', sources: ['ga4', 'gsc', 'seomonitor'], filters: [] },
   ai: { segment: 'ai', title: 'AI Visibility', subtitle: () => 'Cum apare brandul în răspunsurile asistenților AI, pe aceleași întrebări rulate zilnic.', sources: ['seomonitor'], filters: [ENGINE_FILTER], dynamicFilter: AI_GROUPS },
   seo: { segment: 'seo', title: 'SEO și Search', subtitle: () => 'Prezența în Google: clicks, poziții și subiectele pe care competitorii le acoperă înaintea ta.', sources: ['seomonitor', 'gsc'], filters: [KEYWORD_TYPE_FILTER] },
-  traffic: { segment: 'traffic', title: 'Trafic și conversii', subtitle: () => 'Ce se întâmplă după click: vizite, acțiuni importante și calitatea măsurării.', sources: ['ga4', 'clarity'], filters: [DEVICE_FILTER] },
+  traffic: { segment: 'traffic', title: 'Trafic și conversii', subtitle: () => 'Ce se întâmplă după click: vizite, acțiuni importante și calitatea măsurării.', sources: ['ga4'], filters: [DEVICE_FILTER] },
+  ux: { segment: 'ux', title: 'User experience', subtitle: () => 'Cum folosesc vizitatorii site-ul, din Microsoft Clarity: rage clicks, dead clicks, quick backs și scroll, pe device.', sources: ['clarity'], filters: [] },
   paid: {
     segment: 'paid',
     title: 'Paid Media',
@@ -155,6 +179,13 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
     disconnected: (b) => `Datele despre postările ${b} vin din Planable, care nu e încă conectat. Pentru comparația publică cu competitorii, vezi Concurență.`,
   },
   listening: { segment: 'listening', title: 'Listening', subtitle: () => 'Mențiunile publice despre brand, cu sentiment revizuit de echipa AdSymphony.', sources: [], filters: [SENTIMENT_FILTER, AUTHOR_FILTER], dynamicFilter: MENTION_SOURCES },
+  pharmacovigilance: {
+    segment: 'pharmacovigilance',
+    title: 'Farmacovigilență',
+    subtitle: () => 'Mențiunile și răspunsurile AI marcate pentru farmacovigilență, cu starea notificării. Vizibil doar administratorilor agenției.',
+    sources: [],
+    filters: [PV_STATUS_FILTER, PV_ITEM_FILTER],
+  },
   competition: { segment: 'competition', title: 'Concurență', subtitle: () => 'Brandul față de setul de competitori, pe aceleași surse și aceeași perioadă.', sources: [], filters: [] },
   insights: { segment: 'insights', title: 'Analize și acțiuni', subtitle: () => 'Interpretările echipei AdSymphony și acțiunile care decurg din ele.', sources: [], filters: [] },
 }

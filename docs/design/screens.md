@@ -71,7 +71,11 @@ KPI-uri; „Mention Rate pe engine" (card per engine, cu variație și număr de
 
 ## Trafic și conversii (`/brands/:id/traffic`)
 
-Filtre Device și Canal; „Canale" (sessions, pondere, variație); „AI referrals" (sursă, sessions, key events, rată); „Comportament" (Microsoft Clarity, pe device: rage clicks, dead clicks, quick backs, scroll depth, cu definiția fiecărei metrici) cu banner de sursă întârziată („Sincronizarea Clarity eșuează din <data>: ... Afișăm ultimele date importate.", „Reconectează în Surse"); „Tracking quality" (listă de verificări zilnice cu titlu, notă, status).
+Filtre Device și Canal; „Canale" (sessions, pondere, variație); „AI referrals" (sursă, sessions, key events, rată); „Tracking quality" (listă de verificări zilnice cu titlu, notă, status).
+
+## User experience (`/brands/:id/ux`)
+
+Mutat din Trafic (E-1, varianta a): „Comportament" (Microsoft Clarity, pe device: rage clicks, dead clicks, quick backs, scroll depth, cu definiția fiecărei metrici) cu banner de sursă întârziată („Sincronizarea Clarity eșuează din <data>: ... Afișăm ultimele date importate.", „Reconectează în Surse"). Trafic trimite aici printr-un link.
 
 ## Paid Media (`/brands/:id/paid`) și Social (`/brands/:id/social`)
 
@@ -79,7 +83,11 @@ Filtre Device și Canal; „Canale" (sessions, pondere, variație); „AI referr
 
 ## Listening (`/brands/:id/listening`)
 
-„Distribuția sentimentului" (bară segmentată pozitiv/neutru/negativ, cu număr și procent; „Fiecare sentiment e verificat de un om din echipa AdSymphony"); filtre sentiment și sursă; feed de mențiuni (sursă, autor, dată, text, sentiment, „Revizuit de <nume>", „Deschide sursa", PharmacovigilanceButton cu stare „Marcat pentru farmacovigilență <data>"); stare goală „Nicio mențiune pentru filtrele alese"; Mențiunile apar ca postări (E-3): carduri cu platforma, autorul (cont propriu sau extern), data, textul complet, sentimentul și linkul spre original. „Jurnal de farmacovigilență" (marcat la, item, utilizator, notificat, status), vizibil doar agenției și contactelor PV.
+„Distribuția sentimentului" (bară segmentată pozitiv/neutru/negativ, cu număr și procent; „Fiecare sentiment e verificat de un om din echipa AdSymphony"); filtre sentiment și sursă; feed de mențiuni (sursă, autor, dată, text, sentiment, „Revizuit de <nume>", „Deschide sursa", PharmacovigilanceButton cu stare „Marcat pentru farmacovigilență <data>"); stare goală „Nicio mențiune pentru filtrele alese"; Mențiunile apar ca postări (E-3): carduri cu platforma, autorul (cont propriu sau extern), data, textul complet, sentimentul și linkul spre original. Jurnalul PV are submeniul lui:
+
+## Listening → Farmacovigilență (`/brands/:id/pharmacovigilance`)
+
+E-2, varianta a. „Jurnal de farmacovigilență" (marcat la, item, utilizator, notificat, status), cu filtrele Status și Tip. Doar `agency_admin` (B7-14); celelalte roluri sunt redirecționate la Listening, fără cerere spre jurnal. Designul spunea „vizibil agenției și contactelor PV"; rămâne varianta îngustă din B7-14.
 
 ## Concurență (`/brands/:id/competition`)
 

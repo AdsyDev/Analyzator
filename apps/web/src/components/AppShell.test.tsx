@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -60,10 +60,13 @@ describe('AppShell', () => {
     expect(screen.getByText('Nicio sursă nu a importat date încă')).toBeInTheDocument()
   })
 
-  it('navigarea are cele 9 module și păstrează perioada, nu filtrele modulului', () => {
+  it('navigarea are cele 11 module pentru agency_admin și păstrează perioada, nu filtrele modulului', () => {
     setup()
     const nav = screen.getByRole('navigation', { name: 'Module' })
-    expect(within(nav).getAllByRole('link')).toHaveLength(9)
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual([
+      'Overview', 'AI Visibility', 'SEO și Search', 'Trafic și conversii', 'User experience', 'Paid Media', 'Social', 'Listening', 'Farmacovigilență', 'Concurență', 'Analize și acțiuni',
+    ])
+    expect(within(nav).getByRole('link', { name: 'Farmacovigilență' })).toHaveAttribute('href', '/brands/b1/pharmacovigilance?period=7d')
     const ai = within(nav).getByRole('link', { name: 'AI Visibility' })
     expect(ai).toHaveAttribute('href', '/brands/b1/ai?period=7d')
     expect(within(nav).getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page')
@@ -99,7 +102,17 @@ describe('AppShell', () => {
     setup({ brandId: null })
     const nav = screen.getByRole('navigation', { name: 'Module' })
     expect(within(nav).queryAllByRole('link')).toHaveLength(0)
-    expect(nav.querySelectorAll('[aria-disabled="true"]')).toHaveLength(9)
+    expect(nav.querySelectorAll('[aria-disabled="true"]')).toHaveLength(11)
+  })
+
+  it('Farmacovigilență (submeniul Listening) e doar pentru agency_admin (B7-14)', () => {
+    for (const user of [strategist, { ...strategist, role: 'account' as const }, client]) {
+      setup({ user })
+      const nav = screen.getByRole('navigation', { name: 'Module' })
+      expect(within(nav).getAllByRole('link')).toHaveLength(10)
+      expect(within(nav).queryByRole('link', { name: 'Farmacovigilență' }), user.role).toBeNull()
+      cleanup()
+    }
   })
 
   it('sidebar colapsabil, cu stare persistată și etichete păstrate pentru cititoare de ecran', async () => {

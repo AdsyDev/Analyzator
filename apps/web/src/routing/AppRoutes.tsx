@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes, useParams } from 'react-router-dom'
-import { canAccessAdmin, adminItemsFor, brandPath } from '../lib/navigation'
+import { BRAND_NAV, canAccessAdmin, canAccessBrandModule, adminItemsFor, brandPath } from '../lib/navigation'
 import { AppLayout, useLayout } from './AppLayout'
 import { LoginPage } from './LoginPage'
 import { ADMIN_MODULES, BRAND_MODULES } from './modules'
@@ -13,11 +13,13 @@ import { InsightsPage } from '../screens/insights/InsightsPage'
 import { AiPage } from '../screens/ai/AiPage'
 import { CompetitionPage } from '../screens/competition/CompetitionPage'
 import { ListeningPage } from '../screens/listening/ListeningPage'
+import { PharmacovigilancePage } from '../screens/listening/PharmacovigilancePage'
 import { OverviewPage } from '../screens/overview/OverviewPage'
 import { PaidPage } from '../screens/paid/PaidPage'
 import { SeoPage } from '../screens/seo/SeoPage'
 import { SocialPage } from '../screens/social/SocialPage'
 import { TrafficPage } from '../screens/traffic/TrafficPage'
+import { UxPage } from '../screens/ux/UxPage'
 
 /** `/`: spre Overview-ul ultimului brand permis (sau al primului). Fără brand permis, AppLayout arată mesajul. */
 function HomeRedirect() {
@@ -32,17 +34,24 @@ function BrandIndexRedirect() {
 
 function BrandModulePage() {
   const { segment } = useParams()
-  const { brand } = useLayout()
+  const { brand, user } = useLayout()
   const module = segment ? BRAND_MODULES[segment] : undefined
   if (!module || !brand) return <NotFoundPage />
+  // Modul restrâns la un rol (Farmacovigilență: doar agency_admin): spre modulul părinte, fără să confirmi pagina.
+  if (!canAccessBrandModule(user.role, module.segment)) {
+    const parent = BRAND_NAV.find((i) => i.segment === module.segment)?.parent ?? 'overview'
+    return <Navigate to={brandPath(brand.id, parent)} replace />
+  }
   // Ecranele construite înlocuiesc placeholder-ul; restul (UI-3…UI-6) rămân pe starea reală a surselor.
   if (module.segment === 'overview') return <OverviewPage />
   if (module.segment === 'ai') return <AiPage />
   if (module.segment === 'seo') return <SeoPage />
   if (module.segment === 'traffic') return <TrafficPage />
+  if (module.segment === 'ux') return <UxPage />
   if (module.segment === 'paid') return <PaidPage />
   if (module.segment === 'social') return <SocialPage />
   if (module.segment === 'listening') return <ListeningPage />
+  if (module.segment === 'pharmacovigilance') return <PharmacovigilancePage />
   if (module.segment === 'competition') return <CompetitionPage />
   if (module.segment === 'insights') return <InsightsPage />
   return <NotFoundPage />

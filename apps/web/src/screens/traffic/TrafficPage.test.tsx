@@ -10,12 +10,15 @@ const ROUTE = '/brands/brand-urinal/traffic'
 const open = () => pageReady('Trafic și conversii')
 
 describe('Trafic și conversii: structura din spec cap. 16', () => {
-  it('KPI, canale, AI referrals, comportament și tracking quality', async () => {
-    renderApp({ route: ROUTE })
+  it('KPI, canale, AI referrals și tracking quality; comportamentul Clarity e în User experience (E-1)', async () => {
+    renderApp({ route: `${ROUTE}?period=7d` })
     await open()
     expect(within(screen.getByTestId('kpi-grid')).getAllByRole('article')).toHaveLength(5)
-    for (const h of ['Canale', 'AI referrals', 'Comportament', 'Tracking quality']) expect(screen.getByRole('heading', { level: 2, name: h })).toBeInTheDocument()
+    for (const h of ['Canale', 'AI referrals', 'Tracking quality']) expect(screen.getByRole('heading', { level: 2, name: h })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 2, name: 'Comportament' })).toBeNull()
     expect(screen.getByText(/Ce se întâmplă după click/)).toBeInTheDocument()
+    await userEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'User experience' }))
+    await waitFor(() => expect(where()).toBe('/brands/brand-urinal/ux?period=7d'))
   })
 
   it('stările KPI din registru; „Engagement rate" nu e în registru și nu se calculează în UI', async () => {
@@ -88,64 +91,6 @@ describe('Trafic: AI referrals', () => {
   })
 })
 
-describe('Trafic: comportament (Clarity)', () => {
-  it('Urinal: banner de sincronizare cu motivul, „Reconectează în Surse" pentru agency_admin', async () => {
-    renderApp({ route: ROUTE })
-    await open()
-    const alert = await within(section('Comportament')).findByRole('alert')
-    expect(alert).toHaveTextContent('Sincronizarea Clarity are probleme: Tokenul API a expirat.')
-    expect(alert).toHaveTextContent(/Afișăm ultimele date importate/)
-    await userEvent.click(within(alert).getByRole('button', { name: 'Reconectează în Surse' }))
-    await waitFor(() => expect(where()).toBe('/admin/clients/brand-urinal?source=clarity'))
-  })
-
-  it('strategistul vede bannerul, dar nu acțiunea spre Surse', async () => {
-    renderApp({ route: ROUTE, role: 'strategist' })
-    await open()
-    const alert = await within(section('Comportament')).findByRole('alert')
-    expect(within(alert).queryByRole('button')).toBeNull()
-  })
-
-  it('tabelul: patru metrici din registru, coloanele Toate + device, definiții provizorii marcate, stare Învechit', async () => {
-    renderApp({ route: ROUTE })
-    await open()
-    const s = section('Comportament')
-    const table = await within(s).findByRole('table')
-    for (const h of ['Indicator', 'Toate', 'Desktop', 'Mobil', 'Tabletă', 'Stare']) expect(within(table).getByRole('columnheader', { name: h })).toBeInTheDocument()
-    const rows = within(table).getAllByRole('row').slice(1)
-    expect(rows.map((r) => within(r).getByRole('rowheader').textContent)).toEqual([
-      expect.stringContaining('Sesiuni cu rage clicks'), expect.stringContaining('Sesiuni cu dead clicks'), expect.stringContaining('Sesiuni cu quick backs'), expect.stringContaining('Scroll depth mediu'),
-    ])
-    for (const r of rows) {
-      expect(within(r).getByText('Provizoriu')).toBeInTheDocument() // definiții draft în registru
-      expect(within(r).getByText('Învechit')).toBeInTheDocument()
-    }
-    expect(within(s).getAllByText(/Date până la/).length).toBeGreaterThan(0)
-  })
-
-  it('valorile pe device nu sunt zero când lipsesc: Proenzi nu are Clarity conectat', async () => {
-    renderApp({ route: '/brands/brand-proenzi/traffic' })
-    await open()
-    expect(await within(section('Comportament')).findByText(/Sursa Microsoft Clarity nu este conectată pentru acest brand/)).toBeInTheDocument()
-    expect(within(section('Comportament')).queryByRole('alert')).toBeNull()
-  })
-
-  it('Minimartieni: Clarity sănătos, fără banner', async () => {
-    renderApp({ route: '/brands/brand-minimartieni/traffic' })
-    await open()
-    await within(section('Comportament')).findByRole('table')
-    expect(within(section('Comportament')).queryByRole('alert')).toBeNull()
-  })
-
-  it('tooltipul fiecărui indicator arată definiția din registru', async () => {
-    renderApp({ route: ROUTE })
-    await open()
-    const th = within(await within(section('Comportament')).findByRole('table')).getAllByRole('rowheader')[0]!
-    await userEvent.click(within(th).getByRole('button', { name: 'Ce înseamnă indicatorul' }))
-    expect(within(th).getByRole('tooltip')).toHaveTextContent('Sesiunile Clarity cu rage clicks; suma zilelor.')
-  })
-})
-
 describe('Trafic: tracking quality', () => {
   it('verificări cu stare în text (Problemă, Avertisment, În regulă) și momentul verificării', async () => {
     renderApp({ route: ROUTE })
@@ -193,7 +138,8 @@ describe('Trafic: izolarea secțiunilor și providerul real', () => {
     renderApp({ route: ROUTE, wrap: (b) => ({ ...b, traffic: { channels: async (c, d) => (calls.ch++, b.traffic.channels(c, d)), aiReferrals: async (c) => (calls.ai++, b.traffic.aiReferrals(c)), clarityDevices: async (c) => (calls.cl++, b.traffic.clarityDevices(c)), trackingQuality: async (c) => (calls.tq++, b.traffic.trackingQuality(c)) } }) })
     await open()
     await new Promise((r) => setTimeout(r, 300))
-    expect(calls).toEqual({ ch: 1, ai: 1, cl: 1, tq: 1 })
+    // Clarity nu se mai cere aici: are pagina lui (User experience).
+    expect(calls).toEqual({ ch: 1, ai: 1, cl: 0, tq: 1 })
   })
 
   it('un brand nepermis nu declanșează nicio cerere de trafic', async () => {
