@@ -132,6 +132,21 @@ Migrația `20261012290000_rls_brand_access_once_per_query.sql`, decizia D-20.
 - Politicile cu condiții compuse (analize, recomandări, acțiuni, dovezi, `brands`) rămân pe `has_brand_access`.
 - Teste: `19_rls_brand_access_once.test.sql` (R1: toate cele 21 de politici; R2: aceeași mulțime ca `has_brand_access` pentru strategist, client fără acces, alt tenant și admin; R3: INVOKER, fără `anon`), plus izolarea existentă (01–03) și lista A10.
 
+### E10. Identitatea persoanelor și invitarea (23 oct 2026, cererea E-4; în regimul E1)
+
+Migrația `20261023090000_people_identity_invite.sql`, decizia E-4. Emailul și numele trăiesc doar în `auth.users`, inaccesibil clientului. Trei funcții noi în `public`, **SECURITY DEFINER, executabile doar de service_role** (verificat și în corp cu `assert_service_role`), ca la E1:
+
+| Funcție | Returnează | Cine o apelează |
+|---|---|---|
+| `tenant_people_for(actor)` | email, nume, ultima autentificare pentru membrii tenanților în care **actorul** e `agency_admin` activ (tenant activ); alt rol = zero rânduri | Edge Function `users` (`identities`) |
+| `find_user_for_invite(email)` | id-ul contului și dacă e activat | Edge Function `users` (`invite`) |
+| `grant_invited_access(actor, tenant, user, role, brands)` | id-ul membership-ului; verifică în corp actorul `agency_admin` pe tenant, brandurile active din același tenant, lipsa unui rând existent; scrie atomic membership, `brand_access` (`granted_by` = actor) și auditul `user_invited` cu actorul real | Edge Function `users` (`invite`) |
+
+- Funcția `users` autentifică sesiunea prin `/auth/v1/user` și trimite actorul **din sesiune**, nu din corpul cererii; verifică explicit `tenant_id` înainte de orice email (rol, brandurile clientului, persoana deja în listă).
+- Clientul nu primește nicio funcție nouă: lista A10/A11 de funcții executabile de `anon`/`authenticated` e aceeași. Cele trei sunt adăugate explicit în lista din `04_security_inventory.test.sql`.
+- **Risc acceptat:** un `agency_admin` află, la invitație, dacă adresa avea deja un cont activ (răspunsul `access_granted`, fără email). Adresa e una pe care o adaugă chiar în clientul lui, unde persoana devine vizibilă oricum.
+- Teste: `21_people_invite.test.sql` (P1–P3), `supabase/functions/users/handler.test.ts`, `tests/security/edge-users.test.mjs` (H1–H2).
+
 ## Inventar la 7 oct 2026
 
 | Tip | Ce există | Acoperit de |
@@ -357,3 +372,14 @@ Ultima rulare: 7 oct 2026, 13/13 mutații prinse.
 | G3 | `alert_contacts` și `ops_notifications` de non-admin, client, admin T2; modificarea cozii de utilizatori | refuzat / gol; coada rămâne `pending` |
 
 **Neverificat (B8):** rularea orchestratorului pe conectorii reali cu surse reale (doar adaptoare cu conexiuni lipsă și runneri simulați); trimiterea reală a alertelor prin Resend; comportamentul cu zeci de branduri (view-ul `source_status` face câte un lateral join pe sursă și brand; neprofilat); ora de vară pentru cron.
+
+## H. Utilizatori prin HTTP real (`tests/security/edge-users.test.mjs`)
+
+Funcția server `users` (excepția E10). Rulează cu `npm run test:security`; conturile create de test se șterg la final.
+
+| ID | Vector | Rezultat așteptat |
+|---|---|---|
+| H1 | `identities` cerut de admin T1, admin T2, strategist, account, client cu și fără acces; fără sesiune, cheia anon, JWT semnat greșit; `tenant_people_for`, `find_user_for_invite`, `grant_invited_access` apelate direct prin REST de admin T1 | fiecare admin vede doar tenantul lui; ceilalți: listă goală; 401 fără sesiune validă; apelurile directe refuzate și nimic scris |
+| H2 | invitație fără sesiune / cu cheia anon; de strategist, client, admin T2 în T1; cu un brand din T2; invitație validă; cont activ existent; același cont a doua oară | 401 / 403 / 404 / 422 fără cont creat; invitația creează contul, rolul, accesul la brand și auditul cu actorul real, vizibile doar în T1; contul activ primește doar accesul; a doua oară 409, rolul neschimbat |
+
+**Neverificat (E-4):** livrarea emailului de invitație în producție (local îl prinde Mailpit); șablonul și limita de emailuri ale serverului SMTP din proiectul Supabase; durata linkului din invitație în producție.

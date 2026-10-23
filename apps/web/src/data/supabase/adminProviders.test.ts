@@ -5,9 +5,13 @@ import { createSupabaseConfig, createSupabaseUsers } from './adminProviders'
 const T = 't-1'
 const membership = (user_id: string, role = 'strategist', revoked_at: string | null = null) => ({ tenant_id: T, user_id, role, revoked_at, created_at: '2026-09-01T09:00:00Z', tenants: { name: 'AdSymphony' } })
 
+/** Funcția server `users`: `identities` întoarce rândurile date; orice altceva, eroare. */
+const identities = (rows: unknown[]) => (name: string, body: unknown) =>
+  name === 'users' && (body as { action?: string }).action === 'identities' ? { data: { people: rows } } : { error: { message: 'necunoscut' } }
+
 describe('users (supabase)', () => {
-  it('construiește persoanele din membership și brand_access; fără nume sau email inventate', async () => {
-    const { client } = fakeDataClient({
+  it('construiește persoanele din membership, brand_access și identitatea din tenant_people; lipsa rămâne null', async () => {
+    const fake = fakeDataClient({
       tables: {
         memberships: [membership('u-1', 'agency_admin'), membership('u-2', 'client_viewer', '2026-10-01T00:00:00Z')],
         brand_access: [
@@ -15,17 +19,46 @@ describe('users (supabase)', () => {
           { tenant_id: T, brand_id: 'b-2', user_id: 'u-2', revoked_at: '2026-10-02T00:00:00Z' },
         ],
       },
+      invoke: identities([
+        { tenant_id: T, user_id: 'u-1', email: 'ioana@adsymphony.ro', full_name: 'Ioana Popescu', last_sign_in_at: '2026-10-20T08:00:00Z' },
+        // Aceeași persoană în alt tenant nu se lipește de rândul din T.
+        { tenant_id: 't-2', user_id: 'u-2', email: 'alt@client.ro', full_name: 'Alt Tenant', last_sign_in_at: null },
+      ]),
     })
-    const r = await createSupabaseUsers(client).people()
+    const r = await createSupabaseUsers(fake.client).people()
     if (r.kind !== 'ready') throw new Error('nu e ready')
+    expect(fake.invocations).toEqual([{ name: 'users', body: { action: 'identities' } }])
     expect(r.data).toHaveLength(2)
-    expect(r.data[0]).toMatchObject({ user_id: 'u-1', role: 'agency_admin', organization: 'AdSymphony', membership_active: true, name: null, email: null, brands: [] })
-    expect(r.data[1]).toMatchObject({ user_id: 'u-2', membership_active: false, brands: [{ brand_id: 'b-1', active: true }, { brand_id: 'b-2', active: false }] })
+    expect(r.data[0]).toMatchObject({ user_id: 'u-1', role: 'agency_admin', organization: 'AdSymphony', membership_active: true, name: 'Ioana Popescu', email: 'ioana@adsymphony.ro', last_sign_in_at: '2026-10-20T08:00:00Z', brands: [] })
+    expect(r.data[1]).toMatchObject({ user_id: 'u-2', membership_active: false, name: null, email: null, last_sign_in_at: null, brands: [{ brand_id: 'b-1', active: true }, { brand_id: 'b-2', active: false }] })
+  })
+
+  it('eroarea la citirea identității e eroare, nu o listă fără nume', async () => {
+    const { client } = fakeDataClient({ tables: { memberships: [membership('u-1')], brand_access: [] } })
+    expect((await createSupabaseUsers(client).people()).kind).toBe('error')
   })
 
   it('un rol necunoscut în răspuns dă eroare, nu o presupunere', async () => {
-    const { client } = fakeDataClient({ tables: { memberships: [membership('u-1', 'superuser')], brand_access: [] } })
+    const { client } = fakeDataClient({ tables: { memberships: [membership('u-1', 'superuser')], brand_access: [] }, invoke: identities([]) })
     expect((await createSupabaseUsers(client).people()).kind).toBe('error')
+  })
+
+  it('invitația trece prin funcția users (acțiunea invite), cu exact câmpurile din formular', async () => {
+    const fake = fakeDataClient({ userId: 'u-1', invoke: () => ({ data: { status: 'invited', user_id: 'u-9' } }) })
+    const input = { tenant_id: T, email: 'ana@stada.ro', full_name: 'Ana', role: 'client_viewer' as const, brand_ids: ['b-1'] }
+    expect(await createSupabaseUsers(fake.client).invite(input)).toEqual({ kind: 'ready', data: { status: 'invited', user_id: 'u-9' } })
+    expect(fake.invocations).toEqual([{ name: 'users', body: { action: 'invite', ...input } }])
+    expect(fake.calls).toEqual([])
+  })
+
+  it('invitația: mesajul funcției server ajunge în interfață; un răspuns în afara contractului e eroare', async () => {
+    const refused = fakeDataClient({ invoke: () => ({ error: { context: { json: async () => ({ error: 'Persoana este deja în lista acestui client.' }) } } }) })
+    expect(await createSupabaseUsers(refused.client).invite({ tenant_id: T, email: 'a@b.ro', full_name: null, role: 'account', brand_ids: [] })).toEqual({
+      kind: 'error',
+      message: 'Persoana este deja în lista acestui client.',
+    })
+    const odd = fakeDataClient({ invoke: () => ({ data: { status: 'maybe', user_id: 'u-9' } }) })
+    expect((await createSupabaseUsers(odd.client).invite({ tenant_id: T, email: 'a@b.ro', full_name: null, role: 'account', brand_ids: [] })).kind).toBe('error')
   })
 
   it('nu își poate schimba singur rolul, nu își poate revoca singur accesul și nu face nicio scriere', async () => {

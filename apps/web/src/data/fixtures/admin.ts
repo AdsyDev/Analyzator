@@ -27,8 +27,10 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
     since: instantDaysAgo(p.since_days_ago),
     name: p.name,
     email: p.email,
+    last_sign_in_at: instantDaysAgo(1),
     brands: p.brands.map((brand_id) => ({ brand_id, active: true })),
   }))
+  let invited = 0
 
   const adminOnly = () => (getRole() === 'agency_admin' ? null : failed<never>('Administrarea utilizatorilor este disponibilă doar administratorilor agenției.'))
   const find = (tenantId: string, userId: string) => people.find((p) => p.tenant_id === tenantId && p.user_id === userId)
@@ -65,6 +67,36 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
       if (existing) existing.active = active
       else p.brands.push({ brand_id: brandId, active })
       return ready(null)
+    },
+    // Fără email real: persoana apare în listă ca „Invitație neacceptată”, ca după funcția server.
+    invite: async (input) => {
+      const denied = adminOnly()
+      if (denied) return denied
+      const email = input.email.trim().toLowerCase()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return failed('Adresa de email nu este validă.')
+      if (input.brand_ids.some((b) => !allowed.has(b))) return failed('Unul dintre brandurile alese nu există, e arhivat sau aparține altui client.')
+      const organization = people.find((p) => p.tenant_id === input.tenant_id)?.organization
+      if (organization === undefined) return failed('Client inexistent.')
+      const same = people.find((p) => p.tenant_id === input.tenant_id && p.email === email)
+      if (same) {
+        if (same.last_sign_in_at === null) return ready({ status: 'resent' as const, user_id: same.user_id })
+        return failed('Persoana este deja în lista acestui client. Restabilește-i accesul din tabel.')
+      }
+      invited += 1
+      const user_id = `preview-invite-${invited}`
+      people.push({
+        user_id,
+        tenant_id: input.tenant_id,
+        organization,
+        role: input.role,
+        membership_active: true,
+        since: now().toISOString(),
+        name: input.full_name,
+        email,
+        last_sign_in_at: null,
+        brands: input.brand_ids.map((brand_id) => ({ brand_id, active: true })),
+      })
+      return ready({ status: 'invited' as const, user_id })
     },
   }
 

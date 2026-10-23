@@ -44,7 +44,7 @@ function mapTenantConnection(r: TenantConnectionRow): TenantConnection {
 }
 
 /** Mesajul în română al funcției server (`{ error }`), dacă răspunsul HTTP îl conține; altfel un mesaj generic. */
-async function functionError(error: unknown): Promise<string> {
+export async function functionError(error: unknown): Promise<string> {
   const ctx = (error as { context?: unknown } | null)?.context
   if (ctx && typeof (ctx as { json?: unknown }).json === 'function') {
     try {

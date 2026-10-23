@@ -93,7 +93,7 @@ Taburi (agenție: „Flux editorial" și vederea publicată; client: doar public
 
 - **Clienți și site-uri** (`/admin/clients`): carduri de client (status, industrie, număr de spații, utilizatori, contacte PV, „Client din <data>"), tabel de spații de brand (domeniu, surse, utilizatori, ultimul import, status, acțiune „Deschis acum"/„Deschide"), „Adaugă client" și „Adaugă site" ca wizard cu pași (client, brand, competitori cu versiune v1, conectare surse „din 8 surse conectate", utilizatori).
 - **Sursele unui site** (`/admin/clients/:brandId`, înlocuiește `/admin/sources`): un card per sursă (monogramă, nume, ce aduce, stare, „Date până la", „Importat la", acțiuni Reîncearcă / Reconectează / Conectează) și „Istoricul sincronizărilor" (sursă, dată, durată, rânduri, status). Specificația completă a conexiunilor și a testării tokenului e în secțiunea de la începutul acestui fișier și are prioritate față de design.
-- **Utilizatori** (`/admin/users`): „Persoane cu acces" (persoană cu avatar și email, rol, branduri, ultima activitate), „Trimite invitație" (invitațiile sunt valabile 7 zile; cititorii văd doar analizele publicate).
+- **Utilizatori** (`/admin/users`): „Persoane cu acces" (persoană cu avatar și email, rol, branduri, ultima activitate), „Trimite invitație" (cititorii văd doar analizele publicate). Implementat (E-4): durata linkului din invitație e setarea din Supabase, nu 7 zile fixe; persoanele care nu au intrat încă apar „Invitație neacceptată", cu „Retrimite invitația".
 - **Configurare** (`/admin/config`): în design doar EmptyState. Conținutul (competitori cu versiune și dată efectivă, aliasuri, grupuri SEOmonitor → brand) vine în UI-6.
 
 ## Componente transversale (din „Sistem UI")

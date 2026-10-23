@@ -102,9 +102,10 @@ select is_empty(
 -- A10. Funcții SECURITY DEFINER --------------------------------------------------------
 -- Excepție aprobată (7 oct 2026, docs/security-tests.md): funcțiile server din public, doar pentru service_role.
 -- O funcție nouă în public trebuie adăugată explicit în lista de mai jos, după revizuire.
+-- E10 (23 oct 2026): find_user_for_invite, grant_invited_access, tenant_people_for, doar service_role (funcția server `users`).
 create temporary table allowed_public_functions (name text primary key) on commit drop;
 insert into allowed_public_functions values
-  ('brand_ai_answer'), ('brand_ai_answers'), ('brand_ai_cited_sources'), ('brand_ai_engines'), ('brand_ai_topic_matrix'), ('brand_ai_trends'), ('brand_clarity_devices'), ('brand_competition'), ('brand_competition_gaps'), ('brand_insights'), ('brand_landing_pages'), ('brand_mention_sentiment'), ('brand_mentions'), ('brand_metric_trends'), ('brand_metrics'), ('brand_paid'), ('brand_search_keywords'), ('brand_social'), ('brand_traffic_channels'), ('create_competitor_set_version'), ('get_source_token'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token');
+  ('brand_ai_answer'), ('brand_ai_answers'), ('brand_ai_cited_sources'), ('brand_ai_engines'), ('brand_ai_topic_matrix'), ('brand_ai_trends'), ('brand_clarity_devices'), ('brand_competition'), ('brand_competition_gaps'), ('brand_insights'), ('brand_landing_pages'), ('brand_mention_sentiment'), ('brand_mentions'), ('brand_metric_trends'), ('brand_metrics'), ('brand_paid'), ('brand_search_keywords'), ('brand_social'), ('brand_traffic_channels'), ('create_competitor_set_version'), ('find_user_for_invite'), ('get_source_token'), ('grant_invited_access'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token'), ('tenant_people_for');
 
 select is_empty(
   $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -127,7 +128,7 @@ select is_empty(
 select results_eq(
   $$ select p.proname::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and has_function_privilege('service_role', p.oid, 'execute') order by 1 $$,
-  $$ values ('brand_ai_answer'::text collate "C"), ('brand_ai_answers'), ('brand_ai_cited_sources'), ('brand_ai_engines'), ('brand_ai_topic_matrix'), ('brand_ai_trends'), ('brand_clarity_devices'), ('brand_competition'), ('brand_competition_gaps'), ('brand_insights'), ('brand_landing_pages'), ('brand_mention_sentiment'), ('brand_mentions'), ('brand_metric_trends'), ('brand_metrics'), ('brand_paid'), ('brand_search_keywords'), ('brand_social'), ('brand_traffic_channels'), ('create_competitor_set_version'), ('get_source_token'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token') $$,
+  $$ values ('brand_ai_answer'::text collate "C"), ('brand_ai_answers'), ('brand_ai_cited_sources'), ('brand_ai_engines'), ('brand_ai_topic_matrix'), ('brand_ai_trends'), ('brand_clarity_devices'), ('brand_competition'), ('brand_competition_gaps'), ('brand_insights'), ('brand_landing_pages'), ('brand_mention_sentiment'), ('brand_mentions'), ('brand_metric_trends'), ('brand_metrics'), ('brand_paid'), ('brand_search_keywords'), ('brand_social'), ('brand_traffic_channels'), ('create_competitor_set_version'), ('find_user_for_invite'), ('get_source_token'), ('grant_invited_access'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token'), ('tenant_people_for') $$,
   'A10: funcțiile aprobate sunt executabile de service_role'
 );
 select is_empty(
