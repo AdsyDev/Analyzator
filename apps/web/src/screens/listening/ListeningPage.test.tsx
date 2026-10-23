@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { pageReady, renderApp } from '../../test/renderApp'
+import { pageReady, renderApp, where } from '../../test/renderApp'
 
 const URINAL = '/brands/brand-urinal/listening'
 
@@ -45,9 +45,13 @@ describe('Listening', () => {
     await waitFor(() => expect(screen.getAllByTestId('mention')[0]).toHaveAttribute('data-flagged', 'true'))
   })
 
-  it('jurnalul PV: vizibil pentru agency_admin, absent pentru strategist și client', async () => {
-    renderApp({ route: URINAL })
+  it('jurnalul PV s-a mutat în submeniul Farmacovigilență (E-2): agency_admin are linkul, fără jurnal pe pagină', async () => {
+    renderApp({ route: `${URINAL}?period=7d` })
     await pageReady('Listening')
+    await screen.findAllByTestId('mention')
+    expect(screen.queryByRole('heading', { level: 2, name: 'Jurnal de farmacovigilență' })).toBeNull()
+    await userEvent.click(screen.getByRole('link', { name: 'Listening → Farmacovigilență' }))
+    await waitFor(() => expect(where()).toBe('/brands/brand-urinal/pharmacovigilance?period=7d'))
     expect(await screen.findByRole('heading', { level: 2, name: 'Jurnal de farmacovigilență' })).toBeInTheDocument()
   })
 

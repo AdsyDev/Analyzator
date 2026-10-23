@@ -46,18 +46,20 @@ const columns: Column<PvLogEntry>[] = [
   },
 ]
 
-/** Jurnalul de farmacovigilență. Doar `agency_admin` (brief cap. 6, spec cap. 28); nu se cere pentru alte roluri. */
-export function PvLogSection({ state, onRetry }: { state: AsyncState<ProviderResult<PvLogEntry[]>>; onRetry: () => void }) {
+/**
+ * Jurnalul de farmacovigilență. Doar `agency_admin` (brief cap. 6, spec cap. 28); nu se cere pentru alte roluri.
+ * `keep` filtrează jurnalul deja încărcat (pagina Farmacovigilență: status și tip), fără să schimbe ce se cere.
+ */
+export function PvLogSection({ state, onRetry, keep }: { state: AsyncState<ProviderResult<PvLogEntry[]>>; onRetry: () => void; keep?: (e: PvLogEntry) => boolean }) {
   return (
     <Section id="pv-log" title="Jurnal de farmacovigilență" description="Vizibil doar administratorilor agenției. Marcajul rămâne în jurnal și nu poate fi șters, doar adnotat.">
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă jurnalul" skeletonClass="h-36">
-        {(rows) =>
-          rows.length === 0 ? (
-            <EmptyState compact title="Niciun marcaj" text="Nicio mențiune sau răspuns AI nu a fost marcat pentru acest brand." />
-          ) : (
-            <SortableTable caption="Jurnal de farmacovigilență" columns={columns} rows={rows} rowKey={(e) => e.id} pageSize={8} emptyText="Niciun marcaj." />
-          )
-        }
+        {(all) => {
+          const rows = keep ? all.filter(keep) : all
+          if (all.length === 0) return <EmptyState compact title="Niciun marcaj" text="Nicio mențiune sau răspuns AI nu a fost marcat pentru acest brand." />
+          if (rows.length === 0) return <EmptyState compact title="Niciun marcaj pentru filtrele alese" text={`Jurnalul are ${all.length} ${all.length === 1 ? 'marcaj' : 'marcaje'}; schimbă statusul sau tipul ca să le vezi.`} />
+          return <SortableTable caption="Jurnal de farmacovigilență" columns={columns} rows={rows} rowKey={(e) => e.id} pageSize={8} emptyText="Niciun marcaj." />
+        }}
       </Resolved>
     </Section>
   )

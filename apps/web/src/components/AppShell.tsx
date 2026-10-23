@@ -4,7 +4,9 @@ import {
   CaretDoubleRightIcon,
   ChartLineUpIcon,
   ChatCircleTextIcon,
+  CursorClickIcon,
   EarIcon,
+  FirstAidKitIcon,
   MagnifyingGlassIcon,
   MegaphoneSimpleIcon,
   MoonIcon,
@@ -24,7 +26,7 @@ import type { Brand, IsoDate, IsoDateTime, ProviderResult, Role, SessionUser } f
 import { ROLES } from '../contracts'
 import { cn } from '../lib/cn'
 import { formatDate, formatRelative } from '../lib/format'
-import { BRAND_NAV, ROLE_LABELS, adminItemsFor, adminPath, brandPath, type NavItem } from '../lib/navigation'
+import { ROLE_LABELS, adminItemsFor, adminPath, brandNavFor, brandPath, type NavItem } from '../lib/navigation'
 import { sharedSearch } from '../lib/period'
 import { useTheme } from '../theme/ThemeProvider'
 import { Avatar } from './ui/Avatar'
@@ -33,11 +35,13 @@ import { Menu } from './ui/Menu'
 const ICONS: Record<string, Icon> = {
   SquaresFour: SquaresFourIcon,
   ChatCircleText: ChatCircleTextIcon,
+  CursorClick: CursorClickIcon,
   MagnifyingGlass: MagnifyingGlassIcon,
   ChartLineUp: ChartLineUpIcon,
   MegaphoneSimple: MegaphoneSimpleIcon,
   UsersThree: UsersThreeIcon,
   Ear: EarIcon,
+  FirstAidKit: FirstAidKitIcon,
   Scales: ScalesIcon,
   Notebook: NotebookIcon,
   Buildings: BuildingsIcon,
@@ -76,10 +80,15 @@ export interface AppShellProps {
 
 function SidebarLink({ item, to, collapsed }: { item: NavItem; to: { pathname: string; search: string } | null; collapsed: boolean }) {
   const Glyph = ICONS[item.icon] ?? SquaresFourIcon
-  const base = cn('flex h-10 items-center gap-3 rounded-[11px] text-[13.5px] font-medium transition-colors', collapsed ? 'justify-center px-0' : 'px-3')
+  // Submeniul (de ex. Farmacovigilență sub Listening): indentat și mai mic; restrâns, rămâne doar iconița.
+  const base = cn(
+    'flex items-center gap-3 rounded-[11px] font-medium transition-colors',
+    item.parent ? 'h-9 text-[13px]' : 'h-10 text-[13.5px]',
+    collapsed ? 'justify-center px-0' : item.parent ? 'pl-9 pr-3' : 'px-3',
+  )
   const content = (
     <>
-      <Glyph size={18} aria-hidden="true" />
+      <Glyph size={item.parent ? 16 : 18} aria-hidden="true" />
       <span className={collapsed ? 'sr-only' : undefined}>{item.label}</span>
     </>
   )
@@ -203,7 +212,7 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
           {!collapsed && <span className="font-display text-[16px] font-semibold tracking-[-0.01em]">Analyzator</span>}
         </div>
         <nav aria-label="Module" className="flex flex-col gap-0.5">
-          {BRAND_NAV.map((item) => (
+          {brandNavFor(user.role).map((item) => (
             <SidebarLink key={item.segment} item={item} collapsed={collapsed} to={brandId ? { pathname: brandPath(brandId, item.segment), search } : null} />
           ))}
         </nav>

@@ -5,6 +5,10 @@ export interface NavItem {
   segment: string
   label: string
   icon: string
+  /** Submeniu: segmentul modulului sub care apare (de ex. Farmacovigilență sub Listening). */
+  parent?: string
+  /** Doar pentru aceste roluri; fără listă, pentru toți. UI-ul ascunde și redirecționează; RLS rămâne autoritatea. */
+  roles?: readonly Role[]
 }
 
 export interface AdminNavItem extends NavItem {
@@ -17,12 +21,22 @@ export const BRAND_NAV: readonly NavItem[] = [
   { segment: 'ai', label: 'AI Visibility', icon: 'ChatCircleText' },
   { segment: 'seo', label: 'SEO și Search', icon: 'MagnifyingGlass' },
   { segment: 'traffic', label: 'Trafic și conversii', icon: 'ChartLineUp' },
+  { segment: 'ux', label: 'User experience', icon: 'CursorClick' },
   { segment: 'paid', label: 'Paid Media', icon: 'MegaphoneSimple' },
   { segment: 'social', label: 'Social', icon: 'UsersThree' },
   { segment: 'listening', label: 'Listening', icon: 'Ear' },
+  // Jurnalul PV e doar pentru agency_admin (B7-14, brief cap. 6); clientul nu îl vede.
+  { segment: 'pharmacovigilance', label: 'Farmacovigilență', icon: 'FirstAidKit', parent: 'listening', roles: ['agency_admin'] },
   { segment: 'competition', label: 'Concurență', icon: 'Scales' },
   { segment: 'insights', label: 'Analize și acțiuni', icon: 'Notebook' },
 ]
+
+/** Modulele de brand vizibile pentru un rol, în ordinea meniului (submeniurile imediat după părinte). */
+export const brandNavFor = (role: Role): NavItem[] => BRAND_NAV.filter((i) => !i.roles || i.roles.includes(role))
+export const canAccessBrandModule = (role: Role, segment: string): boolean => {
+  const item = BRAND_NAV.find((i) => i.segment === segment)
+  return !item?.roles || item.roles.includes(role)
+}
 
 /**
  * Spec cap. 28: clienții, brandurile, invitațiile, sursele și drepturile sunt ale lui Agency admin;
