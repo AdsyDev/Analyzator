@@ -44,6 +44,18 @@ Rutele aplicației sunt în browser (`/brands/:brandId/<modul>`, `/admin/<pagin�
 
 Build-ul de staging și cel de producție se fac fără `VITE_DESIGN_PREVIEW`: variabila oprește build-ul în orice mod în afară de `development` și `design-preview` (vezi README, „Previzualizare design"). Nu o seta în mediul CI.
 
+## Utilizatori și invitații
+
+Administrare → Utilizatori (doar `agency_admin`): numele și emailul fiecărei persoane, „Trimite invitație” și „Retrimite invitația” pentru cine nu a intrat încă. Ambele trec prin funcția server `users` (contract: `docs/contracts/users.md`), publicată automat de `supabase-deploy` împreună cu celelalte funcții.
+
+- **Secrete ale funcțiilor** (Supabase → Edge Functions → Secrets, deja folosite de `oauth` și `notify`): `APP_BASE_URL` = `https://app.analyzator.ro`, ca linkul din email să ducă la `/login`; `ANALYZATOR_APP_ORIGIN` = aceeași adresă.
+- **Redirect URLs** (Authentication → URL Configuration): `https://app.analyzator.ro/login` trebuie să fie în listă (vezi „Hosting”). Altfel linkul duce la Site URL.
+- **Serverul de email.** Serverul implicit al Supabase trimite foarte puține emailuri pe oră și e gândit pentru teste. Pentru invitații către clienți, configurează un SMTP propriu: Authentication → Emails → SMTP Settings, de exemplu Resend, deja folosit pentru notificări. Altfel invitațiile pot da „S-au trimis prea multe emailuri” (429) sau pot să nu ajungă.
+- **Șablonul emailului:** Authentication → Emails → „Invite user”. Implicit e în engleză („You have been invited”); se traduce în română, păstrând `{{ .ConfirmationURL }}`.
+- **Durata linkului:** Authentication → Providers → Email → „Email OTP Expiration”. După expirare, persoana apare „Invitație neacceptată”, iar adminul apasă „Retrimite invitația”.
+- **Cine poate invita:** doar `agency_admin` activ al clientului. Persoana primește rolul și brandurile alese; un cont deja activ primește doar accesul, fără email. Fiecare invitație lasă în `audit_events` evenimentul `user_invited`, cu cine a invitat.
+- Revocarea, rolul și accesul la branduri se schimbă din același tabel, ca până acum.
+
 ## Colectare săptămânală SEOmonitor
 
 - Conexiunea: `source_connections` cu `provider = 'seomonitor'`, **la nivel de client** (`brand_id` gol), `external_account_id` = company_id SEOmonitor. Tokenul se setează ca la Clarity: `npm run set-source-token -- --connection <uuid> --email <admin>`. Vezi `docs/contracts/seomonitor.md`.

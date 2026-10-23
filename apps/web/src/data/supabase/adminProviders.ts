@@ -1,8 +1,11 @@
-import { failed, ready, notConnected, type AccessPerson, type CompetitorSetVersion, type ConfigProvider, type MappingKind, type NewSeomonitorMapping, type ProviderResult, type Role, type SeomonitorMapping, type UsersProvider } from '../../contracts'
-import { ROLES } from '../../contracts'
+import { failed, ready, notConnected, type AccessPerson, type CompetitorSetVersion, type ConfigProvider, type InviteStatus, type MappingKind, type NewSeomonitorMapping, type ProviderResult, type Role, type SeomonitorMapping, type UsersProvider } from '../../contracts'
+import { INVITE_STATUSES, ROLES } from '../../contracts'
 import { addDays, todayBucharest } from '../../lib/period'
 import type { DataClient } from './dataClient'
 import { QUERY_FAILED } from './dataClient'
+import { functionError } from './sourcesProvider'
+
+const CONTRACT = 'Răspunsul serverului nu respectă contractul așteptat. Reîncearcă sau anunță echipa tehnică.'
 
 const SELF = 'Nu îți poți modifica singur rolul sau accesul.'
 const NO_RIGHT = 'Doar administratorii agenției pot modifica accesul.'
@@ -21,6 +24,14 @@ interface AccessRow {
   user_id: string
   revoked_at: string | null
 }
+/** Rândul din funcția server `users` (`identities`): identitatea din contul persoanei, doar pentru agency_admin. */
+interface IdentityRow {
+  tenant_id: string
+  user_id: string
+  email: string | null
+  full_name: string | null
+  last_sign_in_at: string | null
+}
 
 async function currentUserId(client: DataClient): Promise<string | null> {
   const { data } = await client.auth.getSession()
@@ -34,8 +45,9 @@ function writeError(code: string | undefined, fallback: string): string {
 
 /**
  * Utilizatorii: citire și modificare prin sesiunea utilizatorului. RLS decide cine poate scrie
- * (`agency_admin` al tenantului); nicio verificare din interfață nu înlocuiește asta. Numele și emailul
- * nu sunt citibile din client, deci rămân null.
+ * (`agency_admin` al tenantului); nicio verificare din interfață nu înlocuiește asta. Numele, emailul și invitația trec
+ * prin funcția server `users` (E10): ea autentifică sesiunea și citește `auth.users` cu cheia de service, doar pentru
+ * tenanții în care apelantul e agency_admin, fără să expună cheia.
  */
 export function createSupabaseUsers(client: DataClient): UsersProvider {
   async function guardSelf(userId: string): Promise<ProviderResult<null> | null> {
@@ -46,17 +58,23 @@ export function createSupabaseUsers(client: DataClient): UsersProvider {
 
   return {
     async people() {
-      const [m, a] = await Promise.all([
+      const [m, a, i] = await Promise.all([
         client.from('memberships').select('tenant_id, user_id, role, revoked_at, created_at, tenants(name)').order('created_at'),
         client.from('brand_access').select('tenant_id, brand_id, user_id, revoked_at'),
+        client.functions.invoke('users', { body: { action: 'identities' } }),
       ])
       if (m.error || a.error) return failed(QUERY_FAILED)
+      if (i.error) return failed(await functionError(i.error))
+      const found = (i.data as { people?: unknown } | null)?.people
+      if (!Array.isArray(found)) return failed(CONTRACT)
       const access = (a.data ?? []) as unknown as AccessRow[]
       const rows = (m.data ?? []) as unknown as MembershipRow[]
+      const identities = new Map((found as IdentityRow[]).map((x) => [`${x.tenant_id}:${x.user_id}`, x]))
       const people: AccessPerson[] = []
       for (const r of rows) {
-        if (!(ROLES as readonly string[]).includes(r.role)) return failed('Răspunsul serverului nu respectă contractul așteptat. Reîncearcă sau anunță echipa tehnică.')
+        if (!(ROLES as readonly string[]).includes(r.role)) return failed(CONTRACT)
         const tenant = Array.isArray(r.tenants) ? r.tenants[0] : r.tenants
+        const who = identities.get(`${r.tenant_id}:${r.user_id}`)
         people.push({
           user_id: r.user_id,
           tenant_id: r.tenant_id,
@@ -64,12 +82,23 @@ export function createSupabaseUsers(client: DataClient): UsersProvider {
           role: r.role as Role,
           membership_active: r.revoked_at === null,
           since: r.created_at,
-          name: null,
-          email: null,
+          name: who?.full_name ?? null,
+          email: who?.email ?? null,
+          last_sign_in_at: who?.last_sign_in_at ?? null,
           brands: access.filter((x) => x.tenant_id === r.tenant_id && x.user_id === r.user_id).map((x) => ({ brand_id: x.brand_id, active: x.revoked_at === null })),
         })
       }
       return ready(people)
+    },
+
+    async invite(input) {
+      const { data, error } = await client.functions.invoke('users', {
+        body: { action: 'invite', tenant_id: input.tenant_id, email: input.email, full_name: input.full_name, role: input.role, brand_ids: input.brand_ids },
+      })
+      if (error) return failed(await functionError(error))
+      const d = data as { status?: unknown; user_id?: unknown } | null
+      if (!d || typeof d.user_id !== 'string' || !INVITE_STATUSES.includes(d.status as InviteStatus)) return failed(CONTRACT)
+      return ready({ status: d.status as InviteStatus, user_id: d.user_id })
     },
 
     async setRole(tenantId, userId, role) {

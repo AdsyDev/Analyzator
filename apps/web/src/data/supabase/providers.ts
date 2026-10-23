@@ -157,6 +157,7 @@ const users: UsersProvider = {
   setRole: async () => notConnected('Modificarea accesului nu este încă disponibilă.'),
   setMembershipActive: async () => notConnected('Modificarea accesului nu este încă disponibilă.'),
   setBrandAccess: async () => notConnected('Modificarea accesului nu este încă disponibilă.'),
+  invite: async () => notConnected('Invitarea nu este încă disponibilă.'),
 }
 
 const config: ConfigProvider = {

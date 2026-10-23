@@ -8,8 +8,9 @@ export interface PersonBrandAccess {
 }
 
 /**
- * O persoană cu acces (membership + brand_access). `name` și `email` sunt null până există o sursă
- * citibilă pentru ele: în schema curentă ele trăiesc doar în `auth.users`, inaccesibil din client.
+ * O persoană cu acces (membership + brand_access). `email`, `name` și `last_sign_in_at` vin din contul persoanei
+ * (`auth.users`) prin funcția server `users`, doar pentru `agency_admin` și doar în tenantul lui. `name` e null când
+ * contul nu are nume; `email` e null doar dacă identitatea lipsește din răspuns.
  */
 export interface AccessPerson {
   user_id: string
@@ -21,7 +22,27 @@ export interface AccessPerson {
   since: IsoDateTime
   name: string | null
   email: string | null
+  /** Ultima autentificare; null = persoana nu a intrat încă (invitație neacceptată). */
+  last_sign_in_at: IsoDateTime | null
   brands: PersonBrandAccess[]
+}
+
+/** Invitația trimisă din Administrare → Utilizatori (funcția server `users`, acțiunea `invite`). */
+export interface NewInvite {
+  tenant_id: TenantId
+  email: string
+  full_name: string | null
+  role: Role
+  brand_ids: BrandId[]
+}
+
+/** `invited` = cont nou, email trimis; `access_granted` = cont activ, fără email; `resent` = invitație retrimisă. */
+export type InviteStatus = 'invited' | 'access_granted' | 'resent'
+export const INVITE_STATUSES: readonly InviteStatus[] = ['invited', 'access_granted', 'resent']
+
+export interface InviteResult {
+  status: InviteStatus
+  user_id: string
 }
 
 export interface UsersProvider {
@@ -32,6 +53,8 @@ export interface UsersProvider {
   setMembershipActive(tenantId: TenantId, userId: string, active: boolean): Promise<ProviderResult<null>>
   /** Acordă sau revocă accesul la un brand (`brand_access`). */
   setBrandAccess(tenantId: TenantId, userId: string, brandId: BrandId, active: boolean): Promise<ProviderResult<null>>
+  /** Invită o persoană (sau retrimite invitația uneia care nu și-a activat contul). Doar `agency_admin` al tenantului. */
+  invite(input: NewInvite): Promise<ProviderResult<InviteResult>>
 }
 
 export interface CompetitorMember {
