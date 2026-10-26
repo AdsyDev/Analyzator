@@ -80,7 +80,7 @@ describe('sources.statuses (supabase)', () => {
     expect(s.clarity).toMatchObject({ state: 'connected', data_as_of: '2026-10-06', imported_at: '2026-10-07T03:01:10Z' })
     expect(s.ga4).toMatchObject({ state: 'not_connected', data_as_of: null })
     expect(s.csv_import?.state).toBe('not_connected')
-    expect(Object.keys(s)).toEqual(['seomonitor', 'ga4', 'gsc', 'clarity', 'planable', 'csv_import'])
+    expect(Object.keys(s)).toEqual(['seomonitor', 'ga4', 'gsc', 'clarity', 'planable', 'google_ads', 'meta_ads', 'tiktok_ads', 'csv_import'])
   })
 
   it('token refuzat → eroare; ultima sincronizare eșuată → eroare cu ultimele date păstrate; parțial → parțial', async () => {
@@ -129,6 +129,15 @@ describe('sources.statuses (supabase)', () => {
     const s = await get({ source_connections: [pl], sync_runs: [run({ source: 'planable_analytics', period_end: '2026-10-11' }), run({ id: 'r-l', source: 'planable_listening', status: 'partial', created_at: '2026-10-07T03:00:01Z' })], import_batches: [] })
     expect(s.planable).toMatchObject({ state: 'partial', data_as_of: '2026-10-06' })
     expect((await get({ source_connections: [pl], sync_runs: [], import_batches: [] })).planable?.note).not.toBe('Token neconfigurat.')
+  })
+
+  it('Meta Ads: cu rulări reușite cardul e conectat (nu mai rămâne „Neconectat”); fără drept pe cont: eroare cu motiv', async () => {
+    const meta = conn({ id: 'c-m', provider: 'meta_ads', credential_status: 'missing', external_account_id: 'act_123' })
+    const ok = await get({ source_connections: [meta], sync_runs: [run({ source: 'meta_ads', period_end: '2026-10-25' })], import_batches: [] })
+    expect(ok.meta_ads).toMatchObject({ state: 'connected', data_as_of: '2026-10-25' })
+    const denied = await get({ source_connections: [meta], sync_runs: [run({ source: 'meta_ads', status: 'failed', rows_written: 0, errors: [{ code: 'permission_denied', message: '200' }] })], import_batches: [] })
+    expect(denied.meta_ads).toMatchObject({ state: 'error', note: 'Ultima sincronizare a eșuat: cheia nu are drept de citire pe acest cont.' })
+    expect((await get({ source_connections: [], sync_runs: [], import_batches: [] })).google_ads).toMatchObject({ state: 'not_connected' })
   })
 
   it('Import CSV: conectat doar cu un lot încheiat', async () => {

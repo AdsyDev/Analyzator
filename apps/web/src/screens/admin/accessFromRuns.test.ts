@@ -20,6 +20,12 @@ describe('accessFromRuns (conexiuni cu cheia clientului)', () => {
     expect(a.text).toMatch(/Adaugă service account-ul clientului ca Viewer în proprietatea GA4\./)
   })
 
+  it('Meta: contul neatribuit system user-ului (permission_denied) = acces refuzat, cu pasul de rezolvare', () => {
+    const a = accessFromRuns('meta_ads', [run({ provider: 'meta_ads', status: 'failed', rows: 0, error_codes: ['permission_denied'] })])
+    expect(a).toMatchObject({ tone: 'neg', label: 'Acces refuzat' })
+    expect(a.text).toMatch(/Atribuie contul de ads system user-ului/)
+  })
+
   it('rulări fără date: neconfirmat; nicio rulare: neverificat', () => {
     expect(accessFromRuns('gsc', [run({ status: 'failed', rows: 0, error_codes: ['exception'] })])).toMatchObject({ tone: 'warn', label: 'Neconfirmat' })
     expect(accessFromRuns('planable', [])).toMatchObject({ tone: 'neutral', label: 'Neverificat' })

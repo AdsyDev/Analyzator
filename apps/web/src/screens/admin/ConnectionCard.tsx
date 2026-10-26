@@ -36,7 +36,8 @@ const rowsLabel = (n: number) => (n === 1 ? '1 rând' : `${n.toLocaleString('ro-
 export function accessFromRuns(provider: string, runs: SyncRun[]): AccessState {
   const sorted = [...runs].sort((a, b) => b.started_at.localeCompare(a.started_at))
   const latest = sorted[0]
-  if (latest?.error_codes.includes('access_denied')) {
+  // `access_denied` = cheia refuzată; `permission_denied` = cheia merge, dar nu are drept pe acest cont (Meta, Ads).
+  if (latest && (latest.error_codes.includes('access_denied') || latest.error_codes.includes('permission_denied'))) {
     return { tone: 'neg', label: 'Acces refuzat', text: `Colectarea din ${formatDateTime(latest.started_at)} a fost refuzată. ${ACCESS_FIX[provider] ?? ''}`.trim() }
   }
   const proof = sorted.find((r) => (r.status === 'succeeded' || r.status === 'partial') && (r.rows ?? 0) > 0)

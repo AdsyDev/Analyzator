@@ -30,6 +30,7 @@ function emptyLabel(dimensions: string[], source?: string): string {
 
 const LABELS: Record<string, string> = {
   access_denied: 'accesul a fost refuzat de furnizor',
+  permission_denied: 'cheia nu are drept de citire pe acest cont',
   token_unavailable: 'cheia nu a putut fi citită',
   credential_invalid: 'cheia salvată nu e validă',
   credential_invalid_json: 'cheia salvată nu e validă',

@@ -41,7 +41,7 @@ Același token poate servi mai mulți clienți: îl salvezi pe fiecare client.
 
 1. ID-ul contului apare în Ads Manager, în selectorul de cont sau în adresă (`act=1234567890`), și în Business Settings → Accounts → Ad accounts.
 2. Analyzator: pagina site-ului → cardul **Meta Ads** → pasul 2 → alegi contul de ads din lista conturilor atribuite system user-ului. Manual, dacă e nevoie: `act_1234567890`.
-3. Cardul conexiunii arată „Cheia clientului”: folosește tokenul de la pasul 2.
+3. Conexiunea site-ului arată accesul (D-25): „Neverificat” până la prima colectare, apoi „Acces confirmat” (cu data și rândurile) sau „Acces refuzat” (contul nu e atribuit system user-ului: pasul 1.4).
 
 ## 4. Pornește colectarea
 
@@ -61,7 +61,7 @@ Verifici în pagina site-ului → „Istoricul sincronizărilor”: o rulare **M
 |---|---|---|
 | `not_connected`: „token Meta neconfigurat” | Lipsește tokenul clientului | Pasul 2. |
 | `access_denied` (cod 190) | Token expirat, revocat sau system user șters | Token nou (pasul 1.5), „Rotește tokenul”. |
-| `permission_denied` (cod 200) pe un brand | Contul de ads nu e atribuit system user-ului | Pasul 1.4 pentru acel cont. |
+| `permission_denied` (cod 200) pe un brand; conexiunea arată „Acces refuzat” | Contul de ads nu e atribuit system user-ului | Pasul 1.4 pentru acel cont. |
 | `invalid_account_id` | ID scris greșit | Forma `act_` + cifre. |
 | `rate_limited` | Limită Meta de utilizare | Rularea reîncearcă singură; dacă persistă, rulează mai târziu. |
 | Cost diferit față de Ads Manager | Fus orar sau interval diferit | Contul are fusul lui; Analyzator folosește fusul contului. |

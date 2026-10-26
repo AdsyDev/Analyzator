@@ -118,7 +118,8 @@ const OWN_TOKEN: readonly SourceProviderId[] = ['clarity']
  * rămâne „Neconectată", nu „Conectată" pe baza faptului că tokenul există.
  */
 export function deriveStatuses(connections: ConnectionRow[], runs: SyncRunRow[], batches: ImportBatchRow[]): SourceStatusInfo[] {
-  return (['seomonitor', 'ga4', 'gsc', 'clarity', 'planable', 'csv_import'] as const).map((provider) => {
+  // Toate sursele, inclusiv Ads: fără ele, cardurile Meta, Google Ads și TikTok Ads rămâneau „Neconectat” și după colectări reușite.
+  return SOURCE_PROVIDERS.map((provider) => {
     const base = { provider, description: PROVIDER_DESCRIPTIONS[provider] }
     if (provider === 'csv_import') {
       const last = batches.filter((b) => b.status === 'imported').sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0]
