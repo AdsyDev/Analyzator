@@ -135,7 +135,7 @@ export function PostsSection({ state, onRetry, brandName }: { state: AsyncState<
           view === 'cards' ? (
             <PostCards rows={rows} brandName={brandName} />
           ) : (
-            <SortableTable caption="Performanța conținutului" columns={columns} rows={rows} rowKey={(p) => p.id} pageSize={8} emptyText="Nicio postare pentru filtrele și perioada alese." />
+            <SortableTable caption="Performanța conținutului" columns={columns} rows={rows} rowKey={(p) => p.id} pageSize={8} emptyText="Nicio postare pentru filtrele și perioada alese." phoneCards={false} />
           )
         }
       </Resolved>

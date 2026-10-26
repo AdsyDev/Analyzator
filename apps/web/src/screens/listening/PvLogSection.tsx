@@ -14,6 +14,7 @@ const columns: Column<PvLogEntry>[] = [
   { key: 'at', header: 'Marcat la', sortValue: (e) => e.flagged_at, render: (e) => <span className="font-mono text-[12px]">{formatDateTime(e.flagged_at)}</span> },
   {
     key: 'item',
+    cardTitle: true,
     header: 'Item',
     sortValue: (e) => e.excerpt,
     render: (e) => {

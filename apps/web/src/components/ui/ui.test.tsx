@@ -231,3 +231,51 @@ describe('Popovere pe ecrane înguste', () => {
     vi.restoreAllMocks()
   })
 })
+
+describe('SortableTable pe telefon', () => {
+  // jsdom nu are media queries: se simulează un ecran sub 640 px.
+  const phone = () => vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('40rem'), addEventListener: () => {}, removeEventListener: () => {} }))
+  const titles = () => within(screen.getByRole('list', { name: 'Keywords' })).getAllByRole('listitem').map((li) => li.firstElementChild?.textContent)
+
+  it('un card pe rând: prima coloană e titlul, celelalte sunt „etichetă: valoare"; lipsa rămâne lipsă', () => {
+    phone()
+    render(<SortableTable caption="Keywords" columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="x" />)
+    expect(screen.queryByRole('table')).toBeNull()
+    const cards = within(screen.getByRole('list', { name: 'Keywords' })).getAllByRole('listitem')
+    expect(cards).toHaveLength(4)
+    expect(within(cards[0]!).getByRole('term')).toHaveTextContent('Clicks')
+    expect(within(cards[0]!).getByRole('definition')).toHaveTextContent('30')
+    expect(within(cards[1]!).getByRole('definition')).toHaveTextContent('Fără date')
+    expect(within(cards[2]!).getByRole('definition')).toHaveTextContent('0')
+  })
+
+  it('sortarea se alege dintr-o listă, cu direcția; lipsa rămâne la sfârșit', async () => {
+    phone()
+    render(<SortableTable caption="Keywords" columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="x" />)
+    const select = screen.getByRole('combobox', { name: 'Sortează după' })
+    await userEvent.selectOptions(select, 'Clicks, crescător')
+    expect(titles()).toEqual(['merișor', 'd-manoză', 'urinal', 'cistită'])
+    await userEvent.selectOptions(select, 'Clicks, descrescător')
+    expect(titles()).toEqual(['urinal', 'd-manoză', 'merișor', 'cistită'])
+    await userEvent.selectOptions(select, 'Ordinea implicită')
+    expect(titles()).toEqual(['urinal', 'cistită', 'merișor', 'd-manoză'])
+  })
+
+  it('„Tabel" arată tabelul; click pe card apelează onRowClick', async () => {
+    phone()
+    const onRowClick = vi.fn()
+    render(<SortableTable caption="Keywords" columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="x" onRowClick={onRowClick} />)
+    await userEvent.click(screen.getByText('urinal'))
+    expect(onRowClick).toHaveBeenCalledWith(rows[0])
+    await userEvent.click(screen.getByRole('tab', { name: 'Tabel' }))
+    expect(screen.getByRole('table')).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Keywords' })).toBeNull()
+  })
+
+  it('phoneCards={false} păstrează tabelul (ecranul are propriile carduri)', () => {
+    phone()
+    render(<SortableTable caption="Keywords" columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="x" phoneCards={false} />)
+    expect(screen.getByRole('table')).toBeInTheDocument()
+  })
+})
+

@@ -1,5 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { metric } from '../test/factories'
 import { ComparisonTable, type ComparisonColumn, type ComparisonGroup } from './ComparisonTable'
 
@@ -151,3 +151,23 @@ describe('ComparisonTable', () => {
     expect(within(row).getByRole('button', { name: 'Ce înseamnă Keywords în Top 10' })).toBeInTheDocument()
   })
 })
+
+describe('ComparisonTable pe telefon', () => {
+  it('un card pe metrică, cu numele întregi ale competitorilor, cea mai bună valoare marcată și N/A cu motiv', () => {
+    vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('40rem'), addEventListener: () => {}, removeEventListener: () => {} }))
+    const g: ComparisonGroup[] = [
+      ...groups,
+      { name: 'Listening', rows: [{ key: 'sov', label: 'Listening SoV', cells: { brand: ok(31), c1: { unavailable: 'Competitorii nu au sursă de Listening.' }, c2: { unavailable: 'Competitorii nu au sursă de Listening.' } } }] },
+    ]
+    render(<ComparisonTable caption="Comparație" columns={columns} groups={g} />)
+    expect(screen.queryByRole('table')).toBeNull()
+    const card = within(screen.getByRole('list', { name: 'Comparație: AI' })).getByRole('listitem')
+    expect(card).toHaveTextContent('Mention Rate')
+    expect(within(card).getAllByRole('term').map((t) => t.textContent)).toEqual(['Urinal', 'Cistonal', 'UroFem Plus'])
+    expect(within(card).getByText('Cea mai bună valoare:').parentElement).toHaveTextContent('42')
+    const listening = within(screen.getByRole('list', { name: 'Comparație: Listening' })).getByRole('listitem')
+    expect(within(listening).getAllByText('N/A')).toHaveLength(2)
+    expect(screen.getByText('N/A: Competitorii nu au sursă de Listening.')).toBeInTheDocument()
+  })
+})
+

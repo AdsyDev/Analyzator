@@ -328,7 +328,7 @@ function PeopleTable({ list, brands, selfId, onChanged }: { list: AccessPerson[]
       key: 'brands',
       header: 'Acces la branduri',
       render: (p) => (
-        <span className="flex min-w-60 flex-wrap gap-1.5" role="group" aria-label={`Branduri pentru ${personLabel(p)}`}>
+        <span className="flex flex-wrap gap-1.5 max-sm:justify-end sm:min-w-60" role="group" aria-label={`Branduri pentru ${personLabel(p)}`}>
           {brands.map((b) => {
             const on = p.brands.some((x) => x.brand_id === b.id && x.active)
             return (

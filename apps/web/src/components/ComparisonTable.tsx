@@ -3,7 +3,9 @@ import type { CompetitionCell, IsoDate, MetricDirection, MetricItem, MetricStatu
 import { cn } from '../lib/cn'
 import { formatDate, formatMetricValue } from '../lib/format'
 import { CoverageBadge } from './CoverageBadge'
+import { DataCard, DataCardList } from './ui/DataCard'
 import { InfoTip } from './ui/InfoTip'
+import { useIsPhone } from './ui/useIsPhone'
 import { coveragePercent, coverageStateFor } from '../lib/metricView'
 import { reasonFor } from '../lib/warnings'
 
@@ -102,7 +104,33 @@ function bestKey(row: ComparisonRow, columns: ComparisonColumn[]): string | null
   return tie ? null : best
 }
 
+/** Conținutul unei celule: valoarea (cu acoperirea și marcajul celei mai bune) sau „N/A" cu motivul. */
+function CellValue({ row, column, best }: { row: ComparisonRow; column: ComparisonColumn; best: string | null }) {
+  const v = resolve(row.cells[column.key])
+  const shown = v && 'status' in v && v.value !== null ? { ...v, value: v.value } : null
+  const reason = !v ? null : 'unavailable' in v ? v.unavailable : shown ? null : v.reason
+  const isBest = best === column.key
+  return shown ? (
+    <span className="inline-flex items-center justify-end gap-1.5">
+      {isBest && (
+        <>
+          <StarIcon size={12} weight="fill" aria-hidden="true" />
+          <span className="sr-only">Cea mai bună valoare:</span>
+        </>
+      )}
+      {formatMetricValue(shown.value, shown.unit, 'currency' in shown && typeof shown.currency === 'string' ? shown.currency : null)}
+      {shown.status !== 'ok' && <CoverageBadge state={coverageStateFor(shown.status)} pct={coveragePercent(shown.coverage)} />}
+    </span>
+  ) : (
+    <span title={reason ?? undefined} className="text-text-3">
+      N/A
+      {reason && <span className="sr-only">: {reason}</span>}
+    </span>
+  )
+}
+
 export function ComparisonTable({ caption, columns, groups, setVersion, effectiveFrom, dataAsOf, note, loading = false }: ComparisonTableProps) {
+  const phone = useIsPhone()
   if (loading) {
     return <div role="status" aria-label="Se încarcă comparația" className="h-64 rounded-xl bg-skeleton" />
   }
@@ -143,75 +171,92 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
           )}
         </div>
       )}
-      <div className="scroll-x relative rounded-xl border border-border shadow-1">
-        <table className="w-full border-collapse text-[13px]">
-          <caption className="sr-only">{caption}</caption>
-          <thead>
-            <tr className="border-b border-border bg-surface-2 text-text-2">
-              {/* Prima coloană rămâne pe loc la derularea orizontală (telefon): metrica e mereu lângă valori. */}
-              <th scope="col" className="sticky left-0 z-[1] bg-surface-2 px-4 py-2.5 text-left text-[12px] font-semibold">Metrică</th>
-              {columns.map((c) => (
-                <th key={c.key} scope="col" title={c.full} className={cn('px-4 py-2.5 text-right text-[12px] font-semibold', c.kind === 'brand' && 'text-lav-text')}>
-                  <span aria-hidden="true">{c.short}</span>
-                  <span className="sr-only">{c.full}</span>
-                </th>
-              ))}
-            </tr>
-          </thead>
+      {phone ? (
+        // Telefon: un card pe metrică, cu brandul și competitorii unul sub altul (numele întreg, nu C1-C3).
+        <div className="flex flex-col gap-4">
           {groups.map((g) => (
-            <tbody key={g.name}>
-              <tr className="bg-surface-2/60">
-                <th scope="colgroup" colSpan={columns.length + 1} className="px-4 py-2 text-left text-[12px] font-semibold text-text">
-                  <span className="sticky left-4">
-                    {g.name}
-                    {g.source && <span className="ml-2 font-normal text-text-2">Sursă: {g.source}</span>}
-                  </span>
-                </th>
-              </tr>
-              {g.rows.map((r) => {
-                const best = bestKey(r, columns)
-                return (
-                  <tr key={r.key} className="border-t border-border">
-                    <th scope="row" className="sticky left-0 z-[1] min-w-32 bg-surface px-4 py-2.5 text-left font-medium text-text focus-within:z-[2] hover:z-[2]">
-                      <span className="inline-flex items-center gap-1.5">
-                        {r.label}
-                        {r.definition && <InfoTip label={`Ce înseamnă ${r.label}`}>{r.definition}</InfoTip>}
-                      </span>
-                    </th>
-                    {columns.map((c) => {
-                      const v = resolve(r.cells[c.key])
-                      const shown = v && 'status' in v && v.value !== null ? { ...v, value: v.value } : null
-                      const reason = !v ? null : 'unavailable' in v ? v.unavailable : shown ? null : v.reason
-                      const isBest = best === c.key
-                      return (
-                        <td key={c.key} className={cn('px-4 py-2.5 text-right tabular-nums', isBest && 'font-semibold text-accent-text')}>
-                          {shown ? (
-                            <span className="inline-flex items-center justify-end gap-1.5">
-                              {isBest && (
-                                <>
-                                  <StarIcon size={12} weight="fill" aria-hidden="true" />
-                                  <span className="sr-only">Cea mai bună valoare:</span>
-                                </>
-                              )}
-                              {formatMetricValue(shown.value, shown.unit, 'currency' in shown && typeof shown.currency === 'string' ? shown.currency : null)}
-                              {shown.status !== 'ok' && <CoverageBadge state={coverageStateFor(shown.status)} pct={coveragePercent(shown.coverage)} />}
-                            </span>
-                          ) : (
-                            <span title={reason ?? undefined} className="text-text-3">
-                              N/A
-                              {reason && <span className="sr-only">: {reason}</span>}
-                            </span>
-                          )}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
-            </tbody>
+            <section key={g.name} aria-label={g.name} className="flex flex-col gap-2">
+              <h3 className="text-[12.5px] font-semibold text-text">
+                {g.name}
+                {g.source && <span className="ml-2 font-normal text-text-2">Sursă: {g.source}</span>}
+              </h3>
+              <DataCardList label={`${caption}: ${g.name}`}>
+                {g.rows.map((r) => {
+                  const best = bestKey(r, columns)
+                  return (
+                    <DataCard
+                      key={r.key}
+                      title={
+                        <span className="inline-flex flex-wrap items-center gap-1.5">
+                          {r.label}
+                          {r.definition && <InfoTip label={`Ce înseamnă ${r.label}`}>{r.definition}</InfoTip>}
+                        </span>
+                      }
+                      fields={columns.map((c) => ({
+                        key: c.key,
+                        label: <span className={cn(c.kind === 'brand' && 'font-semibold text-lav-text')}>{c.full}</span>,
+                        value: (
+                          <span className={cn(best === c.key && 'font-semibold text-accent-text')}>
+                            <CellValue row={r} column={c} best={best} />
+                          </span>
+                        ),
+                      }))}
+                    />
+                  )
+                })}
+              </DataCardList>
+            </section>
           ))}
-        </table>
-      </div>
+        </div>
+      ) : (
+        <div className="scroll-x relative rounded-xl border border-border shadow-1">
+          <table className="w-full border-collapse text-[13px]">
+            <caption className="sr-only">{caption}</caption>
+            <thead>
+              <tr className="border-b border-border bg-surface-2 text-text-2">
+                {/* Prima coloană rămâne pe loc la derularea orizontală (telefon): metrica e mereu lângă valori. */}
+                <th scope="col" className="sticky left-0 z-[1] bg-surface-2 px-4 py-2.5 text-left text-[12px] font-semibold">Metrică</th>
+                {columns.map((c) => (
+                  <th key={c.key} scope="col" title={c.full} className={cn('px-4 py-2.5 text-right text-[12px] font-semibold', c.kind === 'brand' && 'text-lav-text')}>
+                    <span aria-hidden="true">{c.short}</span>
+                    <span className="sr-only">{c.full}</span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            {groups.map((g) => (
+              <tbody key={g.name}>
+                <tr className="bg-surface-2/60">
+                  <th scope="colgroup" colSpan={columns.length + 1} className="px-4 py-2 text-left text-[12px] font-semibold text-text">
+                    <span className="sticky left-4">
+                      {g.name}
+                      {g.source && <span className="ml-2 font-normal text-text-2">Sursă: {g.source}</span>}
+                    </span>
+                  </th>
+                </tr>
+                {g.rows.map((r) => {
+                  const best = bestKey(r, columns)
+                  return (
+                    <tr key={r.key} className="border-t border-border">
+                      <th scope="row" className="sticky left-0 z-[1] min-w-32 bg-surface px-4 py-2.5 text-left font-medium text-text focus-within:z-[2] hover:z-[2]">
+                        <span className="inline-flex items-center gap-1.5">
+                          {r.label}
+                          {r.definition && <InfoTip label={`Ce înseamnă ${r.label}`}>{r.definition}</InfoTip>}
+                        </span>
+                      </th>
+                      {columns.map((c) => (
+                        <td key={c.key} className={cn('px-4 py-2.5 text-right tabular-nums', best === c.key && 'font-semibold text-accent-text')}>
+                          <CellValue row={r} column={c} best={best} />
+                        </td>
+                      ))}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            ))}
+          </table>
+        </div>
+      )}
       <div className="flex flex-col gap-1 text-[12px] leading-snug text-text-2">
         {anyBest && <p>Cea mai bună valoare pe rând e marcată doar când toate celulele rândului au date complete.</p>}
         {reasons.map((r) => (
