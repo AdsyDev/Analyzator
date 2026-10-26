@@ -10,7 +10,7 @@ import type { PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from '
 import type { ContentGap, LandingPage, SearchFilters, SearchKeyword } from './search'
 import type { SocialCalendarItem, SocialCompetitor, SocialFilters, SocialGroups, SocialPost, SocialSummary } from './social'
 import type { ClientsProvider, ConfigProvider, UsersProvider } from './admin'
-import type { NewConnection, NewTenantConnection, OAuthProvider, SourceConnection, SourceStatusInfo, SyncRun, TenantConnection, TokenSaved, ValidationOutcome, AccountList, DiscoverKind } from './source'
+import type { NewConnection, NewTenantConnection, OAuthProvider, SourceConnection, SourceStatusInfo, SyncRun, TenantConnection, TokenSaved, ValidationOutcome, AccountList, AirbyteInspection, DiscoverKind } from './source'
 import type { AiReferrals, ClarityDevices, Device, TrackingQuality, TrafficChannels } from './traffic'
 
 /**
@@ -60,6 +60,11 @@ export interface SourcesProvider {
    * client dată), pentru selectorul din pagina site-ului. Doar `agency_admin`; cheia nu ajunge în browser.
    */
   listAccounts(tenantConnectionId: string, kind: DiscoverKind, campaignId?: string): Promise<ProviderResult<AccountList>>
+  /**
+   * Funcția server `airbyte`, `inspect`: tabelele, conturile și metricile din destinația Postgres Airbyte a clientului.
+   * Doar `agency_admin`; consumă din limita zilnică de inspecții. Connection string-ul nu ajunge în browser.
+   */
+  inspectAirbyte(tenantConnectionId: string): Promise<ProviderResult<AirbyteInspection>>
   /** Conturile la nivel de client (Google, SEOmonitor); doar agenția (RLS). */
   tenantConnections(tenantId: TenantId): Promise<ProviderResult<TenantConnection[]>>
   /** Doar `agency_admin` (RLS). Tokenul se setează apoi cu `setToken`. */

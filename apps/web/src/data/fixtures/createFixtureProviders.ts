@@ -400,9 +400,30 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
         if (kind === 'gsc') return { id: `sc-domain:${domain}`, name: `sc-domain:${domain}`, detail: 'Domain property' }
         if (kind === 'planable') return { id: `ws-${b.id}`, name: b.name, detail: 'Europe/Bucharest' }
         if (kind === 'meta_ads') return { id: `act_${1000 + i}`, name: `${b.name} RO`, detail: 'RON' }
+        if (kind === 'airbyte') return { id: `meta_ads:${1000000000 + i}`, name: `${b.name} RO`, detail: 'Meta Ads · ID ' + String(1000000000 + i) }
         return { id: String(500 + i), name: b.name, detail: domain }
       })
       return ready({ outcome: 'ok' as const, credential_status: 'valid' as CredentialStatus, accounts, truncated: false, message: null })
+    },
+    // Previzualizare: o destinație Airbyte fictivă, construită din spațiile clientului; nimic nu pleacă spre un server.
+    inspectAirbyte: async (connectionId) => {
+      if (getRole() !== 'agency_admin') return failed('Doar agency_admin al clientului poate gestiona sursele.')
+      const conn = tenantConnectionsMem.find((c) => c.id === connectionId)
+      if (!conn) return failed('Conexiune inexistentă sau inactivă.')
+      if ((connectionPatch.get(conn.id)?.credential_status ?? conn.credential_status) === 'missing') return failed('Connection string-ul nu e salvat.')
+      connectionPatch.set(conn.id, { ...(connectionPatch.get(conn.id) ?? {}), credential_status: 'valid' })
+      const spaces = brandsFile.brands as Array<{ id: string; name: string }>
+      const synced = instantDaysAgo(0, 3)
+      const accounts = spaces.map((b, i) => ({
+        id: `meta_ads:${1000000000 + i}`, name: `${b.name} RO`, detail: `Meta Ads · ID ${1000000000 + i}`, platform: 'meta_ads' as const, account_id: String(1000000000 + i),
+        rows: 55, first_date: daysAgo(56), last_date: daysAgo(1), last_synced_at: synced, tables: 1,
+      }))
+      const table = { schema: 'meta', table: 'ads_insights', role: 'report' as const, level: 'ad', rows: 55 * spaces.length, accounts: spaces.length, first_date: daysAgo(56), last_date: daysAgo(1), last_synced_at: synced, metrics: ['actions', 'clicks', 'impressions', 'reach', 'spend'], dimensions: [], error: null }
+      return ready({
+        outcome: 'ok' as const, credential_status: 'valid' as CredentialStatus, message: `Previzualizare: ${accounts.length} conturi în 1 tabel (Meta Ads).`,
+        calls_today: 1, daily_limit: 30, inspected_at: now().toISOString(),
+        platforms: [{ platform: 'meta_ads' as const, label: 'Meta Ads', tables: [table] }], accounts, truncated: false,
+      })
     },
     tenantConnections: async (tenantId) => {
       if (!isAgencyRole(getRole())) return failed('Conexiunile și credențialele sunt vizibile doar echipei AdSymphony.')

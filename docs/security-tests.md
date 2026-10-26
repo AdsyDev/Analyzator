@@ -397,3 +397,28 @@ Funcția server `users` (excepția E10). Rulează cu `npm run test:security`; co
 **Neverificat (E-4):** livrarea emailului de invitație în producție (local îl prinde Mailpit); șablonul și limita de emailuri ale serverului SMTP din proiectul Supabase; durata linkului din invitație în producție.
 
 **Neverificat (E-5):** politica de parole a proiectului Supabase din producție (local, minimum 6 caractere; aplicația cere 8). Dacă proiectul cere mai mult, GoTrue refuză cu `weak_password`, iar mesajul din interfață e cel generic. „Secure password change” din producție: dacă e activ, schimbarea parolei temporare merge doar într-o sesiune recentă, ceea ce e cazul la prima intrare.
+
+## I. Airbyte prin HTTP real (`tests/security/edge-airbyte.test.mjs`)
+
+Funcția server `airbyte` (E-6) deschide o conexiune Postgres spre un server ales de client. Obiectivele: connection string-ul nu iese din funcție, doar `agency_admin` al clientului inspectează, iar funcția nu se conectează la adrese interne și nici necriptat. Rulează cu `npm run test:security`.
+
+| ID | Vector | Rezultat așteptat |
+|---|---|---|
+| I1 | Fără Authorization; cheia anon sau service role ca Bearer; JWT semnat cu alt secret; `alg: none` (toate cu `sub` = admin T1) | 401; nicio inspecție contorizată; parola nu apare |
+| I2 | agency_admin din T2 pe conexiunea din T1; strateg din T1; `connection_id` cu filtru PostgREST injectat | 404 fără consum / 403 / 400 |
+| I3 | Connection string spre `localhost:54322` (baza Supabase locală), `db` (serviciul din rețeaua Docker), `172.17.0.1`, `169.254.169.254`, `[::1]`, `kong.internal`, `sslmode=disable` | `host_not_allowed` / `invalid_dsn` / `tls_required`; nicio conexiune deschisă, nimic consumat, credențiala `invalid`, parola nu apare |
+
+Teste unitare (`supabase/functions/airbyte/*.test.ts`, `npm run test:connectors`):
+- **SSRF:** IPv4 și IPv6 private, loopback, link-local, CGNAT, multicast, documentație, IPv4 mapat și NAT64; forme numerice care ajung la 127.0.0.1 prin `getaddrinfo` (`127.1`, `0x7f.1`, `2130706433`); caractere codate în host; nume care se rezolvă și într-o adresă privată. Conexiunea merge la IP-ul verificat.
+- **Sesiunea:** parametrii din connection string în afară de `sslmode` sunt ignorați (`options=-c default_transaction_read_only=off`); se rulează doar SELECT-uri; identificatorii vin din catalog, citați (un tabel numit `x"; drop table t; --` rămâne în ghilimele).
+- **Fără scurgeri:** parola nu apare în răspuns, în audit sau în erorile clasificate (mesajul serverului Postgres se aruncă).
+- **Erori:** configurarea greșită marchează credențiala `invalid`; penele nu schimbă starea; încercarea pornită se contorizează.
+
+Verificat cap-coadă pe edge runtime-ul local (26 oct. 2026), cu `postgres.js` 3.4.5 și o destinație Airbyte falsă (`tests/fixtures/airbyte/destination.sql`), pe TLS cu un CA propriu:
+- detectarea Meta, Google Ads și TikTok, cu numele din cataloage; un tabel fără `GRANT` rămâne invizibil;
+- o scriere (`create table`) e refuzată cu 25006 (sesiune read-only);
+- clasificarea erorilor: parolă greșită → `auth`; bază inexistentă → `database_not_found`; certificat pentru alt nume, CA lipsă sau server fără TLS → `tls`; port închis → `unreachable`.
+
+**Constatări din același test:** în edge runtime, `rejectUnauthorized: false` e ignorat (certificatul se verifică mereu), iar un certificat pe IP nu trece (`NotValidForName`). Funcția nu poate deci să cripteze fără verificare: serverul trebuie să aibă nume de domeniu și certificat valid (public sau cu CA atașat). E mai strict decât `sslmode=require` din libpq; e documentat în ghid.
+
+**Neverificat (E-6):** egress-ul funcțiilor server din producție spre portul 5432 al serverului Airbyte; rezolvarea DNS în producție (`Deno.resolveDns`, testată local doar pe nume inexistente și interne); un server doar IPv6; comportamentul cu PgBouncer în față (parametrii de pornire ar putea fi ignorați: atunci inspecția se oprește cu `not_read_only`, nu citește); tabelele Airbyte reale ale agenției (testat pe structura documentată a fluxurilor, nu pe baza lor).

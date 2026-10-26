@@ -80,7 +80,7 @@ describe('sources.statuses (supabase)', () => {
     expect(s.clarity).toMatchObject({ state: 'connected', data_as_of: '2026-10-06', imported_at: '2026-10-07T03:01:10Z' })
     expect(s.ga4).toMatchObject({ state: 'not_connected', data_as_of: null })
     expect(s.csv_import?.state).toBe('not_connected')
-    expect(Object.keys(s)).toEqual(['seomonitor', 'ga4', 'gsc', 'clarity', 'planable', 'google_ads', 'meta_ads', 'tiktok_ads', 'csv_import'])
+    expect(Object.keys(s)).toEqual(['seomonitor', 'ga4', 'gsc', 'clarity', 'planable', 'google_ads', 'meta_ads', 'tiktok_ads', 'airbyte', 'csv_import'])
   })
 
   it('token refuzat → eroare; ultima sincronizare eșuată → eroare cu ultimele date păstrate; parțial → parțial', async () => {
@@ -114,6 +114,11 @@ describe('sources.statuses (supabase)', () => {
   it('token salvat dar fără nicio sincronizare: neconectat (tokenul nu înseamnă date); fără token: spune asta', async () => {
     expect((await get({ source_connections: [conn()], sync_runs: [], import_batches: [] })).clarity).toMatchObject({ state: 'not_connected', note: expect.stringContaining('sincronizare') })
     expect((await get({ source_connections: [conn({ credential_status: 'missing' })], sync_runs: [], import_batches: [] })).clarity).toMatchObject({ state: 'not_connected', note: 'Token neconfigurat.' })
+  })
+
+  it('Airbyte: conturi legate, dar fără colector încă → neconectat, cu motivul (E-6, etapa 2)', async () => {
+    const s = await get({ source_connections: [conn({ provider: 'airbyte', external_account_id: 'meta_ads:123', credential_status: 'missing' })], sync_runs: [], import_batches: [] })
+    expect(s.airbyte).toMatchObject({ state: 'not_connected', note: expect.stringContaining('colectarea din Airbyte în Paid Media nu e încă activă') })
   })
 
   it('SEOmonitor: contul e al clientului; site-ul cu rulări e conectat fără conexiune proprie, fără rulări rămâne neconectat', async () => {
@@ -252,5 +257,54 @@ describe('conturile la nivel de client', () => {
     expect(r.kind).toBe('ready')
     expect(calls.find((c) => c.op === 'insert')?.payload).toEqual({ tenant_id: 't-1', brand_id: null, provider: 'seomonitor', external_account_id: '4821', display_name: 'SEOmonitor' })
     expect((await p.createTenantConnection('t-1', { provider: 'clarity' as never, external_account_id: 'x', display_name: null })).kind).toBe('error')
+  })
+})
+
+describe('sources.inspectAirbyte (funcția server airbyte)', () => {
+  const table = { schema: 'meta', table: 'ads_insights', role: 'report', level: 'ad', rows: 110, accounts: 2, first_date: '2026-09-01', last_date: '2026-10-25', last_synced_at: '2026-10-26T03:00:00Z', metrics: ['clicks', 'spend'], dimensions: [], error: null }
+  const account = { id: 'meta_ads:123', name: 'Aflamin RO', detail: 'Meta Ads · ID 123', platform: 'meta_ads', account_id: '123', rows: 55, first_date: '2026-09-01', last_date: '2026-10-25', last_synced_at: '2026-10-26T03:00:00Z', tables: 1 }
+  const ok = {
+    connection_id: 't-9', outcome: 'ok', credential_status: 'valid', message: 'Conexiunea funcționează: 1 cont în 1 tabel (Meta Ads).', calls_today: 1, daily_limit: 30,
+    inspected_at: '2026-10-26T10:00:00.000Z', platforms: [{ platform: 'meta_ads', label: 'Meta Ads', tables: [table] }], accounts: [account], truncated: false,
+  }
+
+  it('cheamă funcția airbyte cu acțiunea inspect și parsează rezultatul', async () => {
+    const fake = fakeDataClient({ invoke: () => ({ data: ok }) })
+    const r = await createSupabaseSources(fake.client, NOW).inspectAirbyte('t-9')
+    expect(r.kind).toBe('ready')
+    if (r.kind === 'ready') expect(r.data.accounts[0]).toMatchObject({ id: 'meta_ads:123', last_date: '2026-10-25' })
+    expect(fake.invocations).toEqual([{ name: 'airbyte', body: { action: 'inspect', connection_id: 't-9' } }])
+  })
+
+  it('un răspuns în afara contractului dă eroare, nu date ghicite', async () => {
+    for (const data of [
+      { ...ok, outcome: 'altceva' },
+      { ...ok, accounts: [{ ...account, platform: 'linkedin_ads' }] },
+      { ...ok, platforms: [{ platform: 'meta_ads', label: 'Meta Ads', tables: [{ ...table, rows: -1 }] }] },
+      { ...ok, platforms: [{ platform: 'meta_ads', label: 'Meta Ads', tables: [{ ...table, first_date: '1 sep. 2026' }] }] },
+      { ...ok, inspected_at: 'ieri' },
+    ]) {
+      const r = await createSupabaseSources(fakeDataClient({ invoke: () => ({ data }) }).client, NOW).inspectAirbyte('t-9')
+      expect(r.kind).toBe('error')
+    }
+  })
+
+  it('selectorul de conturi (kind airbyte) folosește inspecția: doar ID, nume, detaliu', async () => {
+    const fake = fakeDataClient({ invoke: () => ({ data: ok }) })
+    const r = await createSupabaseSources(fake.client, NOW).listAccounts('t-9', 'airbyte')
+    expect(r).toEqual({ kind: 'ready', data: { outcome: 'ok', credential_status: 'valid', accounts: [{ id: 'meta_ads:123', name: 'Aflamin RO', detail: 'Meta Ads · ID 123' }], truncated: false, message: null } })
+    expect(fake.invocations[0]!.name).toBe('airbyte')
+  })
+
+  it('selectorul: configurarea greșită → cheie refuzată; pana → eroare de furnizor; motivul ajunge la utilizator', async () => {
+    const fail = (outcome: string) => ({ ...ok, outcome, credential_status: 'invalid', message: `motiv ${outcome}`, platforms: [], accounts: [], inspected_at: null })
+    const list = async (outcome: string) => {
+      const r = await createSupabaseSources(fakeDataClient({ invoke: () => ({ data: fail(outcome) }) }).client, NOW).listAccounts('t-9', 'airbyte')
+      return r.kind === 'ready' ? [r.data.outcome, r.data.message] : null
+    }
+    expect(await list('tls_failed')).toEqual(['invalid', 'motiv tls_failed'])
+    expect(await list('host_not_allowed')).toEqual(['invalid', 'motiv host_not_allowed'])
+    expect(await list('unreachable')).toEqual(['provider_error', 'motiv unreachable'])
+    expect(await list('budget_exhausted')).toEqual(['budget_exhausted', 'motiv budget_exhausted'])
   })
 })

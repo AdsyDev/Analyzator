@@ -11,6 +11,7 @@ Ghiduri pas cu pas pentru agenție (rolul `agency_admin`): de unde obții cheia,
 | Meta Ads | [meta-ads.md](meta-ads.md) | cost, afișări, clickuri pe zi și reclamă | Din aplicație: tokenul system user, cu test, și contul de ads pe brand |
 | Google Ads | [google-ads.md](google-ads.md) | cost, afișări, clickuri, conversii pe zi și campanie | „Conectează cu Google” (OAuth), apoi customer ID-ul pe brand |
 | TikTok Ads | [tiktok-ads.md](tiktok-ads.md) | cost, afișări, clickuri, conversii pe zi și campanie | „Conectează cu TikTok” (OAuth), apoi advertiser ID-ul pe brand |
+| Airbyte (Meta, Google Ads, TikTok) | [airbyte.md](airbyte.md) | conturile și metricile sincronizate de Airbyte-ul agenției | Din aplicație: destinația Postgres (read-only, TLS), inspecția și conturile pe brand; colectarea în Paid Media e etapa 2 |
 | Orice platformă de ads, ca rezervă | [csv.md](csv.md) | cost, clicks, conversii | Import de fișier CSV |
 
 ## Înainte de prima sursă (o singură dată)

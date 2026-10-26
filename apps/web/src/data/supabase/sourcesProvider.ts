@@ -1,4 +1,4 @@
-import { failed, ready, TENANT_PROVIDERS, type AccountList, type AccountListOutcome, type CredentialStatus, type DiscoveredAccount, type ProviderResult, type SourceConnection, type SourcesProvider, type TenantConnection, type TenantProviderId, type TokenSaved, type ValidationOutcome, type ValidationOutcomeKind } from '../../contracts'
+import { failed, ready, TENANT_PROVIDERS, type AccountList, type AccountListOutcome, type AirbyteInspection, type AirbyteOutcome, type CredentialStatus, type DiscoveredAccount, type ProviderResult, type SourceConnection, type SourcesProvider, type TenantConnection, type TenantProviderId, type TokenSaved, type ValidationOutcome, type ValidationOutcomeKind } from '../../contracts'
 import type { DataClient } from './dataClient'
 import { QUERY_FAILED } from './dataClient'
 import { deriveStatuses, mapConnection, mapSyncRun, SourceContractError, type ConnectionRow, type ImportBatchRow, type SyncRunRow } from './mapSources'
@@ -11,6 +11,60 @@ const FUNCTION = 'source-credentials'
 const OUTCOMES: readonly ValidationOutcomeKind[] = ['valid', 'invalid', 'rate_limited', 'provider_error', 'budget_exhausted']
 const CREDENTIALS = ['missing', 'unverified', 'valid', 'invalid']
 const LIST_OUTCOMES: readonly AccountListOutcome[] = ['ok', 'invalid', 'api_disabled', 'rate_limited', 'provider_error', 'budget_exhausted']
+
+const AIRBYTE_OUTCOMES: readonly AirbyteOutcome[] = [
+  'ok', 'budget_exhausted', 'invalid_dsn', 'tls_required', 'host_not_allowed', 'dns_failed', 'auth_failed', 'database_not_found',
+  'tls_failed', 'unreachable', 'timeout', 'permission_denied', 'not_read_only', 'database_error',
+]
+/** Inspecția Airbyte în limbajul selectorului de conturi: configurarea greșită = cheie refuzată, pana = eroare de furnizor. */
+const AIRBYTE_LIST_OUTCOME: Record<AirbyteOutcome, AccountListOutcome> = {
+  ok: 'ok', budget_exhausted: 'budget_exhausted', invalid_dsn: 'invalid', tls_required: 'invalid', host_not_allowed: 'invalid', dns_failed: 'provider_error',
+  auth_failed: 'invalid', database_not_found: 'invalid', tls_failed: 'invalid', unreachable: 'provider_error', timeout: 'provider_error',
+  permission_denied: 'invalid', not_read_only: 'invalid', database_error: 'provider_error',
+}
+const PLATFORMS = ['meta_ads', 'google_ads', 'tiktok_ads']
+const isDate = (v: unknown) => v === null || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v))
+const isInstant = (v: unknown) => v === null || (typeof v === 'string' && !Number.isNaN(Date.parse(v)))
+const isStrings = (v: unknown) => Array.isArray(v) && v.every((x) => typeof x === 'string')
+const isCount = (v: unknown) => v === null || (typeof v === 'number' && Number.isFinite(v) && v >= 0)
+
+/** Verifică forma răspunsului `inspect`; orice abatere e o eroare de contract, nu date ghicite. */
+export function parseInspection(data: unknown): AirbyteInspection {
+  const d = data as Record<string, unknown> | null
+  const tableOk = (t: unknown) => {
+    const v = t as Record<string, unknown> | null
+    return !!v && typeof v.schema === 'string' && typeof v.table === 'string' && (v.role === 'report' || v.role === 'catalog') && (v.level === null || typeof v.level === 'string') &&
+      isCount(v.rows) && isCount(v.accounts) && isDate(v.first_date) && isDate(v.last_date) && isInstant(v.last_synced_at) && isStrings(v.metrics) && isStrings(v.dimensions) &&
+      (v.error === null || ['timeout', 'permission', 'failed', 'skipped'].includes(v.error as string))
+  }
+  const platformOk = (p: unknown) => {
+    const v = p as Record<string, unknown> | null
+    return !!v && PLATFORMS.includes(v.platform as string) && typeof v.label === 'string' && Array.isArray(v.tables) && v.tables.every(tableOk)
+  }
+  const accountOk = (a: unknown) => {
+    const v = a as Record<string, unknown> | null
+    return isAccount(a) && PLATFORMS.includes(v!.platform as string) && typeof v!.account_id === 'string' && typeof v!.rows === 'number' && isDate(v!.first_date) && isDate(v!.last_date) &&
+      isInstant(v!.last_synced_at) && typeof v!.tables === 'number'
+  }
+  if (
+    !d ||
+    !AIRBYTE_OUTCOMES.includes(d.outcome as AirbyteOutcome) ||
+    typeof d.credential_status !== 'string' ||
+    !CREDENTIALS.includes(d.credential_status) ||
+    typeof d.message !== 'string' ||
+    typeof d.calls_today !== 'number' ||
+    typeof d.daily_limit !== 'number' ||
+    !isInstant(d.inspected_at) ||
+    !Array.isArray(d.platforms) ||
+    !d.platforms.every(platformOk) ||
+    !Array.isArray(d.accounts) ||
+    !d.accounts.every(accountOk) ||
+    typeof d.truncated !== 'boolean'
+  ) {
+    throw new SourceContractError('Răspuns airbyte inspect invalid')
+  }
+  return d as unknown as AirbyteInspection
+}
 
 const isAccount = (a: unknown): a is DiscoveredAccount => {
   const v = a as Record<string, unknown> | null
@@ -72,6 +126,11 @@ export function createSupabaseSources(client: DataClient, now: () => Date = () =
     const { data, error } = await client.from('sync_runs').select(RUN_COLUMNS).eq('brand_id', brandId).order('created_at', { ascending: false }).limit(RUN_LIMIT)
     if (error) throw new Error(QUERY_FAILED)
     return (data ?? []) as unknown as SyncRunRow[]
+  }
+  async function inspectAirbyte(connectionId: string): Promise<AirbyteInspection> {
+    const { data, error } = await client.functions.invoke('airbyte', { body: { action: 'inspect', connection_id: connectionId } })
+    if (error) throw new Error(await functionError(error))
+    return parseInspection(data)
   }
   async function callsByConnection(brandId: string): Promise<Map<string, number>> {
     const { data, error } = await client.from('provider_api_calls').select('source_connection_id, calls').eq('brand_id', brandId).eq('call_date_utc', utcDay(now()))
@@ -176,8 +235,14 @@ export function createSupabaseSources(client: DataClient, now: () => Date = () =
         }
       }),
 
+    inspectAirbyte: (connectionId) => guarded(() => inspectAirbyte(connectionId)),
+
     listAccounts: (connectionId, kind, campaignId) =>
       guarded(async (): Promise<AccountList> => {
+        if (kind === 'airbyte') {
+          const r = await inspectAirbyte(connectionId)
+          return { outcome: AIRBYTE_LIST_OUTCOME[r.outcome], credential_status: r.credential_status, accounts: r.accounts.map(({ id, name, detail }) => ({ id, name, detail })), truncated: r.truncated, message: r.outcome === 'ok' ? null : r.message }
+        }
         const { data, error } = await client.functions.invoke(FUNCTION, { body: { action: 'list_accounts', connection_id: connectionId, kind, ...(campaignId ? { campaign_id: campaignId } : {}) } })
         if (error) throw new Error(await functionError(error))
         const d = data as Record<string, unknown> | null

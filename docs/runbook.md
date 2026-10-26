@@ -176,3 +176,12 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 - Rulare: `google-ads-weekly.yml` (`CONNECTOR_GOOGLE_ADS_ENABLED`), `tiktok-weekly.yml` (`CONNECTOR_TIKTOK_ENABLED`); local `npm run collect:google-ads`, `npm run collect:tiktok`.
 - Diagnostic: întoarcerea OAuth are `reason` în adresă (`state_invalid`, `exchange_failed`, `no_refresh_token`…); `oauth_states` (service role) arată pornirile și `used_at`. Reînnoirile TikTok apar în `audit_events` ca `credential_refreshed` (`actor_type = worker`).
 - `not_connected` cu „Reconectează” = refresh token refuzat; conectarea se face din nou din aplicație.
+
+## Airbyte (destinația Postgres, E-6)
+
+- Reguli: `docs/contracts/airbyte.md`; pași pentru agenție, inclusiv utilizatorul read-only și TLS: `docs/connectors/airbyte.md`.
+- Conexiuni: `airbyte_postgres` per client (connection string în Vault, din cardul Airbyte al oricărui site → pasul 1) și `airbyte` per brand (`<platformă>:<ID cont>`, mai multe pe site).
+- Funcția server `airbyte` (`inspect`): fără secrete proprii; folosește `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` și `ANALYZATOR_APP_ORIGIN`. Se publică odată cu celelalte (`supabase functions deploy`); la primul apel descarcă `postgres.js` din npm.
+- Verificare: `audit_events` (`action = airbyte_inspected`, cu rezultatul), `provider_api_calls` (`purpose = discover`, 30/zi per conexiune), `source_connections.credential_status` și `last_validation_error` (codul rezultatului).
+- Diagnostic: rezultatele și remedierile sunt în tabelul din ghid. `tls_failed` înseamnă aproape mereu certificat fără numele serverului sau TLS oprit; `unreachable` înseamnă firewall sau `listen_addresses`.
+- Etapa 2 (colectorul în `paid_daily`) nu există încă: sursa `airbyte` rămâne „Neconectat” cu motivul afișat.

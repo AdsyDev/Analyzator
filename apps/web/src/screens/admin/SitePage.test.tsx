@@ -21,7 +21,7 @@ describe('pagina site-ului: sursele, fiecare conectată pe site (fixtures de pre
     await pageReady('Site și surse')
     const section = (await screen.findByRole('heading', { level: 2, name: 'Surse' })).closest('section')!
     const cards = within(section).getAllByRole('article')
-    expect(cards.map((a) => a.getAttribute('aria-label'))).toEqual(['Google Analytics 4', 'Search Console', 'Microsoft Clarity', 'SEOmonitor', 'Planable', 'Meta Ads', 'Google Ads', 'TikTok Ads', 'Import CSV'])
+    expect(cards.map((a) => a.getAttribute('aria-label'))).toEqual(['Google Analytics 4', 'Search Console', 'Microsoft Clarity', 'SEOmonitor', 'Planable', 'Meta Ads', 'Google Ads', 'TikTok Ads', 'Airbyte (Paid Ads)', 'Import CSV'])
     expect(cards.map((a) => a.getAttribute('data-state')).slice(0, 5)).toEqual(['connected', 'stale', 'error', 'partial', 'not_connected'])
     const admin = screen.getByRole('navigation', { name: 'Administrare' })
     expect(within(admin).queryByRole('link', { name: 'Surse' })).toBeNull()
@@ -293,6 +293,52 @@ describe('pagina site-ului: sursele, fiecare conectată pe site (fixtures de pre
     expect(within(card).getByText(/Fără cheia clientului de la pasul 1/)).toBeInTheDocument()
     const form = within(card).getByRole('form', { name: 'Adaugă conexiunea Meta Ads' })
     expect(within(form).getByLabelText('Contul de ads Meta')).toHaveAttribute('placeholder', 'Contul de ads: act_1234567890')
+  })
+
+  it('Airbyte: connection string în câmp parolă, golit după salvare; inspecția arată tabelele și conturile; mai multe conturi pe site', async () => {
+    renderApp({ route: site('brand-urinal') })
+    await pageReady('Site și surse')
+    const card = await open('Airbyte (Paid Ads)')
+    expect(within(card).getByRole('heading', { name: 'Destinația Postgres Airbyte a clientului' })).toBeInTheDocument()
+    const key = within(card).getByRole('article', { name: 'Destinația Airbyte a clientului' })
+    await userEvent.type(within(key).getByLabelText('Numele destinației'), 'Airbyte AdSymphony')
+    const dsn = within(key).getByLabelText('Connection string')
+    expect(dsn).toHaveAttribute('type', 'password')
+    await userEvent.type(dsn, 'nu-e-dsn')
+    expect(within(key).getByRole('button', { name: 'Salvează' })).toBeDisabled()
+    await userEvent.clear(dsn)
+    await userEvent.type(dsn, 'postgresql://ro:parola-secreta@airbyte-db.exemplu.ro:5432/airbyte?sslmode=require')
+    await userEvent.click(within(key).getByRole('button', { name: 'Salvează' }))
+    expect(await within(card).findByText(/Folosește cheia clientului/)).toBeInTheDocument()
+    expect(within(card).getByText('Airbyte AdSymphony')).toBeInTheDocument()
+    expect(document.body.textContent).not.toContain('parola-secreta')
+
+    // Inspecția: tabelele detectate, metricile și conturile (previzualizare).
+    await userEvent.click(within(card).getByRole('button', { name: 'Inspectează datele' }))
+    const tables = await within(card).findByRole('region', { name: 'Tabele Meta Ads' })
+    expect(within(tables).getByText('meta.ads_insights')).toBeInTheDocument()
+    expect(within(tables).getByText(/actions, clicks, impressions, reach, spend/)).toBeInTheDocument()
+    expect(within(card).getByRole('table', { name: 'Conturile găsite în Airbyte' })).toBeInTheDocument()
+
+    // Pasul 2: contul propus după numele site-ului; după adăugare, formularul rămâne pentru alt cont.
+    const form = within(card).getByRole('form', { name: 'Adaugă conexiunea Airbyte (Paid Ads)' })
+    const select = await within(form).findByLabelText('Contul de ads din Airbyte')
+    expect((select as HTMLSelectElement).value).toMatch(/^meta_ads:\d+$/)
+    expect(within(form).getByLabelText('Nume afișat (opțional)')).toHaveValue('Urinal RO')
+    await userEvent.click(within(form).getByRole('button', { name: 'Adaugă conexiunea' }))
+    const conn = await within(card).findByRole('article', { name: 'Conexiune Airbyte (Paid Ads) · Urinal RO' })
+    expect(within(conn).getByText('Colectare neactivă')).toBeInTheDocument()
+    expect(within(card).getByRole('form', { name: 'Adaugă conexiunea Airbyte (Paid Ads)' })).toBeInTheDocument()
+
+    // Manual: doar formatul platformă:ID.
+    const again = within(card).getByRole('form', { name: 'Adaugă conexiunea Airbyte (Paid Ads)' })
+    await userEvent.click(await within(again).findByRole('button', { name: 'Nu e în listă? Introdu manual' }))
+    const manual = within(again).getByLabelText('Contul din Airbyte')
+    await userEvent.type(manual, '1234567890')
+    expect(within(again).getByRole('button', { name: 'Adaugă conexiunea' })).toBeDisabled()
+    await userEvent.clear(manual)
+    await userEvent.type(manual, 'google_ads:1112223333')
+    expect(within(again).getByRole('button', { name: 'Adaugă conexiunea' })).toBeEnabled()
   })
 
   it('OAuth Google Ads: MCC obligatoriu; în previzualizare conectarea e simulată', async () => {

@@ -5,6 +5,7 @@ import { StatusChip } from '../../components/ui/Chip'
 import { useProviders } from '../../data/DataProvidersContext'
 import { formatDateTime } from '../../lib/format'
 import { checkServiceAccount, type ServiceAccountCheck } from '../../lib/serviceAccount'
+import { AirbyteKeyCard } from './AirbyteKeyCard'
 import { CREDENTIAL_LABELS, OUTCOME_TONE } from './labels'
 
 const field = 'h-9 rounded-[10px] border border-border-strong bg-surface px-3 text-[13px]'
@@ -20,6 +21,7 @@ export function TenantAccountCard({ tenantId, provider, connection, onChanged }:
   if (provider === 'google_service_account') return <GoogleKeyCard tenantId={tenantId} connection={connection} onChanged={onChanged} />
   if (provider === 'google_ads_account') return <OAuthAccountCard spec={GOOGLE_ADS} tenantId={tenantId} connection={connection} onChanged={onChanged} />
   if (provider === 'tiktok_account') return <OAuthAccountCard spec={TIKTOK} tenantId={tenantId} connection={connection} onChanged={onChanged} />
+  if (provider === 'airbyte_postgres') return <AirbyteKeyCard tenantId={tenantId} connection={connection} onChanged={onChanged} />
   const spec = provider === 'seomonitor' ? SEOMONITOR : provider === 'planable_account' ? PLANABLE : META
   return <TokenAccountCard spec={spec} tenantId={tenantId} connection={connection} onChanged={onChanged} />
 }

@@ -18,6 +18,7 @@ const ACCOUNT_LABEL: Partial<Record<SourceProviderId, string>> = {
   meta_ads: 'Contul de ads Meta',
   google_ads: 'Customer ID Google Ads',
   tiktok_ads: 'Advertiser ID TikTok',
+  airbyte: 'Contul din Airbyte',
 }
 
 /** Eticheta selectorului, per sursă. */
@@ -26,6 +27,7 @@ const PICK_LABEL: Partial<Record<SourceProviderId, string>> = {
   gsc: 'Proprietatea Search Console',
   planable: 'Workspace-ul Planable',
   meta_ads: 'Contul de ads Meta',
+  airbyte: 'Contul de ads din Airbyte',
 }
 
 /** Ce se completează la „Cont sau proiect”, per sursă (docs/connectors). */
@@ -37,6 +39,12 @@ const ACCOUNT_HINT: Partial<Record<SourceProviderId, string>> = {
   meta_ads: 'Contul de ads: act_1234567890',
   google_ads: 'Customer ID Google Ads: 123-456-7890',
   tiktok_ads: 'Advertiser ID TikTok (cifre)',
+  airbyte: 'meta_ads:1234567890, google_ads:1234567890 sau tiktok_ads:7000…',
+}
+
+/** Formatul contului introdus manual, unde există unul fix. */
+const ACCOUNT_PATTERN: Partial<Record<SourceProviderId, RegExp>> = {
+  airbyte: /^(meta_ads|google_ads|tiktok_ads):[A-Za-z0-9_-]{1,64}$/,
 }
 
 /** Ce faci când lista e goală: cheia funcționează, dar nu vede niciun cont. */
@@ -45,6 +53,7 @@ const EMPTY_HINT: Partial<Record<DiscoverKind, string>> = {
   gsc: 'Service account-ul nu vede niciun site în Search Console. Adaugă-l ca utilizator Restricted (Settings → Users and permissions), apoi reîncarcă lista.',
   planable: 'Tokenul Planable nu vede niciun workspace. Verifică workspace-urile alese la crearea tokenului.',
   meta_ads: 'System user-ul nu are niciun cont de ads atribuit. Atribuie-l în Business Settings → System users → Assign assets.',
+  airbyte: 'Utilizatorul read-only nu vede niciun tabel Meta, Google Ads sau TikTok cu conturi. Verifică GRANT SELECT pe schemele Airbyte (pasul 1, Inspectează datele).',
 }
 
 /** Selectorul: cheia clientului de folosit și ce fel de conturi se listează. */
@@ -101,12 +110,13 @@ export function AddConnection({ brandId, provider, discovery, onCreated }: Props
   const selected = accounts.find((a) => a.id === selectedId) ?? null
   const usingList = !!discovery && !manual && accounts.length > 0
   const value = usingList ? selectedId : account.trim()
+  const valueOk = value !== '' && (usingList || !ACCOUNT_PATTERN[provider] || ACCOUNT_PATTERN[provider].test(value))
   // Numele afișat: cel din cont, până când utilizatorul îl schimbă.
   const displayName = name ?? (usingList ? (selected?.name ?? '') : '')
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    if (!value || busy) return
+    if (!valueOk || busy) return
     setBusy(true)
     setError(null)
     setDone(false)
@@ -171,7 +181,7 @@ export function AddConnection({ brandId, provider, discovery, onCreated }: Props
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        {(usingList || manual) && <Button type="submit" variant="primary" loading={busy} disabled={!value}>Adaugă conexiunea</Button>}
+        {(usingList || manual) && <Button type="submit" variant="primary" loading={busy} disabled={!valueOk}>Adaugă conexiunea</Button>}
         {discovery && (
           <Button variant="ghost" onClick={() => setManual(!manual)}>
             {manual ? 'Alege din lista cheii' : 'Nu e în listă? Introdu manual'}

@@ -18,6 +18,7 @@ import { useLayout } from '../../routing/AppLayout'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
 import { AddConnection } from './AddConnection'
+import { AirbyteInspect } from './AirbyteKeyCard'
 import { SeomonitorCampaigns } from './SeomonitorCampaigns'
 import { ConnectionCard } from './ConnectionCard'
 import { CREDENTIAL_LABELS, SYNC_LABELS } from './labels'
@@ -45,11 +46,14 @@ export const SITE_SOURCES: readonly SiteSource[] = [
   { provider: 'meta_ads', tenant: 'meta_account', brand: true },
   { provider: 'google_ads', tenant: 'google_ads_account', brand: true },
   { provider: 'tiktok_ads', tenant: 'tiktok_account', brand: true },
+  { provider: 'airbyte', tenant: 'airbyte_postgres', brand: true },
   { provider: 'csv_import', tenant: null, brand: false },
 ]
 
 /** Sursele cu selector: contul site-ului se alege din lista văzută de cheia clientului. */
-const DISCOVER_KIND: Partial<Record<SourceProviderId, DiscoverKind>> = { ga4: 'ga4', gsc: 'gsc', planable: 'planable', meta_ads: 'meta_ads' }
+const DISCOVER_KIND: Partial<Record<SourceProviderId, DiscoverKind>> = { ga4: 'ga4', gsc: 'gsc', planable: 'planable', meta_ads: 'meta_ads', airbyte: 'airbyte' }
+/** Sursele cu mai multe conturi pe același site (Airbyte: câte un cont de ads pe platformă). */
+const MULTI_ACCOUNT: readonly SourceProviderId[] = ['airbyte']
 
 const STATE: Record<SourceState, { label: string; tone: ChipTone; icon: ReactNode }> = {
   connected: { label: 'Conectat', tone: 'pos', icon: <CheckCircleIcon size={11} weight="bold" aria-hidden="true" /> },
@@ -67,6 +71,7 @@ const TENANT_STEP: Record<TenantProviderId, string> = {
   meta_account: 'Tokenul Meta (system user) al clientului',
   google_ads_account: 'Contul Google Ads (MCC) al clientului',
   tiktok_account: 'Contul TikTok for Business al clientului',
+  airbyte_postgres: 'Destinația Postgres Airbyte a clientului',
 }
 
 const duration = (r: SyncRun): string => {
@@ -214,7 +219,7 @@ function SiteContent({ client, space, onChanged }: { client: Client; space: Clie
       <Section
         id="sources"
         title="Surse"
-        description={`Fiecare sursă se conectează aici, pentru ${space.name}. O cheie a clientului (Google, SEOmonitor, Planable, Meta, Google Ads, TikTok) se salvează o singură dată și e refolosită automat de celelalte site-uri ale lui ${client.name}.`}
+        description={`Fiecare sursă se conectează aici, pentru ${space.name}. O cheie a clientului (Google, SEOmonitor, Planable, Meta, Google Ads, TikTok, Airbyte) se salvează o singură dată și e refolosită automat de celelalte site-uri ale lui ${client.name}.`}
       >
         <Resolved state={connections.state} onRetry={connections.reload} loadingLabel="Se încarcă sursele" skeletonClass="h-48">
           {(connList) => (
@@ -321,12 +326,15 @@ function SiteSourceCard({ source, space, client, status, connections, runs, tena
           {source.tenant && (
             <Step n={++n} total={steps} title={TENANT_STEP[source.tenant]} done={keySaved}>
               {keySaved && !changingKey ? (
-                <div className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 px-3 py-2.5 text-[12.5px]">
-                  <span className="text-text-2">Folosește cheia clientului {client.name}:</span>
-                  <span className="break-all font-mono text-[12px]">{tenantConnection.external_account_id}</span>
-                  <StatusChip tone={CREDENTIAL_LABELS[tenantConnection.credential_status].tone}>{CREDENTIAL_LABELS[tenantConnection.credential_status].label}</StatusChip>
-                  <span className="text-text-3">E aceeași pentru toate site-urile clientului.</span>
-                  <Button variant="ghost" onClick={() => setChangingKey(true)}>Schimbă cheia</Button>
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg bg-surface-2 px-3 py-2.5 text-[12.5px]">
+                    <span className="text-text-2">Folosește cheia clientului {client.name}:</span>
+                    <span className="break-all font-mono text-[12px]">{tenantConnection.external_account_id}</span>
+                    <StatusChip tone={CREDENTIAL_LABELS[tenantConnection.credential_status].tone}>{CREDENTIAL_LABELS[tenantConnection.credential_status].label}</StatusChip>
+                    <span className="text-text-3">E aceeași pentru toate site-urile clientului.</span>
+                    <Button variant="ghost" onClick={() => setChangingKey(true)}>Schimbă cheia</Button>
+                  </div>
+                  {source.tenant === 'airbyte_postgres' && <AirbyteInspect connection={tenantConnection} />}
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
@@ -343,13 +351,13 @@ function SiteSourceCard({ source, space, client, status, connections, runs, tena
           )}
 
           {source.brand && (
-            <Step n={++n} total={steps} title={`Contul ${space.name} în ${name}`} done={connections.length > 0}>
+            <Step n={++n} total={steps} title={MULTI_ACCOUNT.includes(provider) ? `Conturile ${space.name} din ${name}` : `Contul ${space.name} în ${name}`} done={connections.length > 0}>
               <div className="flex flex-col gap-3">
                 {source.tenant && !keySaved && <p className="text-[12.5px] text-warn-text">Fără cheia clientului de la pasul 1, contul se adaugă, dar colectarea nu pornește.</p>}
                 {connections.map((c) => (
                   <ConnectionCard key={c.id} connection={c} runs={runs.filter((r) => r.connection_id === c.id || r.connection_id === null)} onChanged={onChanged} />
                 ))}
-                {connections.length === 0 && (
+                {(connections.length === 0 || MULTI_ACCOUNT.includes(provider)) && (
                   <AddConnection
                     key={keySaved ? tenantConnection.id : 'manual'}
                     brandId={space.id}

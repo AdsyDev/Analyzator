@@ -111,6 +111,10 @@ function withReason(head: string, run: SyncRunRow, tail: string): string {
 const CLIENT_LEVEL: readonly SourceProviderId[] = ['seomonitor']
 /** Sursele cu token pe conexiunea site-ului; celelalte folosesc cheia clientului. */
 const OWN_TOKEN: readonly SourceProviderId[] = ['clarity']
+/** Sursele cu conexiuni, dar încă fără colector (E-6: Airbyte, etapa 2). */
+const NO_COLLECTOR_YET: Partial<Record<SourceProviderId, string>> = {
+  airbyte: 'Conturile sunt legate de site; colectarea din Airbyte în Paid Media nu e încă activă.',
+}
 
 /**
  * Starea unei surse din conexiuni, sincronizări și importuri. Regulile sunt clasificări, nu metrici:
@@ -139,7 +143,7 @@ export function deriveStatuses(connections: ConnectionRow[], runs: SyncRunRow[],
     const data_as_of: IsoDate | null = lastWithData?.period_end ?? null
     const imported_at: IsoDateTime | null = lastWithData?.finished_at ?? null
     if (!latest || !lastWithData) {
-      const tokenNote = OWN_TOKEN.includes(provider) && conns.every((c) => c.credential_status === 'missing') ? 'Token neconfigurat.' : 'Fără nicio sincronizare încheiată cu date.'
+      const tokenNote = OWN_TOKEN.includes(provider) && conns.every((c) => c.credential_status === 'missing') ? 'Token neconfigurat.' : (NO_COLLECTOR_YET[provider] ?? 'Fără nicio sincronizare încheiată cu date.')
       if (latest?.status === 'failed') return { ...base, state: 'error' as SourceState, data_as_of, imported_at, note: withReason('Ultima sincronizare a eșuat', latest, '.') }
       return { ...base, state: 'not_connected' as SourceState, data_as_of, imported_at, note: tokenNote }
     }

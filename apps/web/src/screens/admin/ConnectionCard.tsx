@@ -18,6 +18,12 @@ const ACCESS_FIX: Record<string, string> = {
   meta_ads: 'Atribuie contul de ads system user-ului din Business Manager.',
   google_ads: 'Contul trebuie să fie sub MCC-ul conectat la pasul 1.',
   tiktok_ads: 'Advertiserul trebuie să fie printre cele autorizate la pasul 1.',
+  airbyte: 'Contul trebuie să apară în tabelele Airbyte văzute de utilizatorul read-only de la pasul 1.',
+}
+
+/** Sursele fără colectare încă: fără rulări, cardul spune asta, nu „se confirmă la prima colectare”. */
+const NOT_COLLECTED_YET: Record<string, AccessState> = {
+  airbyte: { tone: 'neutral', label: 'Colectare neactivă', text: 'Contul e legat de site. Colectarea din Airbyte în Paid Media nu e încă activă (E-6, etapa 2).' },
 }
 export const USES_TENANT_KEY: readonly string[] = Object.keys(ACCESS_FIX)
 
@@ -47,7 +53,7 @@ export function accessFromRuns(provider: string, runs: SyncRun[]): AccessState {
   if (latest) {
     return { tone: 'warn', label: 'Neconfirmat', text: `Colectarea din ${formatDateTime(latest.started_at)} nu a adus date, deci accesul nu e confirmat încă.` }
   }
-  return { tone: 'neutral', label: 'Neverificat', text: 'Accesul se confirmă la prima colectare, după ce cheia clientului e salvată.' }
+  return NOT_COLLECTED_YET[provider] ?? { tone: 'neutral', label: 'Neverificat', text: 'Accesul se confirmă la prima colectare, după ce cheia clientului e salvată.' }
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

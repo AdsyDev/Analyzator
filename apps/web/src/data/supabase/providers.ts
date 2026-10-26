@@ -97,6 +97,7 @@ const sources: SourcesProvider = {
   setToken: async () => notConnected('Setarea tokenului nu este încă disponibilă.'),
   validate: async () => notConnected('Testarea conexiunii nu este încă disponibilă.'),
   listAccounts: async () => notConnected('Lista conturilor nu este încă disponibilă.'),
+  inspectAirbyte: async () => notConnected('Inspecția Airbyte nu este încă disponibilă.'),
   tenantConnections: async () => notConnected('Conturile la nivel de client nu sunt încă disponibile.'),
   createTenantConnection: async () => notConnected('Conexiunile surselor nu sunt încă disponibile.'),
   startOAuth: async () => notConnected('Conectarea conturilor nu este încă disponibilă.'),

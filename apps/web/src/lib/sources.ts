@@ -10,6 +10,7 @@ export const PROVIDER_LABELS: Record<SourceProviderId, { name: string; mono: str
   google_ads: { name: 'Google Ads', mono: 'GAd' },
   meta_ads: { name: 'Meta Ads', mono: 'MA' },
   tiktok_ads: { name: 'TikTok Ads', mono: 'TT' },
+  airbyte: { name: 'Airbyte (Paid Ads)', mono: 'AB' },
   csv_import: { name: 'Import CSV', mono: 'CSV' },
 }
 
@@ -28,6 +29,7 @@ export const PROVIDER_DESCRIPTIONS: Record<SourceProviderId, string> = {
   google_ads: 'Cheltuieli și performanță din Google Ads.',
   meta_ads: 'Cheltuieli și performanță din Meta Ads.',
   tiktok_ads: 'Cheltuieli și performanță din TikTok Ads.',
+  airbyte: 'Conturile Meta, Google Ads și TikTok sincronizate de Airbyte-ul agenției, citite din destinația lui Postgres.',
   csv_import: 'Date importate din fișiere CSV (Paid Media și Social).',
 }
 

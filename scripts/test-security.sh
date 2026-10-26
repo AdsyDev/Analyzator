@@ -9,16 +9,19 @@ eval "$(supabase status -o env)"
 set +a
 case "$API_URL" in http://127.0.0.1*|http://localhost*) ;; *) echo "Refuz: API_URL nu e local ($API_URL)"; exit 1;; esac
 
-# Edge Functions (source-credentials, csv-import) pentru testele D și E (oprite la final).
+# Edge Functions (source-credentials, csv-import, airbyte) pentru testele D, E și I (oprite la final).
+# airbyte descarcă postgres.js (npm) la primul apel; așteptăm până răspunde 401, nu 503 (BOOT_ERROR).
 supabase functions serve >/dev/null 2>&1 &
 FN_PID=$!
 trap 'kill $FN_PID 2>/dev/null || true' EXIT
-for _ in $(seq 1 45); do
+for _ in $(seq 1 60); do
   code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API_URL/functions/v1/source-credentials" \
     -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" -d '{}' || true)
   code2=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API_URL/functions/v1/csv-import" \
     -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" -d '{}' || true)
-  [ "$code" = "401" ] && [ "$code2" = "401" ] && break
+  code3=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API_URL/functions/v1/airbyte" \
+    -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY" -d '{}' || true)
+  [ "$code" = "401" ] && [ "$code2" = "401" ] && [ "$code3" = "401" ] && break
   sleep 2
 done
 

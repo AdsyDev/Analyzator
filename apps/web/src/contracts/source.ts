@@ -9,6 +9,7 @@ export const SOURCE_PROVIDERS = [
   'google_ads',
   'meta_ads',
   'tiktok_ads',
+  'airbyte',
   'csv_import',
 ] as const
 export type SourceProviderId = (typeof SOURCE_PROVIDERS)[number]
@@ -83,9 +84,11 @@ export interface NewConnection {
  * `seomonitor` = contul SEOmonitor, cu grupurile mapate pe branduri (docs/contracts/seomonitor.md);
  * `planable_account` = tokenul Planable, cu workspace-ul pe fiecare brand (docs/contracts/planable.md);
  * `meta_account` = tokenul system user Meta, cu contul de ads pe fiecare brand (docs/contracts/meta-ads.md);
- * `google_ads_account` și `tiktok_account` = conectate prin OAuth (docs/contracts/oauth.md).
+ * `google_ads_account` și `tiktok_account` = conectate prin OAuth (docs/contracts/oauth.md);
+ * `airbyte_postgres` = destinația Postgres a Airbyte-ului agenției, cu conturile de ads pe fiecare brand
+ * (sursa `airbyte`, `external_account_id` = `<platformă>:<ID cont>`; docs/contracts/airbyte.md).
  */
-export const TENANT_PROVIDERS = ['google_service_account', 'seomonitor', 'planable_account', 'meta_account', 'google_ads_account', 'tiktok_account'] as const
+export const TENANT_PROVIDERS = ['google_service_account', 'seomonitor', 'planable_account', 'meta_account', 'google_ads_account', 'tiktok_account', 'airbyte_postgres'] as const
 
 /** Conturile care se conectează prin OAuth (funcția server `oauth`, D-8): provider-ul fluxului → contul creat. */
 export type OAuthProvider = 'google_ads' | 'tiktok_ads'
@@ -124,8 +127,11 @@ export interface ValidationOutcome {
   message: string
 }
 
-/** Sursele cu selector de cont: lista vine din cheia clientului (funcția server, `list_accounts`). */
-export type DiscoverKind = 'ga4' | 'gsc' | 'planable' | 'meta_ads' | 'seomonitor' | 'seomonitor_groups'
+/**
+ * Sursele cu selector de cont: lista vine din cheia clientului (funcția server `source-credentials`, `list_accounts`;
+ * la `airbyte`, funcția server `airbyte`, `inspect`).
+ */
+export type DiscoverKind = 'ga4' | 'gsc' | 'planable' | 'meta_ads' | 'seomonitor' | 'seomonitor_groups' | 'airbyte'
 
 /** Un cont văzut de cheia clientului: doar ID-ul, numele și un detaliu (contul GA4, fusul orar, moneda, domeniul). */
 export interface DiscoveredAccount {
@@ -145,4 +151,67 @@ export interface AccountList {
   truncated: boolean
   /** Motivul, în română, când `outcome` nu e `ok`. */
   message: string | null
+}
+
+/** Platformele detectate în destinația Postgres Airbyte (E-6). */
+export type AirbytePlatform = 'meta_ads' | 'google_ads' | 'tiktok_ads'
+
+/** Un tabel Airbyte detectat: raport (cheltuieli, afișări) sau catalog (doar numele conturilor). */
+export interface AirbyteTable {
+  schema: string
+  table: string
+  role: 'report' | 'catalog'
+  /** Nivelul raportului (`account`, `campaign`, `ad_group`, `adset`, `ad`, `keyword`); `null` la cataloage. */
+  level: string | null
+  /** `null` = tabelul nu a putut fi citit (vezi `error`), nu zero rânduri. */
+  rows: number | null
+  accounts: number | null
+  first_date: IsoDate | null
+  last_date: IsoDate | null
+  /** Ultima sincronizare Airbyte (`_airbyte_extracted_at`), UTC. */
+  last_synced_at: IsoDateTime | null
+  metrics: string[]
+  dimensions: string[]
+  error: 'timeout' | 'permission' | 'failed' | 'skipped' | null
+}
+
+/** Un cont de ads găsit în Airbyte; `id` = `external_account_id` al conexiunii site-ului (`meta_ads:123`). */
+export interface AirbyteAccount extends DiscoveredAccount {
+  platform: AirbytePlatform
+  account_id: string
+  rows: number
+  first_date: IsoDate | null
+  last_date: IsoDate | null
+  last_synced_at: IsoDateTime | null
+  tables: number
+}
+
+export type AirbyteOutcome =
+  | 'ok'
+  | 'budget_exhausted'
+  | 'invalid_dsn'
+  | 'tls_required'
+  | 'host_not_allowed'
+  | 'dns_failed'
+  | 'auth_failed'
+  | 'database_not_found'
+  | 'tls_failed'
+  | 'unreachable'
+  | 'timeout'
+  | 'permission_denied'
+  | 'not_read_only'
+  | 'database_error'
+
+/** Rezultatul inspecției (funcția server `airbyte`, `inspect`); connection string-ul nu apare niciodată. */
+export interface AirbyteInspection {
+  outcome: AirbyteOutcome
+  credential_status: CredentialStatus
+  /** În română: rezumatul sau motivul. */
+  message: string
+  calls_today: number
+  daily_limit: number
+  inspected_at: IsoDateTime | null
+  platforms: Array<{ platform: AirbytePlatform; label: string; tables: AirbyteTable[] }>
+  accounts: AirbyteAccount[]
+  truncated: boolean
 }
