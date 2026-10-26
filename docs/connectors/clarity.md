@@ -64,6 +64,7 @@ Până atunci, aceste metrici apar ca „indisponibile”, nu ca zero. Sesiunile
 | „Există deja o conexiune pentru acest cont” | ID-ul proiectului e deja conectat (poate la alt brand) | Folosește conexiunea existentă. |
 | Sincronizare „Eșuat”, `insufficient_budget` | Sub 4 apeluri rămase azi | Așteaptă ziua următoare (UTC). |
 | Sincronizare „Parțial”, `empty_payload` | Clarity nu are date pentru o defalcare (site fără trafic în fereastră) | Normal pentru site-uri mici; restul datelor au intrat. |
+| „Parțial”, „Clarity nu a înregistrat nicio vizită” (zi după zi) | Toate defalcările (dispozitiv, sursă, pagină) vin goale și totalul are 0 afișări: Clarity nu primește trafic de la site (Minimartieni, 23–25 oct. 2026) | În Clarity → Settings → Setup, verifică dacă tag-ul e instalat pe site și dacă proiectul e cel din conexiune; dacă site-ul cere consimțământ, verifică și că Clarity se încarcă după acceptare. |
 | Paginile par trunchiate | Clarity dă maximum 1.000 de rânduri per răspuns | Limită a furnizorului. |
 
 **Schimbarea tokenului** (rotire): generează unul nou în Clarity, apoi pe card **Rotește tokenul** → lipește → Salvează → Testează. Șterge tokenul vechi din Clarity.

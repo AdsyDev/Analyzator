@@ -174,6 +174,28 @@ describe('AI Visibility: surse citate', () => {
     expect(counts).toEqual([...counts].sort((a, b) => b - a))
     expect(within(section('Surse citate')).getAllByText(/Owned|Terță parte/).length).toBe(items.length)
   })
+
+  it('o listă lungă se paginează pe loc: 10 domenii pe pagină, „a-b din n”, fără o nouă cerere', async () => {
+    const list = Array.from({ length: 25 }, (_, i) => ({ domain: `sursa-${String(i + 1).padStart(2, '0')}.ro`, kind: 'third_party' as const, count: 100 - i, brand_id: null }))
+    const cited = vi.fn(async () => ready(list))
+    renderApp({ route: ROUTE, wrap: (b) => ({ ...b, ai: { ...b.ai, citedSources: cited } }) })
+    await open()
+    const s = section('Surse citate')
+    expect(within(s).getAllByRole('listitem')).toHaveLength(10)
+    expect(within(s).getByText('1-10 din 25')).toBeInTheDocument()
+    expect(within(s).getByText('sursa-01.ro')).toBeInTheDocument()
+    const calls = cited.mock.calls.length
+    await userEvent.click(within(s).getByRole('button', { name: 'Înainte' }))
+    expect(within(s).getByText('11-20 din 25')).toBeInTheDocument()
+    expect(within(s).getByText('sursa-11.ro')).toBeInTheDocument()
+    expect(within(s).queryByText('sursa-01.ro')).toBeNull()
+    await userEvent.click(within(s).getByRole('button', { name: 'Înainte' }))
+    expect(within(s).getAllByRole('listitem')).toHaveLength(5)
+    expect(within(s).getByRole('button', { name: 'Înainte' })).toBeDisabled()
+    await userEvent.click(within(s).getByRole('button', { name: 'Înapoi' }))
+    expect(within(s).getByText('11-20 din 25')).toBeInTheDocument()
+    expect(cited.mock.calls.length).toBe(calls)
+  })
 })
 
 describe('AI Visibility: Answer Explorer', () => {

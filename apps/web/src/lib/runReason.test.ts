@@ -45,6 +45,21 @@ describe('runReason', () => {
     expect(runErrorCodes(['access_denied', { code: 'parser_unknown_field' }, { code: 'empty_report' }, { code: 'empty_report' }])).toEqual(['access_denied', 'empty_report'])
   })
 
+  it('Clarity (Minimartieni, 25 oct. 2026): observațiile parserului nu sunt respingeri; fără nicio defalcare = nicio vizită', () => {
+    const errors = [
+      { code: 'parser_unconfirmed_field', dimension: 'all', message: 'câmp nemapat' },
+      { code: 'parser_missing_dimension_value', dimension: 'source', message: 'rând fără …' },
+      { code: 'empty_payload', dimension: 'device', message: 'Payload fără rânduri.' },
+      { code: 'empty_payload', dimension: 'source', message: 'Payload fără rânduri.' },
+      { code: 'empty_payload', dimension: 'page', message: 'Payload fără rânduri.' },
+    ]
+    expect(runReason('partial', errors, null, 'clarity')).toBe('Clarity nu a înregistrat nicio vizită (nicio defalcare pe dispozitiv, sursă sau pagină)')
+    expect(runReason('partial', errors.slice(0, 3), null, 'clarity')).toBe('sursa nu a trimis date pentru dispozitiv')
+    expect(runErrorCodes(errors, 'clarity')).toEqual(['empty_payload'])
+    // La SEOmonitor, parser_invalid_item rămâne o respingere reală.
+    expect(runReason('partial', [{ code: 'parser_invalid_item', message: 'x' }], null, 'seomonitor')).toBe('unele rânduri au fost respinse la validare')
+  })
+
   it('count: „1 zi”, „7 zile”, „35 de zile”, „6 intervale”', () => {
     expect([count(1, 'zile'), count(7, 'zile'), count(19, 'zile'), count(20, 'zile'), count(35, 'zile'), count(6, 'intervale'), count(101, 'zile')]).toEqual([
       '1 zi', '7 zile', '19 zile', '20 de zile', '35 de zile', '6 intervale', '101 zile',

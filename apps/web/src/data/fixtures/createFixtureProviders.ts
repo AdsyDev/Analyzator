@@ -322,8 +322,8 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
             status: r.status as SyncRunStatus,
             error: r.error,
             // Ca la sursa reală: motivul vine din codul de eroare al rulării fictive.
-            reason: runReason(r.status as SyncRunStatus, r.error ? [{ code: r.error }] : [], null),
-            error_codes: runErrorCodes(r.error ? [{ code: r.error }] : []),
+            reason: runReason(r.status as SyncRunStatus, r.error ? [{ code: r.error }] : [], null, r.provider),
+            error_codes: runErrorCodes(r.error ? [{ code: r.error }] : [], r.provider),
           }
         }),
       )

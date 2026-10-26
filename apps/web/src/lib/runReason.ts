@@ -8,7 +8,25 @@ import type { SyncRunStatus } from '../contracts'
 
 /** Observații ale conectorilor care nu schimbă datele (câmpuri noi în API, verificări informative). */
 const NOTES = new Set(['unknown_field', 'unknown_block', 'unknown_block_key', 'ignored_breakdown_block', 'parser_note', 'behavior_unverified', 'call_count_not_recorded'])
-const isNote = (code: string) => NOTES.has(code) || code.startsWith('parser_unknown_field')
+/**
+ * La Clarity, tot ce începe cu `parser_` e o observație care nu schimbă starea rulării (câmpuri nemapate, valori
+ * lipsă păstrate ca NULL). La SEOmonitor, doar `parser_unknown_field`; `parser_invalid_item` e o respingere reală.
+ */
+const isNote = (code: string, source?: string) =>
+  NOTES.has(code) || code.startsWith('parser_unknown_field') || (source === 'clarity' && code.startsWith('parser_'))
+
+/** Defalcările Clarity (`errors[].dimension` la `empty_payload`). */
+const BREAKDOWNS: Record<string, string> = { all: 'total', device: 'dispozitiv', source: 'sursă', page: 'pagină' }
+const list = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} și ${xs[xs.length - 1]}`)
+
+/** Rapoartele venite goale: fără nicio defalcare, Clarity n-a înregistrat nicio vizită în ziua colectată. */
+function emptyLabel(dimensions: string[], source?: string): string {
+  const known = dimensions.filter((d) => BREAKDOWNS[d])
+  if (source === 'clarity' && ['device', 'source', 'page'].every((d) => known.includes(d))) {
+    return 'Clarity nu a înregistrat nicio vizită (nicio defalcare pe dispozitiv, sursă sau pagină)'
+  }
+  return known.length ? `sursa nu a trimis date pentru ${list(known.map((d) => BREAKDOWNS[d]!))}` : LABELS.empty_payload!
+}
 
 const LABELS: Record<string, string> = {
   access_denied: 'accesul a fost refuzat de furnizor',
@@ -89,27 +107,42 @@ function coverageGaps(coverage: unknown): string[] {
   return [...byWhat.entries()].map(([what, g]) => `${g.missing} din ${count(g.expected, g.unit)} ${what}`)
 }
 
-/** Cel mult trei motive, primele fiind erorile; `null` pentru o rulare reușită sau fără nicio explicație salvată. */
-export function runReason(status: SyncRunStatus, errors: unknown, coverage: unknown): string | null {
+/**
+ * Cel mult trei motive, primele fiind erorile; `null` pentru o rulare reușită sau fără nicio explicație salvată.
+ * `source` (`sync_runs.source`) decide ce coduri sunt doar observații.
+ */
+export function runReason(status: SyncRunStatus, errors: unknown, coverage: unknown, source?: string): string | null {
   if (status !== 'partial' && status !== 'failed') return null
   const labels: string[] = []
+  // Rapoartele goale dau un singur motiv, pe poziția primului, cu toate defalcările lor.
+  const empty: string[] = []
+  let emptyAt = -1
   for (const e of Array.isArray(errors) ? errors : []) {
-    const o = (typeof e === 'string' ? { code: e } : e) as { code?: unknown; message?: unknown } | null
+    const o = (typeof e === 'string' ? { code: e } : e) as { code?: unknown; message?: unknown; dimension?: unknown } | null
     const code = typeof o?.code === 'string' ? o.code : ''
-    if (!code || isNote(code)) continue
+    if (!code || isNote(code, source)) continue
+    if (code === 'empty_payload') {
+      if (typeof o?.dimension === 'string' && !empty.includes(o.dimension)) empty.push(o.dimension)
+      if (emptyAt < 0) {
+        emptyAt = labels.length
+        labels.push('')
+      }
+      continue
+    }
     const label = labelFor(code, typeof o?.message === 'string' ? o.message : '')
     if (!labels.includes(label)) labels.push(label)
   }
+  if (emptyAt >= 0) labels[emptyAt] = emptyLabel(empty, source)
   const reasons = [...labels, ...coverageGaps(coverage)]
   return reasons.length ? reasons.slice(0, 3).join('; ') : null
 }
 
 /** Codurile de eroare ale rulării (fără observații), pentru verificări precise, de exemplu accesul refuzat. */
-export function runErrorCodes(errors: unknown): string[] {
+export function runErrorCodes(errors: unknown, source?: string): string[] {
   const out = new Set<string>()
   for (const e of Array.isArray(errors) ? errors : []) {
     const code = typeof e === 'string' ? e : typeof (e as { code?: unknown } | null)?.code === 'string' ? (e as { code: string }).code : null
-    if (code && !isNote(code)) out.add(code)
+    if (code && !isNote(code, source)) out.add(code)
   }
   return [...out]
 }

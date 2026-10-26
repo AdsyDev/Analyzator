@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
+import { paginate, Pager } from './Pager'
 
 export interface Column<Row> {
   key: string
@@ -46,10 +47,7 @@ export function SortableTable<Row>({ caption, columns, rows, rowKey, pageSize = 
     })
   }, [rows, columns, sort])
 
-  const pages = Math.max(1, Math.ceil(sorted.length / pageSize))
-  const current = Math.min(page, pages)
-  const start = (current - 1) * pageSize
-  const visible = sorted.slice(start, start + pageSize)
+  const { visible, current, pages } = paginate(sorted, page, pageSize)
 
   function toggle(key: string) {
     setPage(1)
@@ -107,20 +105,7 @@ export function SortableTable<Row>({ caption, columns, rows, rowKey, pageSize = 
       {rows.length === 0 ? (
         <p className="px-4 py-8 text-center text-[13px] text-text-2">{emptyText}</p>
       ) : (
-        pages > 1 && (
-          <nav aria-label="Paginare" className="flex items-center gap-3 border-t border-border px-4 py-2 text-[12px] text-text-2">
-            <span>
-              {start + 1}-{Math.min(start + pageSize, sorted.length)} din {sorted.length}
-            </span>
-            <span className="flex-1" />
-            <button type="button" disabled={current <= 1} onClick={() => setPage(current - 1)} className="rounded-md px-2 py-1 hover:bg-neutral-soft disabled:opacity-40">
-              Înapoi
-            </button>
-            <button type="button" disabled={current >= pages} onClick={() => setPage(current + 1)} className="rounded-md px-2 py-1 hover:bg-neutral-soft disabled:opacity-40">
-              Înainte
-            </button>
-          </nav>
-        )
+        <Pager current={current} pages={pages} pageSize={pageSize} total={sorted.length} onPage={setPage} className="border-t border-border px-4 py-2" />
       )}
     </div>
   )

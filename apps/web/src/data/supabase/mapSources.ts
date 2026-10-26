@@ -94,8 +94,8 @@ export function mapSyncRun(r: SyncRunRow): SyncRun {
     rows: r.status === 'queued' ? null : r.rows_written,
     status: r.status as SyncRunStatus,
     error: firstError(r.errors),
-    reason: runReason(r.status as SyncRunStatus, r.errors, r.coverage),
-    error_codes: runErrorCodes(r.errors),
+    reason: runReason(r.status as SyncRunStatus, r.errors, r.coverage, r.source),
+    error_codes: runErrorCodes(r.errors, r.source),
   }
 }
 
@@ -103,7 +103,7 @@ const NO_CONNECTION = 'Nicio conexiune configurată pentru acest spațiu.'
 
 /** „Ultima sincronizare a eșuat: <motiv>. …”; fără motiv salvat, doar fraza de bază. */
 function withReason(head: string, run: SyncRunRow, tail: string): string {
-  const reason = runReason(run.status as SyncRunStatus, run.errors, run.coverage)
+  const reason = runReason(run.status as SyncRunStatus, run.errors, run.coverage, run.source)
   return reason ? `${head}: ${reason}${tail}` : `${head}${tail}`
 }
 

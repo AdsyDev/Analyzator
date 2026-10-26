@@ -63,7 +63,7 @@ Fără signup. Cinci stări în același cadru: **autentificare** (email de serv
 
 ## AI Visibility (`/brands/:id/ai`)
 
-KPI-uri; „Mention Rate pe engine" (card per engine, cu variație și număr de răspunsuri valide); „Subiecte și competitori" (matrice cu intensitate de culoare = prezență, plus valoare numerică în celulă); „Surse citate" (domenii, tip, număr); „Answer Explorer" (listă întrebare, engine, rezultat; drawer cu răspunsul original sanitizat de date personale, brandurile evidențiate inline, citări numerotate cu domeniu, titlu și marcaj „Owned"; buton „Marchează pentru farmacovigilență").
+KPI-uri; „Mention Rate pe engine" (card per engine, cu variație și număr de răspunsuri valide); „Subiecte și competitori" (matrice cu intensitate de culoare = prezență, plus valoare numerică în celulă); „Surse citate" (domenii, tip, număr; 10 pe pagină, paginate pe loc din lista încărcată o dată, cel mult 200 de domenii, ca să nu întindă coloana sub matrice); „Answer Explorer" (listă întrebare, engine, rezultat; drawer cu răspunsul original sanitizat de date personale, brandurile evidențiate inline, citări numerotate cu domeniu, titlu și marcaj „Owned"; buton „Marchează pentru farmacovigilență").
 
 ## SEO și Search (`/brands/:id/seo`)
 
