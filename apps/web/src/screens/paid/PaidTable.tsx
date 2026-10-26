@@ -14,7 +14,7 @@ function columns(currency: string): Column<PaidRow>[] {
     { key: 'date', header: 'Data', sortValue: (r) => r.date, render: (r) => <span className="font-mono text-[12px]">{formatDate(r.date)}</span> },
     { key: 'platform', header: 'Platformă', sortValue: (r) => r.platform, render: (r) => PLATFORM[r.platform] },
     { key: 'account', header: 'Cont', sortValue: (r) => r.account, render: (r) => r.account },
-    { key: 'campaign', header: 'Campanie', sortValue: (r) => r.campaign, render: (r) => <span className="font-medium">{r.campaign}</span> },
+    { key: 'campaign', header: 'Campanie', cardTitle: true, sortValue: (r) => r.campaign, render: (r) => <span className="font-medium">{r.campaign}</span> },
     { key: 'objective', header: 'Obiectiv', sortValue: (r) => r.objective, render: (r) => r.objective ?? dash },
     { key: 'spend', header: `Spend (${currency})`, align: 'right', sortValue: (r) => r.spend, render: (r) => formatCurrency(r.spend, currency, 2) ?? dash },
     { key: 'impressions', header: 'Impressions', align: 'right', sortValue: (r) => r.impressions, render: (r) => n(r.impressions) },

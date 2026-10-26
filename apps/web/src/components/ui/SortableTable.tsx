@@ -1,6 +1,9 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useId, useMemo, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
+import { DataCard, DataCardList } from './DataCard'
 import { paginate, Pager } from './Pager'
+import { Tabs } from './Tabs'
+import { useIsPhone } from './useIsPhone'
 
 export interface Column<Row> {
   key: string
@@ -9,6 +12,8 @@ export interface Column<Row> {
   /** Valoarea de sortare. Lipsa (null) merge mereu la sfârșit, în ambele direcții. */
   sortValue?: (row: Row) => string | number | null
   render: (row: Row) => ReactNode
+  /** Pe telefon, coloana care dă titlul cardului (implicit prima). */
+  cardTitle?: boolean
 }
 
 interface SortableTableProps<Row> {
@@ -20,6 +25,8 @@ interface SortableTableProps<Row> {
   /** Textul stării goale; tabelul gol explică de ce, nu rămâne gol. */
   emptyText: string
   onRowClick?: (row: Row) => void
+  /** Pe telefon, rândurile devin carduri (cu „Tabel" ca a doua vedere). `false` când ecranul are deja propriile carduri. */
+  phoneCards?: boolean
 }
 
 type Sort = { key: string; dir: 'asc' | 'desc' } | null
@@ -28,9 +35,12 @@ function compare(a: string | number, b: string | number): number {
   return typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), 'ro')
 }
 
-export function SortableTable<Row>({ caption, columns, rows, rowKey, pageSize = 10, emptyText, onRowClick }: SortableTableProps<Row>) {
+export function SortableTable<Row>({ caption, columns, rows, rowKey, pageSize = 10, emptyText, onRowClick, phoneCards = true }: SortableTableProps<Row>) {
   const [sort, setSort] = useState<Sort>(null)
   const [page, setPage] = useState(1)
+  const [view, setView] = useState<'cards' | 'table'>('cards')
+  const phone = useIsPhone()
+  const sortId = useId()
 
   const sorted = useMemo(() => {
     const col = sort && columns.find((c) => c.key === sort.key)
@@ -54,7 +64,10 @@ export function SortableTable<Row>({ caption, columns, rows, rowKey, pageSize = 
     setSort((s) => (s?.key !== key ? { key, dir: 'asc' } : s.dir === 'asc' ? { key, dir: 'desc' } : null))
   }
 
-  return (
+  const empty = <p className="px-4 py-8 text-center text-[13px] text-text-2">{emptyText}</p>
+  const pager = <Pager current={current} pages={pages} pageSize={pageSize} total={sorted.length} onPage={setPage} className="border-t border-border px-4 py-2" />
+
+  const tableView = (
     <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-1">
       <div className="scroll-x relative">
         <table className="w-full border-collapse text-[13px]">
@@ -102,11 +115,80 @@ export function SortableTable<Row>({ caption, columns, rows, rowKey, pageSize = 
           </tbody>
         </table>
       </div>
-      {rows.length === 0 ? (
-        <p className="px-4 py-8 text-center text-[13px] text-text-2">{emptyText}</p>
-      ) : (
-        <Pager current={current} pages={pages} pageSize={pageSize} total={sorted.length} onPage={setPage} className="border-t border-border px-4 py-2" />
-      )}
+      {rows.length === 0 ? empty : pager}
     </div>
   )
+
+  if (phoneCards && phone) {
+    // Telefon: un card pe rând. Sortarea se alege dintr-o listă (antetele de coloană nu mai sunt pe ecran).
+    const titleColumn = columns.find((c) => c.cardTitle) ?? columns[0]
+    const sortable = columns.filter((c) => c.sortValue)
+    return (
+      <div className="flex flex-col gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {view === 'cards' && sortable.length > 0 && (
+            <>
+              <label htmlFor={sortId} className="sr-only">
+                Sortează după
+              </label>
+              {/* Coloana și direcția într-o singură listă: pe telefon, un singur control încape lângă „Carduri / Tabel". */}
+              <select
+                id={sortId}
+                value={sort ? `${sort.key}:${sort.dir}` : ''}
+                onChange={(e) => {
+                  const [key, dir] = e.target.value.split(':')
+                  setPage(1)
+                  setSort(key && (dir === 'asc' || dir === 'desc') ? { key, dir } : null)
+                }}
+                className="h-10 min-w-0 flex-1 rounded-[10px] border border-border bg-surface px-2.5 text-[13px] text-text"
+              >
+                <option value="">Ordinea implicită</option>
+                {sortable.flatMap((c) => [
+                  <option key={`${c.key}:asc`} value={`${c.key}:asc`}>
+                    {c.header}, crescător
+                  </option>,
+                  <option key={`${c.key}:desc`} value={`${c.key}:desc`}>
+                    {c.header}, descrescător
+                  </option>,
+                ])}
+              </select>
+            </>
+          )}
+          {(view === 'table' || sortable.length === 0) && <span className="flex-1" />}
+          <Tabs
+            label={`Afișarea: ${caption}`}
+            items={[
+              { id: 'cards', label: 'Carduri' },
+              { id: 'table', label: 'Tabel' },
+            ]}
+            value={view}
+            onChange={setView}
+          />
+        </div>
+        {view === 'cards' ? (
+          rows.length === 0 ? (
+            <div className="rounded-xl border border-border bg-surface">{empty}</div>
+          ) : (
+            <>
+              <DataCardList label={caption}>
+                {visible.map((row) => (
+                  <DataCard
+                    key={rowKey(row)}
+                    title={titleColumn?.render(row)}
+                    fields={columns.filter((c) => c !== titleColumn).map((c) => ({ key: c.key, label: c.header, value: c.render(row) }))}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  />
+                ))}
+              </DataCardList>
+              <Pager current={current} pages={pages} pageSize={pageSize} total={sorted.length} onPage={setPage} className="px-1" />
+            </>
+          )
+        ) : (
+          tableView
+        )}
+      </div>
+    )
+  }
+
+  return tableView
 }

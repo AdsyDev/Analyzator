@@ -26,7 +26,7 @@ export function toComparison(m: CompetitionMatrix): { columns: ComparisonColumn[
 
 const gapColumns: Column<CompetitionGap>[] = [
   { key: 'dimension', header: 'Dimensiune', sortValue: (g) => g.dimension, render: (g) => <StatusChip tone={g.dimension === 'ai' ? 'lav' : 'accent'}>{DIMENSION_LABELS[g.dimension]}</StatusChip> },
-  { key: 'subject', header: 'Subiect', sortValue: (g) => g.subject, render: (g) => <span className="font-medium">{g.subject}</span> },
+  { key: 'subject', header: 'Subiect', cardTitle: true, sortValue: (g) => g.subject, render: (g) => <span className="font-medium">{g.subject}</span> },
   {
     key: 'competitors',
     header: 'Unde apare concurența',
