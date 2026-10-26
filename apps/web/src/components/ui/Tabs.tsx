@@ -26,7 +26,7 @@ export function Tabs<T extends string>({ items, value, onChange, label }: { item
   }
 
   return (
-    <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className="inline-flex gap-1 rounded-xl bg-neutral-soft p-1">
+    <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className="inline-flex max-w-full gap-1 overflow-x-auto rounded-xl bg-neutral-soft p-1 [scrollbar-width:none]">
       {items.map((t) => {
         const active = t.id === value
         return (
@@ -42,7 +42,7 @@ export function Tabs<T extends string>({ items, value, onChange, label }: { item
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(t.id)}
             className={cn(
-              'h-8 rounded-[9px] px-3 text-[13px] font-medium transition-colors',
+              'h-8 flex-none whitespace-nowrap rounded-[9px] px-3 text-[13px] font-medium transition-colors',
               active ? 'bg-surface text-text shadow-1' : 'text-text-2 hover:text-text',
             )}
           >

@@ -207,7 +207,7 @@ export function LoginPage() {
   const support = import.meta.env.VITE_SUPPORT_EMAIL
 
   return (
-    <div className="relative z-10 flex min-h-screen flex-col px-7 py-5 pt-[calc(1.25rem+var(--banner-h,0px))]">
+    <div className="relative z-10 flex min-h-screen flex-col px-4 py-5 pt-[calc(1.25rem+var(--banner-h,0px))] sm:px-7">
       <header className="flex h-11 items-center gap-2.5">
         <span aria-hidden="true" className="grid size-[30px] place-items-center rounded-[9px] bg-accent-btn font-display text-[15px] font-bold text-on-accent">A</span>
         <span className="font-display text-[16px] font-semibold">Analyzator</span>
@@ -218,7 +218,7 @@ export function LoginPage() {
         </button>
       </header>
       <main className="grid flex-1 place-items-center py-8">
-        <div className="w-[min(420px,100%)] rounded-2xl border border-border bg-surface p-8 shadow-2">{card}</div>
+        <div className="w-[min(420px,100%)] rounded-2xl border border-border bg-surface p-6 shadow-2 sm:p-8">{card}</div>
       </main>
       <footer className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-text-2">
         <span>Accesul se face doar pe bază de invitație.{support ? <> Ai nevoie de ajutor? <a href={`mailto:${support}`} className="text-accent-text hover:underline">{support}</a></> : null}</span>

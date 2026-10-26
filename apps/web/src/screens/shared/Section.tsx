@@ -3,9 +3,10 @@ import type { ReactNode } from 'react'
 /** Suprafață solidă pentru conținut cu date (sticla e doar pentru sidebar, topbar, drawere, modale, popovere). */
 export function Section({ title, description, action, children, id, plain = false }: { title: string; description?: string; action?: ReactNode; children: ReactNode; id?: string; plain?: boolean }) {
   return (
-    <section aria-labelledby={id} className={plain ? 'flex flex-col gap-3' : 'flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 shadow-1'}>
-      <header className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
+    <section aria-labelledby={id} className={plain ? 'flex flex-col gap-3' : 'flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 shadow-1 sm:p-5'}>
+      {/* Pe ecrane înguste, acțiunea (taburi, butoane) coboară sub titlu în loc să-l strivească. */}
+      <header className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1 basis-64">
           <h2 id={id} className="font-display text-[16px] font-semibold tracking-[-0.01em]">
             {title}
           </h2>

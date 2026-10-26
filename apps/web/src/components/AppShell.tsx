@@ -7,6 +7,7 @@ import {
   CursorClickIcon,
   EarIcon,
   FirstAidKitIcon,
+  ListIcon,
   MagnifyingGlassIcon,
   MegaphoneSimpleIcon,
   MoonIcon,
@@ -18,10 +19,11 @@ import {
   SunIcon,
   UserListIcon,
   UsersThreeIcon,
+  XIcon,
   type Icon,
 } from '@phosphor-icons/react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { NavLink, useSearchParams } from 'react-router-dom'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { NavLink, useLocation, useSearchParams } from 'react-router-dom'
 import type { Brand, IsoDate, IsoDateTime, ProviderResult, Role, SessionUser } from '../contracts'
 import { ROLES } from '../contracts'
 import { cn } from '../lib/cn'
@@ -81,15 +83,17 @@ export interface AppShellProps {
 function SidebarLink({ item, to, collapsed }: { item: NavItem; to: { pathname: string; search: string } | null; collapsed: boolean }) {
   const Glyph = ICONS[item.icon] ?? SquaresFourIcon
   // Submeniul (de ex. Farmacovigilență sub Listening): indentat și mai mic; restrâns, rămâne doar iconița.
+  // Restrângerea se aplică doar pe desktop (`lg`); pe ecrane mici meniul e un sertar cu etichete întregi.
   const base = cn(
     'flex items-center gap-3 rounded-[11px] font-medium transition-colors',
-    item.parent ? 'h-9 text-[13px]' : 'h-10 text-[13.5px]',
-    collapsed ? 'justify-center px-0' : item.parent ? 'pl-9 pr-3' : 'px-3',
+    item.parent ? 'h-11 text-[13.5px] lg:h-9 lg:text-[13px]' : 'h-11 text-[14px] lg:h-10 lg:text-[13.5px]',
+    item.parent ? 'pl-9 pr-3' : 'px-3',
+    collapsed && 'lg:justify-center lg:px-0',
   )
   const content = (
     <>
-      <Glyph size={item.parent ? 16 : 18} aria-hidden="true" />
-      <span className={collapsed ? 'sr-only' : undefined}>{item.label}</span>
+      <Glyph size={item.parent ? 16 : 18} aria-hidden="true" className="flex-none" />
+      <span className={collapsed ? 'lg:sr-only' : undefined}>{item.label}</span>
     </>
   )
   if (!to) {
@@ -137,7 +141,7 @@ function UserMenu({ user, roleSwitcher, onSignOut }: Pick<AppShellProps, 'user' 
         </span>
       </button>
       {open && (
-        <div role="group" aria-label="Meniul contului" className="glass-strong absolute right-0 top-[calc(100%+6px)] z-40 w-72 rounded-xl p-3">
+        <div role="group" aria-label="Meniul contului" className="glass-strong absolute right-0 top-[calc(100%+6px)] z-40 w-[min(18rem,calc(100vw-2rem))] rounded-xl p-3">
           <div className="flex items-center gap-3 border-b border-border pb-3">
             <Avatar name={user.name} size="lg" tone="accent" />
             <div className="min-w-0">
@@ -178,6 +182,12 @@ function UserMenu({ user, roleSwitcher, onSignOut }: Pick<AppShellProps, 'user' 
 
 export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle, dataAsOf, lastRefreshAt, onSignOut, roleSwitcher, filterBar, now, children }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(readCollapsed)
+  // Sertarul de navigare de pe ecranele sub `lg` (telefon, tabletă). Pe desktop bara laterală e mereu vizibilă.
+  const [navOpen, setNavOpen] = useState(false)
+  const navId = useId()
+  const navButton = useRef<HTMLButtonElement>(null)
+  const drawer = useRef<HTMLElement>(null)
+  const { pathname } = useLocation()
   const [params] = useSearchParams()
   const { theme, toggleTheme } = useTheme()
   const search = sharedSearch(params)
@@ -194,6 +204,24 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
     })
   }
 
+  // Navigarea închide sertarul; Esc îl închide și întoarce focusul pe butonul de meniu.
+  useEffect(() => setNavOpen(false), [pathname])
+  useEffect(() => {
+    if (!navOpen) return
+    drawer.current?.querySelector<HTMLElement>('button, a[href]')?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      setNavOpen(false)
+      navButton.current?.focus()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [navOpen])
+  function closeNav() {
+    setNavOpen(false)
+    navButton.current?.focus()
+  }
+
   const brandList = brands?.kind === 'ready' ? brands.data : []
   const current = brandList.find((b) => b.id === brandId) ?? null
   const themeLabel = theme === 'dark' ? 'Comută la tema deschisă' : 'Comută la tema închisă'
@@ -203,13 +231,24 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
       <a href="#main" className="glass-strong sr-only z-[80] rounded-lg px-3 py-2 text-[13px] font-semibold focus:not-sr-only focus:fixed focus:left-3 focus:top-3">
         Sari la conținut
       </a>
+      {navOpen && <div data-testid="nav-scrim" aria-hidden="true" className="fixed inset-x-0 bottom-0 top-[var(--banner-h,0px)] z-[25] lg:hidden" style={{ background: 'var(--scrim)' }} onClick={closeNav} />}
       <aside
+        ref={drawer}
+        id={navId}
         aria-label="Navigare principală"
-        className={cn('glass fixed bottom-0 left-0 top-[var(--banner-h,0px)] z-30 flex flex-col gap-1 border-y-0 border-l-0 px-3 py-4 transition-[width] duration-200', collapsed ? 'w-[72px]' : 'w-[240px]')}
+        className={cn(
+          'glass fixed bottom-0 left-0 top-[var(--banner-h,0px)] z-30 flex w-[min(280px,85vw)] flex-col gap-1 overflow-y-auto overscroll-contain border-y-0 border-l-0 px-3 py-4 duration-200',
+          // Deschis: vizibil imediat (focusul intră în sertar). Închis: rămâne vizibil cât alunecă, apoi iese din ordinea de tab.
+          navOpen ? 'transition-[width,translate] max-lg:shadow-drawer' : 'transition-[width,translate,visibility] max-lg:invisible max-lg:-translate-x-full',
+          collapsed ? 'lg:w-[72px]' : 'lg:w-[240px]',
+        )}
       >
-        <div className={cn('mb-3 flex h-11 items-center gap-2.5', collapsed ? 'justify-center' : 'px-2')}>
+        <div className={cn('mb-3 flex h-11 flex-none items-center gap-2.5 px-2', collapsed && 'lg:justify-center lg:px-0')}>
           <span aria-hidden="true" className="grid size-[30px] flex-none place-items-center rounded-[9px] bg-accent-btn font-display text-[15px] font-bold text-on-accent">A</span>
-          {!collapsed && <span className="font-display text-[16px] font-semibold tracking-[-0.01em]">Analyzator</span>}
+          <span className={cn('flex-1 font-display text-[16px] font-semibold tracking-[-0.01em]', collapsed && 'lg:hidden')}>Analyzator</span>
+          <button type="button" onClick={closeNav} aria-label="Închide meniul" className="grid size-10 flex-none place-items-center rounded-[11px] text-text-2 hover:bg-[var(--nav-hover)] lg:hidden">
+            <XIcon size={18} aria-hidden="true" />
+          </button>
         </div>
         <nav aria-label="Module" className="flex flex-col gap-0.5">
           {brandNavFor(user.role).map((item) => (
@@ -218,7 +257,7 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
         </nav>
         {adminItems.length > 0 && (
           <nav aria-label="Administrare" className="mt-4 flex flex-col gap-0.5 border-t border-border pt-3">
-            {!collapsed && <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-3">Administrare</p>}
+            <p className={cn('px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-3', collapsed && 'lg:hidden')}>Administrare</p>
             {adminItems.map((item) => (
               <SidebarLink key={item.segment} item={item} collapsed={collapsed} to={{ pathname: adminPath(item.segment), search: '' }} />
             ))}
@@ -230,15 +269,27 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
           onClick={toggleSidebar}
           aria-label={collapsed ? 'Extinde bara laterală' : 'Restrânge bara laterală'}
           aria-expanded={!collapsed}
-          className={cn('flex h-9 items-center gap-3 rounded-[11px] text-[13px] text-text-2 hover:bg-[var(--nav-hover)]', collapsed ? 'justify-center' : 'px-3')}
+          className={cn('flex h-9 flex-none items-center gap-3 rounded-[11px] text-[13px] text-text-2 hover:bg-[var(--nav-hover)] max-lg:hidden', collapsed ? 'justify-center' : 'px-3')}
         >
           {collapsed ? <CaretDoubleRightIcon size={16} aria-hidden="true" /> : <CaretDoubleLeftIcon size={16} aria-hidden="true" />}
           {!collapsed && <span>Restrânge</span>}
         </button>
       </aside>
 
-      <div className={cn('transition-[margin] duration-200', collapsed ? 'ml-[72px]' : 'ml-[240px]')}>
-        <header className="glass-bar sticky top-[var(--banner-h,0px)] z-20 flex h-14 items-center gap-3 border-x-0 border-t-0 px-6">
+      <div className={cn('transition-[margin] duration-200', collapsed ? 'lg:ml-[72px]' : 'lg:ml-[240px]')}>
+        {/* Pe ecrane mici, linia „Date până la" coboară pe al doilea rând al barei de sus, ca să rămână vizibilă. */}
+        <header className="glass-bar sticky top-[var(--banner-h,0px)] z-20 flex min-h-14 flex-wrap items-center gap-x-2 border-x-0 border-t-0 px-3 pt-2 sm:gap-x-3 sm:px-6 md:h-14 md:flex-nowrap md:pt-0">
+          <button
+            ref={navButton}
+            type="button"
+            onClick={() => setNavOpen(true)}
+            aria-label="Deschide meniul"
+            aria-controls={navId}
+            aria-expanded={navOpen}
+            className="-ml-1 grid size-10 flex-none place-items-center rounded-[11px] text-text hover:bg-neutral-soft lg:hidden"
+          >
+            <ListIcon size={20} aria-hidden="true" />
+          </button>
           {brands === null ? (
             <span className="h-8 w-40 rounded-lg bg-skeleton" role="status" aria-label="Se încarcă brandurile" />
           ) : brands.kind !== 'ready' ? (
@@ -261,17 +312,17 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
                   </NavLink>
                 ) : undefined
               }
-              triggerClassName="h-9 rounded-[10px] px-2.5 text-[13.5px] font-semibold hover:bg-neutral-soft"
+              triggerClassName="h-10 min-w-0 max-w-[50vw] rounded-[10px] px-2.5 text-[13.5px] font-semibold hover:bg-neutral-soft sm:max-w-none md:h-9"
               trigger={
                 <>
                   <Avatar name={current?.name ?? '?'} size="sm" tone="lav" />
-                  <span>{current?.name ?? 'Alege brandul'}</span>
+                  <span className="truncate">{current?.name ?? 'Alege brandul'}</span>
                 </>
               }
             />
           )}
           <span className="flex-1" />
-          <p className="hidden text-[12px] text-text-2 md:block">
+          <p className="order-last basis-full pb-2 text-[11.5px] text-text-2 md:order-none md:basis-auto md:pb-0 md:text-[12px]">
             {dataAsOf || lastRefreshAt ? (
               <>
                 {dataAsOf && (
@@ -290,15 +341,15 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
               'Nicio sursă nu a importat date încă'
             )}
           </p>
-          <button type="button" onClick={toggleTheme} aria-label={themeLabel} title={themeLabel} className="grid size-9 place-items-center rounded-[11px] text-text hover:bg-neutral-soft">
+          <button type="button" onClick={toggleTheme} aria-label={themeLabel} title={themeLabel} className="grid size-10 flex-none place-items-center rounded-[11px] text-text hover:bg-neutral-soft md:size-9">
             {theme === 'dark' ? <SunIcon size={18} aria-hidden="true" /> : <MoonIcon size={18} aria-hidden="true" />}
           </button>
           <UserMenu user={user} roleSwitcher={roleSwitcher} onSignOut={onSignOut} />
         </header>
 
-        <main id="main" tabIndex={-1} className="mx-auto flex max-w-[1440px] flex-col gap-5 px-6 pb-12 pt-5 outline-none">
+        <main id="main" tabIndex={-1} className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 pb-12 pt-4 outline-none sm:gap-5 sm:px-6 sm:pt-5">
           <div>
-            <h1 className="font-display text-[26px] font-semibold tracking-[-0.02em]">{title}</h1>
+            <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em] sm:text-[26px]">{title}</h1>
             {subtitle && <p className="mt-1 max-w-[72ch] text-[14px] leading-normal text-text-2">{subtitle}</p>}
           </div>
           {filterBar}

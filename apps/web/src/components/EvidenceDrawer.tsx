@@ -114,7 +114,7 @@ export function EvidenceDrawer({ open, onClose, page, label, metric, definition,
                 <p className="text-[12px] text-text-2">
                   Cele mai recente {evidence.data.records.length} din <span className="font-mono">{evidence.data.total_records}</span>
                 </p>
-                <div className="overflow-x-auto rounded-lg border border-border">
+                <div className="scroll-x relative rounded-lg border border-border">
                   <table className="w-full border-collapse text-[12.5px]">
                     <caption className="sr-only">Înregistrări sursă pentru {label}</caption>
                     <thead>

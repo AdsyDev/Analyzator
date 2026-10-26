@@ -26,7 +26,7 @@ export function InsightCard({ insight, agencyView = false, onOpenEvidence }: Ins
   const status = INSIGHT_STATUS_LABELS[insight.status]
 
   return (
-    <article aria-label={insight.title} data-status={insight.status} className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-5 shadow-1">
+    <article aria-label={insight.title} data-status={insight.status} className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-1 sm:p-5">
       <header className="flex items-start gap-3">
         <h3 className="flex-1 font-display text-[16px] font-semibold leading-snug tracking-[-0.01em]">{insight.title}</h3>
         {agencyView && <StatusChip tone={status.tone}>{status.label}</StatusChip>}

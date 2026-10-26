@@ -147,7 +147,7 @@ export function AddConnection({ brandId, provider, discovery, onCreated }: Props
 
       {/* Cu o problemă la listă, câmpul manual apare doar la cerere: motivul rămâne vizibil. */}
       {(usingList || manual) && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             {usingList ? (
               <>

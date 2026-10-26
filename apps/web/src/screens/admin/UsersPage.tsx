@@ -162,7 +162,7 @@ function AddPersonForm({ list, brands, selfId, onAdded }: { list: AccessPerson[]
           </select>
         </div>
       )}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={ids[1]} className="text-[12.5px] font-semibold">Email</label>
           <input id={ids[1]} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nume@companie.ro" className={field} autoComplete="off" required />
@@ -328,7 +328,7 @@ function PeopleTable({ list, brands, selfId, onChanged }: { list: AccessPerson[]
       key: 'brands',
       header: 'Acces la branduri',
       render: (p) => (
-        <span className="flex flex-wrap gap-1.5" role="group" aria-label={`Branduri pentru ${personLabel(p)}`}>
+        <span className="flex min-w-60 flex-wrap gap-1.5" role="group" aria-label={`Branduri pentru ${personLabel(p)}`}>
           {brands.map((b) => {
             const on = p.brands.some((x) => x.brand_id === b.id && x.active)
             return (

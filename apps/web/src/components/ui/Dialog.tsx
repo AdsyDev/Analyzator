@@ -71,16 +71,16 @@ export function Dialog({ open, onClose, title, placement = 'center', children, f
             : 'inset-y-0 right-0 w-[min(480px,100vw)] rounded-l-2xl shadow-drawer',
         )}
       >
-        <header className="flex items-center gap-3 border-b border-border px-5 py-4">
+        <header className="flex items-center gap-3 border-b border-border px-4 py-3 sm:px-5 sm:py-4">
           <h2 id={titleId} className="flex-1 font-display text-[16px] font-semibold tracking-[-0.01em]">
             {title}
           </h2>
-          <button type="button" aria-label="Închide" onClick={onClose} className="grid size-8 place-items-center rounded-lg text-text-2 hover:bg-neutral-soft">
+          <button type="button" aria-label="Închide" onClick={onClose} className="grid size-10 flex-none place-items-center rounded-lg text-text-2 hover:bg-neutral-soft sm:size-8">
             ×
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <footer className="flex justify-end gap-2 border-t border-border px-5 py-3">{footer}</footer>}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">{children}</div>
+        {footer && <footer className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-3 sm:px-5">{footer}</footer>}
       </div>
     </div>,
     document.body,

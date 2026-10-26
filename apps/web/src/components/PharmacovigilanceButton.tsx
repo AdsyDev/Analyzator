@@ -67,7 +67,7 @@ export function PharmacovigilanceButton({ item, flag, loadSnapshot, onConfirm, o
 
   if (marked) {
     return (
-      <Button variant="ghost" disabled className="!opacity-100 text-pv" title="Marcajul rămâne în jurnal și nu poate fi șters.">
+      <Button variant="ghost" disabled className="!h-auto min-h-9 !whitespace-normal py-1.5 text-left !opacity-100 text-pv" title="Marcajul rămâne în jurnal și nu poate fi șters.">
         Marcat pentru farmacovigilență, <span className="font-mono text-[12px]">{formatDateTime(marked.flagged_at)}</span>
       </Button>
     )

@@ -64,6 +64,10 @@
   --shadow-drawer: var(--sh-drawer);
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 html, body {
   margin: 0;
   background: var(--bg);
@@ -76,6 +80,12 @@ html, body {
 button, input, select, textarea { font-family: inherit; }
 ::selection { background: var(--accent-soft); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Ecrane tactile: iOS mărește pagina la focus pe un câmp cu text sub 16 px, așa că acolo câmpurile au 16 px.
+   Regula e în afara layerelor Tailwind, deci are prioritate față de clasele text-[…] ale câmpurilor. */
+@media (pointer: coarse) {
+  input, select, textarea { font-size: 16px; }
+}
 
 /* Sticla: singurele clase care folosesc backdrop-filter (`.glass-bar` = topbar, aproape opac). Doar pe sidebar, topbar,
    drawere, modale și popovere. Suprafețele cu date folosesc bg-surface (solid). */
@@ -99,6 +109,18 @@ button, input, select, textarea { font-family: inherit; }
   box-shadow: var(--sh-pop);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
+}
+
+/* Tabele late (pe telefon): umbra de la margine arată că mai sunt coloane. Copertele `local` se mișcă odată cu
+   conținutul și ascund umbra când ești deja la capăt. Fundalul e cel al suprafeței pe care stă tabelul. */
+.scroll-x {
+  overflow-x: auto;
+  background:
+    linear-gradient(to right, var(--surface) 30%, transparent) left center / 40px 100% no-repeat local,
+    linear-gradient(to left, var(--surface) 30%, transparent) right center / 40px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--text) 16%, transparent), transparent) left center / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--text) 16%, transparent), transparent) right center / 12px 100% no-repeat scroll,
+    var(--surface);
 }
 
 @media (prefers-reduced-motion: reduce) {

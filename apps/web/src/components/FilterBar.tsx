@@ -83,7 +83,7 @@ export function FilterBar({ value, onChange, onReset, filterDefs = [], yearAgoAv
     }
   }
 
-  const triggerCls = 'h-9 rounded-[10px] border border-border bg-surface px-3 text-[13px] font-medium text-text hover:border-border-strong'
+  const triggerCls = 'h-10 rounded-[10px] border border-border bg-surface px-3 text-[13px] font-medium text-text hover:border-border-strong sm:h-9'
 
   return (
     <section aria-label="Filtre" className="flex flex-col gap-2.5">
@@ -109,20 +109,23 @@ export function FilterBar({ value, onChange, onReset, filterDefs = [], yearAgoAv
             ) : undefined
           }
         />
-        <span className="text-[12.5px] text-text-2">vs</span>
-        <Menu
-          label="Comparație"
-          value={comparison}
-          options={comparisonOptions}
-          onSelect={(v) => onChange({ comparison: v as ComparisonMode })}
-          triggerClassName={triggerCls}
-          trigger={
-            <>
-              <span>{COMPARISON_LABELS[comparison]}</span>
-              <span className="font-mono text-[11.5px] text-text-2">{formatRange(compare.from, compare.to)}</span>
-            </>
-          }
-        />
+        {/* „vs" rămâne lipit de comparație: pe ecrane înguste coboară împreună pe rândul următor. */}
+        <div className="flex items-center gap-2">
+          <span className="text-[12.5px] text-text-2">vs</span>
+          <Menu
+            label="Comparație"
+            value={comparison}
+            options={comparisonOptions}
+            onSelect={(v) => onChange({ comparison: v as ComparisonMode })}
+            triggerClassName={triggerCls}
+            trigger={
+              <>
+                <span>{COMPARISON_LABELS[comparison]}</span>
+                <span className="font-mono text-[11.5px] text-text-2">{formatRange(compare.from, compare.to)}</span>
+              </>
+            }
+          />
+        </div>
         {filterDefs.map((def) => {
           const v = filters[def.key] ?? def.defaultValue
           const current = def.options.find((o) => o.value === v)

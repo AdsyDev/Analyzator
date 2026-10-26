@@ -143,12 +143,13 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
           )}
         </div>
       )}
-      <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-1">
+      <div className="scroll-x relative rounded-xl border border-border shadow-1">
         <table className="w-full border-collapse text-[13px]">
           <caption className="sr-only">{caption}</caption>
           <thead>
             <tr className="border-b border-border bg-surface-2 text-text-2">
-              <th scope="col" className="px-4 py-2.5 text-left text-[12px] font-semibold">Metrică</th>
+              {/* Prima coloană rămâne pe loc la derularea orizontală (telefon): metrica e mereu lângă valori. */}
+              <th scope="col" className="sticky left-0 z-[1] bg-surface-2 px-4 py-2.5 text-left text-[12px] font-semibold">Metrică</th>
               {columns.map((c) => (
                 <th key={c.key} scope="col" title={c.full} className={cn('px-4 py-2.5 text-right text-[12px] font-semibold', c.kind === 'brand' && 'text-lav-text')}>
                   <span aria-hidden="true">{c.short}</span>
@@ -161,15 +162,17 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
             <tbody key={g.name}>
               <tr className="bg-surface-2/60">
                 <th scope="colgroup" colSpan={columns.length + 1} className="px-4 py-2 text-left text-[12px] font-semibold text-text">
-                  {g.name}
-                  {g.source && <span className="ml-2 font-normal text-text-2">Sursă: {g.source}</span>}
+                  <span className="sticky left-4">
+                    {g.name}
+                    {g.source && <span className="ml-2 font-normal text-text-2">Sursă: {g.source}</span>}
+                  </span>
                 </th>
               </tr>
               {g.rows.map((r) => {
                 const best = bestKey(r, columns)
                 return (
                   <tr key={r.key} className="border-t border-border">
-                    <th scope="row" className="px-4 py-2.5 text-left font-medium text-text">
+                    <th scope="row" className="sticky left-0 z-[1] min-w-32 bg-surface px-4 py-2.5 text-left font-medium text-text focus-within:z-[2] hover:z-[2]">
                       <span className="inline-flex items-center gap-1.5">
                         {r.label}
                         {r.definition && <InfoTip label={`Ce înseamnă ${r.label}`}>{r.definition}</InfoTip>}

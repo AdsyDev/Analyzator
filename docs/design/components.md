@@ -44,6 +44,8 @@ Note secundare (din `warnings`): „Perioadă incompletă", „Comparația nu e 
 ### AppShell
 Sidebar colapsabil (extins cu etichete, colapsat doar iconițe cu tooltip), topbar cu selector de brand, FilterBar, comutator de temă, linia „Date până la · Ultimul refresh". Variante: rol client (fără Administrare), rol agenție. Stări: sidebar extins/colapsat; meniuri deschise (brand, utilizator, perioadă) cu popover de sticlă; fără brand accesibil (EmptyState).
 
+Sub 1024 px (telefon, tabletă; verificat la 390 px, E-7): sidebarul devine sertar, deschis din butonul de meniu din topbar și închis la navigare, la Esc sau la click pe fundal; restrângerea se aplică doar pe desktop. Linia „Date până la · Ultimul refresh" coboară pe al doilea rând al topbarului. Popoverele (meniuri, tooltipuri) rămân în ecran, tabelele late se derulează orizontal cu umbră la marginea cu conținut, iar în ComparisonTable prima coloană rămâne pe loc.
+
 ### KpiCard
 Eticheta, `?` cu tooltip de definiție, valoare mare (Sora, cifre tabulare), variație cu săgeată și culoare după `higherIsBetter`, etichetă de comparație, sparkline cu zilele fără date ca întrerupere, rând de proveniență (sursă, „Date până la", CoverageBadge). Se deschide EvidenceDrawer la click/Enter. Stări: `ready`, `loading` (schelet), `partial` (notă galbenă), `stale` (notă gri), `unavailable`/`not_connected` (iconița „plugs", „Sursă neconectată" și motivul), `error`, plus `base_zero` și `insufficient_sample`.
 

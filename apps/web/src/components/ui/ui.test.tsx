@@ -7,6 +7,7 @@ import { Button } from './Button'
 import { FilterChip, StatusChip } from './Chip'
 import { Dialog } from './Dialog'
 import { InfoTip } from './InfoTip'
+import { Menu } from './Menu'
 import { SortableTable, type Column } from './SortableTable'
 import { Tabs } from './Tabs'
 import { ToastProvider, useToast } from './Toast'
@@ -199,5 +200,34 @@ describe('SortableTable', () => {
     render(<SortableTable caption="K" columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="x" onRowClick={onRowClick} />)
     await userEvent.click(screen.getByText('urinal'))
     expect(onRowClick).toHaveBeenCalledWith(rows[0])
+  })
+})
+
+describe('Popovere pe ecrane înguste', () => {
+  // jsdom nu are layout: se simulează un ecran de 390 px și un panou care ar ieși prin dreapta.
+  function narrowScreen(panelRect: { left: number; width: number }) {
+    vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(390)
+    return vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const popover = this.getAttribute('role') === 'menu' || this.getAttribute('role') === 'tooltip'
+      const { left, width } = popover ? panelRect : { left: 0, width: 0 }
+      return { left, right: left + width, width, top: 0, bottom: 0, height: 0, x: left, y: 0, toJSON: () => ({}) } as DOMRect
+    })
+  }
+
+  it('meniul care ar ieși prin dreapta se mută înăuntru, cu 8 px margine', async () => {
+    narrowScreen({ left: 300, width: 224 })
+    render(<Menu label="Platformă" trigger="Platformă" value="a" options={[{ value: 'a', label: 'Toate' }]} onSelect={() => {}} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Platformă' }))
+    // 390 - 8 - (300 + 224) = -142
+    expect(screen.getByRole('menu', { name: 'Platformă' })).toHaveStyle({ transform: 'translateX(-142px)' })
+    vi.restoreAllMocks()
+  })
+
+  it('tooltipul care încape rămâne pe loc', async () => {
+    narrowScreen({ left: 20, width: 256 })
+    render(<InfoTip>Definiția</InfoTip>)
+    await userEvent.click(screen.getByRole('button', { name: 'Ce înseamnă indicatorul' }))
+    expect(screen.getByRole('tooltip').style.transform).toBe('')
+    vi.restoreAllMocks()
   })
 })

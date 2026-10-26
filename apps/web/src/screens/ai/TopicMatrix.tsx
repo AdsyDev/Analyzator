@@ -28,7 +28,7 @@ export function TopicMatrix({ state, onRetry }: Props) {
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă matricea" skeletonClass="h-56">
         {(m) => (
           <div className="flex flex-col gap-2">
-            <div className="overflow-x-auto rounded-xl border border-border">
+            <div className="scroll-x relative rounded-xl border border-border">
               <table className="w-full border-collapse text-[13px]">
                 <caption className="sr-only">Rata de menționare pe subiect, pentru brand și competitori</caption>
                 <thead>
