@@ -8,8 +8,8 @@ interface DialogProps {
   open: boolean
   onClose: () => void
   title: string
-  /** `center`: modal; `right`: drawer lateral (EvidenceDrawer). */
-  placement?: 'center' | 'right'
+  /** `center`: modal; `right`: drawer lateral (EvidenceDrawer); `bottom`: panou de jos, pe telefon (filtrele). */
+  placement?: 'center' | 'right' | 'bottom'
   children: ReactNode
   footer?: ReactNode
 }
@@ -65,10 +65,12 @@ export function Dialog({ open, onClose, title, placement = 'center', children, f
         aria-labelledby={titleId}
         tabIndex={-1}
         className={cn(
-          'glass-strong absolute flex max-h-full flex-col outline-none',
+          'glass-strong absolute flex flex-col outline-none',
           placement === 'center'
-            ? 'left-1/2 top-1/2 w-[min(560px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl shadow-drawer'
-            : 'inset-y-0 right-0 w-[min(480px,100vw)] rounded-l-2xl shadow-drawer',
+            ? 'left-1/2 top-1/2 max-h-full w-[min(560px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl shadow-drawer'
+            : placement === 'right'
+              ? 'inset-y-0 right-0 max-h-full w-[min(480px,100vw)] rounded-l-2xl shadow-drawer'
+              : 'inset-x-0 bottom-0 max-h-[85dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)] shadow-drawer',
         )}
       >
         <header className="flex items-center gap-3 border-b border-border px-4 py-3 sm:px-5 sm:py-4">

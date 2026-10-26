@@ -49,6 +49,8 @@ Sub 1024 px (telefon, tabletă; verificat la 390 px, E-7): sidebarul devine sert
 ### KpiCard
 Eticheta, `?` cu tooltip de definiție, valoare mare (Sora, cifre tabulare), variație cu săgeată și culoare după `higherIsBetter`, etichetă de comparație, sparkline cu zilele fără date ca întrerupere, rând de proveniență (sursă, „Date până la", CoverageBadge). Se deschide EvidenceDrawer la click/Enter. Stări: `ready`, `loading` (schelet), `partial` (notă galbenă), `stale` (notă gri), `unavailable`/`not_connected` (iconița „plugs", „Sursă neconectată" și motivul), `error`, plus `base_zero` și `insufficient_sample`.
 
+Sub 640 px (telefon, E-7), cardul e compact, pe două rânduri: eticheta, `?` și CoverageBadge sus; valoarea, variația și un sparkline mic jos. Sursa, „Date până la" și perioada de comparație se văd în EvidenceDrawer, care se deschide la atingere. Notele (`partial`, `stale`), „Sursă neconectată" cu motivul și eroarea rămân în card. StatCard (Paid, Social) urmează aceeași așezare.
+
 ### CoverageBadge
 Pilulă de 20 px: Complet (verde), Parțial cu procent în mono (galben), Învechit (gri), Indisponibil (contur). Titlul explică starea.
 
@@ -63,6 +65,8 @@ Panou lateral de sticlă: pagină și indicator, definiție, valoare și variaț
 
 ### FilterBar
 Perioadă, comparație, filtre de modul, chipuri active cu „x", „Resetează filtrele". Citește și scrie doar în URL (`period`, `compare`, filtre), fără stare proprie. Interval personalizat cu două date în Europe/Bucharest.
+
+Sub 640 px (telefon, E-7): în locul meniurilor, un singur buton cu rezumatul (perioada, intervalul, comparația și numărul filtrelor active, același cu al chipurilor). Butonul deschide un panou de jos cu toate opțiunile. Alegerile din panou sunt o ciornă: „Aplică" scrie în URL o singură dată, închiderea fără „Aplică" nu schimbă nimic, „Resetează" readuce valorile implicite în ciornă. Motivul pentru care „Anul trecut" e indisponibil e scris în panou (pe telefon nu există tooltip). Chipurile rămân sub buton.
 
 ### InsightCard
 Titlu, autor (avatar și rol), perioadă, rezumat, „Dovezi atașate" (linkuri la EvidenceDrawer), „Limite". Badge de status (Draft, În review, Publicat, Înlocuit) doar pentru agenție; clientul vede doar „Publicat" fără badge.

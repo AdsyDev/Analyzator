@@ -48,12 +48,14 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
   const paths = spark ? sparkPaths(spark) : { line: '', area: '' }
   const state = loading ? 'loading' : error ? 'error' : 'ready'
 
+  // Sub `sm` (telefon), cardul e compact, pe două rânduri: eticheta și acoperirea sus, valoarea, variația și un
+  // sparkline mic jos. Sursa, „Date până la" și perioada de comparație rămân în EvidenceDrawer; stările nu se schimbă.
   return (
     <article
       aria-label={label}
       data-state={state}
       data-status={metric?.status}
-      className="group relative flex h-full flex-col gap-3 rounded-xl border border-border bg-surface px-4 pb-3 pt-4 shadow-1 transition-[box-shadow,transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-2"
+      className="group relative flex h-full flex-col gap-3 rounded-xl border border-border bg-surface px-4 pb-3 pt-4 shadow-1 transition-[box-shadow,transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-2 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:items-start max-sm:gap-x-3 max-sm:gap-y-2 max-sm:pt-3"
     >
       <button
         type="button"
@@ -61,7 +63,7 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
         aria-label={`Deschide dovezile pentru ${label}`}
         className="absolute inset-0 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2"
       />
-      <div className="pointer-events-none relative flex min-h-5 items-center gap-1.5">
+      <div className="pointer-events-none relative flex min-h-5 flex-wrap items-center gap-1.5 max-sm:col-start-1 max-sm:row-start-1 max-sm:min-h-6">
         <span className="text-[13px] font-semibold leading-snug text-text-2">{label}</span>
         {qualifier && <span className="text-[11.5px] leading-snug text-text-3">{qualifier}</span>}
         <span className="pointer-events-auto relative z-10">
@@ -69,17 +71,17 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
         </span>
       </div>
 
-      <div className="pointer-events-none relative flex flex-1 flex-col gap-3">
+      <div className="pointer-events-none relative flex flex-1 flex-col gap-3 max-sm:col-span-2 max-sm:row-start-2 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-2">
         {state === 'loading' && (
-          <div role="status" aria-label="Se încarcă" className="flex flex-1 flex-col gap-2.5">
+          <div role="status" aria-label="Se încarcă" className="flex flex-1 flex-col gap-2.5 max-sm:col-span-2">
             <div className="h-8 w-1/2 rounded-md bg-skeleton" />
             <div className="h-3 w-2/5 rounded bg-skeleton" />
-            <div className="h-[34px] w-full rounded-md bg-skeleton" />
+            <div className="h-[34px] w-full rounded-md bg-skeleton max-sm:hidden" />
           </div>
         )}
 
         {state === 'error' && (
-          <div className="flex flex-1 flex-col justify-center gap-2">
+          <div className="flex flex-1 flex-col justify-center gap-2 max-sm:col-span-2">
             <div className="flex items-center gap-2 font-display text-[15px] font-semibold text-text">
               <WarningCircleIcon size={18} className="text-neg-text" aria-hidden="true" />
               Nu am putut încărca datele
@@ -94,7 +96,7 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
         )}
 
         {state === 'ready' && view && !view.hasValue && (
-          <div className="flex flex-1 flex-col justify-center gap-1.5 py-1">
+          <div className="flex flex-1 flex-col justify-center gap-1.5 py-1 max-sm:col-span-2 max-sm:py-0">
             <div className="flex items-center gap-2 font-display text-[15px] font-semibold text-text">
               <PlugsIcon size={18} className="text-text-2" aria-hidden="true" />
               {view.emptyTitle}
@@ -110,7 +112,7 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
           <>
             <div className="flex flex-col gap-1.5">
               <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-                <span className="font-display text-[34px] font-semibold leading-none tracking-[-0.02em] tabular-nums text-text">{view.valueText}</span>
+                <span className="font-display text-[34px] font-semibold leading-none tracking-[-0.02em] tabular-nums text-text max-sm:text-[26px]">{view.valueText}</span>
                 {view.deltaText && view.deltaDirection && (() => {
                   const Icon = DELTA_ICON[view.deltaDirection]
                   return (
@@ -121,10 +123,10 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
                   )
                 })()}
               </div>
-              {compareLabel && view.deltaText && <span className="text-[12px] leading-tight text-text-2">{compareLabel}</span>}
+              {compareLabel && view.deltaText && <span className="text-[12px] leading-tight text-text-2 max-sm:hidden">{compareLabel}</span>}
             </div>
             {paths.line && (
-              <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true" className="block h-[34px] w-full overflow-visible">
+              <svg viewBox="0 0 100 32" preserveAspectRatio="none" aria-hidden="true" className="block h-[34px] w-full overflow-visible max-sm:h-7 max-sm:w-[84px]">
                 <path d={paths.area} className="fill-accent opacity-[0.08]" />
                 <path d={paths.line} vectorEffect="non-scaling-stroke" className="fill-none stroke-accent" strokeWidth="1.75" strokeLinejoin="round" strokeLinecap="round" />
               </svg>
@@ -132,7 +134,7 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
             {view.caveat && (
               <div
                 className={cn(
-                  'flex items-start gap-1.5 text-[12px] leading-snug',
+                  'flex items-start gap-1.5 text-[12px] leading-snug max-sm:col-span-2',
                   metric?.status === 'stale' || metric?.status === 'base_zero' ? 'text-text-2' : 'text-warn-text',
                 )}
               >
@@ -141,20 +143,20 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
               </div>
             )}
             {view.notes.map((n) => (
-              <p key={n} className="text-[12px] leading-snug text-text-2">{n}</p>
+              <p key={n} className="text-[12px] leading-snug text-text-2 max-sm:col-span-2">{n}</p>
             ))}
           </>
         )}
       </div>
 
-      <div className="pointer-events-none relative mt-auto flex min-w-0 items-center gap-2 whitespace-nowrap border-t border-border pt-2.5 text-[11.5px] text-text-2">
-        {metric?.source && <span className="flex-none font-semibold text-text">{sourceName(metric.source)}</span>}
+      <div className="pointer-events-none relative mt-auto flex min-w-0 items-center gap-2 whitespace-nowrap border-t border-border pt-2.5 text-[11.5px] text-text-2 max-sm:col-start-2 max-sm:row-start-1 max-sm:mt-0 max-sm:min-h-6 max-sm:border-t-0 max-sm:pt-0">
+        {metric?.source && <span className="flex-none font-semibold text-text max-sm:hidden">{sourceName(metric.source)}</span>}
         {metric?.data_as_of && (
-          <span className="min-w-0 overflow-hidden text-ellipsis">
+          <span className="min-w-0 overflow-hidden text-ellipsis max-sm:hidden">
             Date până la <span className="font-mono text-[11px]">{formatDate(metric.data_as_of)}</span>
           </span>
         )}
-        <span className="flex-1" />
+        <span className="flex-1 max-sm:hidden" />
         {state === 'ready' && view && <CoverageBadge state={view.coverage} pct={coveragePercent(metric?.coverage ?? null)} />}
       </div>
     </article>
