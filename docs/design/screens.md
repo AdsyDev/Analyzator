@@ -42,7 +42,7 @@ Extras din `docs/design/reference/Analyzator.dc.html` (referință vizuală, nu 
 
 ## Cadrul comun (shell)
 
-- **Sidebar** colapsabil (sticlă): Overview, AI Visibility, SEO și Search, Trafic și conversii, Paid Media, Social, Listening, Concurență, Analize și acțiuni. Secțiunea **Administrare** (doar agenție): Clienți și site-uri (cu pagina fiecărui site și sursele lui), Utilizatori, Configurare.
+- **Sidebar** colapsabil (sticlă; sub 1024 px, sertar deschis din butonul de meniu al topbarului): Overview, AI Visibility, SEO și Search, Trafic și conversii, Paid Media, Social, Listening, Concurență, Analize și acțiuni. Secțiunea **Administrare** (doar agenție): Clienți și site-uri (cu pagina fiecărui site și sursele lui), Utilizatori, Configurare.
 - **Topbar** (sticlă): selector de brand (lista „Spații de brand accesibile", cu categoria; linkul „Clienți și site-uri" doar pentru agenție), titlul paginii, comutator temă, meniul utilizatorului (nume, rol și organizație, email, „Vezi interfața ca" client/agenție doar în previzualizare, „Ieși din cont").
 - **FilterBar**: perioadă (Ultimele 7 zile, Ultimele 28 de zile, Luna curentă, Interval personalizat, cu intervalul afișat), comparație („vs perioada anterioară" implicit, „vs anul trecut"), filtre specifice modulului (Trafic: Device și Canal), chipuri pentru filtrele active și „Resetează filtrele".
 - **Linia de proveniență**: „Date până la <data>" · „Ultimul refresh <acum 2 ore>".

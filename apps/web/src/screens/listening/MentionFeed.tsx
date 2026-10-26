@@ -52,7 +52,7 @@ export function MentionFeed({ brand, ctx, filters, onChanged }: { brand: Brand; 
             <EmptyState compact title="Nicio mențiune pentru filtrele alese" text="Schimbă sentimentul, sursa sau perioada." />
           ) : (
             <div className="flex flex-col gap-3">
-              <ul className="grid gap-3 lg:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {p.items.map((m) => {
                   const own = m.owned_account === true
                   return (

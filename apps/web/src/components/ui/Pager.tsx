@@ -27,10 +27,10 @@ export function Pager({ current, pages, pageSize, total, onPage, className }: Pa
         {start + 1}-{Math.min(start + pageSize, total)} din {total}
       </span>
       <span className="flex-1" />
-      <button type="button" disabled={current <= 1} onClick={() => onPage(current - 1)} className="rounded-md px-2 py-1 hover:bg-neutral-soft disabled:opacity-40">
+      <button type="button" disabled={current <= 1} onClick={() => onPage(current - 1)} className="min-h-10 rounded-md px-3 hover:bg-neutral-soft disabled:opacity-40 sm:min-h-0 sm:px-2 sm:py-1">
         Înapoi
       </button>
-      <button type="button" disabled={current >= pages} onClick={() => onPage(current + 1)} className="rounded-md px-2 py-1 hover:bg-neutral-soft disabled:opacity-40">
+      <button type="button" disabled={current >= pages} onClick={() => onPage(current + 1)} className="min-h-10 rounded-md px-3 hover:bg-neutral-soft disabled:opacity-40 sm:min-h-0 sm:px-2 sm:py-1">
         Înainte
       </button>
     </nav>

@@ -8,7 +8,7 @@ import type { SocialFormat } from '../../contracts'
 
 function Table({ title, rows, label }: { title: string; rows: SocialGroupStat[]; label: (g: string) => string }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-border">
+    <div className="scroll-x relative rounded-xl border border-border">
       <table className="w-full border-collapse text-[13px]">
         <caption className="sr-only">{title}</caption>
         <thead>

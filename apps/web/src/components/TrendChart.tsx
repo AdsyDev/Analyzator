@@ -169,7 +169,7 @@ export function TrendChart({ title, series, labels, height = 240, format = 'int'
       </div>
 
       {asTable ? (
-        <div className="max-h-[360px] overflow-auto rounded-xl border border-border bg-surface">
+        <div className="relative max-h-[360px] overflow-auto rounded-xl border border-border bg-surface">
           <table className="w-full border-collapse text-[13px]">
             <caption className="sr-only">{title}</caption>
             <thead>

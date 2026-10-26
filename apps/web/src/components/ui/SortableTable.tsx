@@ -56,7 +56,7 @@ export function SortableTable<Row>({ caption, columns, rows, rowKey, pageSize = 
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-1">
-      <div className="overflow-x-auto">
+      <div className="scroll-x relative">
         <table className="w-full border-collapse text-[13px]">
           <caption className="sr-only">{caption}</caption>
           <thead>

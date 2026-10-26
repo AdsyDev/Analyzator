@@ -123,6 +123,32 @@ describe('AppShell', () => {
     expect(screen.getByRole('link', { name: 'AI Visibility' })).toBeInTheDocument()
   })
 
+  it('ecrane mici: butonul de meniu deschide sertarul, Esc îl închide și întoarce focusul', async () => {
+    setup()
+    const toggle = screen.getByRole('button', { name: 'Deschide meniul' })
+    expect(toggle).toHaveAttribute('aria-controls', screen.getByRole('complementary', { name: 'Navigare principală' }).id)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Închide meniul' })).toHaveFocus()
+    await userEvent.keyboard('{Escape}')
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle).toHaveFocus()
+  })
+
+  it('ecrane mici: sertarul se închide la click pe fundal și la navigare', async () => {
+    setup()
+    const toggle = screen.getByRole('button', { name: 'Deschide meniul' })
+    await userEvent.click(toggle)
+    await userEvent.click(screen.getByTestId('nav-scrim'))
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.click(toggle)
+    await userEvent.click(screen.getByRole('link', { name: 'AI Visibility' }))
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('nav-scrim')).toBeNull()
+    expect(screen.getByRole('link', { name: 'AI Visibility' })).toHaveAttribute('aria-current', 'page')
+  })
+
   it('selectorul de brand listează brandurile permise și apelează onBrandChange', async () => {
     const props = setup()
     await userEvent.click(screen.getByRole('button', { name: 'Spațiu de brand' }))

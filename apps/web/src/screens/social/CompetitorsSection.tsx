@@ -12,7 +12,7 @@ export function CompetitorsSection({ state, onRetry }: { state: AsyncState<Provi
     <Section id="competitors" title="Concurență publică" description="Date publice ale competitorilor: ritm de publicare, followers și interacțiuni pe postare. Reach-ul competitorilor nu e public și nu se estimează.">
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă concurența" skeletonClass="h-36">
         {(rows) => (
-          <div className="overflow-x-auto rounded-xl border border-border">
+          <div className="scroll-x relative rounded-xl border border-border">
             <table className="w-full border-collapse text-[13px]">
               <caption className="sr-only">Concurența publică pe social</caption>
               <thead>

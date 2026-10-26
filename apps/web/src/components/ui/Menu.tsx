@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
+import { useInViewportShift } from './useInViewportShift'
 
 export interface MenuOption {
   value: string
@@ -28,7 +29,9 @@ export function Menu({ label, trigger, options, value, onSelect, align = 'left',
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const button = useRef<HTMLButtonElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
   const id = useId()
+  const shift = useInViewportShift(panel, open)
 
   useEffect(() => {
     if (!open) return
@@ -77,10 +80,12 @@ export function Menu({ label, trigger, options, value, onSelect, align = 'left',
       </button>
       {open && (
         <div
+          ref={panel}
           id={id}
           role="menu"
           aria-label={label}
-          className={cn('glass-strong absolute top-[calc(100%+6px)] z-40 min-w-56 rounded-xl p-1.5', align === 'right' ? 'right-0' : 'left-0')}
+          style={shift ? { transform: `translateX(${shift}px)` } : undefined}
+          className={cn('glass-strong absolute top-[calc(100%+6px)] z-40 max-h-[70dvh] min-w-56 max-w-[calc(100vw-16px)] overflow-y-auto rounded-xl p-1.5', align === 'right' ? 'right-0' : 'left-0')}
         >
           {options.map((o) => {
             const checked = o.value === value
@@ -98,7 +103,7 @@ export function Menu({ label, trigger, options, value, onSelect, align = 'left',
                   button.current?.focus()
                 }}
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px] disabled:cursor-not-allowed disabled:opacity-50',
+                  'flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px] disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0',
                   checked ? 'bg-accent-soft text-accent-text' : 'text-text hover:bg-neutral-soft',
                 )}
               >

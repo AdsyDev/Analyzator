@@ -61,7 +61,7 @@ export function BehaviorSection({ devices, items, definitions, source, canManage
       <Resolved state={devices} onRetry={onRetry} loadingLabel="Se încarcă comportamentul" skeletonClass="h-48">
         {(d) => (
           <div className="flex flex-col gap-2">
-            <div className="overflow-x-auto rounded-xl border border-border">
+            <div className="scroll-x relative rounded-xl border border-border">
               <table className="w-full border-collapse text-[13px]">
                 <caption className="sr-only">Comportament pe device (Microsoft Clarity)</caption>
                 <thead>
