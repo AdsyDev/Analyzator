@@ -22,6 +22,11 @@ async function main(): Promise<void> {
       `${o.source} ${o.connection_id} brand ${o.brand_id}: ${o.status}, ${o.rows_written} rânduri, ${o.api_calls} apeluri` +
         (o.errors.length ? `, ${o.errors.length} note în sync_runs.errors` : ''),
     )
+    // Motivele, ca în rezumatul SEOmonitor: codul și mesajul fiecărei erori, apoi seturile cu zile fără rânduri.
+    for (const e of o.errors) console.log(`  ${e.code}${e.dimension ? ` [${e.dimension}]` : ''}: ${e.message}`)
+    for (const [dataset, c] of Object.entries(o.coverage)) {
+      if (c.coverage < 1) console.log(`  acoperire ${dataset}: ${c.covered_days} din ${c.expected_days}`)
+    }
     if (o.status === 'failed') failed++
   }
   if (outcomes.length === 0) console.log('Nicio conexiune ga4/gsc activă.')

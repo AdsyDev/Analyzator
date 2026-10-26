@@ -80,6 +80,5 @@ Colectarea automată rulează **marțea la 04:00 UTC**, după ce `CONNECTOR_GOOG
 | Search Console nu găsește site-ul | `site_url` nu e exact ca în Search Console | `sc-domain:` pentru domain property; URL complet cu `/` pentru URL prefix. |
 | „Parțial”, `ga4_thresholding` sau `ga4_sampled` | GA4 ascunde sau eșantionează date (Google Signals, volume mici) | Limită a GA4; cifrele sunt marcate. |
 | „Parțial”, `gsc_truncated` | Site foarte mare, peste plafonul de pagini | Totalurile sunt complete; detaliile pe query sunt trunchiate. |
-| „Parțial”, „N din 35 de zile fără sesiuni” (GA4) | Site cu trafic mic: GA4 nu trimite rânduri pentru zilele fără sesiuni | Normal; zilele rămân fără date, nu zero (regula 8). |
-| „Parțial”, „N din 35 de zile fără date Search Console” | Datele finale au întârziat mai mult de 3 zile | Se completează la rularea următoare. |
+| „Reușit”, dar log-ul arată „acoperire web_daily: N din 35” | Site cu trafic mic: GA4 nu trimite rânduri pentru zilele fără sesiuni | Normal (D-25). Zilele rămân fără date, nu zero (regula 8); metricile le marchează singure. |
 | Ultimele 2-3 zile lipsesc în Search Console | Google publică datele finale cu întârziere | Normal; apar la rularea următoare. |

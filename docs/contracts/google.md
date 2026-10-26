@@ -57,7 +57,7 @@ Fixtures: `tests/fixtures/google/docs-derived/` (**derivate din documentație, n
 
 ## Acoperire și statusul run-ului
 
-`sync_runs.coverage`: `web_daily`, `web_key_events`, `web_active_users_interval`, `search_daily`, `search_queries` (zile cu rânduri / zile așteptate, sau intervale scrise / intervale cerute). Run-ul e `succeeded` doar fără erori și cu acoperire 100%; altfel `partial`; `failed` la acces refuzat, configurare invalidă sau zero rânduri cu erori.
+`sync_runs.coverage`: `web_daily`, `web_key_events`, `web_active_users_interval`, `search_daily`, `search_queries` (zile cu rânduri / zile așteptate, sau intervale scrise / intervale cerute). Run-ul e `succeeded` fără erori (D-25: zilele fără rânduri nu îl mai fac parțial; GA4 nu trimite zilele fără trafic, iar Search Console zilele nefinalizate, iar acoperirea rămâne în `coverage` și metricile o aplică singure); `partial` cu erori sau cu zero rânduri; `failed` la acces refuzat, configurare invalidă sau zero rânduri cu erori.
 
 ## Reconcilierea
 

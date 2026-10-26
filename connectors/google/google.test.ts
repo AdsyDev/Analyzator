@@ -352,12 +352,13 @@ const run = (db: FakeDb, opts: FakeOpts = {}, only?: 'ga4' | 'gsc', extra: Parti
 }
 
 describe('collectGoogle: GA4', () => {
-  test('scrie web_daily, web_key_events și intervale; reconciliere = match; acoperire parțială (3 din 35 de zile) → partial', async () => {
+  test('scrie web_daily, web_key_events și intervale; reconciliere = match; zile fără rânduri (3 din 35 acoperite) → succeeded, acoperirea salvată', async () => {
     const db = makeDb()
     const { outcomes, calls } = await run(db, {}, 'ga4')
     const o = outcomes[0]!
     if (o.status === 'not_connected') assert.fail()
-    assert.equal(o.status as string, 'partial', 'fereastra de 35 de zile nu e acoperită de fixture')
+    assert.equal(o.status, 'succeeded', 'fără erori, zilele fără trafic nu fac rularea parțială (20 oct. 2026)')
+    assert.deepEqual(o.errors, [])
     assert.equal(db.tables.web_daily!.length, 7)
     assert.equal(db.tables.web_key_events!.length, 6)
     assert.equal(o.coverage.web_daily!.covered_days, 3)
@@ -374,7 +375,8 @@ describe('collectGoogle: GA4', () => {
     assert.equal(run1.source_connection_id, GA4_CONN)
     assert.equal(run1.period_start, '2026-09-03')
     assert.equal(run1.period_end, '2026-10-07')
-    assert.notEqual(run1.status, 'succeeded')
+    assert.equal(run1.status, 'succeeded')
+    assert.equal((run1.coverage as Record<string, { covered_days: number }>).web_daily!.covered_days, 3)
   })
 
   test('acoperire completă și fără erori → succeeded', async () => {
@@ -547,8 +549,9 @@ describe('collectGoogle: Search Console', () => {
 
   test('fereastra GSC se oprește la ultima zi cu date finale: cererea și perioada rulării până la 5 oct (nu 7 oct)', async () => {
     const db = makeDb()
-    const { calls } = await run(db, {}, 'gsc', { gscRowLimit: 3 })
+    const { calls, outcomes } = await run(db, {}, 'gsc', { gscRowLimit: 3 })
     assert.ok(calls.gsc.length > 0 && calls.gsc.every((c) => c.range === '2026-09-01..2026-10-05'), JSON.stringify(calls.gsc))
+    assert.equal(outcomes[0]!.status, 'succeeded', 'fără erori: zilele fără date nu fac rularea parțială')
     assert.deepEqual([db.tables.sync_runs![0]!.period_start, db.tables.sync_runs![0]!.period_end], ['2026-09-01', '2026-10-05'])
   })
 

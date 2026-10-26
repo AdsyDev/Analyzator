@@ -197,11 +197,13 @@ async function runConnection(deps: GoogleDeps, conn: BrandConnection & { brand_i
     fail('call_count_not_recorded', (err as Error).message)
   }
 
-  const incomplete = Object.values(state.coverage).some((c) => c.coverage < 1)
+  // Zilele fără rânduri nu fac rularea parțială: GA4 nu trimite zilele fără trafic, iar Search Console zilele încă
+  // nefinalizate. Pe 20 oct. 2026, rulări fără nicio eroare ieșeau „partial” doar din acest motiv. Acoperirea rămâne
+  // în `sync_runs.coverage`, iar metricile o aplică singure (o zi fără rânduri rămâne lipsă, nu zero; regula 8).
   const status: SyncRunResult['status'] =
     state.fatal || (state.rowsWritten === 0 && state.errors.length > 0 && !state.errors.every((e) => e.code === 'empty_report'))
       ? 'failed'
-      : state.errors.length > 0 || incomplete || state.rowsWritten === 0
+      : state.errors.length > 0 || state.rowsWritten === 0
         ? 'partial'
         : 'succeeded'
   if (state.rowsWritten === 0 && !state.fatal && !state.errors.some((e) => e.code === 'empty_report')) {
