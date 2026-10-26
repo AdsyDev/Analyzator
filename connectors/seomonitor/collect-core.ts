@@ -298,148 +298,165 @@ export async function collectSeomonitorConnection(deps: SeomonitorDeps, connecti
       const add = (n: number) => written.set(brand_id, (written.get(brand_id) ?? 0) + n)
       const seenDays: Record<string, Set<string>> = { ranks: new Set(), visibility: new Set(), ai_answers: new Set() }
       const handle = handles.get(brand_id)!
-
-      for (const bg of resolution.byBrand.get(brand_id) ?? []) {
-        const campaign = campaigns.get(bg.group.campaign_id)
-        if (!campaign) {
-          pushError(brand_id, { code: 'campaign_not_found', dimension: `campaign:${bg.group.campaign_id}`, status: null, message: 'Campania nu e în lista Tracked Campaigns.' })
-          continue
+      // Originalele AI nesalvate: o singură eroare pe brand (rularea devine partial), răspunsurile rămân scrise.
+      let originalsReported = false
+      const saveAnswers = (r: { written: number; originalsError: string | null }) => {
+        add(r.written)
+        if (r.originalsError && !originalsReported) {
+          originalsReported = true
+          pushError(brand_id, { code: 'ai_originals_not_saved', dimension: 'ai_answer_originals', status: null, message: r.originalsError })
         }
-        const ctx: Ctx = {
-          tenant_id, brand_id, source_id: connection.id, campaign_id: campaign.id, sync_run_id: handle.id,
-          collected_at: collectedAt(), domain: campaign.domain, maxTracked: campaign.maxTracked, rangeStart, rangeEnd, group: bg,
-        }
-        const base = { campaign_id: campaign.id, start_date: rangeStart, end_date: rangeEnd }
+      }
 
-        // Grupul.
-        add((await upsertRows(db, 'keyword_groups', [{
-          tenant_id, brand_id, source_id: connection.id, campaign_id: campaign.id, group_id: bg.group.group_id,
-          parent_group_id: bg.group.parent_group_id, name: bg.group.name || bg.group.group_id,
-          group_type: ['group', 'folder', 'smart'].includes(bg.group.type) ? bg.group.type : 'group',
-          brand_type: bg.mapping.brand_type, mapping_version: bg.mapping.version, sync_run_id: handle.id,
-          collected_at: ctx.collected_at, payload_hash: groupHash.get(`${campaign.id}|${bg.group.group_id}`) ?? '0'.repeat(64),
-          schema_version: SEOMONITOR_SCHEMA_VERSION,
-        }], scope)).length)
-
-        // Keywords branded (Brand folder, group_id = -1), o dată per campanie.
-        if (!brandedCache.has(campaign.id)) {
-          const r = await fetchAll('keywords', { ...base, group_id: SPECIAL_GROUP_BRAND }, 'until_short_page')
-          brandedCache.set(campaign.id, stopOn(r, 'keywords:brand', brand_id) ? null
-            : new Set(r.pages.flatMap((p) => [...brandedKeywordIds(p.payload)])))
-        }
-        const branded = brandedCache.get(campaign.id) ?? null
-
-        // Keywords active din grup.
-        const keywordInfo = new Map<string, KeywordInfo>()
-        const kw = await fetchAll('keywords', { ...base, group_id: bg.group.group_id }, 'until_short_page')
-        if (!stopOn(kw, 'keywords', brand_id)) {
-          for (const page of kw.pages) {
-            const n = normalizeKeywords(page.payload, ctx, page.payloadHash, branded)
-            for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
-            for (const i of n.info) keywordInfo.set(i.keyword_id, i)
-            add((await upsertRows(db, 'keywords', n.rows, scope)).length)
+      // O eroare neașteptată pe un site oprește doar site-ul respectiv (pe 20 oct. 2026, un timeout pe primul site
+      // lăsa necolectate toate celelalte). Oprirea rulării (acces refuzat, buget) rămâne pentru toate.
+      try {
+        for (const bg of resolution.byBrand.get(brand_id) ?? []) {
+          const campaign = campaigns.get(bg.group.campaign_id)
+          if (!campaign) {
+            pushError(brand_id, { code: 'campaign_not_found', dimension: `campaign:${bg.group.campaign_id}`, status: null, message: 'Campania nu e în lista Tracked Campaigns.' })
+            continue
           }
-        }
+          const ctx: Ctx = {
+            tenant_id, brand_id, source_id: connection.id, campaign_id: campaign.id, sync_run_id: handle.id,
+            collected_at: collectedAt(), domain: campaign.domain, maxTracked: campaign.maxTracked, rangeStart, rangeEnd, group: bg,
+          }
+          const base = { campaign_id: campaign.id, start_date: rangeStart, end_date: rangeEnd }
 
-        // Rankuri zilnice: active, apoi arhivate. Pe date reale (12 oct 2026), `get_archive=true` întoarce și keywords
-        // active: un keyword din lista activă sau din trecerea activă nu se marchează niciodată arhivat.
-        const activeIds = new Set(keywordInfo.keys())
-        for (const status of ['active', 'archived'] as const) {
-          const r = await fetchAll('dailyRanks', { ...base, group_id: bg.group.group_id, get_archive: status === 'archived' ? 'true' : undefined }, 'until_short_page')
-          if (stopOn(r, `daily-ranks:${status}`, brand_id)) continue
-          for (const page of r.pages) {
-            const raw = normalizeDailyRanks(page.payload, ctx, page.payloadHash, keywordInfo, status)
-            const n = status === 'active'
-              ? raw
-              : { ...raw, rows: raw.rows.filter((row) => !activeIds.has(String(row.keyword_id))), archivedKeywords: raw.archivedKeywords.filter((k) => !activeIds.has(k.keyword_id)) }
-            if (status === 'active') for (const row of n.rows) activeIds.add(String(row.keyword_id))
-            for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
-            if (n.archivedKeywords.length) {
-              add((await upsertRows(db, 'keywords', n.archivedKeywords.map((k) => ({
-                tenant_id, brand_id, source_id: connection.id, campaign_id: campaign.id, keyword_id: k.keyword_id, keyword: k.keyword,
-                group_ids: [], status: 'archived', archived_detected_at: ctx.collected_at, sync_run_id: handle.id,
-                collected_at: ctx.collected_at, payload_hash: page.payloadHash, schema_version: SEOMONITOR_SCHEMA_VERSION,
-              })), scope)).length)
+          // Grupul.
+          add((await upsertRows(db, 'keyword_groups', [{
+            tenant_id, brand_id, source_id: connection.id, campaign_id: campaign.id, group_id: bg.group.group_id,
+            parent_group_id: bg.group.parent_group_id, name: bg.group.name || bg.group.group_id,
+            group_type: ['group', 'folder', 'smart'].includes(bg.group.type) ? bg.group.type : 'group',
+            brand_type: bg.mapping.brand_type, mapping_version: bg.mapping.version, sync_run_id: handle.id,
+            collected_at: ctx.collected_at, payload_hash: groupHash.get(`${campaign.id}|${bg.group.group_id}`) ?? '0'.repeat(64),
+            schema_version: SEOMONITOR_SCHEMA_VERSION,
+          }], scope)).length)
+
+          // Keywords branded (Brand folder, group_id = -1), o dată per campanie.
+          if (!brandedCache.has(campaign.id)) {
+            const r = await fetchAll('keywords', { ...base, group_id: SPECIAL_GROUP_BRAND }, 'until_short_page')
+            brandedCache.set(campaign.id, stopOn(r, 'keywords:brand', brand_id) ? null
+              : new Set(r.pages.flatMap((p) => [...brandedKeywordIds(p.payload)])))
+          }
+          const branded = brandedCache.get(campaign.id) ?? null
+
+          // Keywords active din grup.
+          const keywordInfo = new Map<string, KeywordInfo>()
+          const kw = await fetchAll('keywords', { ...base, group_id: bg.group.group_id }, 'until_short_page')
+          if (!stopOn(kw, 'keywords', brand_id)) {
+            for (const page of kw.pages) {
+              const n = normalizeKeywords(page.payload, ctx, page.payloadHash, branded)
+              for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
+              for (const i of n.info) keywordInfo.set(i.keyword_id, i)
+              add((await upsertRows(db, 'keywords', n.rows, scope)).length)
             }
-            for (const row of n.rows) seenDays.ranks!.add(String(row.date))
-            add((await upsertRows(db, 'rank_observations', n.rows, scope)).length)
           }
-        }
 
-        // Visibility pe grup.
-        const vis = await fetchAll('groupVisibility', { ...base, group_id: bg.group.group_id }, 'none')
-        if (!stopOn(vis, 'groups/daily-visibility', brand_id) && vis.pages[0]) {
-          const n = normalizeGroupVisibility(vis.pages[0].payload, ctx, vis.pages[0].payloadHash)
-          for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
-          for (const row of n.rows) if (row.visibility !== null) seenDays.visibility!.add(String(row.date))
-          add((await upsertRows(db, 'seomonitor_group_visibility_daily', n.rows, scope)).length)
-        }
+          // Rankuri zilnice: active, apoi arhivate. Pe date reale (12 oct 2026), `get_archive=true` întoarce și keywords
+          // active: un keyword din lista activă sau din trecerea activă nu se marchează niciodată arhivat.
+          const activeIds = new Set(keywordInfo.keys())
+          for (const status of ['active', 'archived'] as const) {
+            const r = await fetchAll('dailyRanks', { ...base, group_id: bg.group.group_id, get_archive: status === 'archived' ? 'true' : undefined }, 'until_short_page')
+            if (stopOn(r, `daily-ranks:${status}`, brand_id)) continue
+            for (const page of r.pages) {
+              const raw = normalizeDailyRanks(page.payload, ctx, page.payloadHash, keywordInfo, status)
+              const n = status === 'active'
+                ? raw
+                : { ...raw, rows: raw.rows.filter((row) => !activeIds.has(String(row.keyword_id))), archivedKeywords: raw.archivedKeywords.filter((k) => !activeIds.has(k.keyword_id)) }
+              if (status === 'active') for (const row of n.rows) activeIds.add(String(row.keyword_id))
+              for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
+              if (n.archivedKeywords.length) {
+                add((await upsertRows(db, 'keywords', n.archivedKeywords.map((k) => ({
+                  tenant_id, brand_id, source_id: connection.id, campaign_id: campaign.id, keyword_id: k.keyword_id, keyword: k.keyword,
+                  group_ids: [], status: 'archived', archived_detected_at: ctx.collected_at, sync_run_id: handle.id,
+                  collected_at: ctx.collected_at, payload_hash: page.payloadHash, schema_version: SEOMONITOR_SCHEMA_VERSION,
+                })), scope)).length)
+              }
+              for (const row of n.rows) seenDays.ranks!.add(String(row.date))
+              add((await upsertRows(db, 'rank_observations', n.rows, scope)).length)
+            }
+          }
 
-        // AI Search: doar motoarele activate (un motor neactivat întoarce gol, nu eroare).
-        const campaignEngines = engines.get(campaign.id)
-        if (campaignEngines === undefined) {
-          pushError(brand_id, { code: 'ai_engines_unknown', dimension: 'ais/stats', status: null, message: 'Motoarele AI activate nu au putut fi citite; AI Search necolectat.' })
-        }
-        for (const engine of campaignEngines ?? []) {
-          const ais = await fetchAll('keywordsAis', { ...base, group_id: bg.group.group_id, ai_search_llm: engine, content_format: 'markdown', include_raw_content: 'true' }, 'until_empty_page')
-          if (!stopOn(ais, `keywords/ais:${engine}`, brand_id)) {
-            for (const page of ais.pages) {
-              const n = normalizeKeywordAis(page.payload, ctx, page.payloadHash, engine)
+          // Visibility pe grup.
+          const vis = await fetchAll('groupVisibility', { ...base, group_id: bg.group.group_id }, 'none')
+          if (!stopOn(vis, 'groups/daily-visibility', brand_id) && vis.pages[0]) {
+            const n = normalizeGroupVisibility(vis.pages[0].payload, ctx, vis.pages[0].payloadHash)
+            for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
+            for (const row of n.rows) if (row.visibility !== null) seenDays.visibility!.add(String(row.date))
+            add((await upsertRows(db, 'seomonitor_group_visibility_daily', n.rows, scope)).length)
+          }
+
+          // AI Search: doar motoarele activate (un motor neactivat întoarce gol, nu eroare).
+          const campaignEngines = engines.get(campaign.id)
+          if (campaignEngines === undefined) {
+            pushError(brand_id, { code: 'ai_engines_unknown', dimension: 'ais/stats', status: null, message: 'Motoarele AI activate nu au putut fi citite; AI Search necolectat.' })
+          }
+          for (const engine of campaignEngines ?? []) {
+            const ais = await fetchAll('keywordsAis', { ...base, group_id: bg.group.group_id, ai_search_llm: engine, content_format: 'markdown', include_raw_content: 'true' }, 'until_empty_page')
+            if (!stopOn(ais, `keywords/ais:${engine}`, brand_id)) {
+              for (const page of ais.pages) {
+                const n = normalizeKeywordAis(page.payload, ctx, page.payloadHash, engine)
+                for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
+                for (const a of n.answers) seenDays.ai_answers!.add(String(a.crawl_at))
+                saveAnswers(await upsertAnswers(db, n.answers, n.originals, scope))
+                add((await upsertRows(db, 'ai_citations', n.citations, scope)).length)
+              }
+            }
+            const ranksAis = await fetchAll('dailyRanksAis', { ...base, group_id: bg.group.group_id, ai_search_llm: engine }, 'until_short_page')
+            if (!stopOn(ranksAis, `keywords/daily-ranks/ais:${engine}`, brand_id)) {
+              for (const page of ranksAis.pages) {
+                const n = normalizeDailyRanksAis(page.payload, ctx, page.payloadHash, engine)
+                for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
+                add((await upsertRows(db, 'ai_brand_observations', n.rows, scope)).length)
+              }
+            }
+            const comp = await fetchAll('competitionAis', { ...base, group_id: bg.group.group_id, ai_search_llm: engine }, 'until_short_page')
+            if (!stopOn(comp, `keywords/competition/ais:${engine}`, brand_id)) {
+              for (const page of comp.pages) {
+                const n = normalizeCompetitionAis(page.payload, ctx, page.payloadHash, engine)
+                for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
+                add((await upsertRows(db, 'ai_brand_observations', n.rows, scope)).length)
+              }
+            }
+            for (const [route, metric] of [['aisMentions', 'brand_mentions'], ['aisCitations', 'site_citations']] as const) {
+              const r = await fetchAll(route, { ...base, group_id: bg.group.group_id, ai_search_llm: engine }, 'none')
+              if (!stopOn(r, `${route}:${engine}`, brand_id) && r.pages[0]) {
+                const n = normalizeAiVisibility(r.pages[0].payload, ctx, r.pages[0].payloadHash, engine, metric)
+                for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
+                add((await upsertRows(db, 'seomonitor_ai_visibility_daily', n.rows, scope)).length)
+              }
+            }
+            const st = await fetchAll('aisStats', { ...base, group_id: bg.group.group_id, gpt_provider: engine }, 'none')
+            if (!stopOn(st, `ais/stats:${engine}`, brand_id) && st.pages[0]) {
+              const n = normalizeAisStats(st.pages[0].payload, ctx, st.pages[0].payloadHash, engine)
+              for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
+              add((await upsertRows(db, 'seomonitor_ai_engine_stats', n.rows, scope)).length)
+            }
+          }
+
+          // Google AI Overview.
+          // Pe date reale, AIO răspunde 422 „Request too large to return AI Overview content” cu HTML-ul snapshot-ului
+          // (`include_raw_content`), chiar și la 100 de keywords pe pagină: cerem doar conținutul markdown, păstrat ca original
+          // (`raw_format = 'markdown'`). AI Search rămâne cu HTML (nu dă eroare).
+          // Și fără HTML, 35 de zile × desktop și mobile într-o cerere tot dau 422: AIO se cere pe ferestre de câte
+          // SEOMONITOR_AIO_WINDOW_DAYS zile (cheia răspunsurilor e pe zi și device, deci ferestrele nu se suprapun în date).
+          for (const w of dayWindows(rangeStart, rangeEnd, SEOMONITOR_AIO_WINDOW_DAYS)) {
+            const aio = await fetchAll('aio', { ...base, start_date: w.start, end_date: w.end, group_id: bg.group.group_id, content_format: 'markdown' }, 'until_empty_page', SEOMONITOR_AIO_PAGE_SIZE)
+            if (stopOn(aio, `keywords/aio:${w.start}`, brand_id)) continue
+            for (const page of aio.pages) {
+              const n = normalizeAio(page.payload, ctx, page.payloadHash)
               for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
               for (const a of n.answers) seenDays.ai_answers!.add(String(a.crawl_at))
-              add(await upsertAnswers(db, n.answers, n.originals, scope))
+              saveAnswers(await upsertAnswers(db, n.answers, n.originals, scope))
               add((await upsertRows(db, 'ai_citations', n.citations, scope)).length)
             }
           }
-          const ranksAis = await fetchAll('dailyRanksAis', { ...base, group_id: bg.group.group_id, ai_search_llm: engine }, 'until_short_page')
-          if (!stopOn(ranksAis, `keywords/daily-ranks/ais:${engine}`, brand_id)) {
-            for (const page of ranksAis.pages) {
-              const n = normalizeDailyRanksAis(page.payload, ctx, page.payloadHash, engine)
-              for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
-              add((await upsertRows(db, 'ai_brand_observations', n.rows, scope)).length)
-            }
-          }
-          const comp = await fetchAll('competitionAis', { ...base, group_id: bg.group.group_id, ai_search_llm: engine }, 'until_short_page')
-          if (!stopOn(comp, `keywords/competition/ais:${engine}`, brand_id)) {
-            for (const page of comp.pages) {
-              const n = normalizeCompetitionAis(page.payload, ctx, page.payloadHash, engine)
-              for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
-              add((await upsertRows(db, 'ai_brand_observations', n.rows, scope)).length)
-            }
-          }
-          for (const [route, metric] of [['aisMentions', 'brand_mentions'], ['aisCitations', 'site_citations']] as const) {
-            const r = await fetchAll(route, { ...base, group_id: bg.group.group_id, ai_search_llm: engine }, 'none')
-            if (!stopOn(r, `${route}:${engine}`, brand_id) && r.pages[0]) {
-              const n = normalizeAiVisibility(r.pages[0].payload, ctx, r.pages[0].payloadHash, engine, metric)
-              for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
-              add((await upsertRows(db, 'seomonitor_ai_visibility_daily', n.rows, scope)).length)
-            }
-          }
-          const st = await fetchAll('aisStats', { ...base, group_id: bg.group.group_id, gpt_provider: engine }, 'none')
-          if (!stopOn(st, `ais/stats:${engine}`, brand_id) && st.pages[0]) {
-            const n = normalizeAisStats(st.pages[0].payload, ctx, st.pages[0].payloadHash, engine)
-            for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
-            add((await upsertRows(db, 'seomonitor_ai_engine_stats', n.rows, scope)).length)
-          }
         }
-
-        // Google AI Overview.
-        // Pe date reale, AIO răspunde 422 „Request too large to return AI Overview content” cu HTML-ul snapshot-ului
-        // (`include_raw_content`), chiar și la 100 de keywords pe pagină: cerem doar conținutul markdown, păstrat ca original
-        // (`raw_format = 'markdown'`). AI Search rămâne cu HTML (nu dă eroare).
-        // Și fără HTML, 35 de zile × desktop și mobile într-o cerere tot dau 422: AIO se cere pe ferestre de câte
-        // SEOMONITOR_AIO_WINDOW_DAYS zile (cheia răspunsurilor e pe zi și device, deci ferestrele nu se suprapun în date).
-        for (const w of dayWindows(rangeStart, rangeEnd, SEOMONITOR_AIO_WINDOW_DAYS)) {
-          const aio = await fetchAll('aio', { ...base, start_date: w.start, end_date: w.end, group_id: bg.group.group_id, content_format: 'markdown' }, 'until_empty_page', SEOMONITOR_AIO_PAGE_SIZE)
-          if (stopOn(aio, `keywords/aio:${w.start}`, brand_id)) continue
-          for (const page of aio.pages) {
-            const n = normalizeAio(page.payload, ctx, page.payloadHash)
-            for (const e of issuesToErrors(n.issues)) pushError(brand_id, e)
-            for (const a of n.answers) seenDays.ai_answers!.add(String(a.crawl_at))
-            add(await upsertAnswers(db, n.answers, n.originals, scope))
-            add((await upsertRows(db, 'ai_citations', n.citations, scope)).length)
-          }
-        }
+      } catch (err) {
+        if (err instanceof AbortRun) throw err
+        pushError(brand_id, { code: 'exception', status: null, message: (err as Error).message })
+        failedBrands.add(brand_id)
       }
 
       // reportCoverage.

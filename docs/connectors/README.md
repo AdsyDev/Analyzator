@@ -48,7 +48,7 @@ Ghiduri pas cu pas pentru agenție (rolul `agency_admin`): de unde obții cheia,
 | Etichetă | Ce înseamnă |
 |---|---|
 | Reușit | Toate datele așteptate au intrat, fără erori. |
-| Parțial | O parte a intrat; restul apare la „errors”. Datele care lipsesc rămân lipsă, nu devin zero. |
+| Parțial | O parte a intrat; restul apare la „errors”. Datele care lipsesc rămân lipsă, nu devin zero. Cardul sursei și istoricul spun de ce (D-25). |
 | Eșuat | Nu a intrat nimic (cheie refuzată, buget epuizat, eroare a furnizorului). |
 
 „Sursă neconectată” pe un ecran nu e o eroare: înseamnă că nu există conexiune, cheie sau date pentru brandul respectiv.

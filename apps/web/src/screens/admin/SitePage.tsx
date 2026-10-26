@@ -13,7 +13,7 @@ import { useAsync } from '../../data/useAsync'
 import { formatDate, formatDateTime } from '../../lib/format'
 import { adminPath, sitePath } from '../../lib/navigation'
 import { normalizeDomain } from '../../lib/slug'
-import { PROVIDER_DESCRIPTIONS, PROVIDER_LABELS, sourceName } from '../../lib/sources'
+import { PROVIDER_DESCRIPTIONS, PROVIDER_LABELS, runSourcesFor, sourceName } from '../../lib/sources'
 import { useLayout } from '../../routing/AppLayout'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
@@ -75,6 +75,9 @@ const duration = (r: SyncRun): string => {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`
 }
 
+/** Motivul unei rulări parțiale sau eșuate; codul brut doar dacă nu există o explicație. */
+const why = (r: SyncRun): string | null => r.reason ?? (r.status === 'failed' || r.status === 'partial' ? r.error : null)
+
 const runColumns: Column<SyncRun>[] = [
   { key: 'source', header: 'Sursă', sortValue: (r) => sourceName(r.provider), render: (r) => sourceName(r.provider) },
   { key: 'started', header: 'Început', sortValue: (r) => r.started_at, render: (r) => <span className="font-mono text-[12px]">{formatDateTime(r.started_at)}</span> },
@@ -88,7 +91,7 @@ const runColumns: Column<SyncRun>[] = [
     render: (r) => (
       <span className="flex flex-col gap-0.5">
         <StatusChip tone={SYNC_LABELS[r.status].tone}>{SYNC_LABELS[r.status].label}</StatusChip>
-        {r.error && <span className="text-[12px] text-neg-text">{r.error}</span>}
+        {why(r) && <span className={`text-[12px] ${r.status === 'failed' ? 'text-neg-text' : 'text-text-2'}`}>{why(r)}</span>}
       </span>
     ),
   },
@@ -183,6 +186,8 @@ function SiteContent({ client, space, onChanged }: { client: Client; space: Clie
 
   // Starea surselor nu blochează cardurile: fără ea, o sursă apare „Neconectat", nu ascunsă.
   const statusList = statuses.state.status === 'done' && statuses.state.value.kind === 'ready' ? statuses.state.value.data : []
+  // La fel rulările: până se încarcă, accesul unei conexiuni apare „Neverificat”.
+  const runList = runs.state.status === 'done' && runs.state.value.kind === 'ready' ? runs.state.value.data : []
 
   return (
     <div className="flex flex-col gap-5">
@@ -224,6 +229,7 @@ function SiteContent({ client, space, onChanged }: { client: Client; space: Clie
                       client={client}
                       status={statusList.find((s) => s.provider === src.provider) ?? null}
                       connections={connList.filter((c) => c.provider === src.provider)}
+                      runs={runList.filter((r) => runSourcesFor(src.provider).includes(r.provider))}
                       tenantConnection={src.tenant ? (tenantList.find((t) => t.provider === src.tenant) ?? null) : null}
                       onChanged={refresh}
                     />
@@ -251,12 +257,14 @@ interface CardProps {
   /** `null` = sursa nu e raportată: neconectată, nu necunoscută. */
   status: SourceStatusInfo | null
   connections: SourceConnection[]
+  /** Rulările sursei pentru acest site, cele mai noi întâi. */
+  runs: SyncRun[]
   tenantConnection: TenantConnection | null
   onChanged: () => void
 }
 
 /** O sursă a site-ului: starea ei și, la deschidere, pașii de conectare (cheia clientului, apoi contul site-ului). */
-function SiteSourceCard({ source, space, client, status, connections, tenantConnection, onChanged }: CardProps) {
+function SiteSourceCard({ source, space, client, status, connections, runs, tenantConnection, onChanged }: CardProps) {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const bodyId = useId()
@@ -339,7 +347,7 @@ function SiteSourceCard({ source, space, client, status, connections, tenantConn
               <div className="flex flex-col gap-3">
                 {source.tenant && !keySaved && <p className="text-[12.5px] text-warn-text">Fără cheia clientului de la pasul 1, contul se adaugă, dar colectarea nu pornește.</p>}
                 {connections.map((c) => (
-                  <ConnectionCard key={c.id} connection={c} onChanged={onChanged} />
+                  <ConnectionCard key={c.id} connection={c} runs={runs.filter((r) => r.connection_id === c.id || r.connection_id === null)} onChanged={onChanged} />
                 ))}
                 {connections.length === 0 && (
                   <AddConnection

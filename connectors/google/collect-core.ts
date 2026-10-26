@@ -22,6 +22,7 @@ import {
   GOOGLE_LOOKBACK_DAYS,
   GOOGLE_SCHEMA_VERSION,
   GSC_DATA_STATE,
+  GSC_FINAL_LAG_DAYS,
   GSC_MAX_PAGES,
   GSC_ROW_LIMIT,
   GSC_TIMEZONE,
@@ -157,7 +158,8 @@ async function runConnection(deps: GoogleDeps, conn: BrandConnection & { brand_i
   const state: RunState = { errors: [], coverage: {}, rowsWritten: 0, calls: 0, fatal: false, reconciliations: [] }
   const fail = (code: string, message: string, extra: Partial<SyncRunError> = {}) => state.errors.push({ code, status: null, message, ...extra })
 
-  const window = isValidTimeZone(timezone) ? lookbackWindow(now(), timezone, GOOGLE_LOOKBACK_DAYS) : lookbackWindow(now(), GSC_TIMEZONE, GOOGLE_LOOKBACK_DAYS)
+  const lag = source === 'gsc' ? GSC_FINAL_LAG_DAYS : 0
+  const window = lookbackWindow(now(), isValidTimeZone(timezone) ? timezone : GSC_TIMEZONE, GOOGLE_LOOKBACK_DAYS, lag)
   const handle = await startSyncRun(
     db,
     { tenant_id: conn.tenant_id, brand_id: conn.brand_id, source, source_connection_id: conn.id, period_start: window.start, period_end: window.end },

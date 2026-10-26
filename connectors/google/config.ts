@@ -24,6 +24,12 @@ export const GSC_MAX_PAGES = 40
 export const GSC_TIMEZONE = 'America/Los_Angeles'
 /** `final`: fără zilele încă incomplete (implicit în API). */
 export const GSC_DATA_STATE = 'final'
+/**
+ * Datele `final` apar cu 2–3 zile întârziere: fereastra GSC se termină cu atâtea zile înainte de ieri (PT). Altfel,
+ * zilele încă nefinalizate apăreau drept lipsă și fiecare rulare ieșea „partial” (20 oct. 2026, toate site-urile).
+ * Zilele sărite intră la rularea următoare (fereastra de 35 de zile se suprapune).
+ */
+export const GSC_FINAL_LAG_DAYS = 2
 
 export const RETRY_ATTEMPTS = 3
 export const RETRY_BASE_DELAY_MS = 1000

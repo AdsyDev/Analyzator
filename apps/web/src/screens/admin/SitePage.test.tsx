@@ -90,7 +90,11 @@ describe('pagina site-ului: sursele, fiecare conectată pe site (fixtures de pre
     // Pasul 2: proprietatea site-ului, fără token propriu.
     const step2 = within(card).getByRole('region', { name: 'Contul Urinal în Google Analytics 4' })
     const conn = within(step2).getByRole('article', { name: /Conexiune Google Analytics 4/ })
-    expect(within(conn).getByText('Cheia clientului')).toBeInTheDocument()
+    // Doar accesul contează: confirmat de ultima colectare cu date, fără test, buget sau „configurat de”.
+    expect(within(conn).getByText('Acces confirmat')).toBeInTheDocument()
+    expect(within(conn).getByText(/Confirmat de colectarea din .*: 28 de rânduri\./)).toBeInTheDocument()
+    for (const gone of ['Ultima testare', 'Configurat de', 'Apeluri azi', 'Netestat', 'Cheia clientului']) expect(within(conn).queryByText(gone)).toBeNull()
+    expect(within(conn).queryByText(/Testarea conexiunii nu este disponibilă|Nu are token propriu/)).toBeNull()
     expect(within(conn).queryByLabelText(/tokenul/)).toBeNull()
   })
 
@@ -126,7 +130,8 @@ describe('pagina site-ului: sursele, fiecare conectată pe site (fixtures de pre
     await userEvent.click(within(form).getByRole('button', { name: 'Adaugă conexiunea' }))
     const conn = await within(card).findByRole('article', { name: 'Conexiune Planable · Urinal' })
     expect(within(conn).getByText('ws-brand-urinal')).toBeInTheDocument()
-    expect(within(conn).getByText(/folosește tokenul Planable al clientului \(pasul 1\)/)).toBeInTheDocument()
+    expect(within(conn).getByText('Neverificat')).toBeInTheDocument()
+    expect(within(conn).getByText(/se confirmă la prima colectare/)).toBeInTheDocument()
 
     // Alt site al aceluiași client: tokenul nu se mai cere.
     await userEvent.click(screen.getByRole('link', { name: 'Înapoi la clienți și site-uri' }))

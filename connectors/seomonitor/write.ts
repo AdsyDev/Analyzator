@@ -2,7 +2,8 @@
 // tenantului și brandului (înainte și după scriere). Rândurile duplicate în același lot se comasează (ultimul
 // câștigă), altfel Postgres refuză un upsert care atinge același rând de două ori.
 
-import { assertUuid, type Db, type Row } from '../shared/supabase-rest.ts'
+import { createHash } from 'node:crypto'
+import { assertUuid, DbError, type Db, type Row } from '../shared/supabase-rest.ts'
 
 export const KEYS = {
   keyword_groups: ['tenant_id', 'brand_id', 'source_id', 'campaign_id', 'group_id'],
@@ -79,13 +80,73 @@ export async function upsertRows(
   return out
 }
 
-/** ai_answers + originalele lor (tabel separat, doar agenție). */
+/**
+ * Plafon mai mic pentru originale: textele complete sunt mari, iar rescrierea lor e scumpă. Pe 20 oct. 2026, loturile
+ * de ~1 MB tot depășeau `statement_timeout` (57014).
+ */
+export const ORIGINALS_BATCH_BYTES = 250_000
+/** Câte id-uri intră într-un filtru `in.(...)` la citirea hash-urilor existente (URL-ul rămâne scurt). */
+const ID_CHUNK = 100
+const ID = /^[0-9a-f-]{1,36}$/i
+
+export const contentHash = (raw: string | null) => createHash('sha256').update(raw ?? '').digest('hex')
+
+const isTimeout = (err: unknown) => err instanceof Error && /57014|statement timeout/.test(err.message)
+
+/**
+ * Originalele răspunsurilor AI (doar pentru audit de agenție). Se scriu doar cele noi sau cu alt conținut decât cel
+ * salvat (`content_sha256`): fereastra de 35 de zile se suprapune de la o rulare la alta, iar textele vechi nu se
+ * mai rescriu. La timeout, lotul se împarte în două, până la un singur rând. Întoarce câte rânduri au fost scrise.
+ */
+export async function upsertOriginals(db: Db, rows: Row[], scope: { tenant_id: string; brand_id: string }): Promise<number> {
+  assertUuid(scope.tenant_id, 'tenant_id')
+  assertUuid(scope.brand_id, 'brand_id')
+  const unique = dedupe(rows, KEYS.ai_answer_originals).map((r): Row => ({ ...r, content_sha256: contentHash((r.raw_content as string | null) ?? null) }))
+  for (const r of unique) {
+    if (r.tenant_id !== scope.tenant_id || r.brand_id !== scope.brand_id) throw new Error('ai_answer_originals: rând trimis pentru alt tenant sau brand; opresc rularea.')
+    if (!ID.test(String(r.answer_id))) throw new Error(`ai_answer_originals: answer_id invalid: ${JSON.stringify(r.answer_id)}`)
+  }
+
+  const stored = new Map<string, string | null>()
+  for (let i = 0; i < unique.length; i += ID_CHUNK) {
+    const ids = unique.slice(i, i + ID_CHUNK).map((r) => String(r.answer_id))
+    const existing = await db.select<{ answer_id: string; content_sha256: string | null; tenant_id: string; brand_id: string }>(
+      'ai_answer_originals',
+      `select=answer_id,content_sha256,tenant_id,brand_id&tenant_id=eq.${scope.tenant_id}&brand_id=eq.${scope.brand_id}&answer_id=in.(${ids.join(',')})`,
+    )
+    for (const e of existing) {
+      if (e.tenant_id !== scope.tenant_id || e.brand_id !== scope.brand_id) throw new Error('ai_answer_originals: rând citit din alt tenant sau brand; opresc rularea.')
+      stored.set(String(e.answer_id), e.content_sha256)
+    }
+  }
+  const changed = unique.filter((r) => stored.get(String(r.answer_id)) !== r.content_sha256)
+
+  const write = async (batch: Row[]): Promise<number> => {
+    try {
+      const returned = await db.upsert<Row>('ai_answer_originals', batch, [...KEYS.ai_answer_originals])
+      if (returned.length !== batch.length) throw new Error(`ai_answer_originals: upsert a întors ${returned.length} din ${batch.length} rânduri.`)
+      return returned.length
+    } catch (err) {
+      if (!isTimeout(err) || batch.length === 1) throw err
+      const half = Math.ceil(batch.length / 2)
+      return (await write(batch.slice(0, half))) + (await write(batch.slice(half)))
+    }
+  }
+  let written = 0
+  for (const batch of batches(changed, BATCH, ORIGINALS_BATCH_BYTES)) written += await write(batch)
+  return written
+}
+
+/**
+ * ai_answers + originalele lor (tabel separat, doar agenție). Originalele sunt doar pentru audit: dacă baza de date nu
+ * le poate scrie (HTTP), răspunsurile rămân salvate și eroarea se raportează, fără să oprească rularea.
+ */
 export async function upsertAnswers(
   db: Db,
   answers: Row[],
   originals: Array<{ key: string; raw_content: string | null; raw_format: string }>,
   scope: { tenant_id: string; brand_id: string },
-): Promise<number> {
+): Promise<{ written: number; originalsError: string | null }> {
   const written = await upsertRows(db, 'ai_answers', answers, scope)
   const idByKey = new Map(written.map((r) => [`${r.engine}|${r.keyword_id}|${r.crawl_at}|${r.device}`, r]))
   const originalRows = originals.flatMap((o) => {
@@ -101,6 +162,12 @@ export async function upsertAnswers(
       payload_hash: answer.payload_hash,
     }]
   })
-  await upsertRows(db, 'ai_answer_originals', originalRows, scope)
-  return written.length
+  try {
+    await upsertOriginals(db, originalRows, scope)
+  } catch (err) {
+    // Doar erorile bazei de date; o nepotrivire de tenant sau brand oprește rularea, ca peste tot.
+    if (err instanceof DbError) return { written: written.length, originalsError: err.message }
+    throw err
+  }
+  return { written: written.length, originalsError: null }
 }

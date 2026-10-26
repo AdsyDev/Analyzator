@@ -258,6 +258,11 @@ describe('dates', () => {
     assert.equal(calendarDateIn(late, 'America/Los_Angeles'), '2026-10-07')
     assert.equal(addDaysIso('2026-03-01', -1), '2026-02-28')
   })
+
+  test('cu întârziere (Search Console): fereastra de 35 de zile se termină cu 2 zile înainte de ieri', () => {
+    // 07:00 UTC pe 8 oct = 00:00 pe 8 oct în PT → ieri = 7 oct → ultima zi cerută = 5 oct.
+    assert.deepEqual(lookbackWindow(NOW, 'America/Los_Angeles', 35, 2), { start: '2026-09-01', end: '2026-10-05' })
+  })
 })
 
 // --- Colectare completă cu clienți simulați ------------------------------------------------------------------------------
@@ -274,7 +279,7 @@ type FakeOpts = {
 }
 
 function fakeClients(opts: FakeOpts = {}) {
-  const calls = { check: 0, report: [] as Array<{ dims: string; metrics: string[]; offset: number; limit: number; range: string }>, gsc: [] as Array<{ dims: string; startRow: number }> }
+  const calls = { check: 0, report: [] as Array<{ dims: string; metrics: string[]; offset: number; limit: number; range: string }>, gsc: [] as Array<{ dims: string; startRow: number; range: string }> }
   const throwOnce = [...(opts.throwOnce ?? [])]
   const g4: Ga4Client = {
     async checkCompatibility() {
@@ -310,7 +315,7 @@ function fakeClients(opts: FakeOpts = {}) {
   }
   const gs: GscClient = {
     async query(req) {
-      calls.gsc.push({ dims: req.dimensions.join(','), startRow: req.startRow })
+      calls.gsc.push({ dims: req.dimensions.join(','), startRow: req.startRow, range: `${req.startDate}..${req.endDate}` })
       const slice = (payload: unknown) => {
         const p = payload as { rows: unknown[] }
         return { ...p, rows: p.rows.slice(req.startRow, req.startRow + req.rowLimit) }
@@ -538,6 +543,13 @@ describe('collectGoogle: Search Console', () => {
     assert.ok(db.tables.search_daily!.every((r) => r.data_state === 'final'))
     assert.equal(o.coverage.search_daily!.covered_days, 3)
     assert.equal(db.tables.sync_runs![0]!.source, 'gsc')
+  })
+
+  test('fereastra GSC se oprește la ultima zi cu date finale: cererea și perioada rulării până la 5 oct (nu 7 oct)', async () => {
+    const db = makeDb()
+    const { calls } = await run(db, {}, 'gsc', { gscRowLimit: 3 })
+    assert.ok(calls.gsc.length > 0 && calls.gsc.every((c) => c.range === '2026-09-01..2026-10-05'), JSON.stringify(calls.gsc))
+    assert.deepEqual([db.tables.sync_runs![0]!.period_start, db.tables.sync_runs![0]!.period_end], ['2026-09-01', '2026-10-05'])
   })
 
   test('rulare dublă idempotentă', async () => {

@@ -30,7 +30,7 @@ Fixtures: `tests/fixtures/google/docs-derived/` (**derivate din documentație, n
 | totaluri | (niciuna) | `sessions`, `engagedSessions`, `keyEvents` | (doar reconciliere) |
 | utilizatori activi | (niciuna; **fără `date`**), câte unul per interval | `activeUsers` | `web_active_users_interval` |
 
-- Fereastra: ultimele **35 de zile până ieri**, în fusul proprietății (reimport al sursei mutabile, spec cap. 9).
+- Fereastra: ultimele **35 de zile până ieri**, în fusul proprietății (reimport al sursei mutabile, spec cap. 9). Search Console: aceleași 35 de zile, dar terminate cu **2 zile înainte de ieri** (PT, `GSC_FINAL_LAG_DAYS`), pentru că datele `final` apar cu 2–3 zile întârziere (D-25). Zilele sărite intră la rularea următoare.
 - Paginare: `limit` 100.000, `offset` până la `rowCount`; peste 20 de pagini, `ga4_too_many_pages`.
 - **`checkCompatibility` rulează înainte de fiecare `runReport`** (o dată per combinație). Metrici incompatibile: se elimină din cerere și rămân NULL (`ga4_incompatible_metrics`). Dimensiune incompatibilă: raportul se sare (`ga4_incompatible_dimensions`). Ambele în `sync_runs.errors`; run-ul nu e `succeeded`.
 - Din `metadata` se raportează: `dataLossFromOtherRow` (`ga4_data_loss_other_row`), `samplingMetadatas` (`ga4_sampled`), `subjectToThresholding` (`ga4_thresholding`), `timeZone` diferit de conexiune (`timezone_mismatch`).

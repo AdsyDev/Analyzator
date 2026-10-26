@@ -25,8 +25,11 @@ export function isValidTimeZone(tz: string): boolean {
   }
 }
 
-/** Fereastra de reimport: ultimele `days` zile, până ieri în fusul dat. */
-export function lookbackWindow(now: Date, timeZone: string, days: number): { start: string; end: string } {
-  const end = addDaysIso(calendarDateIn(now, timeZone), -1)
+/**
+ * Fereastra de reimport: ultimele `days` zile, până ieri în fusul dat. Cu `lagDays`, fereastra se termină cu atâtea
+ * zile mai devreme (surse ale căror date finale apar cu întârziere, ca Search Console).
+ */
+export function lookbackWindow(now: Date, timeZone: string, days: number, lagDays = 0): { start: string; end: string } {
+  const end = addDaysIso(calendarDateIn(now, timeZone), -1 - lagDays)
   return { start: addDaysIso(end, -(days - 1)), end }
 }

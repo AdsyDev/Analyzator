@@ -5,7 +5,7 @@ import { deriveStatuses, mapConnection, mapSyncRun, SourceContractError, type Co
 
 const CONNECTION_COLUMNS =
   'id, brand_id, provider, external_account_id, display_name, credential_status, last_validated_at, last_validation_error, credential_updated_by, credential_updated_at'
-const RUN_COLUMNS = 'id, brand_id, source, period_start, period_end, status, rows_written, errors, started_at, finished_at, created_at'
+const RUN_COLUMNS = 'id, brand_id, source, source_connection_id, period_start, period_end, status, rows_written, errors, coverage, started_at, finished_at, created_at'
 const RUN_LIMIT = 50
 const FUNCTION = 'source-credentials'
 const OUTCOMES: readonly ValidationOutcomeKind[] = ['valid', 'invalid', 'rate_limited', 'provider_error', 'budget_exhausted']

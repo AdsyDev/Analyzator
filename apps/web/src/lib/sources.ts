@@ -31,3 +31,9 @@ export const PROVIDER_DESCRIPTIONS: Record<SourceProviderId, string> = {
   csv_import: 'Date importate din fișiere CSV (Paid Media și Social).',
 }
 
+
+/** Sursele din `sync_runs` care aparțin fiecărui card (Planable scrie separat Analytics și Listening). */
+const RUN_SOURCES: Partial<Record<SourceProviderId, readonly string[]>> = {
+  planable: ['planable', 'planable_analytics', 'planable_listening'],
+}
+export const runSourcesFor = (provider: SourceProviderId): readonly string[] => RUN_SOURCES[provider] ?? [provider]

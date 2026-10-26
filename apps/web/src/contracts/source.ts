@@ -55,6 +55,8 @@ export interface SyncRun {
   brand_id: BrandId
   /** Cheia din `sync_runs.source`; poate fi o sursă încă fără etichetă în `PROVIDER_LABELS`. */
   provider: string
+  /** Conexiunea site-ului folosită la rulare; `null` la sursele la nivel de client (SEOmonitor) sau la rulări vechi. */
+  connection_id: string | null
   range_from: IsoDate
   range_to: IsoDate
   started_at: IsoDateTime
@@ -62,6 +64,10 @@ export interface SyncRun {
   rows: number | null
   status: SyncRunStatus
   error: string | null
+  /** De ce e „Parțial” sau „Eșuat”, în română (din erori și acoperire); `null` dacă a reușit sau nu există o explicație. */
+  reason: string | null
+  /** Codurile de eroare ale conectorului, fără observații (de exemplu `access_denied`). */
+  error_codes: string[]
 }
 
 /** Conexiune nouă (agency_admin). Tokenul se setează separat, prin funcția server. */

@@ -31,6 +31,7 @@ import {
   type CredentialStatus,
   type Sentiment,
 } from '../../contracts'
+import { runErrorCodes, runReason } from '../../lib/runReason'
 import { addDays, comparisonRange, todayBucharest } from '../../lib/period'
 import { createClientsFixtures } from './clients'
 import { createAdminFixtures } from './admin'
@@ -312,6 +313,7 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
             id: r.id,
             brand_id: brandId,
             provider: r.provider as SourceProviderId,
+            connection_id: null,
             range_from: daysAgo(r.days_ago + 6),
             range_to: daysAgo(r.days_ago),
             started_at: started,
@@ -319,6 +321,9 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
             rows: r.rows,
             status: r.status as SyncRunStatus,
             error: r.error,
+            // Ca la sursa reală: motivul vine din codul de eroare al rulării fictive.
+            reason: runReason(r.status as SyncRunStatus, r.error ? [{ code: r.error }] : [], null),
+            error_codes: runErrorCodes(r.error ? [{ code: r.error }] : []),
           }
         }),
       )

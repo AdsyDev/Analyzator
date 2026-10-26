@@ -59,7 +59,7 @@ Pentru `keywords/ais` documentația nu spune ce numără `limit`: folosim conser
 | `rank_observations` | tenant, brand, keyword_id, device, date, domain | `rank` + `rank_status` + `rank_original`, `search_volume`, `keyword_status`, URL doar pentru ultima zi (landing page curentă) |
 | `seomonitor_group_visibility_daily` | tenant, brand, campanie, grup, date, device, domain | `visibility` + `visibility_original`, `avg_rank`, `is_primary` |
 | `ai_answers` | tenant, brand, engine, keyword_id, crawl_at, **device** | conținut sanitizat, citări, prezență, rank, sentiment, `status` |
-| `ai_answer_originals` | answer_id | HTML brut al snapshotului, **doar roluri de agenție** |
+| `ai_answer_originals` | answer_id | HTML brut al snapshotului, **doar roluri de agenție**; `content_sha256` = sha256 al conținutului. Se scriu doar originalele noi sau schimbate, în loturi de ~250 KB, împărțite la timeout; un eșec al bazei de date dă `ai_originals_not_saved` (rularea „partial”), nu oprește rularea (D-26) |
 | `ai_brand_observations` | tenant, brand, engine, keyword_id, crawl_at, device, domeniu observat | brandul propriu (rankuri săptămânale) și concurenții |
 | `ai_citations` | tenant, brand, engine, keyword_id, crawl_at, device, url | poziția în listă, `is_own_domain` |
 | `seomonitor_ai_visibility_daily` | tenant, brand, campanie, grup, date, engine, metric | `brand_mentions` / `site_citations` |

@@ -63,6 +63,8 @@ Până la confirmare, visibility apare ca „draft”, nu ca cifră finală. Tri
 | Nicio rulare pe brand | Grupurile nu sunt mapate pe brand | Pasul 3. |
 | `access_denied` (401/403), rularea se oprește | Token invalid sau revocat; tokenul e marcat refuzat | Token nou din Edit Profile → API Token, apoi „Rotește tokenul” (pasul 2). |
 | `mapped_group_missing`, rulare „Parțial” | Grupul a fost șters sau mutat în SEOmonitor | Mapare nouă (versiune nouă) pentru grupul corect. |
+| `ai_originals_not_saved`, rulare „Parțial” | Baza de date nu a scris textele originale AI la timp (57014) | Datele (poziții, vizibilitate, răspunsuri AI) au intrat; originalele se scriu la rularea următoare. Dacă se repetă, verifică încărcarea bazei de date în Supabase. |
+| „Eșuat” pe un singur site, `exception` | Eroare neașteptată la acel site | Celelalte site-uri ale clientului s-au colectat (D-26); motivul apare în istoricul site-ului. |
 | `campaign_not_found` | Campania nu mai e urmărită în SEOmonitor | Verifică Tracked Campaigns. |
 | Grup în coada de verificare | Grup nou, nemapat, sau `multi_brand` | Mapează-l (pasul 3). |
 | 429 | Limita SEOmonitor (10 cereri/secundă, 10.000/zi) | Rularea reîncearcă singură după 1, 5, 15 minute. |

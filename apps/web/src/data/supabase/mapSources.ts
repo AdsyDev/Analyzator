@@ -1,6 +1,7 @@
 import type { CredentialStatus, IsoDate, IsoDateTime, SourceConnection, SourceProviderId, SourceState, SourceStatusInfo, SyncRun, SyncRunStatus } from '../../contracts'
 import { SOURCE_PROVIDERS } from '../../contracts'
-import { PROVIDER_DESCRIPTIONS } from '../../lib/sources'
+import { runErrorCodes, runReason } from '../../lib/runReason'
+import { PROVIDER_DESCRIPTIONS, runSourcesFor } from '../../lib/sources'
 
 /** Bugetul zilnic de apeluri la pilot (spec: 10 per token). */
 export const DAILY_CALL_BUDGET = 10
@@ -22,11 +23,14 @@ export interface SyncRunRow {
   id: string
   brand_id: string
   source: string
+  source_connection_id?: string | null
   period_start: string
   period_end: string
   status: string
   rows_written: number
   errors: unknown
+  /** Acoperirea pe seturi de date (jsonb); lipsește la conectorii care nu o raportează. */
+  coverage?: unknown
   started_at: string | null
   finished_at: string | null
   created_at: string
@@ -82,6 +86,7 @@ export function mapSyncRun(r: SyncRunRow): SyncRun {
     id: r.id,
     brand_id: r.brand_id,
     provider: r.source,
+    connection_id: r.source_connection_id ?? null,
     range_from: r.period_start,
     range_to: r.period_end,
     started_at: r.started_at ?? r.created_at,
@@ -89,15 +94,19 @@ export function mapSyncRun(r: SyncRunRow): SyncRun {
     rows: r.status === 'queued' ? null : r.rows_written,
     status: r.status as SyncRunStatus,
     error: firstError(r.errors),
+    reason: runReason(r.status as SyncRunStatus, r.errors, r.coverage),
+    error_codes: runErrorCodes(r.errors),
   }
 }
 
 const NO_CONNECTION = 'Nicio conexiune configurată pentru acest spațiu.'
 
-/** Sursele din `sync_runs` care aparțin fiecărui card (Planable scrie separat Analytics și Listening). */
-const RUN_SOURCES: Partial<Record<SourceProviderId, readonly string[]>> = {
-  planable: ['planable', 'planable_analytics', 'planable_listening'],
+/** „Ultima sincronizare a eșuat: <motiv>. …”; fără motiv salvat, doar fraza de bază. */
+function withReason(head: string, run: SyncRunRow, tail: string): string {
+  const reason = runReason(run.status as SyncRunStatus, run.errors, run.coverage)
+  return reason ? `${head}: ${reason}${tail}` : `${head}${tail}`
 }
+
 /** Contul e al clientului, nu al site-ului: site-ul primește date prin mapare (campanii SEOmonitor), fără conexiune proprie. */
 const CLIENT_LEVEL: readonly SourceProviderId[] = ['seomonitor']
 /** Sursele cu token pe conexiunea site-ului; celelalte folosesc cheia clientului. */
@@ -118,7 +127,7 @@ export function deriveStatuses(connections: ConnectionRow[], runs: SyncRunRow[],
         : { ...base, state: 'not_connected' as SourceState, data_as_of: null, imported_at: null, note: 'Niciun import încheiat pentru acest spațiu.' }
     }
     const conns = connections.filter((c) => c.provider === provider)
-    const sources = RUN_SOURCES[provider] ?? [provider]
+    const sources = runSourcesFor(provider)
     const own = runs.filter((r) => sources.includes(r.source)).sort((a, b) => b.created_at.localeCompare(a.created_at))
     if (conns.length === 0 && !(CLIENT_LEVEL.includes(provider) && own.length > 0)) return { ...base, state: 'not_connected' as SourceState, data_as_of: null, imported_at: null, note: NO_CONNECTION }
     if (conns.some((c) => c.credential_status === 'invalid')) {
@@ -130,11 +139,11 @@ export function deriveStatuses(connections: ConnectionRow[], runs: SyncRunRow[],
     const imported_at: IsoDateTime | null = lastWithData?.finished_at ?? null
     if (!latest || !lastWithData) {
       const tokenNote = OWN_TOKEN.includes(provider) && conns.every((c) => c.credential_status === 'missing') ? 'Token neconfigurat.' : 'Fără nicio sincronizare încheiată cu date.'
-      if (latest?.status === 'failed') return { ...base, state: 'error' as SourceState, data_as_of, imported_at, note: 'Ultima sincronizare a eșuat.' }
+      if (latest?.status === 'failed') return { ...base, state: 'error' as SourceState, data_as_of, imported_at, note: withReason('Ultima sincronizare a eșuat', latest, '.') }
       return { ...base, state: 'not_connected' as SourceState, data_as_of, imported_at, note: tokenNote }
     }
-    if (latest.status === 'failed') return { ...base, state: 'error' as SourceState, data_as_of, imported_at, note: 'Ultima sincronizare a eșuat. Afișăm ultimele date importate.' }
-    if (latest.status === 'partial') return { ...base, state: 'partial' as SourceState, data_as_of, imported_at, note: 'Ultima sincronizare a adus date parțiale.' }
+    if (latest.status === 'failed') return { ...base, state: 'error' as SourceState, data_as_of, imported_at, note: withReason('Ultima sincronizare a eșuat', latest, '. Afișăm ultimele date importate.') }
+    if (latest.status === 'partial') return { ...base, state: 'partial' as SourceState, data_as_of, imported_at, note: withReason('Ultima sincronizare a adus date parțiale', latest, '.') }
     return { ...base, state: 'connected' as SourceState, data_as_of, imported_at, note: null }
   })
 }

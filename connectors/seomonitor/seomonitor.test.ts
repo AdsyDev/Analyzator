@@ -4,9 +4,10 @@ import assert from 'node:assert/strict'
 import { collectSeomonitorConnection, dayWindows } from './collect-core.ts'
 import { FIXTURE_FILES, seoFixture, type FixtureName } from './docs-fixtures.ts'
 import { parseAioRank, parseRank, sanitizeContent, aiStatus, toNumber, enabledEngines } from './normalize.ts'
-import { batches, MAX_BATCH_BYTES } from './write.ts'
+import { batches, contentHash, MAX_BATCH_BYTES, upsertOriginals } from './write.ts'
 import { AUTO_NOTE, autoMappings, currentMappings, resolveGroups, flattenGroups, type FlatGroup, type MappingRow } from './mapping.ts'
 import { FakeDb, noSleep, type FakeResponse } from '../shared/test-helpers.ts'
+import { DbError, type Row } from '../shared/supabase-rest.ts'
 import type { TenantConnection } from '../shared/connections.ts'
 import type { FetchLike } from '../shared/http-budget.ts'
 
@@ -479,5 +480,82 @@ describe('reguli de valori', () => {
     assert.equal(sanitizeContent('a<script>x()</script>b <b>c</b> [l](javascript:alert(1))'), 'ab c [l](#)')
     assert.equal(sanitizeContent('   '), null)
     assert.equal(sanitizeContent(null), null)
+  })
+})
+
+describe('rezistența rulării pe date reale (20 oct 2026, D-26)', () => {
+  const TIMEOUT = 'POST ai_answer_originals: HTTP 500 57014 canceling statement due to statement timeout'
+  /** Două site-uri: B1A pe grupul 6001 (principal), B1B pe grupul 5002. */
+  const twoBrands = () => [
+    mapping({ group_id: '6001', is_primary_visibility: true }),
+    mapping({ group_id: '5002', brand_id: B1B, brand_type: 'branded', is_primary_visibility: true }),
+  ]
+  /** Baza în memorie, cu o eroare la upsert când `fail` o cere (tabel + rânduri). */
+  class FailingDb extends FakeDb {
+    fail: (table: string, rows: Row[]) => Error | null = () => null
+    override async upsert<T extends Row>(table: string, rows: Row[], onConflict: string[]): Promise<T[]> {
+      const err = this.fail(table, rows)
+      if (err) throw err
+      return super.upsert<T>(table, rows, onConflict)
+    }
+  }
+  const failingDb = (mappings: MappingRow[]) => {
+    const db = new FailingDb({ seomonitor_group_mappings: mappings, provider_api_calls: [] })
+    db.rpcs.get_source_token = () => TOKEN
+    db.rpcs.record_source_validation = (args) => (args.p_ok ? 'valid' : 'invalid')
+    return db
+  }
+
+  test('o eroare neașteptată pe un site îl oprește doar pe el; celălalt site se colectează', async () => {
+    const db = failingDb(twoBrands())
+    db.fail = (table, rows) => (table === 'rank_observations' && rows.some((r) => r.brand_id === B1A) ? new Error('POST rank_observations: HTTP 500 boom') : null)
+    await run(db)
+    const a = runOf(db, B1A)[0]!
+    const b = runOf(db, B1B)[0]!
+    assert.equal(a.status, 'failed')
+    assert.ok((a.errors as Array<{ code: string }>).some((e) => e.code === 'exception'))
+    assert.notEqual(b.status, 'failed')
+    assert.ok(Number(b.rows_written) > 0)
+    assert.ok(!(b.errors as Array<{ code: string }>).some((e) => e.code === 'exception'), 'eroarea lui B1A nu apare la B1B')
+    assert.ok(rows(db, 'rank_observations').some((r) => r.brand_id === B1B))
+  })
+
+  test('timeout la originalele AI: răspunsurile rămân, rularea e partial cu o singură eroare ai_originals_not_saved, nu failed', async () => {
+    const db = failingDb(defaultMappings())
+    db.fail = (table) => (table === 'ai_answer_originals' ? new DbError(TIMEOUT, 500) : null)
+    await run(db)
+    const r = runOf(db)[0]!
+    assert.equal(r.status, 'partial')
+    const errs = (r.errors as Array<{ code: string; message: string }>).filter((e) => e.code === 'ai_originals_not_saved')
+    assert.equal(errs.length, 1)
+    assert.match(errs[0]!.message, /57014/)
+    assert.ok(rows(db, 'ai_answers').length > 0)
+    assert.equal(rows(db, 'ai_answer_originals').length, 0)
+  })
+
+  test('a doua rulare nu rescrie originalele neschimbate; fiecare original are hash-ul conținutului', async () => {
+    const db = makeDb()
+    await run(db)
+    const originals = rows(db, 'ai_answer_originals')
+    assert.ok(originals.length > 0)
+    assert.ok(originals.every((o) => o.content_sha256 === contentHash((o.raw_content as string | null) ?? null)))
+    const before = db.log.length
+    await run(db)
+    assert.equal(db.log.slice(before).filter((l) => l.op === 'upsert' && l.table === 'ai_answer_originals').length, 0)
+  })
+
+  test('upsertOriginals: doar rândurile noi sau schimbate; la timeout lotul se împarte până trece; alt tenant oprește', async () => {
+    const scope = { tenant_id: T1, brand_id: B1A }
+    const row = (id: number, raw: string) => ({ answer_id: id, tenant_id: T1, brand_id: B1A, raw_content: raw, raw_format: 'html', collected_at: '2026-10-05T04:00:00Z', payload_hash: 'a'.repeat(64) })
+    const db = new FailingDb({ ai_answer_originals: [{ ...row(1, 'vechi'), content_sha256: contentHash('vechi') }, { ...row(2, 'vechi'), content_sha256: contentHash('vechi') }] })
+    const sizes: number[] = []
+    db.fail = (_t, rows) => (sizes.push(rows.length), rows.length > 2 ? new DbError(TIMEOUT, 500) : null)
+    const written = await upsertOriginals(db, [row(1, 'vechi'), row(2, 'schimbat'), row(3, 'nou'), row(4, 'nou'), row(5, 'nou'), row(6, 'nou')], scope)
+    assert.equal(written, 5, 'rândul 1 e neschimbat și nu se trimite')
+    assert.deepEqual(sizes, [5, 3, 2, 1, 2])
+    assert.equal(db.tables.ai_answer_originals!.find((r) => r.answer_id === 2)!.raw_content, 'schimbat')
+    await assert.rejects(() => upsertOriginals(db, [{ ...row(9, 'x'), tenant_id: '10000000-0000-0000-0000-000000000002' }], scope), /alt tenant/)
+    db.fail = () => new DbError('POST ai_answer_originals: HTTP 500 altceva', 500)
+    await assert.rejects(() => upsertOriginals(db, [row(7, 'a'), row(8, 'b')], scope), /altceva/, 'altă eroare decât timeout nu se reîncearcă')
   })
 })

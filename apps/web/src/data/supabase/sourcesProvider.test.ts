@@ -90,6 +90,27 @@ describe('sources.statuses (supabase)', () => {
     expect((await get({ source_connections: [conn()], sync_runs: [run({ status: 'partial' })], import_batches: [] })).clarity?.state).toBe('partial')
   })
 
+  it('nota spune de ce e parțial sau eșuat, din erori și acoperire (20 oct. 2026)', async () => {
+    const ga4 = conn({ id: 'c-g', provider: 'ga4', credential_status: 'missing' })
+    const partial = await get({
+      source_connections: [ga4],
+      sync_runs: [run({ source: 'ga4', status: 'partial', coverage: { web_daily: { expected_days: 35, covered_days: 30, coverage: 0.857 } }, errors: [{ code: 'parser_unknown_field', message: 'x' }] })],
+      import_batches: [],
+    })
+    expect(partial.ga4).toMatchObject({ state: 'partial', note: 'Ultima sincronizare a adus date parțiale: 5 din 35 de zile fără sesiuni.' })
+    const seo = await get({
+      source_connections: [],
+      sync_runs: [
+        run({ id: 'r-ok', source: 'seomonitor', created_at: '2026-10-13T12:00:00Z', period_end: '2026-10-12' }),
+        run({ id: 'r-x', source: 'seomonitor', status: 'failed', rows_written: 0, created_at: '2026-10-20T09:00:00Z', errors: [{ code: 'exception', message: 'POST ai_answer_originals: HTTP 500 57014 canceling statement due to statement timeout' }] }),
+      ],
+      import_batches: [],
+    })
+    expect(seo.seomonitor).toMatchObject({ state: 'error', data_as_of: '2026-10-12', note: 'Ultima sincronizare a eșuat: baza de date nu a răspuns la timp. Afișăm ultimele date importate.' })
+    // Fără explicație salvată: fraza de bază, fără „:”.
+    expect((await get({ source_connections: [conn()], sync_runs: [run({ status: 'partial' })], import_batches: [] })).clarity?.note).toBe('Ultima sincronizare a adus date parțiale.')
+  })
+
   it('token salvat dar fără nicio sincronizare: neconectat (tokenul nu înseamnă date); fără token: spune asta', async () => {
     expect((await get({ source_connections: [conn()], sync_runs: [], import_batches: [] })).clarity).toMatchObject({ state: 'not_connected', note: expect.stringContaining('sincronizare') })
     expect((await get({ source_connections: [conn({ credential_status: 'missing' })], sync_runs: [], import_batches: [] })).clarity).toMatchObject({ state: 'not_connected', note: 'Token neconfigurat.' })
@@ -126,6 +147,15 @@ describe('sources.syncRuns (supabase)', () => {
     expect(r.data.map((x) => x.id)).toEqual(['r-q', 'r-f', 'r-1'])
     expect(r.data[0]).toMatchObject({ provider: 'altceva', rows: null, finished_at: null, started_at: '2026-10-08T03:00:00Z' })
     expect(r.data[1]).toMatchObject({ status: 'failed', error: 'HTTP 429', rows: 120 })
+  })
+
+  it('fiecare rulare are conexiunea, codurile de eroare și motivul (din errors și coverage)', async () => {
+    const { client } = fakeDataClient({
+      tables: { sync_runs: [run({ source: 'ga4', status: 'partial', source_connection_id: 'c-g', errors: [{ code: 'ga4_thresholding', message: 'x' }], coverage: { web_daily: { expected_days: 35, covered_days: 35, coverage: 1 } } })] },
+    })
+    const r = await createSupabaseSources(client, NOW).syncRuns(BRAND)
+    if (r.kind !== 'ready') throw new Error('nu e ready')
+    expect(r.data[0]).toMatchObject({ connection_id: 'c-g', error_codes: ['ga4_thresholding'], reason: 'GA4 a ascuns valori mici (pragul de confidențialitate)' })
   })
 })
 
