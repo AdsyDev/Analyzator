@@ -35,18 +35,19 @@ export function StatCard({ label, definition, valueText, deltaText = null, delta
   const Icon = deltaDirection ? ICON[deltaDirection] : null
 
   return (
-    <article aria-label={label} data-status={status} className="flex h-full flex-col gap-3 rounded-xl border border-border bg-surface px-4 pb-3 pt-4 shadow-1">
-      <div className="flex min-h-5 items-center gap-1.5">
+    // Sub `sm` (telefon), compact ca KpiCard: eticheta și starea sus, valoarea și variația jos.
+    <article aria-label={label} data-status={status} className="flex h-full flex-col gap-3 rounded-xl border border-border bg-surface px-4 pb-3 pt-4 shadow-1 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:items-start max-sm:gap-x-3 max-sm:gap-y-2 max-sm:pt-3">
+      <div className="flex min-h-5 flex-wrap items-center gap-1.5 max-sm:col-start-1 max-sm:row-start-1 max-sm:min-h-6">
         <span className="text-[13px] font-semibold leading-snug text-text-2">{label}</span>
         <InfoTip>{definition}</InfoTip>
       </div>
       {loading ? (
-        <div role="status" aria-label="Se încarcă" className="flex flex-1 flex-col gap-2.5">
+        <div role="status" aria-label="Se încarcă" className="flex flex-1 flex-col gap-2.5 max-sm:col-span-2 max-sm:row-start-2">
           <div className="h-8 w-1/2 rounded-md bg-skeleton" />
           <div className="h-3 w-2/5 rounded bg-skeleton" />
         </div>
       ) : empty ? (
-        <div className="flex flex-1 flex-col justify-center gap-1.5 py-1">
+        <div className="flex flex-1 flex-col justify-center gap-1.5 py-1 max-sm:col-span-2 max-sm:row-start-2 max-sm:py-0">
           <div className="flex items-center gap-2 font-display text-[15px] font-semibold">
             <PlugsIcon size={18} className="text-text-2" aria-hidden="true" />
             Fără date pentru interval
@@ -54,9 +55,9 @@ export function StatCard({ label, definition, valueText, deltaText = null, delta
           {note && <p className="text-[13px] leading-snug text-text-2">{note}</p>}
         </div>
       ) : (
-        <div className="flex flex-1 flex-col gap-1.5">
+        <div className="flex flex-1 flex-col gap-1.5 max-sm:col-span-2 max-sm:row-start-2">
           <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-            <span className="font-display text-[28px] font-semibold leading-none tracking-[-0.02em] tabular-nums">{valueText}</span>
+            <span className="font-display text-[28px] font-semibold leading-none tracking-[-0.02em] tabular-nums max-sm:text-[24px]">{valueText}</span>
             {deltaText && Icon && (
               <span className={cn('inline-flex items-center gap-0.5 whitespace-nowrap text-[13px] font-semibold leading-none tabular-nums', tone)}>
                 <Icon size={12} weight="bold" aria-hidden="true" />
@@ -64,7 +65,7 @@ export function StatCard({ label, definition, valueText, deltaText = null, delta
               </span>
             )}
           </div>
-          {compareLabel && deltaText && <span className="text-[12px] leading-tight text-text-2">{compareLabel}</span>}
+          {compareLabel && deltaText && <span className="text-[12px] leading-tight text-text-2 max-sm:hidden">{compareLabel}</span>}
           {note && (
             <p className="flex items-start gap-1.5 text-[12px] leading-snug text-text-2">
               {status === 'partial' && <WarningIcon size={13} className="mt-px flex-none text-warn-text" aria-hidden="true" />}
@@ -73,8 +74,8 @@ export function StatCard({ label, definition, valueText, deltaText = null, delta
           )}
         </div>
       )}
-      <div className="mt-auto flex items-center border-t border-border pt-2.5">
-        <span className="flex-1" />
+      <div className="mt-auto flex items-center border-t border-border pt-2.5 max-sm:col-start-2 max-sm:row-start-1 max-sm:mt-0 max-sm:min-h-6 max-sm:border-t-0 max-sm:pt-0">
+        <span className="flex-1 max-sm:hidden" />
         <CoverageBadge state={coverageStateFor(status)} />
       </div>
     </article>

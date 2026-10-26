@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { QueryContext } from '../contracts'
@@ -116,5 +116,70 @@ describe('FilterBar', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Perioadă' }))
     expect(screen.getByRole('button', { name: 'Aplică intervalul' })).toBeDisabled()
     expect(screen.getByText(/data de început înaintea/)).toBeInTheDocument()
+  })
+
+  describe('pe telefon: rezumat și panoul de jos', () => {
+    const openSheet = async () => {
+      await userEvent.click(screen.getByRole('button', { name: /^Filtre:/ }))
+      return screen.getByRole('dialog', { name: 'Filtre' })
+    }
+
+    it('rezumatul are perioada, intervalul, comparația și câte filtre sunt active (cât chipurile)', () => {
+      setup({ ...base, filters: { device: 'mobile' } })
+      const btn = screen.getByRole('button', { name: /^Filtre:/ })
+      expect(btn).toHaveAccessibleName(/Ultimele 28 de zile, 8 sept\.?\s-\s5 oct\.?\s2026, vs perioada anterioară, 1 filtru activ$/)
+      expect(btn).toHaveAttribute('aria-haspopup', 'dialog')
+      cleanup()
+      setup({ ...base, period: { preset: '7d', from: '2026-09-29', to: '2026-10-05' }, filters: { device: 'mobile' } })
+      expect(screen.getByRole('button', { name: /^Filtre:/ })).toHaveAccessibleName(/2 filtre active$/)
+    })
+
+    it('alegerile sunt o ciornă: „Aplică" trimite o singură schimbare și închide panoul', async () => {
+      const { onChange } = setup()
+      const sheet = await openSheet()
+      await userEvent.click(within(sheet).getByRole('radio', { name: /Ultimele 7 zile/ }))
+      await userEvent.click(within(sheet).getByRole('radio', { name: 'Mobil' }))
+      expect(onChange).not.toHaveBeenCalled()
+      await userEvent.click(within(sheet).getByRole('button', { name: 'Aplică' }))
+      expect(onChange).toHaveBeenCalledTimes(1)
+      expect(onChange).toHaveBeenCalledWith({ period: { preset: '7d', from: '2026-09-29', to: '2026-10-05' }, filters: { device: 'mobile' } })
+      expect(screen.queryByRole('dialog')).toBeNull()
+    })
+
+    it('închiderea fără „Aplică" (Esc) nu schimbă nimic și întoarce focusul pe rezumat', async () => {
+      const { onChange } = setup()
+      const sheet = await openSheet()
+      await userEvent.click(within(sheet).getByRole('radio', { name: 'Mobil' }))
+      await userEvent.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(onChange).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: /^Filtre:/ })).toHaveFocus()
+    })
+
+    it('„Resetează" readuce valorile implicite în ciornă; „Aplică" le trimite', async () => {
+      const { onChange } = setup({ ...base, period: { preset: '7d', from: '2026-09-29', to: '2026-10-05' }, filters: { device: 'mobile' } })
+      const sheet = await openSheet()
+      await userEvent.click(within(sheet).getByRole('button', { name: 'Resetează' }))
+      expect(onChange).not.toHaveBeenCalled()
+      await userEvent.click(within(sheet).getByRole('button', { name: 'Aplică' }))
+      expect(onChange).toHaveBeenCalledWith({ period: { preset: '28d', from: '2026-09-08', to: '2026-10-05' }, filters: { device: 'all' } })
+    })
+
+    it('interval personalizat inversat: „Aplică" e dezactivat, cu explicație', async () => {
+      setup()
+      const sheet = await openSheet()
+      await userEvent.click(within(sheet).getByRole('radio', { name: /Interval personalizat/ }))
+      fireEvent.change(within(sheet).getByLabelText('De la'), { target: { value: '2026-09-30' } })
+      fireEvent.change(within(sheet).getByLabelText('Până la'), { target: { value: '2026-07-01' } })
+      expect(within(sheet).getByRole('button', { name: 'Aplică' })).toBeDisabled()
+      expect(within(sheet).getByText(/data de început înaintea/)).toBeInTheDocument()
+    })
+
+    it('anul trecut rămâne dezactivat, cu motivul scris (pe telefon nu există tooltip)', async () => {
+      setup()
+      const sheet = await openSheet()
+      expect(within(sheet).getByRole('radio', { name: /Anul trecut/ })).toBeDisabled()
+      expect(within(sheet).getByText('Comparația cu anul trecut nu e disponibilă încă pentru acest interval.')).toBeInTheDocument()
+    })
   })
 })

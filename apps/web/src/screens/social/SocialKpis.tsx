@@ -6,7 +6,7 @@ import { comparisonRange } from '../../lib/period'
 export function SocialKpis({ kpis, ctx }: { kpis: SocialKpi[]; ctx: QueryContext }) {
   const cmp = comparisonRange(ctx.period, ctx.comparison)
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5" data-testid="social-kpis">
+    <div className="grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-5" data-testid="social-kpis">
       {kpis.map((k) => (
         <StatCard
           key={k.key}

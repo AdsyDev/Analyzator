@@ -16,7 +16,7 @@ function valueText(k: PaidKpi): string | null {
 export function PaidKpis({ kpis, ctx }: { kpis: PaidKpi[]; ctx: QueryContext }) {
   const cmp = comparisonRange(ctx.period, ctx.comparison)
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" data-testid="paid-kpis">
+    <div className="grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-4" data-testid="paid-kpis">
       {kpis.map((k) => {
         const change = k.change
         const text = change === null ? null : k.unit === 'percent' ? formatAbsoluteChange(change, 'percent') : formatRelativeChange(change)

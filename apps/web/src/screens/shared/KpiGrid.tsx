@@ -22,7 +22,7 @@ interface Props {
 export function KpiGrid({ slots, page, metrics, definitions, trends, onRetry, onOpen }: Props) {
   const items = metrics.status === 'done' ? metrics.value.items : []
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="kpi-grid">
+    <div className="grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="kpi-grid">
       {slots.map((slot) => {
         const item = items.find((i) => i.metric_key === slot.key) ?? null
         const def = definitions.get(slot.key) ?? null
