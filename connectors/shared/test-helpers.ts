@@ -24,17 +24,31 @@ export const noSleep = () => {
   return { sleep: async (ms: number) => void delays.push(ms), delays }
 }
 
-/** Interpretează filtrele simple PostgREST folosite de conectori: col=eq.x, col=in.(a,b). */
+/** Comparațiile PostgREST pe valori text (date ISO, care se compară corect ca text). */
+const COMPARE: Record<string, (a: string, b: string) => boolean> = {
+  'gte.': (a, b) => a >= b,
+  'gt.': (a, b) => a > b,
+  'lte.': (a, b) => a <= b,
+  'lt.': (a, b) => a < b,
+}
+
+/**
+ * Interpretează filtrele simple PostgREST folosite de conectori: col=eq.x, col=in.(a,b), col=gte.x (și gt, lte, lt,
+ * pe text). `order`, `limit` și `offset` se ignoră: codul care le folosește trebuie să-și ordoneze singur rezultatul.
+ */
 function matches(row: Row, query: string): boolean {
   for (const part of query.split('&')) {
     const [col, expr] = part.split('=', 2) as [string, string | undefined]
     if (col === 'select' || col === 'order' || col === 'limit' || col === 'offset' || expr === undefined) continue
+    const cmp = Object.keys(COMPARE).find((op) => expr.startsWith(op))
     if (expr.startsWith('eq.')) {
       if (String(row[col]) !== expr.slice(3)) return false
     } else if (expr.startsWith('in.(')) {
       if (!expr.slice(4, -1).split(',').includes(String(row[col]))) return false
     } else if (expr === 'not.is.null') {
       if (row[col] === null || row[col] === undefined) return false
+    } else if (cmp) {
+      if (typeof row[col] !== 'string' || !COMPARE[cmp]!(row[col] as string, expr.slice(cmp.length))) return false
     } else {
       throw new Error(`FakeDb: filtru nesuportat ${part}`)
     }

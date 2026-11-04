@@ -65,6 +65,14 @@ Fixtures: `tests/fixtures/google/docs-derived/` (**derivate din documentație, n
 
 **Verificarea și trecerea mai multor site-uri:** `npm run gsc:properties` (sau workflow-ul `gsc-properties`). Fără `--apply`, doar citește: conexiunile `gsc`, site-urile active și proprietățile văzute de cheia clientului (aceeași listare ca selectorul, `discover`; o cerere per client). Acțiunea pe fiecare site e `switch`, `connect`, `keep` sau ceva de lămurit. Cu `--apply --brand <uuid>… [--from …]`, trece doar site-urile `switch` / `connect`, numai când cheia vede `sc-domain:<domeniul site-ului>` și proprietatea veche ține de același domeniu, apoi rulează colectarea de mai sus. Toate site-urile se verifică înainte de prima scriere. Scrierile filtrează pe `tenant_id`, `brand_id` și `provider`; dacă adăugarea conexiunii noi eșuează, cea veche se reactivează.
 
+**Istoricul vechi dintr-o proprietate arhivată:** Domain property are date doar de când a fost creată (D-27). `npm run gsc:properties -- --history --brand <uuid>… [--from …]` (sau `mode = history`) aduce zilele dinaintea primei zile cu date de la proprietatea activă (din `search_daily`) din singura proprietate URL prefix arhivată a domeniului, pe care cheia trebuie s-o vadă încă; `from` implicit = cea mai veche zi permisă (16 luni).
+
+- Ferestrele acoperă exact [`from`, ziua dinaintea proprietății active], de la cea mai veche; fiecare are `sync_run`-ul ei pe **conexiunea arhivată**, iar rândurile o au ca `source_id` (proveniența rămâne cea reală). Conexiunea rămâne arhivată.
+- Niciun rând din afara ferestrei cerute nu se scrie (`normalize_out_of_window`, rândul se sare), deci zilele proprietății active nu se rescriu, chiar dacă API-ul ar trimite mai mult. Totalurile pentru reconciliere se iau tot doar din fereastră.
+- La final rulează fereastra obișnuită pe proprietatea activă: ultima rulare rămâne cea de zi cu zi (`source_status`). Oprire la prima fereastră `failed`; reluarea e sigură (upsert).
+- Refuz înainte de orice scriere: site-ul nu e pe Domain property, proprietatea activă nu are date, zero sau mai multe proprietăți URL prefix arhivate ale domeniului, cheia nu mai vede proprietatea arhivată. Toate site-urile cerute se verifică înainte de prima scriere.
+- Verificarea (`gsc:properties` fără argumente) arată, pe fiecare site, prima și ultima zi a proprietății active și a celor arhivate, și dacă proprietățile arhivate au rânduri din prima zi a celei active încolo („zile amestecate”, trebuie `nu`).
+
 ## Proveniență (pe fiecare rând)
 
 `source_id` (conexiunea brandului), `sync_run_id`, `collected_at`, `collection_method = 'api'`, `payload_hash` (SHA-256 al paginii brute), `window_days`, `source_timezone`, `schema_version`, `data_state` (GSC). Chei unice naturale: vezi migrația `20261008140000_google_ga4_gsc.sql`. Textele lungi (landing page, query, page) intră în cheie prin `md5`, verificat de CHECK.
