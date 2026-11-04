@@ -97,6 +97,13 @@ export function gscEarliestDate(now: Date): string {
   return addMonthsIso(calendarDateIn(now, GSC_TIMEZONE), -GSC_HISTORY_MONTHS)
 }
 
+/** Începutul unui reimport: o dată YYYY-MM-DD, nu mai veche de cât păstrează Search Console. Altfel aruncă. */
+export function assertBackfillFrom(from: string, now: Date): void {
+  if (!isIsoDate(from)) throw new Error(`--from nu e o dată YYYY-MM-DD: ${JSON.stringify(from)}`)
+  const earliest = gscEarliestDate(now)
+  if (from < earliest) throw new Error(`Search Console păstrează ${GSC_HISTORY_MONTHS} luni: cea mai veche zi care se poate cere azi e ${earliest}.`)
+}
+
 type BrandConnection = {
   id: string
   tenant_id: string
@@ -130,9 +137,7 @@ export async function collectGoogle(deps: GoogleDeps, only?: GoogleSource, optio
   if (options.from !== undefined) {
     if (only !== 'gsc') throw new Error('Reimportul istoricului (--from) e doar pentru Search Console: adaugă --only gsc.')
     if (options.brandId === undefined) throw new Error('Reimportul istoricului (--from) se face pe un singur site: adaugă --brand <uuid>.')
-    if (!isIsoDate(options.from)) throw new Error(`--from nu e o dată YYYY-MM-DD: ${JSON.stringify(options.from)}`)
-    const earliest = gscEarliestDate(now())
-    if (options.from < earliest) throw new Error(`Search Console păstrează ${GSC_HISTORY_MONTHS} luni: cea mai veche zi care se poate cere azi e ${earliest}.`)
+    assertBackfillFrom(options.from, now())
   }
   const brandFilter = options.brandId ? `&brand_id=eq.${options.brandId}` : ''
 

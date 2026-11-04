@@ -63,6 +63,8 @@ Fixtures: `tests/fixtures/google/docs-derived/` (**derivate din documentație, n
 - Rândurile se scriu pe aceleași chei naturale: o zi reimportată își înlocuiește rândurile, nu le dublează. `source_id` devine conexiunea nouă.
 - GA4 nu are reimport de istoric (intervalele utilizatorilor activi sunt legate de data rulării).
 
+**Verificarea și trecerea mai multor site-uri:** `npm run gsc:properties` (sau workflow-ul `gsc-properties`). Fără `--apply`, doar citește: conexiunile `gsc`, site-urile active și proprietățile văzute de cheia clientului (aceeași listare ca selectorul, `discover`; o cerere per client). Acțiunea pe fiecare site e `switch`, `connect`, `keep` sau ceva de lămurit. Cu `--apply --brand <uuid>… [--from …]`, trece doar site-urile `switch` / `connect`, numai când cheia vede `sc-domain:<domeniul site-ului>` și proprietatea veche ține de același domeniu, apoi rulează colectarea de mai sus. Toate site-urile se verifică înainte de prima scriere. Scrierile filtrează pe `tenant_id`, `brand_id` și `provider`; dacă adăugarea conexiunii noi eșuează, cea veche se reactivează.
+
 ## Proveniență (pe fiecare rând)
 
 `source_id` (conexiunea brandului), `sync_run_id`, `collected_at`, `collection_method = 'api'`, `payload_hash` (SHA-256 al paginii brute), `window_days`, `source_timezone`, `schema_version`, `data_state` (GSC). Chei unice naturale: vezi migrația `20261008140000_google_ga4_gsc.sql`. Textele lungi (landing page, query, page) intră în cheie prin `md5`, verificat de CHECK.

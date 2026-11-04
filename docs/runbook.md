@@ -109,6 +109,16 @@ Când: site-ul e legat de o proprietate URL prefix (`https://exemplu.ro/`), iar 
 
 Datele nu se dublează nici înainte, nici după: site-ul are o singură proprietate activă, iar rândurile au cheia (site, zi, device[, query, pagină]), fără proprietate. Fără reimport, însă, seria ar amesteca proprietățile: colectarea obișnuită rescrie doar ultimele 35 de zile.
 
+**Cu workflow-ul `gsc-properties` (toate site-urile odată):**
+
+1. GitHub → Actions → `gsc-properties` → Run workflow, `mode` = `check`. Doar citire. Log-ul arată, pe fiecare site, proprietatea folosită, proprietățile văzute de cheia clientului și acțiunea: `switch` (URL prefix → Domain property), `connect` (fără conexiune), `keep` (deja pe Domain property) sau ceva de lămurit (`no_domain_access`, `mismatch`, `multiple`, `no_domain`, `no_credential`, `list_failed`). Mai arată estimarea reimportului pe 16 luni și dimensiunea bazei, dacă environment-ul are tokenul de deploy Supabase.
+2. `mode` = `apply`, `brands` = ID-urile site-urilor (din `/admin/clients/<id>`), `from` = data de azi minus 16 luni. Toate site-urile se verifică înainte de prima scriere: unul nepregătit oprește tot. Pe fiecare site, conexiunea veche se arhivează, Domain property se adaugă (sau se reactivează), apoi urmează reimportul, fereastră cu fereastră. Dacă adăugarea eșuează, conexiunea veche revine. Log-ul se termină cu starea de după.
+3. Verifică: `mode` = `check` din nou. Site-urile trecute sunt `keep`, iar „rânduri rămase de la ele” e `nu`.
+
+`no_domain_access` înseamnă că service account-ul nu e adăugat pe Domain property: clientul îl adaugă (Search Console → Settings → Users and permissions), apoi reia pasul 1.
+
+**Manual, pentru un singur site (SQL Editor + `google-weekly`):**
+
 1. **ID-ul site-ului:** pagina site-ului (Administrare → Clienți și site-uri → „Editează și surse”) are adresa `/admin/clients/<id>`.
 2. **Schimbă proprietatea** (Supabase → SQL Editor, proiectul în care rulează colectarea). O singură instrucțiune, deci atomică: arhivează conexiunea veche (istoricul ei rămâne) și adaugă conexiunea nouă, cu același fus. Înlocuiește ID-ul site-ului, adresa veche (exact, cu `/` la final) și domeniul:
 
