@@ -58,6 +58,8 @@ Cheia nu se mai poate citi din aplicație. Pentru o cheie nouă (rotire), încar
 | Google Analytics 4 | **Property ID** (doar cifre, de ex. `412345678`) | GA4 → Admin → Property → Property details. **Nu** e Measurement ID-ul `G-…`. |
 | Search Console | **Exact** cum apare proprietatea | Domain property: `sc-domain:exemplu.ro`. URL prefix: `https://www.exemplu.ro/` (cu `/` la final). |
 
+**Search Console: alege Domain property.** Când service account-ul vede și Domain property, și URL prefix pentru același site, alege `sc-domain:…` (selectorul îl propune primul când domeniul site-ului e același): include `www`, `http` și subdomeniile. Site-ul are o singură proprietate Search Console, deci datele nu se dublează. Dacă site-ul e deja legat de URL prefix și clientul dă acces și la Domain property, schimbarea se face din `docs/runbook.md` („Search Console: trecerea pe Domain property”), cu reimportul istoricului.
+
 La GA4 și Search Console **nu există token pe card**: ele folosesc cheia clientului de la pasul 3 (eticheta „Cheia clientului”).
 
 Fusul orar al conexiunii GA4 e implicit `Europe/Bucharest`. Dacă proprietatea GA4 e în alt fus, rularea semnalează `timezone_mismatch`; cere echipei tehnice să corecteze fusul conexiunii.

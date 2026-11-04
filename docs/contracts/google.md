@@ -20,6 +20,8 @@ Fixtures: `tests/fixtures/google/docs-derived/` (**derivate din documentație, n
 - JSON-ul se setează din pagina site-ului → cardul GA4 sau Search Console → pasul 1 (fișierul e verificat în browser și trimis o singură dată funcției `source-credentials`) sau cu `npm run set-source-token` (conexiunea `google_service_account`); niciodată din fișiere sau din mediul workerului.
 - **Fără credential** (conexiune lipsă, `missing` sau `invalid`): conexiunile `ga4`/`gsc` ale tenantului raportează `not_connected`, fără excepție, fără `sync_run`, fără cereri.
 - Un `403` pe o proprietate înseamnă „service account-ul nu are acces la proprietatea asta”; credentialul tenantului nu se marchează invalid.
+- **O singură proprietate Search Console per brand**, de preferat **Domain property** (`sc-domain:…`): include toate protocoalele și subdomeniile, deci e sursa completă (D-27). URL prefix doar când clientul nu are Domain property. Cheia rândurilor (`search_daily`, `search_queries`) nu conține proprietatea: două proprietăți active pe același brand nu s-ar aduna, s-ar suprascrie una pe alta. Pagina site-ului permite o singură conexiune `gsc`.
+- `external_account_id` nu se schimbă pe loc (utilizatorii nu au drept de UPDATE pe coloană): proprietatea se schimbă arhivând conexiunea veche și adăugând una nouă, apoi reimportând istoricul (procedura din `docs/runbook.md`).
 
 ## GA4: rapoarte
 
@@ -50,6 +52,18 @@ Fixtures: `tests/fixtures/google/docs-derived/` (**derivate din documentație, n
 - `dataState = final`; `type = web`; `rowLimit` 25.000, paginare `startRow` până la o pagină incompletă; plafon 40 de pagini (`gsc_truncated`).
 - Zilele fără date lipsesc din răspuns: sunt **neconfirmate**, nu zero.
 - Poziția medie GSC ≠ rankul SEOmonitor; păstrează numele complet.
+
+## Reimportul istoricului (Search Console)
+
+`npm run collect:google -- --only gsc --brand <uuid> --from YYYY-MM-DD` (sau `google-weekly` → Run workflow cu `only`, `brand`, `from`). Folosit când se schimbă proprietatea unui site, ca toată seria să vină din aceeași proprietate (D-27).
+
+- Doar Search Console și doar un brand: altfel conectorul refuză înainte de orice citire. `from` nu poate fi mai vechi de 16 luni (`GSC_HISTORY_MONTHS`): mesajul spune cea mai veche zi permisă.
+- Intervalul de la `from` până la sfârșitul ferestrei obișnuite se împarte în ferestre de 35 de zile, rulate **de la cea mai veche**; ultima e chiar fereastra obișnuită. Fiecare fereastră are `sync_run`-ul ei, reconcilierea ei și acoperirea raportată la zilele ei (prima poate fi mai scurtă). Ultima rulare rămâne astfel cea de zi cu zi, iar starea sursei (`source_status`, după ultima rulare) nu arată o fereastră veche.
+- La prima fereastră `failed` (de ex. `access_denied` pe proprietatea nouă), reimportul se oprește; datele existente rămân. Se reia cu aceeași comandă (upsert idempotent).
+- Rândurile se scriu pe aceleași chei naturale: o zi reimportată își înlocuiește rândurile, nu le dublează. `source_id` devine conexiunea nouă.
+- GA4 nu are reimport de istoric (intervalele utilizatorilor activi sunt legate de data rulării).
+
+**Verificarea și trecerea mai multor site-uri:** `npm run gsc:properties` (sau workflow-ul `gsc-properties`). Fără `--apply`, doar citește: conexiunile `gsc`, site-urile active și proprietățile văzute de cheia clientului (aceeași listare ca selectorul, `discover`; o cerere per client). Acțiunea pe fiecare site e `switch`, `connect`, `keep` sau ceva de lămurit. Cu `--apply --brand <uuid>… [--from …]`, trece doar site-urile `switch` / `connect`, numai când cheia vede `sc-domain:<domeniul site-ului>` și proprietatea veche ține de același domeniu, apoi rulează colectarea de mai sus. Toate site-urile se verifică înainte de prima scriere. Scrierile filtrează pe `tenant_id`, `brand_id` și `provider`; dacă adăugarea conexiunii noi eșuează, cea veche se reactivează.
 
 ## Proveniență (pe fiecare rând)
 

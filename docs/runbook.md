@@ -101,6 +101,77 @@ _De completat._
 - `not_connected` în log = lipsește credentialul Google al tenantului, sau a fost marcat invalid. Nu e o eroare a rulării.
 - `access_denied` pe un brand = service account-ul nu are acces la proprietatea respectivă (adaugă-l în GA4 / Search Console).
 - `ga4_incompatible_*` = combinație de dimensiuni și metrici respinsă de `checkCompatibility`; metrica rămâne NULL, nu 0.
+- Un singur site: `--brand <uuid>` (sau `brand` în `google-weekly` → Run workflow). Reimportul istoricului Search Console: `--only gsc --brand <uuid> --from YYYY-MM-DD` (mai jos).
+
+### Search Console: trecerea pe Domain property și reimportul istoricului (D-27)
+
+Când: site-ul e legat de o proprietate URL prefix (`https://exemplu.ro/`), iar clientul a dat acces service account-ului și la Domain property (`sc-domain:exemplu.ro`). Domain property include `www`, `http` și subdomeniile, deci cifrele pot crește puțin. Prima dată: Urinal (STADA), 4 nov. 2026.
+
+Datele nu se dublează nici înainte, nici după: site-ul are o singură proprietate activă, iar rândurile au cheia (site, zi, device[, query, pagină]), fără proprietate. Fără reimport, însă, seria ar amesteca proprietățile: colectarea obișnuită rescrie doar ultimele 35 de zile.
+
+**Cu workflow-ul `gsc-properties` (toate site-urile odată):**
+
+1. GitHub → Actions → `gsc-properties` → Run workflow, `mode` = `check`. Doar citire. Log-ul arată, pe fiecare site, proprietatea folosită, proprietățile văzute de cheia clientului și acțiunea: `switch` (URL prefix → Domain property), `connect` (fără conexiune), `keep` (deja pe Domain property) sau ceva de lămurit (`no_domain_access`, `mismatch`, `multiple`, `no_domain`, `no_credential`, `list_failed`). Mai arată estimarea reimportului pe 16 luni și dimensiunea bazei, dacă environment-ul are tokenul de deploy Supabase.
+2. `mode` = `apply`, `brands` = ID-urile site-urilor (din `/admin/clients/<id>`), `from` = data de azi minus 16 luni. Toate site-urile se verifică înainte de prima scriere: unul nepregătit oprește tot. Pe fiecare site, conexiunea veche se arhivează, Domain property se adaugă (sau se reactivează), apoi urmează reimportul, fereastră cu fereastră. Dacă adăugarea eșuează, conexiunea veche revine. Log-ul se termină cu starea de după.
+3. Verifică: `mode` = `check` din nou. Site-urile trecute sunt `keep`, iar „rânduri rămase de la ele” e `nu`.
+
+`no_domain_access` înseamnă că service account-ul nu e adăugat pe Domain property: clientul îl adaugă (Search Console → Settings → Users and permissions), apoi reia pasul 1.
+
+**Manual, pentru un singur site (SQL Editor + `google-weekly`):**
+
+1. **ID-ul site-ului:** pagina site-ului (Administrare → Clienți și site-uri → „Editează și surse”) are adresa `/admin/clients/<id>`.
+2. **Schimbă proprietatea** (Supabase → SQL Editor, proiectul în care rulează colectarea). O singură instrucțiune, deci atomică: arhivează conexiunea veche (istoricul ei rămâne) și adaugă conexiunea nouă, cu același fus. Înlocuiește ID-ul site-ului, adresa veche (exact, cu `/` la final) și domeniul:
+
+   ```sql
+   with old as (
+     update public.source_connections
+     set status = 'archived'
+     where provider = 'gsc' and status = 'active'
+       and brand_id = '<id-site>'
+       and external_account_id = 'https://urinal.ro/'
+     returning tenant_id, brand_id, timezone
+   )
+   insert into public.source_connections (tenant_id, brand_id, provider, external_account_id, display_name, timezone, status)
+   select tenant_id, brand_id, 'gsc', 'sc-domain:urinal.ro', 'sc-domain:urinal.ro', timezone, 'active'
+   from old
+   returning id, tenant_id, brand_id, external_account_id;
+   ```
+
+   Trebuie să întoarcă **un rând**. Zero rânduri = nimic schimbat (ID-ul site-ului sau adresa veche nu se potrivesc). Eroarea `23505` = proprietatea nouă există deja pe client, arhivată (de ex. după o revenire), iar instrucțiunea nu a schimbat nimic: folosește instrucțiunea de la pasul 5 cu adresele inversate, care o reactivează.
+3. **Reimportă istoricul:** GitHub → Actions → `google-weekly` → Run workflow: `only` = `gsc`, `brand` = ID-ul site-ului, `from` = data de azi minus 16 luni (Search Console nu are mai mult; o dată prea veche e refuzată, iar mesajul spune ziua permisă). Log-ul are câte un rând pe fereastră de 35 de zile, de la cea mai veche; ultima e fereastra obișnuită. Câteva minute. Reluarea e sigură (upsert pe aceleași chei).
+4. **Verifică:** cardul Search Console din pagina site-ului arată `sc-domain:…` și „Acces confirmat”; în istoric, câte o rulare „Search Console” pe fereastră. Rânduri rămase de la proprietatea veche (trebuie 0):
+
+   ```sql
+   select 'search_daily' as tabel, count(*) from public.search_daily d
+     join public.source_connections c on c.tenant_id = d.tenant_id and c.id = d.source_id
+     where d.brand_id = '<id-site>' and c.provider = 'gsc' and c.status = 'archived'
+   union all
+   select 'search_queries', count(*) from public.search_queries q
+     join public.source_connections c on c.tenant_id = q.tenant_id and c.id = q.source_id
+     where q.brand_id = '<id-site>' and c.provider = 'gsc' and c.status = 'archived';
+   ```
+
+   Peste 0: zile (sau combinații query × pagină) pe care proprietatea nouă nu le-a rescris, de obicei pentru că reimportul s-a oprit înainte de capăt. Reia pasul 3. Rândurile nu se șterg fără o decizie (regula 8).
+5. **Revenire** (de ex. `access_denied` la prima fereastră: clientul nu a dat încă acces la Domain property). Rularea refuzată nu scrie nimic, deci datele vechi sunt neatinse; arhivează proprietatea nouă și reactivează-o pe cea veche (trebuie să întoarcă un rând):
+
+   ```sql
+   with new as (
+     update public.source_connections
+     set status = 'archived'
+     where provider = 'gsc' and status = 'active'
+       and brand_id = '<id-site>'
+       and external_account_id = 'sc-domain:urinal.ro'
+     returning tenant_id, brand_id
+   )
+   update public.source_connections c
+   set status = 'active'
+   from new
+   where c.tenant_id = new.tenant_id and c.brand_id = new.brand_id
+     and c.provider = 'gsc' and c.external_account_id = 'https://urinal.ro/'
+   returning c.id, c.external_account_id;
+   ```
+
+**Spațiu:** 16 luni de detalii query × pagină sunt de ~14 ori volumul unei rulări obișnuite (la Urinal, ~17.700 de rânduri pe 35 de zile, deci ~250.000 de rânduri, ordinul a 150 MB cu indecși; estimare). Pe planul Free Supabase (500 MB), verifică spațiul înainte.
 
 
 ## Import CSV (paid, social, listening)
