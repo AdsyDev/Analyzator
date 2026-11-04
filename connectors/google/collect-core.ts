@@ -12,7 +12,8 @@
 // dacă există erori sau acoperire incompletă).
 //
 // Reimportul istoricului (doar Search Console, un singur brand): ferestre de 35 de zile de la `from`, fiecare cu
-// sync_run-ul ei, de la cea mai veche la fereastra obișnuită (D-27).
+// sync_run-ul ei, de la cea mai veche la fereastra obișnuită (D-27). Istoricul vechi dintr-o proprietate arhivată
+// (`collectGscArchivedHistory`): aceleași ferestre, doar până în ziua dinaintea datelor proprietății active.
 
 import { getSourceToken, loadActiveConnections, recordProviderCalls, utcDay } from '../shared/connections.ts'
 import { finishSyncRun, startSyncRun, type SyncRunError, type SyncRunResult } from '../shared/sync-runs.ts'
@@ -35,7 +36,7 @@ import {
   RETRY_BASE_DELAY_MS,
 } from './config.ts'
 import { createGoogleClients, type ClientFactory, type Ga4Client, type GscClient } from './clients.ts'
-import { addMonthsIso, backfillWindows, calendarDateIn, daysInclusive, isIsoDate, isValidTimeZone, lookbackWindow } from './dates.ts'
+import { addMonthsIso, backfillWindows, calendarDateIn, daysInclusive, isIsoDate, isValidTimeZone, lookbackWindow, rangeWindows } from './dates.ts'
 import { callWithRetry } from './errors.ts'
 import { activeUsersIntervals } from './intervals.ts'
 import {
@@ -112,6 +113,66 @@ type BrandConnection = {
   external_account_id: string
   timezone: string
   status: string
+}
+
+export type ArchivedHistoryOptions = {
+  tenantId: string
+  brandId: string
+  /** Conexiunea `gsc` arhivată a site-ului: proprietatea folosită înainte (de ex. URL prefix). */
+  connectionId: string
+  /** Prima zi (YYYY-MM-DD, PT), cel mult 16 luni în urmă. */
+  from: string
+  /** Ultima zi, inclusiv: ziua dinaintea primelor date ale proprietății active. */
+  until: string
+}
+
+/**
+ * Istoricul vechi dintr-o proprietate Search Console arhivată (D-27). După trecerea pe Domain property, zilele pe care
+ * Domain property nu le are se iau din proprietatea veche, doar în [from, until]: ferestre de 35 de zile de la cea mai
+ * veche, fiecare cu sync_run-ul ei, pe conexiunea arhivată (rândurile o au ca `source_id`). Niciun rând din afara
+ * ferestrei cerute nu se scrie, deci zilele proprietății active rămân neatinse. Oprire la prima fereastră eșuată.
+ * Fereastra obișnuită nu face parte de aici: apelantul o rulează după, pe conexiunea activă.
+ */
+export async function collectGscArchivedHistory(deps: GoogleDeps, options: ArchivedHistoryOptions): Promise<GoogleOutcome[]> {
+  const { db } = deps
+  const now = deps.now ?? (() => new Date())
+  // Verificările vin înaintea oricărei citiri.
+  assertUuid(options.tenantId, 'tenant_id')
+  assertUuid(options.brandId, 'brand_id')
+  assertUuid(options.connectionId, 'connection_id')
+  assertBackfillFrom(options.from, now())
+  if (!isIsoDate(options.until)) throw new Error(`Ultima zi nu e o dată YYYY-MM-DD: ${JSON.stringify(options.until)}`)
+  const lastFinal = lookbackWindow(now(), GSC_TIMEZONE, GOOGLE_LOOKBACK_DAYS, GSC_FINAL_LAG_DAYS).end
+  if (options.until > lastFinal) throw new Error(`Ultima zi (${options.until}) e după ultima zi finalizată în Search Console (${lastFinal}).`)
+  const windows = rangeWindows(options.from, options.until, GOOGLE_LOOKBACK_DAYS)
+  if (windows.length === 0) return []
+
+  const rows = await db.select<BrandConnection>(
+    'source_connections',
+    `select=id,tenant_id,brand_id,provider,external_account_id,timezone,status&id=eq.${options.connectionId}` +
+      `&tenant_id=eq.${options.tenantId}&brand_id=eq.${options.brandId}&provider=eq.gsc&status=eq.archived`,
+  )
+  const conn = rows[0]
+  if (
+    rows.length !== 1 || !conn || conn.id !== options.connectionId || conn.tenant_id !== options.tenantId ||
+    conn.brand_id !== options.brandId || conn.provider !== 'gsc' || conn.status !== 'archived'
+  ) {
+    throw new Error(`Conexiunea ${options.connectionId} nu e o proprietate Search Console arhivată a acestui site; nu import nimic.`)
+  }
+
+  const credentials = await loadActiveConnections(db, GOOGLE_CREDENTIAL_PROVIDER, { requireBrand: false })
+  const credential = credentials.connections.find((c) => c.tenant_id === conn.tenant_id)
+  if (!credential) {
+    return [{ source: 'gsc', connection_id: conn.id, brand_id: options.brandId, status: 'not_connected', reason: 'credential Google neconfigurat sau invalid pentru acest client' }]
+  }
+
+  const outcomes: GoogleOutcome[] = []
+  for (const window of windows) {
+    const outcome = await runConnection(deps, { ...conn, brand_id: options.brandId }, credential.id, window, { strictWindow: true })
+    outcomes.push(outcome)
+    if (outcome.status === 'failed') break
+  }
+  return outcomes
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -215,6 +276,8 @@ async function runConnection(
   conn: BrandConnection & { brand_id: string },
   credentialConnectionId: string,
   window: { start: string; end: string },
+  /** `strictWindow`: rândurile Search Console din afara ferestrei se sar (istoricul unei proprietăți arhivate). */
+  opts: { strictWindow?: boolean } = {},
 ): Promise<GoogleOutcome> {
   const { db } = deps
   const now = deps.now ?? (() => new Date())
@@ -242,7 +305,7 @@ async function runConnection(
         const clients = (deps.createClients ?? createGoogleClients)(credentials.value)
         const ctxBase = { tenant_id: conn.tenant_id, brand_id: conn.brand_id, source_id: conn.id, sync_run_id: handle.id, schema_version: GOOGLE_SCHEMA_VERSION }
         if (source === 'ga4') await collectGa4(deps, clients.ga4, conn, ctxBase, window, state, now)
-        else await collectGsc(deps, clients.gsc, conn, ctxBase, window, state, now)
+        else await collectGsc(deps, clients.gsc, conn, ctxBase, window, state, now, opts.strictWindow === true)
       }
     }
   } catch (err) {
@@ -537,6 +600,7 @@ async function collectGsc(
   window: { start: string; end: string },
   state: RunState,
   now: () => Date,
+  strictWindow = false,
 ): Promise<void> {
   const sleep = deps.sleep ?? defaultSleep
   const retry = { sleep, attempts: RETRY_ATTEMPTS, baseDelayMs: RETRY_BASE_DELAY_MS }
@@ -580,6 +644,19 @@ async function collectGsc(
     }
   }
 
+  // Istoricul unei proprietăți arhivate nu scrie nicio zi din afara ferestrei: zilele de după ea sunt ale proprietății
+  // active (D-27). API-ul respectă intervalul cerut; verificarea face garanția independentă de el.
+  const inWindow = (date: unknown) => typeof date === 'string' && date >= window.start && date <= window.end
+  const clip = (rows: Row[], issues: Issue[]): Row[] => {
+    if (!strictWindow) return rows
+    const kept: Row[] = []
+    for (const r of rows) {
+      if (inWindow(r.date)) kept.push(r)
+      else issues.push({ code: 'out_of_window', message: `rând din ${String(r.date)}, în afara ferestrei ${window.start}..${window.end}; sărit` })
+    }
+    return kept
+  }
+
   const days = { search_daily: new Set<string>(), search_queries: new Set<string>() }
   const daily: Row[] = []
 
@@ -587,10 +664,11 @@ async function collectGsc(
   await paginate('search_daily', ['date', 'device'], async (res, hash) => {
     const ctx = mkCtx(base, now, hash, GSC_TIMEZONE)
     const n = normalizeGscDaily(res, ctx, GSC_DATA_STATE)
+    const rows = clip(n.rows, n.issues)
     noteIssues(state, 'search_daily', n.issues)
-    daily.push(...n.rows)
-    state.rowsWritten += await upsertScoped(deps.db, 'search_daily', KEYS.search_daily, n.rows, scope)
-    for (const r of n.rows) days.search_daily.add(r.date as string)
+    daily.push(...rows)
+    state.rowsWritten += await upsertScoped(deps.db, 'search_daily', KEYS.search_daily, rows, scope)
+    for (const r of rows) days.search_daily.add(r.date as string)
   })
 
   // 2. totaluri pe zi (fără device, fără query): referința pentru reconciliere
@@ -600,7 +678,8 @@ async function collectGsc(
     await paginate('search_totals_by_date', ['date'], async (res) => {
       const t = parseGscDateTotals(res)
       noteIssues(state, 'search_totals_by_date', t.issues)
-      for (const v of t.byDate.values()) {
+      for (const [date, v] of t.byDate) {
+        if (strictWindow && !inWindow(date)) continue
         reported.rows++
         if (v.clicks === null || v.impressions === null) ok = false
         reported.clicks += v.clicks ?? 0
@@ -627,9 +706,10 @@ async function collectGsc(
   if (!state.fatal) {
     await paginate('search_queries', ['date', 'query', 'page', 'device'], async (res, hash) => {
       const n = normalizeGscQueries(res, mkCtx(base, now, hash, GSC_TIMEZONE), GSC_DATA_STATE)
+      const rows = clip(n.rows, n.issues)
       noteIssues(state, 'search_queries', n.issues)
-      state.rowsWritten += await upsertScoped(deps.db, 'search_queries', KEYS.search_queries, n.rows, scope)
-      for (const r of n.rows) days.search_queries.add(r.date as string)
+      state.rowsWritten += await upsertScoped(deps.db, 'search_queries', KEYS.search_queries, rows, scope)
+      for (const r of rows) days.search_queries.add(r.date as string)
     })
   }
 

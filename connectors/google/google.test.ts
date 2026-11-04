@@ -2,7 +2,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { collectGoogle, ga4PropertyName, gscEarliestDate } from './collect-core.ts'
+import { collectGoogle, collectGscArchivedHistory, ga4PropertyName, gscEarliestDate } from './collect-core.ts'
 import { activeUsersIntervals, lastCompleteSunday, previousPeriod } from './intervals.ts'
 import {
   ga4Date,
@@ -18,7 +18,7 @@ import {
 import { classifyGoogleError, callWithRetry } from './errors.ts'
 import { reconcileTotals } from './reconcile.ts'
 import { Ga4ReportSchema, GscResponseSchema } from './schemas.ts'
-import { addDaysIso, addMonthsIso, backfillWindows, calendarDateIn, daysInclusive, isIsoDate, lookbackWindow } from './dates.ts'
+import { addDaysIso, addMonthsIso, backfillWindows, calendarDateIn, daysInclusive, isIsoDate, lookbackWindow, rangeWindows } from './dates.ts'
 import type { Ga4Client, GscClient, GoogleClients } from './clients.ts'
 import { FakeDb } from '../shared/test-helpers.ts'
 
@@ -283,6 +283,20 @@ describe('dates', () => {
     assert.deepEqual(backfillWindows('2026-09-01', current, 35), [current])
     assert.deepEqual(backfillWindows('2026-09-20', current, 35), [current])
     assert.deepEqual(backfillWindows('2026-08-31', current, 35), [{ start: '2026-08-31', end: '2026-08-31' }, current])
+  })
+
+  test('interval închis în ferestre: ultima se termină exact în `until`, prima tăiată la `from`; nimic când until < from', () => {
+    assert.deepEqual(rangeWindows('2026-07-01', '2026-08-31', 35), [
+      { start: '2026-07-01', end: '2026-07-27' },
+      { start: '2026-07-28', end: '2026-08-31' },
+    ])
+    assert.deepEqual(rangeWindows('2026-10-09', '2026-10-09', 35), [{ start: '2026-10-09', end: '2026-10-09' }])
+    assert.deepEqual(rangeWindows('2026-10-10', '2026-10-09', 35), [])
+    const w = rangeWindows('2025-07-04', '2026-10-09', 35)
+    assert.equal(w[0]!.start, '2025-07-04')
+    assert.equal(w[w.length - 1]!.end, '2026-10-09')
+    for (let i = 1; i < w.length; i++) assert.equal(w[i]!.start, addDaysIso(w[i - 1]!.end, 1))
+    assert.throws(() => rangeWindows('2026-07-01', '2026-08-31', 0), /fereastră invalidă/)
   })
 
   test('date ISO, zile dintr-un interval, luni înapoi', () => {
@@ -692,6 +706,124 @@ describe('collectGoogle: reimportul istoricului Search Console (D-27)', () => {
     const db2 = withSecondSite()
     const regular = await run(db2, {}, 'gsc', { gscRowLimit: 3 }, { brandId: B3 })
     assert.deepEqual(regular.outcomes.map((o) => [o.connection_id, o.status === 'not_connected' ? null : `${o.period.start}..${o.period.end}`]), [[GSC_CONN_B3, '2026-09-01..2026-10-05']])
+  })
+})
+
+describe('collectGscArchivedHistory: zilele vechi din proprietatea arhivată (D-27)', () => {
+  const OLD = '50000000-0000-0000-0000-0000000000b1'
+  const OTHER_BRAND_OLD = '50000000-0000-0000-0000-0000000000b2'
+  const B3 = '20000000-0000-0000-0000-000000000013'
+  const DOMAIN_START = '2026-09-20'
+  const archived = (id: string, brand: string, site: string, tenant = T1) =>
+    ({ id, tenant_id: tenant, brand_id: brand, provider: 'gsc', external_account_id: site, status: 'archived', credential_status: 'missing', timezone: 'Europe/Bucharest' })
+  const db = () => makeDb({ source_connections: [archived(OLD, B1, 'https://example.ro/'), archived(OTHER_BRAND_OLD, B3, 'https://altsite.ro/')] })
+
+  /**
+   * Search Console care respectă intervalul și proprietatea cerute: câte un rând pe zi; Domain property are date abia de la
+   * DOMAIN_START. Cu `leak`, întoarce și ziua de după capăt (un API care n-ar respecta intervalul).
+   */
+  function rangeClients(opts: { leak?: boolean; deny?: boolean } = {}) {
+    const calls: Array<{ site: string; dims: string; range: string }> = []
+    const gs: GscClient = {
+      async query(req) {
+        calls.push({ site: req.siteUrl, dims: req.dimensions.join(','), range: `${req.startDate}..${req.endDate}` })
+        if (opts.deny) throw { code: 403, message: 'User does not have sufficient permission for site' }
+        if (req.startRow > 0) return { rows: [] }
+        const first = req.siteUrl.startsWith('sc-domain:') ? DOMAIN_START : '0000-01-01'
+        const days: string[] = []
+        for (let d = req.startDate; d <= req.endDate; d = addDaysIso(d, 1)) if (d >= first) days.push(d)
+        if (opts.leak) days.push(addDaysIso(req.endDate, 1))
+        const m = { clicks: 2, impressions: 10, ctr: 0.2, position: 3 }
+        const dims = req.dimensions.join(',')
+        if (dims === 'date,device') return { rows: days.map((d) => ({ keys: [d, 'MOBILE'], ...m })) }
+        if (dims === 'date') return { rows: days.map((d) => ({ keys: [d], ...m })) }
+        return { rows: days.map((d) => ({ keys: [d, 'urinal', 'https://example.ro/', 'MOBILE'], ...m })) }
+      },
+    }
+    const unused = async () => {
+      throw new Error('GA4 nu se folosește aici')
+    }
+    return { clients: { ga4: { checkCompatibility: unused, runReport: unused }, gsc: gs } as GoogleClients, calls }
+  }
+  const history = (d: FakeDb, options: Partial<Parameters<typeof collectGscArchivedHistory>[1]> = {}, opts: { leak?: boolean; deny?: boolean } = {}) => {
+    const f = rangeClients(opts)
+    return collectGscArchivedHistory(
+      { db: d, createClients: () => f.clients, now: () => NOW, ...noSleep },
+      { tenantId: T1, brandId: B1, connectionId: OLD, from: '2026-07-01', until: '2026-08-31', ...options },
+    ).then((outcomes) => ({ outcomes, calls: f.calls }))
+  }
+  const dates = (d: FakeDb, table: string) => (d.tables[table] ?? []).map((r) => r.date as string)
+
+  test('ferestre de 35 de zile de la cea mai veche, până în `until`; rândurile și rulările pe conexiunea arhivată', async () => {
+    const d = db()
+    const { outcomes, calls } = await history(d)
+    assert.deepEqual(outcomes.map((o) => (o.status === 'not_connected' ? null : `${o.period.start}..${o.period.end}:${o.status}`)), [
+      '2026-07-01..2026-07-27:succeeded',
+      '2026-07-28..2026-08-31:succeeded',
+    ])
+    assert.ok(calls.every((c) => c.site === 'https://example.ro/'), 'doar proprietatea arhivată')
+    for (const table of ['search_daily', 'search_queries']) {
+      assert.ok(dates(d, table).every((x) => x >= '2026-07-01' && x <= '2026-08-31'), table)
+      assert.ok(d.tables[table]!.every((r) => r.source_id === OLD && r.brand_id === B1 && r.tenant_id === T1), table)
+    }
+    assert.deepEqual(d.tables.sync_runs!.map((r) => [r.source_connection_id, r.period_start, r.period_end]), [
+      [OLD, '2026-07-01', '2026-07-27'],
+      [OLD, '2026-07-28', '2026-08-31'],
+    ])
+    // Conexiunea arhivată rămâne arhivată, cea activă neatinsă.
+    assert.deepEqual(d.tables.source_connections!.filter((c) => c.provider === 'gsc' && c.brand_id === B1).map((c) => [c.id, c.status]), [
+      [GSC_CONN, 'active'],
+      [OLD, 'archived'],
+    ])
+  })
+
+  test('un rând din afara ferestrei (după `until`) nu se scrie: zilele proprietății active rămân neatinse', async () => {
+    const d = db()
+    const { outcomes } = await history(d, {}, { leak: true })
+    for (const table of ['search_daily', 'search_queries']) assert.ok(!dates(d, table).includes('2026-09-01'), table)
+    const last = outcomes[outcomes.length - 1]!
+    assert.ok(last.status === 'partial' && last.errors.some((e) => e.code === 'normalize_out_of_window'), JSON.stringify(last))
+  })
+
+  test('acces refuzat la proprietatea arhivată: oprire după prima fereastră, nimic scris', async () => {
+    const d = db()
+    const { outcomes } = await history(d, {}, { deny: true })
+    assert.deepEqual(outcomes.map((o) => o.status), ['failed'])
+    assert.equal(d.tables.search_daily, undefined)
+    assert.equal(d.tables.sync_runs!.length, 1)
+  })
+
+  test('cereri greșite refuzate înainte de orice citire', async () => {
+    const cases: Array<[Partial<Parameters<typeof collectGscArchivedHistory>[1]>, RegExp]> = [
+      [{ tenantId: 'stada' }, /tenant_id invalid/],
+      [{ brandId: 'urinal' }, /brand_id invalid/],
+      [{ connectionId: 'veche' }, /connection_id invalid/],
+      [{ from: '2025-06-07' }, /16 luni/],
+      [{ until: '2026-8-31' }, /nu e o dată YYYY-MM-DD/],
+      [{ until: '2026-10-06' }, /după ultima zi finalizată în Search Console \(2026-10-05\)/],
+    ]
+    for (const [options, message] of cases) {
+      const d = db()
+      await assert.rejects(history(d, options), message, JSON.stringify(options))
+      assert.equal(d.log.length, 0, 'nicio citire din bază')
+    }
+  })
+
+  test('nimic de importat (until < from): nicio citire, nicio rulare', async () => {
+    const d = db()
+    const { outcomes, calls } = await history(d, { from: '2026-09-20', until: '2026-09-19' })
+    assert.deepEqual(outcomes, [])
+    assert.equal(calls.length, 0)
+    assert.equal(d.log.length, 0)
+  })
+
+  test('doar o conexiune arhivată a site-ului și a clientului: activă, alt site sau alt client → refuz fără scrieri', async () => {
+    for (const options of [{ connectionId: GSC_CONN }, { connectionId: OTHER_BRAND_OLD }, { tenantId: T2 }]) {
+      const d = db()
+      await assert.rejects(history(d, options), /nu e o proprietate Search Console arhivată a acestui site/, JSON.stringify(options))
+      assert.equal(d.tables.sync_runs, undefined)
+      assert.equal(d.tables.search_daily, undefined)
+    }
   })
 })
 

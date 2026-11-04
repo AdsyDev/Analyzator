@@ -73,3 +73,14 @@ export function backfillWindows(from: string, current: { start: string; end: str
   }
   return windows
 }
+
+/**
+ * Intervalul închis [from, until] în ferestre de câte `days` zile, de la cea mai veche; ultima se termină exact în
+ * `until`, prima poate fi mai scurtă. Fără nicio fereastră când `until` e înainte de `from`.
+ */
+export function rangeWindows(from: string, until: string, days: number): Array<{ start: string; end: string }> {
+  if (!Number.isInteger(days) || days < 1) throw new Error(`fereastră invalidă: ${days} zile`)
+  if (until < from) return []
+  const earliest = addDaysIso(until, -(days - 1))
+  return backfillWindows(from, { start: earliest < from ? from : earliest, end: until }, days)
+}

@@ -1,6 +1,17 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { applyGscProperty, belongsToDomain, estimateHistoryRows, inspectGscProperties, propertyHost, type ListGscSites } from './gsc-properties-core.ts'
+import {
+  applyGscProperty,
+  belongsToDomain,
+  estimateHistoryRows,
+  importArchivedHistory,
+  inspectGscProperties,
+  planArchivedHistory,
+  propertyHost,
+  type ListGscSites,
+} from './gsc-properties-core.ts'
+import type { GoogleClients, GscClient } from './clients.ts'
+import { addDaysIso } from './dates.ts'
 import { FakeDb } from '../shared/test-helpers.ts'
 
 const T1 = '10000000-0000-0000-0000-000000000001'
@@ -202,5 +213,133 @@ describe('Search Console: trecerea pe Domain property (D-27)', () => {
     db.tables.source_connections!.find((c) => c.id === C.urinal)!.status = 'archived'
     await assert.rejects(applyGscProperty(db, report), /nu mai e activă/)
     assert.equal(db.log.filter((l) => l.op === 'insert').length, 0)
+  })
+})
+
+describe('Search Console: istoricul vechi din proprietatea URL prefix arhivată (D-27)', () => {
+  const DOMAIN_START = '2026-10-10'
+  const day = (date: string, source: string) => ({ tenant_id: T1, brand_id: B.urinal, date, device: 'MOBILE', source_id: source })
+  const reportFor = async (db: FakeDb, brand: string, sites?: string[]) =>
+    (await inspectGscProperties({ db, listSites: fakeList(sites).listSites, now: NOW })).find((r) => r.brand_id === brand)!
+
+  /** Urinal trecut pe Domain property: zilele vechi de la URL prefix, cele noi de la Domain property. */
+  async function switchedDb() {
+    const db = makeDb()
+    const switched = await applyGscProperty(db, await reportFor(db, B.urinal))
+    db.tables.search_daily = [day('2026-09-01', C.urinal), day('2026-10-09', C.urinal), day(DOMAIN_START, switched.connection_id), day('2026-10-31', switched.connection_id)]
+    db.tables.search_queries = []
+    return { db, current: switched.connection_id }
+  }
+
+  /** Search Console simulat: câte un rând pe zi din intervalul cerut; Domain property are date abia de la DOMAIN_START. */
+  function rangeClients() {
+    const calls: Array<{ site: string; range: string }> = []
+    const gs: GscClient = {
+      async query(req) {
+        calls.push({ site: req.siteUrl, range: `${req.startDate}..${req.endDate}` })
+        if (req.startRow > 0) return { rows: [] }
+        const first = req.siteUrl.startsWith('sc-domain:') ? DOMAIN_START : '0000-01-01'
+        const days: string[] = []
+        for (let d = req.startDate; d <= req.endDate; d = addDaysIso(d, 1)) if (d >= first) days.push(d)
+        const m = { clicks: 1, impressions: 5, ctr: 0.2, position: 4 }
+        const dims = req.dimensions.join(',')
+        if (dims === 'date,device') return { rows: days.map((d) => ({ keys: [d, 'MOBILE'], ...m })) }
+        if (dims === 'date') return { rows: days.map((d) => ({ keys: [d], ...m })) }
+        return { rows: days.map((d) => ({ keys: [d, 'urinal', 'https://urinal.ro/produs', 'MOBILE'], ...m })) }
+      },
+    }
+    const unused = async () => {
+      throw new Error('GA4 nu se folosește aici')
+    }
+    return { clients: { ga4: { checkCompatibility: unused, runReport: unused }, gsc: gs } as GoogleClients, calls }
+  }
+
+  test('verificarea arată zilele fiecărei proprietăți și zilele amestecate', async () => {
+    const { db } = await switchedDb()
+    const r = await reportFor(db, B.urinal)
+    assert.equal(r.action, 'keep')
+    assert.deepEqual(r.archived, [{ connection_id: C.urinal, site_url: 'https://urinal.ro/' }])
+    assert.deepEqual(r.days_current, { first: DOMAIN_START, last: '2026-10-31' })
+    assert.deepEqual(r.days_archived, { first: '2026-09-01', last: '2026-10-09' })
+    assert.equal(r.archived_rows_since_current, false, 'zilele dinaintea Domain property nu sunt amestec')
+    // Un rând query × pagină al proprietății vechi într-o zi a proprietății noi: amestec.
+    db.tables.search_queries!.push({ id: 99, tenant_id: T1, brand_id: B.urinal, date: '2026-10-15', device: 'MOBILE', source_id: C.urinal })
+    assert.equal((await reportFor(db, B.urinal)).archived_rows_since_current, true)
+    assert.deepEqual(writes(db).filter((w) => w.table !== 'source_connections'), [])
+  })
+
+  test('planul: zilele de la `from` până în ziua dinaintea Domain property, din singura proprietate URL prefix arhivată', async () => {
+    const { db, current } = await switchedDb()
+    assert.deepEqual(planArchivedHistory(await reportFor(db, B.urinal), '2025-07-04'), {
+      tenant_id: T1,
+      brand_id: B.urinal,
+      brand_name: 'Urinal',
+      current: { connection_id: current, site_url: 'sc-domain:urinal.ro', first_day: DOMAIN_START },
+      source: { connection_id: C.urinal, site_url: 'https://urinal.ro/' },
+      from: '2025-07-04',
+      until: '2026-10-09',
+    })
+  })
+
+  test('site nepregătit: refuz cu motivul, înainte de orice scriere', async () => {
+    // Încă pe URL prefix.
+    const fresh = makeDb()
+    await assert.rejects(async () => planArchivedHistory(await reportFor(fresh, B.urinal), '2025-07-04'), /întâi --apply/)
+    // Domain property fără date: nu se știe ziua de trecere.
+    const empty = await switchedDb()
+    empty.db.tables.search_daily = empty.db.tables.search_daily!.filter((r) => r.source_id !== empty.current)
+    await assert.rejects(async () => planArchivedHistory(await reportFor(empty.db, B.urinal), '2025-07-04'), /nu are încă date/)
+    // Fără proprietate URL prefix arhivată (Keep a fost mereu pe Domain property).
+    const keep = makeDb()
+    keep.tables.search_daily!.push({ id: 2, tenant_id: T1, brand_id: B.keep, date: '2026-10-01', device: 'MOBILE', source_id: C.keep })
+    await assert.rejects(async () => planArchivedHistory(await reportFor(keep, B.keep), '2025-07-04'), /nicio proprietate URL prefix arhivată/)
+    // Două proprietăți URL prefix arhivate: de ales manual.
+    const two = await switchedDb()
+    two.db.tables.source_connections!.push(gsc('50000000-0000-0000-0000-000000000401', B.urinal, 'https://www.urinal.ro/', 'archived'))
+    await assert.rejects(async () => planArchivedHistory(await reportFor(two.db, B.urinal), '2025-07-04'), /mai multe proprietăți URL prefix arhivate/)
+    // Clientul a scos accesul pe URL prefix.
+    const gone = await switchedDb()
+    await assert.rejects(async () => planArchivedHistory(await reportFor(gone.db, B.urinal, ['sc-domain:urinal.ro']), '2025-07-04'), /nu mai vede https:\/\/urinal.ro\//)
+    await assert.rejects(async () => planArchivedHistory(await reportFor(gone.db, B.urinal), '2025-7-4'), /YYYY-MM-DD/)
+    for (const d of [fresh, empty.db, keep, two.db, gone.db]) assert.deepEqual(writes(d).filter((w) => w.table !== 'source_connections'), [])
+  })
+
+  test('importul: zilele vechi din URL prefix, apoi fereastra obișnuită pe Domain property; nicio zi nu se amestecă', async () => {
+    const { db, current } = await switchedDb()
+    const plan = planArchivedHistory(await reportFor(db, B.urinal), '2026-08-01')
+    const f = rangeClients()
+    const { history, regular } = await importArchivedHistory({ db, createClients: () => f.clients, now: NOW, sleep: async () => undefined }, plan)
+
+    assert.deepEqual(history.map((o) => [o.connection_id, o.status === 'not_connected' ? null : `${o.period.start}..${o.period.end}`, o.status]), [
+      [C.urinal, '2026-08-01..2026-09-04', 'succeeded'],
+      [C.urinal, '2026-09-05..2026-10-09', 'succeeded'],
+    ])
+    assert.deepEqual(regular.map((o) => [o.connection_id, o.status === 'not_connected' ? null : `${o.period.start}..${o.period.end}`]), [[current, '2026-09-27..2026-10-31']])
+    // Cererile: zilele vechi doar la URL prefix, fereastra obișnuită doar la Domain property.
+    assert.ok(f.calls.filter((c) => c.site === 'https://urinal.ro/').every((c) => c.range <= '2026-10-09'))
+    assert.ok(f.calls.filter((c) => c.site === 'sc-domain:urinal.ro').every((c) => c.range === '2026-09-27..2026-10-31'))
+    // Fiecare zi are o singură proprietate: URL prefix înainte de DOMAIN_START, Domain property de atunci încolo.
+    for (const table of ['search_daily', 'search_queries']) {
+      const rows = db.tables[table]!.filter((r) => r.brand_id === B.urinal)
+      assert.ok(rows.length > 0, table)
+      for (const r of rows) assert.equal(r.source_id, (r.date as string) < DOMAIN_START ? C.urinal : current, `${table} ${r.date}`)
+    }
+    // Ultima rulare (după care se citește starea sursei) e fereastra obișnuită, pe Domain property.
+    const runs = db.tables.sync_runs!.filter((r) => r.brand_id === B.urinal && r.source === 'gsc' && r.period_start)
+    assert.deepEqual([runs[runs.length - 1]!.source_connection_id, runs[runs.length - 1]!.period_start], [current, '2026-09-27'])
+
+    const after = await reportFor(db, B.urinal)
+    assert.deepEqual(after.days_archived, { first: '2026-08-01', last: '2026-10-09' })
+    assert.deepEqual(after.days_current, { first: DOMAIN_START, last: '2026-10-31' })
+    assert.equal(after.archived_rows_since_current, false)
+    assert.equal(after.action, 'keep')
+  })
+
+  test('nimic de importat (Domain property începe la `from` sau înainte): nicio rulare, niciun apel', async () => {
+    const { db } = await switchedDb()
+    const plan = planArchivedHistory(await reportFor(db, B.urinal), DOMAIN_START)
+    const f = rangeClients()
+    assert.deepEqual(await importArchivedHistory({ db, createClients: () => f.clients, now: NOW }, plan), { history: [], regular: [] })
+    assert.equal(f.calls.length, 0)
   })
 })

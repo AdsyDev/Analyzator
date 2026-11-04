@@ -6,6 +6,9 @@
 # mode = apply: trece site-urile din `brands` pe Domain property (doar când cheia o vede și proprietatea veche ține
 #   de același domeniu), apoi colectează Search Console pentru fiecare: de la `from` (reimport) sau ultimele 35 de zile.
 #   Toate site-urile se verifică înainte de prima scriere; unul nepregătit oprește tot.
+# mode = history: pentru site-urile din `brands`, deja pe Domain property, aduce zilele dinaintea primei zile cu date
+#   de la Domain property din proprietatea URL prefix arhivată (cât timp cheia o mai vede), de la `from` (gol = cea mai
+#   veche zi permisă, 16 luni); apoi fereastra obișnuită. Nicio zi a Domain property nu se rescrie.
 #
 # Secrete în environment-ul ales: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (ca la colectori); opțional
 # SUPABASE_ACCESS_TOKEN și variabila SUPABASE_PROJECT_REF (ca la supabase-deploy), doar pentru dimensiunea bazei.
@@ -21,16 +24,16 @@ on:
         options: [staging]
         default: staging
       mode:
-        description: 'check = doar citire; apply = trece site-urile din brands pe Domain property'
+        description: 'check = doar citire; apply = trece site-urile din brands pe Domain property; history = zilele dinaintea Domain property, din URL prefix'
         type: choice
-        options: [check, apply]
+        options: [check, apply, history]
         default: check
       brands:
-        description: 'apply: ID-urile site-urilor (din /admin/clients/<id>), separate prin spațiu sau virgulă'
+        description: 'apply / history: ID-urile site-urilor (din /admin/clients/<id>), separate prin spațiu sau virgulă'
         type: string
         default: ''
       from:
-        description: 'apply: reimport Search Console de la această zi (YYYY-MM-DD, cel mult 16 luni în urmă); gol = ultimele 35 de zile'
+        description: 'apply: reimport de la această zi (YYYY-MM-DD, cel mult 16 luni în urmă; gol = ultimele 35 de zile). history: prima zi (gol = cea mai veche permisă)'
         type: string
         default: ''
 
@@ -99,8 +102,8 @@ jobs:
             exit 1
           fi
           ARGS=()
-          if [ "$MODE" = "apply" ]; then
-            ARGS+=(--apply)
+          if [ "$MODE" = "apply" ] || [ "$MODE" = "history" ]; then
+            ARGS+=("--$MODE")
             IFS=', ' read -ra LIST <<< "$BRANDS"
             for b in "${LIST[@]}"; do
               if [ -n "$b" ]; then ARGS+=(--brand "$b"); fi

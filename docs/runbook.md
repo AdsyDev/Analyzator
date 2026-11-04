@@ -107,13 +107,16 @@ _De completat._
 
 Când: site-ul e legat de o proprietate URL prefix (`https://exemplu.ro/`), iar clientul a dat acces service account-ului și la Domain property (`sc-domain:exemplu.ro`). Domain property include `www`, `http` și subdomeniile, deci cifrele pot crește puțin. Prima dată: Urinal (STADA), 4 nov. 2026.
 
+**Domain property are date doar de când a fost creată.** La STADA, pe 4 nov. 2026: Urinal, Modafen și Proenzi abia din octombrie 2026, Minimartieni din iulie 2026; ferestrele mai vechi ale reimportului au venit goale (`empty_report`). Zilele dinainte se iau din proprietatea URL prefix arhivată (pasul 4 de mai jos), deci clientul **nu scoate accesul pe URL prefix** până la acel import.
+
 Datele nu se dublează nici înainte, nici după: site-ul are o singură proprietate activă, iar rândurile au cheia (site, zi, device[, query, pagină]), fără proprietate. Fără reimport, însă, seria ar amesteca proprietățile: colectarea obișnuită rescrie doar ultimele 35 de zile.
 
 **Cu workflow-ul `gsc-properties` (toate site-urile odată):**
 
 1. GitHub → Actions → `gsc-properties` → Run workflow, `mode` = `check`. Doar citire. Log-ul arată, pe fiecare site, proprietatea folosită, proprietățile văzute de cheia clientului și acțiunea: `switch` (URL prefix → Domain property), `connect` (fără conexiune), `keep` (deja pe Domain property) sau ceva de lămurit (`no_domain_access`, `mismatch`, `multiple`, `no_domain`, `no_credential`, `list_failed`). Mai arată estimarea reimportului pe 16 luni și dimensiunea bazei, dacă environment-ul are tokenul de deploy Supabase.
 2. `mode` = `apply`, `brands` = ID-urile site-urilor (din `/admin/clients/<id>`), `from` = data de azi minus 16 luni. Toate site-urile se verifică înainte de prima scriere: unul nepregătit oprește tot. Pe fiecare site, conexiunea veche se arhivează, Domain property se adaugă (sau se reactivează), apoi urmează reimportul, fereastră cu fereastră. Dacă adăugarea eșuează, conexiunea veche revine. Log-ul se termină cu starea de după.
-3. Verifică: `mode` = `check` din nou. Site-urile trecute sunt `keep`, iar „rânduri rămase de la ele” e `nu`.
+3. Verifică: `mode` = `check` din nou. Site-urile trecute sunt `keep`. „zile cu date” arată zilele fiecărei proprietăți: dacă Domain property are tot istoricul, proprietatea arhivată nu mai are zile („rânduri rămase de la ele: nu”). Dacă Domain property începe mai târziu, zilele arhivate se termină în ziua dinaintea ei: e istoricul vechi, nu amestec. Amestec ar fi doar „zile amestecate: DA”.
+4. **Istoricul vechi din URL prefix** (când Domain property începe mai târziu decât cele 16 luni): `mode` = `history`, `brands` = aceleași ID-uri, `from` gol (cea mai veche zi permisă). Pe fiecare site, zilele de la `from` până în ziua dinaintea primei zile a Domain property se aduc din proprietatea URL prefix arhivată, în ferestre de 35 de zile; rândurile și rulările sunt ale conexiunii arhivate, iar niciun rând din afara ferestrelor nu se scrie, deci zilele Domain property rămân neatinse. Apoi rulează fereastra obișnuită pe Domain property, ca starea sursei să rămână cea de zi cu zi. Refuză, fără nicio scriere, un site care nu e încă pe Domain property, a cărui Domain property nu are date, fără exact o proprietate URL prefix arhivată a domeniului, sau a cărui cheie nu mai vede acea proprietate. Reluarea e sigură. Verifică apoi cu `check`: zilele arhivate încep la `from` și se termină în ziua dinaintea Domain property, iar „zile amestecate” e `nu`. Ziua de trecere a fiecărui site se notează în `docs/decisions.md` (D-27): acolo cifrele pot sări puțin (Domain property include și `www`, `http`, subdomeniile).
 
 `no_domain_access` înseamnă că service account-ul nu e adăugat pe Domain property: clientul îl adaugă (Search Console → Settings → Users and permissions), apoi reia pasul 1.
 
@@ -151,7 +154,7 @@ Datele nu se dublează nici înainte, nici după: site-ul are o singură proprie
      where q.brand_id = '<id-site>' and c.provider = 'gsc' and c.status = 'archived';
    ```
 
-   Peste 0: zile (sau combinații query × pagină) pe care proprietatea nouă nu le-a rescris, de obicei pentru că reimportul s-a oprit înainte de capăt. Reia pasul 3. Rândurile nu se șterg fără o decizie (regula 8).
+   Peste 0: zile (sau combinații query × pagină) pe care proprietatea nouă nu le-a rescris: reimportul s-a oprit înainte de capăt (reia pasul 3) sau Domain property nu are acele zile (e creată mai recent; zilele vechi rămân de la URL prefix, vezi pasul 4 al procedurii cu workflow-ul). Rândurile nu se șterg fără o decizie (regula 8).
 5. **Revenire** (de ex. `access_denied` la prima fereastră: clientul nu a dat încă acces la Domain property). Rularea refuzată nu scrie nimic, deci datele vechi sunt neatinse; arhivează proprietatea nouă și reactivează-o pe cea veche (trebuie să întoarcă un rând):
 
    ```sql

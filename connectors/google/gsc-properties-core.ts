@@ -8,11 +8,16 @@
 // proprietatea veche ține de același domeniu: conexiunea veche se arhivează (istoricul ei rămâne), iar cea nouă se
 // adaugă sau, dacă a existat și a fost arhivată, se reactivează. Dacă pasul al doilea eșuează, conexiunea veche se
 // reactivează. Fiecare scriere filtrează explicit pe tenant și brand.
+//
+// Istoricul vechi: Domain property are date doar de când a fost creată. Zilele dinaintea primei ei zile cu date se
+// iau din proprietatea URL prefix arhivată a site-ului, cât timp cheia o mai vede (D-27).
 
 import { discover, type DiscoverOutcome } from '../../supabase/functions/source-credentials/discover.ts'
 import { getSourceToken, loadActiveConnections } from '../shared/connections.ts'
 import { assertUuid, type Db } from '../shared/supabase-rest.ts'
+import { collectGoogle, collectGscArchivedHistory, type GoogleDeps, type GoogleOutcome } from './collect-core.ts'
 import { GOOGLE_CREDENTIAL_PROVIDER, GOOGLE_LOOKBACK_DAYS, GSC_HISTORY_MONTHS, GSC_PROVIDER } from './config.ts'
+import { addDaysIso, isIsoDate } from './dates.ts'
 
 /** Proprietățile Search Console pe care le vede o cheie (JSON-ul service account-ului). */
 export type ListGscSites = (serviceAccountJson: string) => Promise<DiscoverOutcome>
@@ -57,9 +62,21 @@ export type GscSiteReport = {
   last_run_rows: number | null
   /** Conexiunile `gsc` arhivate ale site-ului (proprietăți folosite înainte). */
   archived_count: number
+  archived: Array<{ connection_id: string; site_url: string }>
   /** Există rânduri Search Console legate de o conexiune `gsc` arhivată a site-ului (proprietatea veche). */
   old_property_rows: boolean
+  /** Prima și ultima zi din `search_daily` cu rânduri de la proprietatea activă (doar când e una singură). */
+  days_current: DayRange | null
+  /** Prima și ultima zi din `search_daily` cu rânduri de la proprietățile arhivate. */
+  days_archived: DayRange | null
+  /**
+   * Rânduri ale proprietăților arhivate din prima zi a proprietății active încolo (`search_daily` sau `search_queries`):
+   * zile amestecate. Trebuie `false`; zilele de dinainte sunt istoricul vechi, nu amestec.
+   */
+  archived_rows_since_current: boolean
 }
+
+export type DayRange = { first: string; last: string }
 
 type ConnectionRow = { id: string; tenant_id: string; brand_id: string | null; external_account_id: string; timezone: string; status: string }
 
@@ -160,6 +177,7 @@ export async function inspectGscProperties(deps: GscPropertyDeps, options: { ten
       note = `fără conexiune; se adaugă ${target}`
     }
 
+    const daysCurrent = active.length === 1 ? await dayRange(db, b.tenant_id, b.id, [active[0]!.id]) : null
     reports.push({
       tenant_id: b.tenant_id,
       tenant_name: tenantName.get(b.tenant_id) ?? null,
@@ -173,7 +191,11 @@ export async function inspectGscProperties(deps: GscPropertyDeps, options: { ten
       note,
       last_run_rows: await lastRunRows(db, b.tenant_id, b.id),
       archived_count: archivedIds.length,
+      archived: mine.filter((c) => c.status === 'archived').map((c) => ({ connection_id: c.id, site_url: c.external_account_id.trim() })),
       old_property_rows: await hasOldPropertyRows(db, b.tenant_id, b.id, archivedIds),
+      days_current: daysCurrent,
+      days_archived: await dayRange(db, b.tenant_id, b.id, archivedIds),
+      archived_rows_since_current: daysCurrent ? await hasRowsSince(db, b.tenant_id, b.id, archivedIds, daysCurrent.first) : false,
     })
   }
   return reports
@@ -184,7 +206,7 @@ async function lastRunRows(db: Db, tenantId: string, brandId: string): Promise<n
     'sync_runs',
     `select=rows_written,created_at,status&tenant_id=eq.${tenantId}&brand_id=eq.${brandId}&source=eq.${GSC_PROVIDER}&order=created_at.desc&limit=1`,
   )
-  const last = [...runs].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
+  const last = [...runs].sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')))[0]
   return typeof last?.rows_written === 'number' ? last.rows_written : null
 }
 
@@ -192,6 +214,33 @@ async function hasOldPropertyRows(db: Db, tenantId: string, brandId: string, arc
   if (archivedIds.length === 0) return false
   for (const id of archivedIds) assertUuid(id, 'source_id')
   const filter = `tenant_id=eq.${tenantId}&brand_id=eq.${brandId}&source_id=in.(${archivedIds.join(',')})&limit=1`
+  for (const table of ['search_daily', 'search_queries']) {
+    if ((await db.select(table, `select=id&${filter}`)).length > 0) return true
+  }
+  return false
+}
+
+/** Prima și ultima zi cu rânduri `search_daily` ale conexiunilor date (indexul pe tenant, brand, zi). */
+async function dayRange(db: Db, tenantId: string, brandId: string, sourceIds: string[]): Promise<DayRange | null> {
+  if (sourceIds.length === 0) return null
+  for (const id of sourceIds) assertUuid(id, 'source_id')
+  const filter = `tenant_id=eq.${tenantId}&brand_id=eq.${brandId}&source_id=in.(${sourceIds.join(',')})`
+  const edge = async (dir: 'asc' | 'desc'): Promise<string | undefined> => {
+    const rows = await db.select<{ date: unknown }>('search_daily', `select=date&${filter}&order=date.${dir}&limit=1`)
+    const dates = rows.map((r) => r.date).filter((d): d is string => typeof d === 'string').sort()
+    return dir === 'asc' ? dates[0] : dates[dates.length - 1]
+  }
+  const first = await edge('asc')
+  const last = await edge('desc')
+  return first && last ? { first, last } : null
+}
+
+/** Există rânduri ale conexiunilor date din ziua `from` încolo, în `search_daily` sau `search_queries`. */
+async function hasRowsSince(db: Db, tenantId: string, brandId: string, sourceIds: string[], from: string): Promise<boolean> {
+  if (sourceIds.length === 0) return false
+  for (const id of sourceIds) assertUuid(id, 'source_id')
+  if (!isIsoDate(from)) throw new Error(`zi invalidă: ${JSON.stringify(from)}`)
+  const filter = `tenant_id=eq.${tenantId}&brand_id=eq.${brandId}&source_id=in.(${sourceIds.join(',')})&date=gte.${from}&limit=1`
   for (const table of ['search_daily', 'search_queries']) {
     if ((await db.select(table, `select=id&${filter}`)).length > 0) return true
   }
@@ -267,4 +316,65 @@ export async function applyGscProperty(db: Db, report: GscSiteReport): Promise<G
     if (previous) await db.update('source_connections', `id=eq.${previous.id}&${scope}&status=eq.archived`, { status: 'active' })
     throw err
   }
+}
+
+export type HistoryPlan = {
+  tenant_id: string
+  brand_id: string
+  brand_name: string
+  /** Proprietatea activă (Domain property) și prima ei zi cu date. */
+  current: { connection_id: string; site_url: string; first_day: string }
+  /** Proprietatea URL prefix arhivată din care vin zilele vechi. */
+  source: { connection_id: string; site_url: string }
+  /** Zilele de importat, inclusiv; `until` e ziua dinaintea primei zile a proprietății active. Fără nimic când until < from. */
+  from: string
+  until: string
+}
+
+/**
+ * Istoricul vechi al unui site, după raportul lui proaspăt (D-27): doar zilele dinaintea primei zile cu date de la
+ * Domain property, din singura proprietate URL prefix arhivată a domeniului, pe care cheia trebuie s-o vadă încă.
+ * Orice altă situație aruncă, înainte de vreo scriere.
+ */
+export function planArchivedHistory(report: GscSiteReport, from: string): HistoryPlan {
+  const name = report.brand_name
+  if (!isIsoDate(from)) throw new Error(`--from nu e o dată YYYY-MM-DD: ${JSON.stringify(from)}`)
+  if (report.action !== 'keep' || report.current.length !== 1) {
+    throw new Error(`${name}: nu e pe Domain property (${report.action}: ${report.note}); întâi --apply.`)
+  }
+  const current = report.current[0]!
+  if (!report.days_current) throw new Error(`${name}: ${current.site_url} nu are încă date, deci nu știu de unde începe; nu import nimic.`)
+  const domain = report.domain
+  const candidates = report.archived.filter((a) => /^https?:\/\//.test(a.site_url) && domain !== null && belongsToDomain(a.site_url, domain))
+  if (candidates.length === 0) throw new Error(`${name}: nicio proprietate URL prefix arhivată pentru ${domain ?? 'site'}; nu am de unde lua zilele vechi.`)
+  if (candidates.length > 1) {
+    throw new Error(`${name}: mai multe proprietăți URL prefix arhivate (${candidates.map((c) => c.site_url).join(', ')}); de ales manual.`)
+  }
+  const source = candidates[0]!
+  if (!report.visible.includes(source.site_url)) {
+    throw new Error(`${name}: cheia nu mai vede ${source.site_url} (accesul a fost scos); zilele vechi nu se mai pot citi.`)
+  }
+  return {
+    tenant_id: report.tenant_id,
+    brand_id: report.brand_id,
+    brand_name: name,
+    current: { ...current, first_day: report.days_current.first },
+    source,
+    from,
+    until: addDaysIso(report.days_current.first, -1),
+  }
+}
+
+/**
+ * Importă zilele vechi ale unui site din proprietatea arhivată, apoi rulează fereastra obișnuită pe proprietatea
+ * activă, ca ultima rulare (după care se citește starea sursei) să fie cea de zi cu zi. Fără zile de importat, nu
+ * rulează nimic.
+ */
+export async function importArchivedHistory(google: GoogleDeps, plan: HistoryPlan): Promise<{ history: GoogleOutcome[]; regular: GoogleOutcome[] }> {
+  const history = await collectGscArchivedHistory(google, {
+    tenantId: plan.tenant_id, brandId: plan.brand_id, connectionId: plan.source.connection_id, from: plan.from, until: plan.until,
+  })
+  if (history.length === 0) return { history, regular: [] }
+  const regular = await collectGoogle(google, 'gsc', { brandId: plan.brand_id })
+  return { history, regular }
 }
