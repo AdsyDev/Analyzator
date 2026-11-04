@@ -107,7 +107,7 @@ _De completat._
 
 Când: site-ul e legat de o proprietate URL prefix (`https://exemplu.ro/`), iar clientul a dat acces service account-ului și la Domain property (`sc-domain:exemplu.ro`). Domain property include `www`, `http` și subdomeniile, deci cifrele pot crește puțin. Prima dată: Urinal (STADA), 4 nov. 2026.
 
-**Domain property are date doar de când a fost creată.** La STADA, pe 4 nov. 2026: Urinal, Modafen și Proenzi abia din octombrie 2026, Minimartieni din iulie 2026; ferestrele mai vechi ale reimportului au venit goale (`empty_report`). Zilele dinainte se iau din proprietatea URL prefix arhivată (pasul 4 de mai jos), deci clientul **nu scoate accesul pe URL prefix** până la acel import.
+**Domain property are date doar de când a fost creată.** La STADA, pe 4 nov. 2026: Urinal, Modafen și Proenzi abia de pe 11 oct. 2026, Minimartieni de pe 19 iul. 2026, Hepathrombin de pe 7 aug. 2025; ferestrele mai vechi ale reimportului au venit goale (`empty_report`). Zilele dinainte se iau din proprietatea URL prefix arhivată (pasul 4 de mai jos), deci clientul **nu scoate accesul pe URL prefix** până la acel import.
 
 Datele nu se dublează nici înainte, nici după: site-ul are o singură proprietate activă, iar rândurile au cheia (site, zi, device[, query, pagină]), fără proprietate. Fără reimport, însă, seria ar amesteca proprietățile: colectarea obișnuită rescrie doar ultimele 35 de zile.
 
