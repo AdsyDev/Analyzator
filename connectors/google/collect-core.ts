@@ -10,10 +10,13 @@
 // Fluxul unei conexiuni: sync_run → token din Vault → checkCompatibility înainte de fiecare runReport →
 // pagini → normalizare → upsert idempotent → reconciliere → acoperire → sync_run închis (niciodată `succeeded`
 // dacă există erori sau acoperire incompletă).
+//
+// Reimportul istoricului (doar Search Console, un singur brand): ferestre de 35 de zile de la `from`, fiecare cu
+// sync_run-ul ei, de la cea mai veche la fereastra obișnuită (D-27).
 
 import { getSourceToken, loadActiveConnections, recordProviderCalls, utcDay } from '../shared/connections.ts'
 import { finishSyncRun, startSyncRun, type SyncRunError, type SyncRunResult } from '../shared/sync-runs.ts'
-import type { Db, Row } from '../shared/supabase-rest.ts'
+import { assertUuid, type Db, type Row } from '../shared/supabase-rest.ts'
 import { upsertScoped } from '../shared/upsert.ts'
 import {
   GA4_MAX_PAGES,
@@ -23,6 +26,7 @@ import {
   GOOGLE_SCHEMA_VERSION,
   GSC_DATA_STATE,
   GSC_FINAL_LAG_DAYS,
+  GSC_HISTORY_MONTHS,
   GSC_MAX_PAGES,
   GSC_ROW_LIMIT,
   GSC_TIMEZONE,
@@ -31,7 +35,7 @@ import {
   RETRY_BASE_DELAY_MS,
 } from './config.ts'
 import { createGoogleClients, type ClientFactory, type Ga4Client, type GscClient } from './clients.ts'
-import { calendarDateIn, isValidTimeZone, lookbackWindow } from './dates.ts'
+import { addMonthsIso, backfillWindows, calendarDateIn, daysInclusive, isIsoDate, isValidTimeZone, lookbackWindow } from './dates.ts'
 import { callWithRetry } from './errors.ts'
 import { activeUsersIntervals } from './intervals.ts'
 import {
@@ -69,12 +73,29 @@ export type GoogleOutcome =
       brand_id: string
       status: 'succeeded' | 'partial' | 'failed'
       sync_run_id: string
+      /** Fereastra cerută (zile calendaristice în fusul sursei). */
+      period: { start: string; end: string }
       rows_written: number
       api_calls: number
       errors: SyncRunError[]
       coverage: NonNullable<SyncRunResult['coverage']>
       reconciliations: Array<{ metric: string } & ReconcileResult>
     }
+
+export type GoogleRunOptions = {
+  /** Doar conexiunile acestui brand (UUID-ul din adresa paginii site-ului, /admin/clients/<id>). */
+  brandId?: string
+  /**
+   * Reimport de la această zi (YYYY-MM-DD, PT), în ferestre de 35 de zile. Doar Search Console și doar pentru un brand:
+   * folosit când se schimbă proprietatea (de ex. URL prefix → Domain property), ca seria să vină dintr-o singură proprietate.
+   */
+  from?: string
+}
+
+/** Cea mai veche zi pe care o mai are Search Console (16 luni în urmă, în PT). */
+export function gscEarliestDate(now: Date): string {
+  return addMonthsIso(calendarDateIn(now, GSC_TIMEZONE), -GSC_HISTORY_MONTHS)
+}
 
 type BrandConnection = {
   id: string
@@ -97,9 +118,24 @@ const KEYS = {
   source_reconciliations: ['tenant_id', 'brand_id', 'source', 'metric', 'period_start', 'period_end', 'property_ref'],
 } as const
 
-/** Punctul de intrare: colectează toate conexiunile ga4/gsc active (sau doar una dintre surse). */
-export async function collectGoogle(deps: GoogleDeps, only?: GoogleSource): Promise<GoogleOutcome[]> {
+/**
+ * Punctul de intrare: colectează toate conexiunile ga4/gsc active (sau doar una dintre surse, doar un brand). Cu
+ * `options.from`, reimportă istoricul Search Console al brandului ales.
+ */
+export async function collectGoogle(deps: GoogleDeps, only?: GoogleSource, options: GoogleRunOptions = {}): Promise<GoogleOutcome[]> {
   const { db } = deps
+  const now = deps.now ?? (() => new Date())
+  // Verificările vin înaintea oricărei citiri: un reimport greșit nu pornește deloc.
+  if (options.brandId !== undefined) assertUuid(options.brandId, 'brand_id')
+  if (options.from !== undefined) {
+    if (only !== 'gsc') throw new Error('Reimportul istoricului (--from) e doar pentru Search Console: adaugă --only gsc.')
+    if (options.brandId === undefined) throw new Error('Reimportul istoricului (--from) se face pe un singur site: adaugă --brand <uuid>.')
+    if (!isIsoDate(options.from)) throw new Error(`--from nu e o dată YYYY-MM-DD: ${JSON.stringify(options.from)}`)
+    const earliest = gscEarliestDate(now())
+    if (options.from < earliest) throw new Error(`Search Console păstrează ${GSC_HISTORY_MONTHS} luni: cea mai veche zi care se poate cere azi e ${earliest}.`)
+  }
+  const brandFilter = options.brandId ? `&brand_id=eq.${options.brandId}` : ''
+
   const credentials = await loadActiveConnections(db, GOOGLE_CREDENTIAL_PROVIDER, { requireBrand: false })
   const credentialByTenant = new Map(credentials.connections.map((c) => [c.tenant_id, c]))
 
@@ -117,10 +153,11 @@ export async function collectGoogle(deps: GoogleDeps, only?: GoogleSource): Prom
   for (const source of (only ? [only] : ['ga4', 'gsc']) as GoogleSource[]) {
     const connections = await db.select<BrandConnection>(
       'source_connections',
-      `select=id,tenant_id,brand_id,provider,external_account_id,timezone,status&provider=eq.${source}&status=eq.active`,
+      `select=id,tenant_id,brand_id,provider,external_account_id,timezone,status&provider=eq.${source}&status=eq.active${brandFilter}`,
     )
     for (const conn of connections) {
       if (conn.provider !== source || conn.status !== 'active') throw new Error(`Conexiunea ${conn.id} nu corespunde filtrului; opresc rularea.`)
+      if (options.brandId && conn.brand_id !== options.brandId) throw new Error(`Conexiunea ${conn.id} nu e a brandului cerut; opresc rularea.`)
       if (!conn.brand_id) {
         outcomes.push({ source, connection_id: conn.id, brand_id: null, status: 'not_connected', reason: 'conexiune fără brand' })
         continue
@@ -133,10 +170,28 @@ export async function collectGoogle(deps: GoogleDeps, only?: GoogleSource): Prom
         })
         continue
       }
-      outcomes.push(await runConnection(deps, { ...conn, brand_id: conn.brand_id }, credential.id))
+      const brandConn = { ...conn, brand_id: conn.brand_id }
+      if (options.from === undefined) {
+        outcomes.push(await runConnection(deps, brandConn, credential.id, regularWindow(brandConn, now())))
+        continue
+      }
+      for (const window of backfillWindows(options.from, regularWindow(brandConn, now()), GOOGLE_LOOKBACK_DAYS)) {
+        const outcome = await runConnection(deps, brandConn, credential.id, window)
+        outcomes.push(outcome)
+        // Un eșec (de ex. acces refuzat la proprietate) s-ar repeta pe fiecare fereastră: reimportul se oprește aici.
+        if (outcome.status === 'failed') break
+      }
     }
   }
   return outcomes
+}
+
+/** Fereastra obișnuită: ultimele 35 de zile, până ieri în fusul sursei; la Search Console, fără zilele încă nefinalizate. */
+function regularWindow(conn: BrandConnection, instant: Date): { start: string; end: string } {
+  const source = conn.provider as GoogleSource
+  const timezone = source === 'gsc' ? GSC_TIMEZONE : conn.timezone
+  const lag = source === 'gsc' ? GSC_FINAL_LAG_DAYS : 0
+  return lookbackWindow(instant, isValidTimeZone(timezone) ? timezone : GSC_TIMEZONE, GOOGLE_LOOKBACK_DAYS, lag)
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -150,7 +205,12 @@ type RunState = {
   reconciliations: Array<{ metric: string } & ReconcileResult>
 }
 
-async function runConnection(deps: GoogleDeps, conn: BrandConnection & { brand_id: string }, credentialConnectionId: string): Promise<GoogleOutcome> {
+async function runConnection(
+  deps: GoogleDeps,
+  conn: BrandConnection & { brand_id: string },
+  credentialConnectionId: string,
+  window: { start: string; end: string },
+): Promise<GoogleOutcome> {
   const { db } = deps
   const now = deps.now ?? (() => new Date())
   const source = conn.provider as GoogleSource
@@ -158,8 +218,6 @@ async function runConnection(deps: GoogleDeps, conn: BrandConnection & { brand_i
   const state: RunState = { errors: [], coverage: {}, rowsWritten: 0, calls: 0, fatal: false, reconciliations: [] }
   const fail = (code: string, message: string, extra: Partial<SyncRunError> = {}) => state.errors.push({ code, status: null, message, ...extra })
 
-  const lag = source === 'gsc' ? GSC_FINAL_LAG_DAYS : 0
-  const window = lookbackWindow(now(), isValidTimeZone(timezone) ? timezone : GSC_TIMEZONE, GOOGLE_LOOKBACK_DAYS, lag)
   const handle = await startSyncRun(
     db,
     { tenant_id: conn.tenant_id, brand_id: conn.brand_id, source, source_connection_id: conn.id, period_start: window.start, period_end: window.end },
@@ -211,7 +269,7 @@ async function runConnection(deps: GoogleDeps, conn: BrandConnection & { brand_i
   }
   await finishSyncRun(db, handle, { status, rows_written: state.rowsWritten, attempt_count: state.calls, errors: state.errors, coverage: state.coverage }, now)
   return {
-    source, connection_id: conn.id, brand_id: conn.brand_id, status, sync_run_id: handle.id, rows_written: state.rowsWritten,
+    source, connection_id: conn.id, brand_id: conn.brand_id, status, sync_run_id: handle.id, period: window, rows_written: state.rowsWritten,
     api_calls: state.calls, errors: state.errors, coverage: state.coverage, reconciliations: state.reconciliations,
   }
 }
@@ -570,7 +628,9 @@ async function collectGsc(
     })
   }
 
-  const cov = (covered: number) => ({ expected_days: GOOGLE_LOOKBACK_DAYS, covered_days: covered, coverage: Math.round((covered / GOOGLE_LOOKBACK_DAYS) * 10_000) / 10_000 })
+  // Zilele așteptate = zilele ferestrei: 35 la rularea obișnuită, mai puține pe cea mai veche fereastră a unui reimport.
+  const expected = daysInclusive(window.start, window.end)
+  const cov = (covered: number) => ({ expected_days: expected, covered_days: covered, coverage: Math.round((covered / expected) * 10_000) / 10_000 })
   state.coverage.search_daily = cov(days.search_daily.size)
   state.coverage.search_queries = cov(days.search_queries.size)
 }

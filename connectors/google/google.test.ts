@@ -2,7 +2,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { collectGoogle, ga4PropertyName } from './collect-core.ts'
+import { collectGoogle, ga4PropertyName, gscEarliestDate } from './collect-core.ts'
 import { activeUsersIntervals, lastCompleteSunday, previousPeriod } from './intervals.ts'
 import {
   ga4Date,
@@ -18,7 +18,7 @@ import {
 import { classifyGoogleError, callWithRetry } from './errors.ts'
 import { reconcileTotals } from './reconcile.ts'
 import { Ga4ReportSchema, GscResponseSchema } from './schemas.ts'
-import { addDaysIso, calendarDateIn, lookbackWindow } from './dates.ts'
+import { addDaysIso, addMonthsIso, backfillWindows, calendarDateIn, daysInclusive, isIsoDate, lookbackWindow } from './dates.ts'
 import type { Ga4Client, GscClient, GoogleClients } from './clients.ts'
 import { FakeDb } from '../shared/test-helpers.ts'
 
@@ -263,6 +263,38 @@ describe('dates', () => {
     // 07:00 UTC pe 8 oct = 00:00 pe 8 oct în PT → ieri = 7 oct → ultima zi cerută = 5 oct.
     assert.deepEqual(lookbackWindow(NOW, 'America/Los_Angeles', 35, 2), { start: '2026-09-01', end: '2026-10-05' })
   })
+
+  test('reimport: ferestre de 35 de zile de la cea mai veche, ultima = fereastra obișnuită, prima tăiată la `from`', () => {
+    const current = { start: '2026-09-01', end: '2026-10-05' }
+    assert.deepEqual(backfillWindows('2026-07-01', current, 35), [
+      { start: '2026-07-01', end: '2026-07-27' },
+      { start: '2026-07-28', end: '2026-08-31' },
+      current,
+    ])
+    // Ferestrele se ating, fără goluri și fără suprapuneri.
+    const w = backfillWindows('2025-06-08', current, 35)
+    for (let i = 1; i < w.length; i++) assert.equal(w[i]!.start, addDaysIso(w[i - 1]!.end, 1))
+    assert.equal(w[0]!.start, '2025-06-08')
+    assert.ok(w.slice(1).every((x) => daysInclusive(x.start, x.end) === 35))
+  })
+
+  test('reimport cu `from` în fereastra obișnuită (sau după): doar fereastra obișnuită', () => {
+    const current = { start: '2026-09-01', end: '2026-10-05' }
+    assert.deepEqual(backfillWindows('2026-09-01', current, 35), [current])
+    assert.deepEqual(backfillWindows('2026-09-20', current, 35), [current])
+    assert.deepEqual(backfillWindows('2026-08-31', current, 35), [{ start: '2026-08-31', end: '2026-08-31' }, current])
+  })
+
+  test('date ISO, zile dintr-un interval, luni înapoi', () => {
+    assert.ok(isIsoDate('2025-07-04'))
+    for (const bad of ['2025-7-4', '2025-02-30', '2025-13-01', '04.07.2025', '']) assert.equal(isIsoDate(bad), false, bad)
+    assert.equal(daysInclusive('2026-09-01', '2026-10-05'), 35)
+    assert.equal(daysInclusive('2026-03-28', '2026-03-30'), 3, 'trecerea la ora de vară nu schimbă numărul de zile')
+    assert.equal(addMonthsIso('2026-11-04', -16), '2025-07-04')
+    assert.equal(addMonthsIso('2026-10-31', -1), '2026-09-30')
+    assert.equal(addMonthsIso('2024-03-31', -1), '2024-02-29')
+    assert.equal(gscEarliestDate(NOW), '2025-06-08')
+  })
 })
 
 // --- Colectare completă cu clienți simulați ------------------------------------------------------------------------------
@@ -276,6 +308,7 @@ type FakeOpts = {
   dailyOverride?: unknown
   totalsOverride?: unknown
   gscTotalsOverride?: unknown
+  denyGsc?: boolean
 }
 
 function fakeClients(opts: FakeOpts = {}) {
@@ -316,6 +349,7 @@ function fakeClients(opts: FakeOpts = {}) {
   const gs: GscClient = {
     async query(req) {
       calls.gsc.push({ dims: req.dimensions.join(','), startRow: req.startRow, range: `${req.startDate}..${req.endDate}` })
+      if (opts.denyGsc) throw { code: 403, message: 'User does not have sufficient permission for site' }
       const slice = (payload: unknown) => {
         const p = payload as { rows: unknown[] }
         return { ...p, rows: p.rows.slice(req.startRow, req.startRow + req.rowLimit) }
@@ -346,9 +380,9 @@ function makeDb(extra: Record<string, Array<Record<string, unknown>>> = {}, cred
 }
 
 const noSleep = { sleep: async () => undefined }
-const run = (db: FakeDb, opts: FakeOpts = {}, only?: 'ga4' | 'gsc', extra: Partial<Parameters<typeof collectGoogle>[0]> = {}) => {
+const run = (db: FakeDb, opts: FakeOpts = {}, only?: 'ga4' | 'gsc', extra: Partial<Parameters<typeof collectGoogle>[0]> = {}, options: Parameters<typeof collectGoogle>[2] = {}) => {
   const f = fakeClients(opts)
-  return collectGoogle({ db, createClients: () => f.clients, now: () => NOW, ...noSleep, ...extra }, only).then((outcomes) => ({ outcomes, ...f }))
+  return collectGoogle({ db, createClients: () => f.clients, now: () => NOW, ...noSleep, ...extra }, only, options).then((outcomes) => ({ outcomes, ...f }))
 }
 
 describe('collectGoogle: GA4', () => {
@@ -588,6 +622,76 @@ describe('collectGoogle: Search Console', () => {
     if (o.status === 'not_connected') assert.fail()
     assert.equal(o.status, 'failed')
     assert.equal(calls.gsc.length, 0)
+  })
+})
+
+describe('collectGoogle: reimportul istoricului Search Console (D-27)', () => {
+  const B3 = '20000000-0000-0000-0000-000000000012'
+  const GSC_CONN_B3 = '50000000-0000-0000-0000-0000000000a4'
+  const withSecondSite = () =>
+    makeDb({ source_connections: [{ id: GSC_CONN_B3, tenant_id: T1, brand_id: B3, provider: 'gsc', external_account_id: 'https://altsite.ro/', status: 'active', credential_status: 'missing', timezone: 'Europe/Bucharest' }] })
+
+  test('o rulare per fereastră, de la cea mai veche; ultima e fereastra obișnuită; doar site-ul ales', async () => {
+    const db = withSecondSite()
+    const { outcomes, calls } = await run(db, {}, 'gsc', { gscRowLimit: 3 }, { brandId: B1, from: '2026-07-01' })
+    const periods = outcomes.map((o) => (o.status === 'not_connected' ? null : `${o.period.start}..${o.period.end}`))
+    assert.deepEqual(periods, ['2026-07-01..2026-07-27', '2026-07-28..2026-08-31', '2026-09-01..2026-10-05'])
+    assert.ok(outcomes.every((o) => o.connection_id === GSC_CONN && o.status === 'succeeded'), JSON.stringify(outcomes.map((o) => o.status)))
+    // Fiecare fereastră are sync_run-ul ei, iar ultimul creat e cel al ferestrei obișnuite (după el se citește starea sursei).
+    const runs = db.tables.sync_runs!
+    assert.deepEqual(runs.map((r) => `${r.period_start}..${r.period_end}`), periods)
+    assert.ok(runs.every((r) => r.brand_id === B1 && r.source_connection_id === GSC_CONN))
+    // Cererile urmează ferestrele, în ordine; celălalt site nu e atins.
+    assert.deepEqual([...new Set(calls.gsc.map((c) => c.range))], ['2026-07-01..2026-07-27', '2026-07-28..2026-08-31', '2026-09-01..2026-10-05'])
+    assert.ok([...db.tables.search_daily!, ...db.tables.search_queries!].every((r) => r.brand_id === B1 && r.source_id === GSC_CONN))
+    // Acoperirea se raportează la zilele ferestrei (27 pe prima, 35 pe celelalte).
+    assert.deepEqual(runs.map((r) => (r.coverage as Record<string, { expected_days: number }>).search_daily!.expected_days), [27, 35, 35])
+  })
+
+  test('reimportul e idempotent: rândurile se suprascriu pe cheia naturală, nu se adaugă', async () => {
+    const db = makeDb()
+    await run(db, {}, 'gsc', { gscRowLimit: 3 })
+    const before = [db.tables.search_daily!.length, db.tables.search_queries!.length]
+    await run(db, {}, 'gsc', { gscRowLimit: 3 }, { brandId: B1, from: '2026-07-01' })
+    assert.deepEqual([db.tables.search_daily!.length, db.tables.search_queries!.length], before)
+  })
+
+  test('acces refuzat la proprietate: se oprește după prima fereastră, fără alte cereri', async () => {
+    const db = makeDb()
+    const { outcomes, calls } = await run(db, { denyGsc: true }, 'gsc', {}, { brandId: B1, from: '2026-07-01' })
+    assert.deepEqual(outcomes.map((o) => o.status), ['failed'])
+    assert.ok(calls.gsc.every((c) => c.range === '2026-07-01..2026-07-27'), JSON.stringify(calls.gsc))
+    assert.equal(db.tables.sync_runs!.length, 1)
+    assert.equal(db.tables.search_daily, undefined)
+  })
+
+  test('cereri greșite refuzate înainte de orice citire sau apel', async () => {
+    const cases: Array<[only: 'ga4' | 'gsc' | undefined, options: Parameters<typeof collectGoogle>[2], message: RegExp]> = [
+      ['ga4', { brandId: B1, from: '2026-07-01' }, /doar pentru Search Console/],
+      [undefined, { brandId: B1, from: '2026-07-01' }, /doar pentru Search Console/],
+      ['gsc', { from: '2026-07-01' }, /un singur site/],
+      ['gsc', { brandId: B1, from: '2026-7-1' }, /nu e o dată YYYY-MM-DD/],
+      ['gsc', { brandId: B1, from: '2025-06-07' }, /16 luni: cea mai veche zi care se poate cere azi e 2025-06-08/],
+      ['gsc', { brandId: 'urinal' }, /brand_id invalid/],
+    ]
+    for (const [only, options, message] of cases) {
+      const db = makeDb()
+      const f = fakeClients()
+      await assert.rejects(collectGoogle({ db, createClients: () => f.clients, now: () => NOW, ...noSleep }, only, options), message, JSON.stringify(options))
+      assert.equal(db.log.length, 0, 'nicio citire din bază')
+      assert.equal(f.calls.gsc.length + f.calls.report.length, 0)
+    }
+  })
+
+  test('cea mai veche zi permisă trece; --brand fără --from = rularea obișnuită, doar pe acel site', async () => {
+    const db = withSecondSite()
+    const { outcomes } = await run(db, {}, 'gsc', { gscRowLimit: 3 }, { brandId: B1, from: '2025-06-08' })
+    assert.equal(outcomes[0]!.status === 'not_connected' ? null : outcomes[0]!.period.start, '2025-06-08')
+    assert.ok(outcomes.every((o) => o.brand_id === B1))
+
+    const db2 = withSecondSite()
+    const regular = await run(db2, {}, 'gsc', { gscRowLimit: 3 }, { brandId: B3 })
+    assert.deepEqual(regular.outcomes.map((o) => [o.connection_id, o.status === 'not_connected' ? null : `${o.period.start}..${o.period.end}`]), [[GSC_CONN_B3, '2026-09-01..2026-10-05']])
   })
 })
 

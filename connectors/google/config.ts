@@ -30,6 +30,11 @@ export const GSC_DATA_STATE = 'final'
  * Zilele sărite intră la rularea următoare (fereastra de 35 de zile se suprapune).
  */
 export const GSC_FINAL_LAG_DAYS = 2
+/**
+ * Search Console păstrează ultimele 16 luni. Un reimport al istoricului (`--from`) nu cere zile mai vechi: ar întoarce
+ * ferestre goale, deci rulări „partial” fără motiv.
+ */
+export const GSC_HISTORY_MONTHS = 16
 
 export const RETRY_ATTEMPTS = 3
 export const RETRY_BASE_DELAY_MS = 1000
