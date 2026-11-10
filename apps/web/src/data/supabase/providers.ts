@@ -84,6 +84,9 @@ const insights: InsightsProvider = {
   saveDraft: async () => notConnected(INSIGHTS_OFF),
   deleteDraft: async () => notConnected(INSIGHTS_OFF),
   transition: async () => notConnected(INSIGHTS_OFF),
+  supersede: async () => notConnected(INSIGHTS_OFF),
+  addRecommendation: async () => notConnected(INSIGHTS_OFF),
+  deleteRecommendation: async () => notConnected(INSIGHTS_OFF),
   addAction: async () => notConnected(INSIGHTS_OFF),
   transitionAction: async () => notConnected(INSIGHTS_OFF),
 }

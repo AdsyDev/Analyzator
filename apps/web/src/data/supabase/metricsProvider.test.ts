@@ -18,6 +18,12 @@ describe('createSupabaseMetrics', () => {
     expect(bundle.items[0]).toMatchObject({ metric_key: 'meta_ads_spend', value: 70, relative_change: 40, status: 'ok', source: 'meta_ads' })
   })
 
+  it('comparația cu anul trecut pleacă spre server ca tip de perioadă `yoy`, nu se calculează în interfață', async () => {
+    const { client, rpcs } = fakeDataClient({ tables: { metric_definitions_current: [def] }, rpc: () => ({ data: envelope }) })
+    await createSupabaseMetrics(client).metrics({ ...ctx, comparison: 'year_ago' }, ['meta_ads_spend'])
+    expect(rpcs[0]?.args).toMatchObject({ p_kind: 'yoy', p_start: '2026-09-10', p_end: '2026-10-07' })
+  })
+
   it('o eroare de acces devine un mesaj în română, nu o valoare', async () => {
     const { client } = fakeDataClient({ rpc: () => ({ error: { code: '42501', message: 'x' } }) })
     await expect(createSupabaseMetrics(client).metrics(ctx, ['meta_ads_spend'])).rejects.toThrow('Nu ai acces la acest spațiu de brand.')

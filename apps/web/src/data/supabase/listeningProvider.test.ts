@@ -110,6 +110,31 @@ describe('analize: scrieri (Supabase)', () => {
     expect(await ask({ code: 'XX000', message: 'Tranziție nepermisă' })).toEqual({ kind: 'error', message: 'Statusul analizei nu a putut fi schimbat. Reîncearcă.' })
   })
 
+  it('versiune nouă: pleacă textele și `supersedes_id`; versiunea, dovezile și recomandările le pune serverul', async () => {
+    const { client, calls } = fakeDataClient({ userId: 'me' })
+    const insight = { id: 'i1', brand_id: 'b1', title: 'Analiză', summary: 'C', interpretation: 'I', author: { id: 'a', name: 'A', role: '' }, period: { from: '2026-10-01', to: '2026-10-07' }, status: 'published' as const, evidence: [], limits: 'L', actions: [], updated_at: '', published_at: '' }
+    expect(await createSupabaseInsights(client).supersede(brand, insight)).toEqual({ kind: 'ready', data: { id: 'new-id' } })
+    expect(calls).toHaveLength(1)
+    expect(calls[0]?.payload).toEqual({ tenant_id: 't1', brand_id: 'b1', author_id: 'me', supersedes_id: 'i1', title: 'Analiză', period_start: '2026-10-01', period_end: '2026-10-07', period_kind: 'custom', summary: 'C', interpretation: 'I', limits: 'L' })
+  })
+
+  it('recomandările: inserare cu brandul și analiza; ștergere doar pe ID', async () => {
+    const tables = { recommendations: [{ id: 'r1' }, { id: 'r2' }] }
+    const { client, calls } = fakeDataClient({ tables })
+    const p = createSupabaseInsights(client)
+    await p.addRecommendation(brand, 'i1', { problem: ' P ', action: ' A ', expected_benefit: ' B ', priority: 1 })
+    expect(calls[0]?.payload).toEqual({ tenant_id: 't1', brand_id: 'b1', insight_id: 'i1', problem: 'P', action: 'A', expected_benefit: 'B', priority: 1 })
+    await p.deleteRecommendation('r1')
+    expect(tables.recommendations).toEqual([{ id: 'r2' }])
+  })
+
+  it('responsabilul ales pleacă spre server, care îl verifică; fără alegere rămâne utilizatorul curent', async () => {
+    const { client, calls } = fakeDataClient({ userId: 'me' })
+    await createSupabaseInsights(client).addAction(brand, 'i1', { title: 'x', owner_id: 'coleg', due: null, effort: null, tracked_metric_key: null })
+    await createSupabaseInsights(client).addAction(brand, 'i1', { title: 'y', owner_id: null, due: null, effort: null, tracked_metric_key: null })
+    expect(calls.map((c) => (c.payload as { responsible_user_id: string }).responsible_user_id)).toEqual(['coleg', 'me'])
+  })
+
   it('ștergerea țintește doar analiza cerută', async () => {
     const tables = { insights: [{ id: 'i1' }, { id: 'i2' }] }
     const { client } = fakeDataClient({ tables })

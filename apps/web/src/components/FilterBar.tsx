@@ -22,8 +22,8 @@ interface FilterBarProps {
   onReset: () => void
   filterDefs?: readonly FilterDef[]
   /**
-   * Comparația cu anul trecut cere istoric comparabil (spec 2.3) și un mod de calcul pe server;
-   * `metrics.comparison_period` nu are încă unul pentru intervale arbitrare, deci implicit e dezactivată.
+   * Comparația cu anul trecut e calculată de server (`kind = yoy`, H-1). Rămâne un comutator, ca un ecran fără
+   * comparație pe an să o poată dezactiva, cu motivul afișat.
    */
   yearAgoAvailable?: boolean
   now?: Date
@@ -38,7 +38,7 @@ const PRESET_LABELS: Record<PeriodPreset, string> = {
   custom: 'Interval personalizat',
 }
 const COMPARISON_LABELS: Record<ComparisonMode, string> = { previous: 'perioada anterioară', year_ago: 'anul trecut' }
-const YEAR_AGO_UNAVAILABLE = 'Comparația cu anul trecut nu e disponibilă încă pentru acest interval.'
+const YEAR_AGO_UNAVAILABLE = 'Comparația cu anul trecut nu e disponibilă pe acest ecran.'
 const RANGE_PROBLEM = 'Alege un interval încheiat, cu data de început înaintea celei de sfârșit.'
 
 /** Un interval personalizat e valid dacă e încheiat (până ieri, în Europe/Bucharest) și nu e inversat. */
@@ -210,7 +210,7 @@ function FilterSheet({ value, filterDefs, yearAgoAvailable, now, onApply, onClos
   )
 }
 
-export function FilterBar({ value, onChange, onReset, filterDefs = [], yearAgoAvailable = false, now }: FilterBarProps) {
+export function FilterBar({ value, onChange, onReset, filterDefs = [], yearAgoAvailable = true, now }: FilterBarProps) {
   const { period, comparison, filters } = value
   const compare = comparisonRange(period, comparison)
 

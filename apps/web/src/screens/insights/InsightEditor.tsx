@@ -1,5 +1,5 @@
 import { useId, useState, type FormEvent } from 'react'
-import type { ActionTransition, Insight, InsightDraft, MetricDefinition, NewAction } from '../../contracts'
+import type { ActionTransition, Insight, InsightDraft, MetricDefinition, NewAction, NewRecommendation } from '../../contracts'
 import { Button } from '../../components/ui/Button'
 import { Dialog } from '../../components/ui/Dialog'
 import { lastCompleteDay } from '../../lib/period'
@@ -127,17 +127,20 @@ export function InsightEditor({ insight, defaultPeriod, definitions, onSave, onC
 interface ActionFormProps {
   insightTitle: string
   definitions: MetricDefinition[]
+  /** Membrii activi ai agenției dintre care se poate alege responsabilul; gol = doar utilizatorul curent. */
+  owners?: ReadonlyArray<{ id: string; name: string }>
   onSave: (action: NewAction) => Promise<string | null>
   onClose: () => void
 }
 
 /** O acțiune nouă pe o analiză: ce facem, până când, cu ce efort și ce indicator urmărim după. */
-export function ActionForm({ insightTitle, definitions, onSave, onClose }: ActionFormProps) {
+export function ActionForm({ insightTitle, definitions, owners = [], onSave, onClose }: ActionFormProps) {
   const id = useId()
   const [title, setTitle] = useState('')
   const [due, setDue] = useState('')
   const [effort, setEffort] = useState('')
   const [metric, setMetric] = useState('')
+  const [owner, setOwner] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -146,7 +149,7 @@ export function ActionForm({ insightTitle, definitions, onSave, onClose }: Actio
     if (!title.trim()) return setError('Acțiunea are nevoie de un titlu.')
     setBusy(true)
     setError(null)
-    const failed = await onSave({ title, due: due || null, effort: effort.trim() || null, tracked_metric_key: metric || null })
+    const failed = await onSave({ title, owner_id: owner || null, due: due || null, effort: effort.trim() || null, tracked_metric_key: metric || null })
     setBusy(false)
     if (failed) setError(failed)
   }
@@ -164,7 +167,7 @@ export function ActionForm({ insightTitle, definitions, onSave, onClose }: Actio
       }
     >
       <form id={`${id}-form`} onSubmit={submit} className="flex flex-col gap-4" noValidate>
-        <p className="text-[12.5px] text-text-2">Din analiza „{insightTitle}”. Responsabilul ești tu; clientul o vede după ce e agreată.</p>
+        <p className="text-[12.5px] text-text-2">Din analiza „{insightTitle}”. {owners.length === 0 ? 'Responsabilul ești tu; c' : 'C'}lientul o vede după ce e agreată.</p>
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${id}-title`} className={labelCls}>Ce facem</label>
           <input id={`${id}-title`} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={300} className={field} autoComplete="off" />
@@ -179,6 +182,17 @@ export function ActionForm({ insightTitle, definitions, onSave, onClose }: Actio
             <input id={`${id}-effort`} value={effort} onChange={(e) => setEffort(e.target.value)} maxLength={120} placeholder="de ex. 2 zile" className={field} autoComplete="off" />
           </div>
         </div>
+        {owners.length > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`${id}-owner`} className={labelCls}>Responsabil</label>
+            <select id={`${id}-owner`} value={owner} onChange={(e) => setOwner(e.target.value)} className={field}>
+              <option value="">Eu</option>
+              {owners.map((o) => (
+                <option key={o.id} value={o.id}>{o.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="flex flex-col gap-1.5">
           <label htmlFor={`${id}-metric`} className={labelCls}>KPI urmărit</label>
           <select id={`${id}-metric`} value={metric} onChange={(e) => setMetric(e.target.value)} className={field}>
@@ -190,6 +204,92 @@ export function ActionForm({ insightTitle, definitions, onSave, onClose }: Actio
         </div>
         <ErrorNote message={error} />
       </form>
+    </Dialog>
+  )
+}
+
+interface RecommendationsProps {
+  insight: Insight
+  onAdd: (rec: NewRecommendation) => Promise<string | null>
+  onDelete: (id: string) => Promise<string | null>
+  onClose: () => void
+}
+
+/** Recomandările unei ciorne: problema, ce propunem, beneficiul așteptat și prioritatea (1–3). */
+export function RecommendationsDialog({ insight, onAdd, onDelete, onClose }: RecommendationsProps) {
+  const id = useId()
+  const [problem, setProblem] = useState('')
+  const [action, setAction] = useState('')
+  const [benefit, setBenefit] = useState('')
+  const [priority, setPriority] = useState<1 | 2 | 3>(2)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const list = insight.recommendations ?? []
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!problem.trim() || !action.trim() || !benefit.trim()) return setError('Completează problema, recomandarea și beneficiul așteptat.')
+    setBusy(true)
+    setError(null)
+    const failed = await onAdd({ problem, action, expected_benefit: benefit, priority })
+    setBusy(false)
+    if (failed) return setError(failed)
+    setProblem('')
+    setAction('')
+    setBenefit('')
+  }
+  async function remove(recId: string) {
+    setBusy(true)
+    setError(await onDelete(recId))
+    setBusy(false)
+  }
+
+  return (
+    <Dialog open onClose={onClose} title="Recomandări" footer={<Button variant="ghost" onClick={onClose}>Închide</Button>}>
+      <div className="flex flex-col gap-4">
+        <p className="text-[12.5px] text-text-2">Pentru „{insight.title}”. Se pot schimba doar cât analiza e ciornă; clientul le vede după publicare.</p>
+        {list.length === 0 ? (
+          <p className="text-[13px] text-text-2">Nicio recomandare încă.</p>
+        ) : (
+          <ul className="flex flex-col gap-2" aria-label="Recomandările analizei">
+            {list.map((r) => (
+              <li key={r.id} className="flex items-start gap-3 rounded-lg border border-border px-3 py-2 text-[13px]">
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium">{r.action}</span>
+                  <span className="mt-0.5 block text-[12.5px] text-text-2">Prioritate {r.priority} · {r.problem}</span>
+                </span>
+                <Button variant="ghost" onClick={() => void remove(r.id)} disabled={busy} aria-label={`Șterge recomandarea: ${r.action}`}>Șterge</Button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <form onSubmit={submit} className="flex flex-col gap-3 border-t border-border pt-4" noValidate>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`${id}-problem`} className={labelCls}>Problema</label>
+            <textarea id={`${id}-problem`} value={problem} onChange={(e) => setProblem(e.target.value)} rows={2} maxLength={5000} className={field} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`${id}-action`} className={labelCls}>Ce recomandăm</label>
+            <textarea id={`${id}-action`} value={action} onChange={(e) => setAction(e.target.value)} rows={2} maxLength={5000} className={field} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`${id}-benefit`} className={labelCls}>Beneficiu așteptat</label>
+            <textarea id={`${id}-benefit`} value={benefit} onChange={(e) => setBenefit(e.target.value)} rows={2} maxLength={5000} className={field} placeholder="Ce ne așteptăm să se schimbe și cum verificăm." />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={`${id}-priority`} className={labelCls}>Prioritate</label>
+            <select id={`${id}-priority`} value={priority} onChange={(e) => setPriority(Number(e.target.value) as 1 | 2 | 3)} className={field}>
+              <option value={1}>1 (cea mai mare)</option>
+              <option value={2}>2</option>
+              <option value={3}>3</option>
+            </select>
+          </div>
+          <ErrorNote message={error} />
+          <div>
+            <Button variant="primary" type="submit" loading={busy}>Adaugă recomandarea</Button>
+          </div>
+        </form>
+      </div>
     </Dialog>
   )
 }

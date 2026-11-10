@@ -99,3 +99,9 @@ Clientul primește în continuare doar ce permite RLS: analize publicate și ac�
 (metricile citate; SEOmonitor primește `options.device = desktop`), `insight_transitions`, `actions` (responsabilul e utilizatorul
 curent) și `action_transitions`. Nu apare nicio funcție nouă în `public`. Mesajele triggerelor (de ex. ce lipsește la trimiterea în
 review) ajung la utilizator; erorile de schemă rămân generice. Recomandările și înlocuirea unei analize publicate nu au încă formular.
+
+### Completări la editor (10 nov. 2026, H-4)
+
+- **Recomandări:** `InsightsProvider.addRecommendation` și `deleteRecommendation` scriu în `recommendations` (problemă, recomandare, beneficiu așteptat, prioritate 1–3). Triggerul existent le permite doar cât analiza e ciornă. `brand_insights` le întoarce în ordinea priorității, iar analiza publicată le arată și clientului.
+- **Versiune nouă:** `supersede` inserează o analiză cu `supersedes_id`; versiunea, dovezile și recomandările le copiază serverul. O analiză publicată are cel mult o versiune de înlocuire în lucru; la publicarea ei, cea veche devine `superseded`.
+- **Responsabil:** `NewAction.owner_id` e opțional. Selectorul apare doar pentru `agency_admin` (numele membrilor vin prin funcția `users`, E10) și listează membrii activi cu rol de agenție din clientul brandului. Serverul verifică oricum (`actions_before_write`).

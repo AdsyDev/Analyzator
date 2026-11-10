@@ -13,7 +13,7 @@ export function createSupabaseTraffic(client: DataClient): TrafficProvider {
     async channels(ctx, device) {
       // GA4 nu e colectat pe device: nu arătăm canale nefiltrate sub un filtru de device.
       if (device) return notConnected('Defalcarea pe device nu e colectată din GA4; canalele sunt disponibile doar pentru toate device-urile.')
-      const { data, error } = await client.rpc('brand_traffic_channels', { p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to, p_kind: serverPeriodKind(ctx.period.preset) })
+      const { data, error } = await client.rpc('brand_traffic_channels', { p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to, p_kind: serverPeriodKind(ctx.period.preset, ctx.comparison) })
       if (error) return failed(rpcError(error))
       const d = data as { connected?: boolean; channels?: Array<Record<string, unknown>>; data_as_of?: string | null } | null
       if (!d || typeof d.connected !== 'boolean') return failed(CONTRACT)

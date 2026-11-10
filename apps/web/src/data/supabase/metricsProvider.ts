@@ -64,7 +64,7 @@ export function createSupabaseMetrics(client: DataClient): MetricsProvider {
           p_metric_keys: [...keys],
           p_start: ctx.period.from,
           p_end: ctx.period.to,
-          p_kind: serverPeriodKind(ctx.period.preset),
+          p_kind: serverPeriodKind(ctx.period.preset, ctx.comparison),
           p_device: ctx.filters?.device ?? null,
         }),
       ])

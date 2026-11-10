@@ -35,6 +35,12 @@ export const GSC_FINAL_LAG_DAYS = 2
  * ferestre goale, deci rulări „partial” fără motiv.
  */
 export const GSC_HISTORY_MONTHS = 16
+/**
+ * Cât istoric GA4 se poate reimporta cu `--from` (H-3). Limita e a noastră, nu a furnizorului: acoperă comparația cu
+ * anul trecut pentru perioade de până la un trimestru și ține volumul sub control (un rând pe zi, canal, sursă și
+ * landing page). Peste ea, reimportul se cere în mai mulți pași, după verificarea spațiului din bază.
+ */
+export const GA4_HISTORY_MONTHS = 16
 
 export const RETRY_ATTEMPTS = 3
 export const RETRY_BASE_DELAY_MS = 1000

@@ -17,7 +17,7 @@ import { EvidenceHost, type EvidenceTarget } from '../shared/EvidenceHost'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
 import { ACTION_LABEL } from '../overview/InsightSections'
-import { ACTION_STEP, ActionForm, EVIDENCE_KEYS, InsightEditor, NoteDialog } from './InsightEditor'
+import { ACTION_STEP, ActionForm, EVIDENCE_KEYS, InsightEditor, NoteDialog, RecommendationsDialog } from './InsightEditor'
 
 type StatusTab = 'all' | InsightStatus
 
@@ -60,6 +60,8 @@ interface Workflow {
   onDelete: (i: Insight) => void
   onTransition: (i: Insight, to: InsightTransition) => void
   onAddAction: (i: Insight) => void
+  onRecommendations: (i: Insight) => void
+  onSupersede: (i: Insight) => void
   onActionStep: (a: ActionRow, to: ActionTransition['to']) => void
   busy: string | null
 }
@@ -97,7 +99,17 @@ function InsightsContent({ brand, ctx, role }: { brand: Brand; ctx: QueryContext
   const [editing, setEditing] = useState<{ insight: Insight | null } | null>(null)
   const [actionFor, setActionFor] = useState<Insight | null>(null)
   const [note, setNote] = useState<PendingNote | null>(null)
+  const [recsFor, setRecsFor] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  // Responsabilul se poate alege doar unde numele membrilor sunt vizibile (agency_admin, E10); altfel rămâne utilizatorul curent.
+  const people = useAsync(() => (role === 'agency_admin' ? providers.users.people() : Promise.resolve(null)), [providers, role])
+  const owners = useMemo(() => {
+    const r = people.state.status === 'done' ? people.state.value : null
+    if (!r || r.kind !== 'ready') return []
+    return r.data
+      .filter((p) => p.tenant_id === brand.tenant_id && p.membership_active && p.role !== 'client_viewer')
+      .map((p) => ({ id: p.user_id, name: p.name ?? p.email ?? `Utilizator ${p.user_id.slice(0, 8)}` }))
+  }, [people.state, brand.tenant_id])
 
   const open = (q: EvidenceQuery, label: string) => setTarget({ page: 'Analize și acțiuni', label, query: q })
 
@@ -125,6 +137,8 @@ function InsightsContent({ brand, ctx, role }: { brand: Brand; ctx: QueryContext
     onEdit: (i) => setEditing({ insight: i }),
     onDelete: (i) => void step(`del:${i.id}`, () => providers.insights.deleteDraft(i.id), 'Ciorna a fost ștearsă.'),
     onAddAction: (i) => setActionFor(i),
+    onRecommendations: (i) => setRecsFor(i.id),
+    onSupersede: (i) => void step(`sup:${i.id}`, () => providers.insights.supersede(brand, i), 'Versiunea nouă e în ciornă, cu dovezile și recomandările copiate. Cea publicată rămâne vizibilă până la publicarea ei.'),
     onTransition: (i, to) => {
       if (to === 'draft') {
         setNote({ title: 'Returnează la draft', label: 'Motiv', hint: 'Autorul vede motivul și poate corecta analiza.', confirm: 'Returnează', run: (text) => providers.insights.transition(i.id, 'draft', text), done: 'Analiza a fost returnată la draft.' })
@@ -168,6 +182,7 @@ function InsightsContent({ brand, ctx, role }: { brand: Brand; ctx: QueryContext
         <ActionForm
           insightTitle={actionFor.title}
           definitions={definitions}
+          owners={owners}
           onClose={() => setActionFor(null)}
           onSave={async (action) => {
             const failed = await run('action', () => providers.insights.addAction(brand, actionFor.id, action), 'Acțiunea a fost adăugată.')
@@ -176,6 +191,19 @@ function InsightsContent({ brand, ctx, role }: { brand: Brand; ctx: QueryContext
           }}
         />
       )}
+      {recsFor &&
+        (() => {
+          // Analiza se ia din lista curentă, ca dialogul să arate recomandările imediat după fiecare adăugare sau ștergere.
+          const current = list.state.status === 'done' && list.state.value.kind === 'ready' ? list.state.value.data.find((i) => i.id === recsFor) : undefined
+          return current ? (
+            <RecommendationsDialog
+              insight={current}
+              onClose={() => setRecsFor(null)}
+              onAdd={(rec) => run('rec', () => providers.insights.addRecommendation(brand, current.id, rec), 'Recomandarea a fost adăugată.')}
+              onDelete={(id) => run('rec', () => providers.insights.deleteRecommendation(id), 'Recomandarea a fost ștearsă.')}
+            />
+          ) : null
+        })()}
       {note && (
         <NoteDialog
           title={note.title}
@@ -202,6 +230,7 @@ function InsightSteps({ insight, w }: { insight: Insight; w: Workflow }) {
       {insight.status === 'draft' && (
         <>
           <Button onClick={() => w.onEdit(insight)} disabled={busy}>Editează</Button>
+          <Button onClick={() => w.onRecommendations(insight)} disabled={busy}>Recomandări ({insight.recommendations?.length ?? 0})</Button>
           <Button variant="primary" onClick={() => w.onTransition(insight, 'in_review')} disabled={busy}>Trimite la review</Button>
           <Button variant="ghost" onClick={() => w.onDelete(insight)} disabled={busy}>Șterge ciorna</Button>
         </>
@@ -216,6 +245,7 @@ function InsightSteps({ insight, w }: { insight: Insight; w: Workflow }) {
           <p className="text-[12.5px] text-text-2">Așteaptă review-ul unui strategist sau al unui administrator.</p>
         ))}
       {insight.status !== 'draft' && <Button onClick={() => w.onAddAction(insight)} disabled={busy}>Adaugă acțiune</Button>}
+      {insight.status === 'published' && <Button variant="ghost" onClick={() => w.onSupersede(insight)} disabled={busy}>Versiune nouă</Button>}
     </div>
   )
 }

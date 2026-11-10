@@ -49,7 +49,7 @@ export function createSupabaseAi(client: DataClient): AiVisibilityProvider {
     },
 
     engines: (ctx, f) =>
-      call('brand_ai_engines', { ...base(ctx), p_kind: serverPeriodKind(ctx.period.preset), p_group: f.group }, (d) => {
+      call('brand_ai_engines', { ...base(ctx), p_kind: serverPeriodKind(ctx.period.preset, ctx.comparison), p_group: f.group }, (d) => {
         const list = d.engines as Array<Record<string, unknown>>
         if (!Array.isArray(list) || list.some((e) => !isEngine(e.engine) || !isStatus(e.status))) return null
         return list.map<AiEngineStat>((e) => ({

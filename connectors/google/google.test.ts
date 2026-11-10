@@ -681,9 +681,11 @@ describe('collectGoogle: reimportul istoricului Search Console (D-27)', () => {
 
   test('cereri greșite refuzate înainte de orice citire sau apel', async () => {
     const cases: Array<[only: 'ga4' | 'gsc' | undefined, options: Parameters<typeof collectGoogle>[2], message: RegExp]> = [
-      ['ga4', { brandId: B1, from: '2026-07-01' }, /doar pentru Search Console/],
-      [undefined, { brandId: B1, from: '2026-07-01' }, /doar pentru Search Console/],
+      [undefined, { brandId: B1, from: '2026-07-01' }, /o singură sursă: adaugă --only gsc sau --only ga4/],
       ['gsc', { from: '2026-07-01' }, /un singur site/],
+      ['ga4', { from: '2026-07-01' }, /un singur site/],
+      ['ga4', { brandId: B1, from: '2025-06-07' }, /Reimportul GA4 e limitat la 16 luni: cea mai veche zi care se poate cere azi e 2025-06-08/],
+      ['ga4', { brandId: B1, from: 'ieri' }, /nu e o dată YYYY-MM-DD/],
       ['gsc', { brandId: B1, from: '2026-7-1' }, /nu e o dată YYYY-MM-DD/],
       ['gsc', { brandId: B1, from: '2025-06-07' }, /16 luni: cea mai veche zi care se poate cere azi e 2025-06-08/],
       ['gsc', { brandId: 'urinal' }, /brand_id invalid/],
@@ -706,6 +708,52 @@ describe('collectGoogle: reimportul istoricului Search Console (D-27)', () => {
     const db2 = withSecondSite()
     const regular = await run(db2, {}, 'gsc', { gscRowLimit: 3 }, { brandId: B3 })
     assert.deepEqual(regular.outcomes.map((o) => [o.connection_id, o.status === 'not_connected' ? null : `${o.period.start}..${o.period.end}`]), [[GSC_CONN_B3, '2026-09-01..2026-10-05']])
+  })
+})
+
+describe('collectGoogle: reimportul istoricului GA4 (H-3)', () => {
+  const activeUsers = (c: { dims: string; metrics: string[] }) => c.dims === '' && c.metrics.length === 1 && c.metrics[0] === 'activeUsers'
+
+  test('o rulare per fereastră, de la cea mai veche; ultima e fereastra obișnuită', async () => {
+    const db = makeDb()
+    const { outcomes } = await run(db, {}, 'ga4', {}, { brandId: B1, from: '2026-07-01' })
+    const periods = outcomes.map((o) => (o.status === 'not_connected' ? null : `${o.period.start}..${o.period.end}`))
+    assert.deepEqual(periods, ['2026-07-01..2026-07-29', '2026-07-30..2026-09-02', '2026-09-03..2026-10-07'])
+    assert.ok(outcomes.every((o) => o.connection_id === GA4_CONN && o.status === 'succeeded'), JSON.stringify(outcomes.map((o) => o.status)))
+    const runs = db.tables.sync_runs!
+    assert.deepEqual(runs.map((r) => `${r.period_start}..${r.period_end}`), periods)
+    assert.ok(runs.every((r) => r.source === 'ga4' && r.brand_id === B1 && r.source_connection_id === GA4_CONN))
+    // Acoperirea se raportează la zilele ferestrei: 29 pe prima, 35 pe celelalte.
+    assert.deepEqual(runs.map((r) => (r.coverage as Record<string, { expected_days: number }>).web_daily!.expected_days), [29, 35, 35])
+  })
+
+  test('utilizatorii activi (intervale relative la azi) se cer o singură dată, în fereastra obișnuită', async () => {
+    const db = makeDb()
+    const regular = await run(makeDb(), {}, 'ga4')
+    const perRun = regular.calls.report.filter(activeUsers).length
+    assert.ok(perRun > 0, 'rularea obișnuită cere intervalele')
+    const { calls } = await run(db, {}, 'ga4', {}, { brandId: B1, from: '2026-07-01' })
+    assert.equal(calls.report.filter(activeUsers).length, perRun, 'ferestrele vechi nu le mai cer')
+    const runs = db.tables.sync_runs!
+    assert.deepEqual(runs.map((r) => 'web_active_users_interval' in (r.coverage as object)), [false, false, true])
+    // Rapoartele zilnice urmează ferestrele, în ordine.
+    const dailyRanges = [...new Set(calls.report.filter((c) => c.dims.includes('landingPagePlusQueryString')).map((c) => c.range))]
+    assert.deepEqual(dailyRanges, ['2026-07-01..2026-07-29', '2026-07-30..2026-09-02', '2026-09-03..2026-10-07'])
+  })
+
+  test('reimportul e idempotent și nu atinge Search Console', async () => {
+    const db = makeDb()
+    await run(db, {}, 'ga4')
+    const before = [db.tables.web_daily!.length, db.tables.web_key_events!.length]
+    const { calls } = await run(db, {}, 'ga4', {}, { brandId: B1, from: '2026-07-01' })
+    assert.deepEqual([db.tables.web_daily!.length, db.tables.web_key_events!.length], before)
+    assert.equal(calls.gsc.length, 0)
+    assert.equal(db.tables.search_daily, undefined)
+  })
+
+  test('cea mai veche zi permisă trece', async () => {
+    const { outcomes } = await run(makeDb(), {}, 'ga4', {}, { brandId: B1, from: '2025-06-08' })
+    assert.equal(outcomes[0]!.status === 'not_connected' ? null : outcomes[0]!.period.start, '2025-06-08')
   })
 })
 

@@ -99,7 +99,7 @@ Antet cu „Set de competitori v<n>", „Efectiv din <data>", „Date până la 
 
 ## Analize și acțiuni (`/brands/:id/insights`)
 
-**Etapa 2 (10 nov. 2026):** agenția lucrează în pagină: „Analiză nouă" și „Editează" (titlu, perioadă, constatare, interpretare, limite, metrici citate), „Trimite la review", „Publică" și „Returnează la draft" (doar strategist și agency_admin, cu motiv), „Șterge ciorna", „Adaugă acțiune" (termen, efort, KPI urmărit) și pașii acțiunii în tabel (agreată, în lucru, finalizată, rezultat, anulare cu motiv). Clientul nu vede niciunul dintre controale.
+**Etapa 2 (10 nov. 2026):** agenția lucrează în pagină: „Analiză nouă" și „Editează" (titlu, perioadă, constatare, interpretare, limite, metrici citate), „Trimite la review", „Publică" și „Returnează la draft" (doar strategist și agency_admin, cu motiv), „Șterge ciorna", „Adaugă acțiune" (termen, efort, KPI urmărit) și pașii acțiunii în tabel (agreată, în lucru, finalizată, rezultat, anulare cu motiv). Clientul nu vede niciunul dintre controale. Din a doua rundă (H-4): „Recomandări” pe ciornă, „Versiune nouă” pe analiza publicată și selectorul de responsabil pentru `agency_admin`; recomandările apar în analiza publicată.
 
 Designul inițial: Taburi (agenție: „Flux editorial" și vederea publicată; client: doar publicate); tabel cu titlu, autor, perioadă, status (Draft, În review, Publicat, Înlocuit), actualizat; detaliu cu rezumat, dovezi atașate, „Limite", tabel „Acțiuni" (acțiune, responsabil, termen, status); „Analiză nouă" pentru agenție.
 

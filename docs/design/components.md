@@ -19,7 +19,7 @@ Tipurile din `apps/web/src/contracts/metric.ts` oglindesc `public.metric_definit
 - Direcție: `higher_is_better`, `lower_is_better`, `neutral` (fără culoare pozitiv/negativ, fără „cea mai bună valoare").
 - Serverul nu trimite text. Motivul stării vine din `lib/warnings.ts`, din status, acoperire și codurile din `warnings`; un cod necunoscut nu inventează o cauză.
 - `build_response` nu pune `source`, versiunea și `warnings` pe metrică; mapperul le alipește din registru și din `meta`.
-- Comparația: `Luna curentă` e MTD (aceeași porțiune din luna anterioară), restul intervalelor compară cu perioada anterioară de aceeași lungime, exact ca `metrics.comparison_period`. „Anul trecut" e dezactivat până când serverul îl calculează.
+- Comparația: `Luna curentă` e MTD (aceeași porțiune din luna anterioară), restul intervalelor compară cu perioada anterioară de aceeași lungime, exact ca `metrics.comparison_period`. „Anul trecut" trimite serverului tipul de perioadă `yoy` (același interval, cu un an înainte; H-1); unde sursa nu are date atât de vechi, comparația lipsește, cu motivul afișat.
 
 ## Maparea statusurilor `MetricResponse` → afișare
 

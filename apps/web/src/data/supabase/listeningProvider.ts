@@ -207,6 +207,37 @@ export function createSupabaseInsights(client: DataClient): InsightsProvider {
       return error ? failed(writeError(error, 'Statusul analizei nu a putut fi schimbat. Reîncearcă.')) : ready(null)
     },
 
+    async supersede(brand, insight) {
+      const me = await currentUser(client)
+      if (!me) return failed('Sesiunea a expirat. Autentifică-te din nou.')
+      // Versiunea, dovezile și recomandările le pune serverul (triggerele din `insights_pv`); de aici pleacă doar textele.
+      const { data, error } = await client
+        .from('insights')
+        .insert({
+          tenant_id: brand.tenant_id, brand_id: brand.id, author_id: me, supersedes_id: insight.id, title: insight.title,
+          period_start: insight.period.from, period_end: insight.period.to, period_kind: 'custom',
+          summary: insight.summary, interpretation: insight.interpretation ?? '', limits: insight.limits ?? '',
+        })
+        .select('id')
+        .single()
+      if (error) return failed(writeError(error, 'Versiunea nouă nu a putut fi creată. Reîncearcă.'))
+      const id = (data as { id?: string } | null)?.id
+      return id ? ready({ id }) : failed(CONTRACT)
+    },
+
+    async addRecommendation(brand, insightId, rec) {
+      const { error } = await client.from('recommendations').insert({
+        tenant_id: brand.tenant_id, brand_id: brand.id, insight_id: insightId,
+        problem: rec.problem.trim(), action: rec.action.trim(), expected_benefit: rec.expected_benefit.trim(), priority: rec.priority,
+      })
+      return error ? failed(writeError(error, 'Recomandarea nu a putut fi adăugată. Reîncearcă.')) : ready(null)
+    },
+
+    async deleteRecommendation(id) {
+      const { error } = await client.from('recommendations').delete().eq('id', id)
+      return error ? failed(writeError(error, 'Recomandarea nu a putut fi ștearsă.')) : ready(null)
+    },
+
     async addAction(brand, insightId, action) {
       const me = await currentUser(client)
       if (!me) return failed('Sesiunea a expirat. Autentifică-te din nou.')
@@ -215,7 +246,7 @@ export function createSupabaseInsights(client: DataClient): InsightsProvider {
         brand_id: brand.id,
         insight_id: insightId,
         title: action.title.trim(),
-        responsible_user_id: me,
+        responsible_user_id: action.owner_id || me,
         due_date: action.due,
         effort: action.effort?.trim() || null,
         tracked_metric_key: action.tracked_metric_key,

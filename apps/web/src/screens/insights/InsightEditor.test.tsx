@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
+import type { DataProviders } from '../../contracts'
 import { pageReady, renderApp } from '../../test/renderApp'
 
 const PROENZI = '/brands/brand-proenzi/insights'
@@ -114,7 +115,89 @@ describe('editorul de analize (agenție)', () => {
   })
 })
 
+describe('recomandări și versiuni noi (agenție)', () => {
+  it('o ciornă primește recomandări cu prioritate; apar în analiză și se pot șterge', async () => {
+    renderApp({ route: PROENZI })
+    await pageReady('Analize și acțiuni')
+    await newDraft('Cu recomandări')
+    await userEvent.click((await steps('Cu recomandări')).getByRole('button', { name: 'Recomandări (0)' }))
+    const dlg = await screen.findByRole('dialog', { name: 'Recomandări' })
+    await userEvent.click(within(dlg).getByRole('button', { name: 'Adaugă recomandarea' }))
+    expect(within(dlg).getByRole('alert')).toHaveTextContent('Completează problema, recomandarea și beneficiul așteptat.')
+    await userEvent.type(within(dlg).getByLabelText('Problema'), 'Pagina nu răspunde la întrebările din panel.')
+    await userEvent.type(within(dlg).getByLabelText('Ce recomandăm'), 'Rescrie ghidul de mobilitate')
+    await userEvent.type(within(dlg).getByLabelText('Beneficiu așteptat'), 'Mai multe mențiuni pe topic.')
+    await userEvent.selectOptions(within(dlg).getByLabelText('Prioritate'), '1 (cea mai mare)')
+    await userEvent.click(within(dlg).getByRole('button', { name: 'Adaugă recomandarea' }))
+    const list = await within(await screen.findByRole('dialog', { name: 'Recomandări' })).findByRole('list', { name: 'Recomandările analizei' })
+    expect(list).toHaveTextContent('Rescrie ghidul de mobilitate')
+    expect(list).toHaveTextContent('Prioritate 1')
+    // Analiza le arată; butonul le numără.
+    expect(await article('Cu recomandări')).toHaveTextContent('Rescrie ghidul de mobilitate')
+    expect((await steps('Cu recomandări')).getByRole('button', { name: 'Recomandări (1)' })).toBeInTheDocument()
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Recomandări' })).getByRole('button', { name: 'Șterge recomandarea: Rescrie ghidul de mobilitate' }))
+    await waitFor(async () => expect((await steps('Cu recomandări')).getByRole('button', { name: 'Recomandări (0)' })).toBeInTheDocument())
+  })
+
+  it('o analiză publicată nu se editează: „Versiune nouă” creează o ciornă cu dovezile copiate, iar publicarea ei o înlocuiește pe cea veche', async () => {
+    renderApp({ route: URINAL })
+    await pageReady('Analize și acțiuni')
+    const title = 'Vizibilitatea în răspunsurile AI scade pe criteriile de alegere'
+    const published = await article(title)
+    expect(within(published.closest('li')!).queryByRole('button', { name: 'Editează' })).toBeNull()
+    await userEvent.click(within(published.closest('li')!).getByRole('button', { name: 'Versiune nouă' }))
+    await waitFor(() => expect(screen.getAllByRole('article', { name: title })).toHaveLength(2))
+    const draft = screen.getAllByRole('article', { name: title }).find((a) => a.getAttribute('data-status') === 'draft')!
+    expect(within(draft).getByRole('button', { name: 'AI Mention Rate' })).toBeInTheDocument()
+    const draftSteps = within(within(draft.closest('li')!).getByRole('group'))
+    // A doua versiune de înlocuire e refuzată cât prima e în lucru.
+    const still = screen.getAllByRole('article', { name: title }).find((a) => a.getAttribute('data-status') === 'published')!
+    await userEvent.click(within(still.closest('li')!).getByRole('button', { name: 'Versiune nouă' }))
+    expect(await screen.findByText('Analiza are deja o versiune de înlocuire în lucru.')).toBeInTheDocument()
+
+    await userEvent.click(draftSteps.getByRole('button', { name: 'Trimite la review' }))
+    const inReview = async () => screen.getAllByRole('article', { name: title }).find((a) => a.getAttribute('data-status') === 'in_review')
+    await waitFor(async () => expect(await inReview()).toBeDefined())
+    await userEvent.click(within((await inReview())!.closest('li')!).getByRole('button', { name: 'Publică' }))
+    await waitFor(() => expect(screen.getAllByRole('article', { name: title }).map((a) => a.getAttribute('data-status')).sort()).toEqual(['published', 'superseded']))
+  })
+})
+
 describe('registrul acțiunilor (agenție)', () => {
+  it('agency_admin alege responsabilul dintre membrii activi ai agenției din clientul brandului; ceilalți rămân responsabili ei înșiși', async () => {
+    // Pe date reale, membrii agenției au rolul lor în tenantul clientului; fixtures îi țin într-un tenant al agenției.
+    const inClientTenant = (b: DataProviders): DataProviders => ({
+      ...b,
+      users: { ...b.users, people: async () => { const r = await b.users.people(); return r.kind === 'ready' ? { ...r, data: r.data.map((p) => ({ ...p, tenant_id: 'tenant-stada-preview' })) } : r } },
+    })
+    renderApp({ route: URINAL, wrap: inClientTenant })
+    await pageReady('Analize și acțiuni')
+    const published = await article('Vizibilitatea în răspunsurile AI scade pe criteriile de alegere')
+    await userEvent.click(within(published.closest('li')!).getByRole('button', { name: 'Adaugă acțiune' }))
+    const dlg = await screen.findByRole('dialog', { name: 'Acțiune nouă' })
+    const owner = await within(dlg).findByLabelText('Responsabil')
+    const names = within(owner).getAllByRole('option').map((o) => o.textContent)
+    expect(names[0]).toBe('Eu')
+    expect(names).toContain('Andrei Vasile')
+    expect(names).not.toContain('Elena Dobre')
+    await userEvent.type(within(dlg).getByLabelText('Ce facem'), 'Audit de conținut')
+    await userEvent.selectOptions(owner, 'Andrei Vasile')
+    await userEvent.click(within(dlg).getByRole('button', { name: 'Adaugă acțiunea' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    const row = (await within(section('Acțiuni')).findByText('Audit de conținut')).closest('tr')!
+    expect(row).toHaveTextContent('Andrei Vasile')
+  })
+
+  it('strategistul nu are selector de responsabil', async () => {
+    renderApp({ route: URINAL, role: 'strategist' })
+    await pageReady('Analize și acțiuni')
+    const published = await article('Vizibilitatea în răspunsurile AI scade pe criteriile de alegere')
+    await userEvent.click(within(published.closest('li')!).getByRole('button', { name: 'Adaugă acțiune' }))
+    const dlg = await screen.findByRole('dialog', { name: 'Acțiune nouă' })
+    expect(within(dlg).queryByLabelText('Responsabil')).toBeNull()
+    expect(dlg).toHaveTextContent('Responsabilul ești tu')
+  })
+
   it('o acțiune nouă are efort și KPI urmărit; apoi parcurge agreat → în lucru → finalizat → rezultat', async () => {
     renderApp({ route: URINAL })
     await pageReady('Analize și acțiuni')
