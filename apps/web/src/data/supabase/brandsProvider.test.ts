@@ -8,8 +8,19 @@ describe('brands (supabase)', () => {
   it('listează doar brandurile active, fără categorie inventată', async () => {
     const { client, calls } = fakeDataClient({ tables: { brands: [{ id: 'b1', tenant_id: 't1', name: 'Urinal', domain: 'urinal.example', status: 'active' }, { id: 'b2', tenant_id: 't1', name: 'Vechi', domain: null, status: 'archived' }] } })
     const r = await createSupabaseBrands(client, NOW).list()
-    expect(r).toEqual({ kind: 'ready', data: [{ id: 'b1', tenant_id: 't1', name: 'Urinal', category: null, domain: 'urinal.example' }] })
+    expect(r).toEqual({ kind: 'ready', data: [{ id: 'b1', tenant_id: 't1', tenant_name: null, name: 'Urinal', category: null, domain: 'urinal.example' }] })
     expect(calls[0]?.filters).toContainEqual(['status', 'eq', 'active'])
+  })
+
+  it('numele clientului vine din `tenants`, citit doar pentru clienții brandurilor permise; o eroare nu blochează brandurile', async () => {
+    const tables = { brands: [{ id: 'b1', tenant_id: 't1', name: 'Urinal', domain: null, status: 'active' }], tenants: [{ id: 't1', name: 'STADA România' }, { id: 't2', name: 'Alt client' }] }
+    const ok = fakeDataClient({ tables })
+    const r = await createSupabaseBrands(ok.client, NOW).list()
+    expect(r.kind === 'ready' && r.data[0]?.tenant_name).toBe('STADA România')
+    expect(ok.calls.find((c) => c.table === 'tenants')?.filters).toContainEqual(['id', 'in', ['t1']])
+    const broken = fakeDataClient({ tables, errors: { tenants: { message: 'boom' } } })
+    const r2 = await createSupabaseBrands(broken.client, NOW).list()
+    expect(r2).toEqual({ kind: 'ready', data: [{ id: 'b1', tenant_id: 't1', tenant_name: null, name: 'Urinal', category: null, domain: null }] })
   })
 
   it('setul de competitori efectiv: ultima versiune cu effective_from <= azi, membrii etichetați C1…', async () => {

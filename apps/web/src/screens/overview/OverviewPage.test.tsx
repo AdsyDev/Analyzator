@@ -5,11 +5,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../../App'
 import { createUnconfiguredAuth } from '../../auth/createAuthSource'
 import type { AuthSource } from '../../auth/types'
-import { failed, notConnected, ready, type DataProviders, type Insight, type Role } from '../../contracts'
+import { failed, notConnected, ready, type DataProviders, type Insight, type MetricItem, type Role } from '../../contracts'
 import { createFixtureProviders } from '../../data/fixtures/createFixtureProviders'
 import { createSupabaseProviders } from '../../data/supabase/providers'
 import { createPreviewAuth } from '../../preview/previewAuth'
-import { KPI_SLOTS } from './slots'
+import { OVERVIEW_CARDS } from './slots'
 
 function Where() {
   const l = useLocation()
@@ -41,132 +41,215 @@ beforeEach(() => {
 })
 
 const card = (name: string) => screen.getByRole('article', { name })
+const section = (name: string) => screen.getByRole('region', { name })
 const loaded = async () => {
   await screen.findByRole('heading', { level: 1, name: 'Overview' })
   await waitFor(() => expect(screen.queryByRole('status', { name: 'Se încarcă' })).toBeNull())
 }
 
-describe('Overview: structura din spec cap. 12', () => {
-  it('are bara de context, cele 6 KPI, evoluția, ultima analiză, comparația și oportunitățile', async () => {
+/** Înlocuiește variațiile venite de la provider, ca semnalele să nu depindă de data rulării. */
+const withChanges = (changes: Record<string, Partial<MetricItem>>) => (b: DataProviders): DataProviders => ({
+  ...b,
+  metrics: {
+    ...b.metrics,
+    metrics: async (c, k) => {
+      const r = await b.metrics.metrics(c, k)
+      return { ...r, items: r.items.map((i) => ({ ...i, relative_change: 1, ...(i.value === null ? {} : (changes[i.metric_key] ?? {})) })) }
+    },
+  },
+})
+
+const NAMES = { ai: 'AI Mention Rate', seo: 'Visibility SEOmonitor (ultima observație)', mentions: 'Mențiuni (Planable Listening)', social: 'Interacțiuni (social propriu)', sessions: 'Sesiuni', events: 'Key events' }
+
+describe('Overview: structura din propunerea din 10 nov. 2026', () => {
+  it('are starea datelor, bara de context, 6 carduri, „Ce s-a schimbat", evoluția, poziția, prioritățile și interpretarea, în această ordine', async () => {
     setup()
     await loaded()
+    expect(screen.getByRole('region', { name: 'Starea datelor' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Context' })).toBeInTheDocument()
     expect(within(screen.getByTestId('kpi-grid')).getAllByRole('article')).toHaveLength(6)
-    for (const h of ['Evoluție', 'Ultima analiză publicată', 'Comparație cu competitorii', 'Oportunități']) {
-      expect(await screen.findByRole('heading', { level: 2, name: h })).toBeInTheDocument()
-    }
+    const titles = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(titles).toEqual(['Ce s-a schimbat', 'Evoluția brandului', 'Poziția față de competitori', 'Prioritățile următoare', 'Interpretarea AdSymphony'])
   })
 
-  it('bara de context: brand, țară, perioadă, comparație și acoperirea indicatorilor', async () => {
-    setup()
+  it('bara de context: client, brand, țară, perioadă, comparație și acoperirea indicatorilor', async () => {
+    setup({ route: '/brands/brand-urinal/overview?period=custom&from=2026-09-08&to=2026-10-05' })
     await loaded()
-    const ctx = screen.getByRole('region', { name: 'Context' })
-    expect(ctx).toHaveTextContent('Urinal')
-    expect(ctx).toHaveTextContent('România')
-    expect(ctx).toHaveTextContent(/Perioadă .* - .*\d{4}/)
-    expect(ctx).toHaveTextContent(/Comparație .* - .*\d{4}/)
-    expect(within(ctx).getByLabelText('Acoperirea indicatorilor')).toBeInTheDocument()
+    const bar = screen.getByRole('region', { name: 'Context' })
+    expect(bar).toHaveTextContent('Client STADA România')
+    expect(bar).toHaveTextContent('Brand Urinal')
+    expect(bar).toHaveTextContent('Țară România')
+    expect(bar).toHaveTextContent('8 sept. - 5 oct. 2026')
+    expect(bar).toHaveTextContent('11 aug. - 7 sept. 2026')
+    expect(within(bar).getByLabelText('Acoperirea indicatorilor')).toBeInTheDocument()
   })
 
-  it('acoperirea indicatorilor numără cele 6 carduri, pe stări', async () => {
+  it('acoperirea numără cele cinci metrici din registru, pe stări', async () => {
     setup()
     await loaded()
-    await waitFor(() => expect(screen.queryByRole('status', { name: 'Se încarcă acoperirea' })).toBeNull())
-    // Urinal: gsc_clicks parțial, ga4_key_events învechit, ga4_sessions complet; 3 chei din afara registrului: indisponibil.
-    expect(screen.getByTestId('cov-complete')).toHaveTextContent('1')
-    expect(screen.getByTestId('cov-partial')).toHaveTextContent('1')
-    expect(screen.getByTestId('cov-stale')).toHaveTextContent('1')
-    expect(screen.getByTestId('cov-unavailable')).toHaveTextContent('3')
+    const cov = within(screen.getByRole('region', { name: 'Context' })).getByLabelText('Acoperirea indicatorilor')
+    const total = ['complete', 'partial', 'stale', 'unavailable'].reduce((n, s) => n + Number(within(cov).queryByTestId(`cov-${s}`)?.textContent ?? 0), 0)
+    expect(total).toBe(5)
+  })
+
+  it('starea datelor arată sursele modulului cu „date până la" și următoarea actualizare estimată', async () => {
+    setup()
+    await loaded()
+    const strip = screen.getByRole('region', { name: 'Starea datelor' })
+    const items = within(within(strip).getByRole('list', { name: 'Date până la, pe sursă' })).getAllByRole('listitem')
+    expect(items.map((i) => i.querySelector('span')?.textContent)).toEqual(['SEOmonitor', 'Search Console', 'Google Analytics 4', 'Planable'])
+    expect(strip).toHaveTextContent('Următoarea actualizare estimată')
   })
 })
 
-describe('Overview: cardurile KPI', () => {
-  it('etichetele vin din registru când există definiția și din slot când nu', async () => {
+describe('Overview: cele șase carduri', () => {
+  it('fiecare card răspunde la o întrebare, în ordinea din propunere, cu numele exact al metricii din registru', async () => {
     setup()
     await loaded()
-    expect(card('Clicks (Search Console)')).toBeInTheDocument() // name_ro din registru
-    expect(card('Sesiuni')).toBeInTheDocument()
-    expect(card('Key events')).toBeInTheDocument()
-    expect(card('AI Mention Rate')).toBeInTheDocument() // slot: nu e în registru
-    expect(card('Cost paid')).toBeInTheDocument()
-    expect(card('Mențiuni eligibile')).toBeInTheDocument()
-  })
-
-  it.each(['AI Mention Rate', 'Cost paid', 'Mențiuni eligibile'])('%s: not_connected, fără cifră, fără definiție inventată', async (name) => {
-    setup()
-    await loaded()
-    const c = card(name)
-    expect(within(c).getByText('Sursă neconectată')).toBeInTheDocument()
-    expect(within(c).queryByText(/^\d/)).toBeNull()
-    expect(c).toHaveAttribute('data-status', 'not_connected')
-    await userEvent.click(within(c).getByRole('button', { name: 'Ce înseamnă indicatorul' }))
-    expect(within(c).getByRole('tooltip')).toHaveTextContent('Definiția acestui indicator nu este încă în registrul de metrici.')
-  })
-
-  it.each([
-    ['Cost paid', 'Indicatorul vine din Google Ads, Meta Ads și TikTok Ads, dar nu are încă definiție în registrul de metrici'],
-    ['Mențiuni eligibile', 'Indicatorul vine din Planable, dar nu are încă definiție în registrul de metrici'],
-  ])('%s: motivul numește sursele așteptate, fără să spună că sunt deconectate', async (name, reason) => {
-    setup()
-    await loaded()
-    const c = card(name)
-    expect(within(c).getByText(new RegExp(reason))).toBeInTheDocument()
-    expect(within(c).queryByText(/^Sursa nu este conectată/)).toBeNull()
+    const cards = within(screen.getByTestId('kpi-grid')).getAllByRole('article')
+    expect(cards.map((c) => c.getAttribute('aria-label'))).toEqual([NAMES.ai, NAMES.seo, NAMES.mentions, NAMES.social, NAMES.sessions, NAMES.events])
+    OVERVIEW_CARDS.forEach((c, i) => expect(cards[i]).toHaveTextContent(c.category))
   })
 
   it('metricile din registru au valoare, variație, sursă, „Date până la" și tooltip cu formula din registru', async () => {
     setup()
     await loaded()
-    const c = card('Sesiuni')
+    const c = card(NAMES.sessions)
     expect(c).toHaveAttribute('data-status', 'ok')
-    expect(within(c).getByText('Google Analytics 4')).toBeInTheDocument()
-    expect(within(c).getByText(/Date până la/)).toBeInTheDocument()
-    expect(within(c).getByText(/^[+−]?\d+(,\d)?\s%$/)).toBeInTheDocument()
-    expect(within(c).getByText(/față de .* - .*\d{4}/)).toBeInTheDocument()
+    expect(within(c).getByText(/^\d{1,3}(\.\d{3})*$/)).toBeInTheDocument()
+    expect(c).toHaveTextContent('Google Analytics 4')
+    expect(c).toHaveTextContent('Date până la')
+    expect(c).toHaveTextContent('față de')
     await userEvent.click(within(c).getByRole('button', { name: 'Ce înseamnă indicatorul' }))
-    expect(within(c).getByRole('tooltip')).toHaveTextContent('Numărul de sesiuni GA4 în perioadă; suma zilelor.')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Numărul de sesiuni GA4 în perioadă; suma zilelor.')
   })
 
-  it('stările parțial și învechit apar cu motivul lor, nu ca zero', async () => {
+  it.each(OVERVIEW_CARDS.map((c) => [c.category, c.detailLabel, c.module] as const))('„%s" duce la detaliu (%s), cu perioada păstrată', async (category, label, module) => {
+    setup({ route: '/brands/brand-urinal/overview?period=7d' })
+    await loaded()
+    await userEvent.click(screen.getByRole('link', { name: `${category}: ${label}` }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent(`/brands/brand-urinal/${module}?period=7d`))
+  })
+
+  it('conversații: numărul de mențiuni vine din registru, iar ponderea negativă apare doar din mențiunile revizuite, cu numere absolute', async () => {
     setup()
     await loaded()
-    const partial = card('Clicks (Search Console)')
-    expect(partial).toHaveAttribute('data-status', 'partial')
-    expect(within(partial).getByText('Parțial')).toBeInTheDocument()
-    expect(within(partial).getByText(/Date disponibile pentru \d+% din zilele intervalului/)).toBeInTheDocument()
-    const stale = card('Key events')
-    expect(stale).toHaveAttribute('data-status', 'stale')
-    expect(within(stale).getByText('Învechit')).toBeInTheDocument()
-    expect(within(stale).getByText(/Ultimele date sunt din/)).toBeInTheDocument()
+    const c = card(NAMES.mentions)
+    expect(c).toHaveTextContent('Conversații relevante')
+    expect(c).toHaveTextContent('Planable Listening')
+    expect(c).toHaveTextContent(/Negativ, după revizuire: \d+ din \d+ \(\d+(,\d)? %\) · \d+ nerevizuite\./)
   })
 
-  it('un card cu sparkline nu desenează nimic pentru o sursă neconectată', async () => {
+  it('performanță socială: fără import, „Sursă neconectată" cu motivul; cu date, interacțiunile și ce lipsește față de engagement rate', async () => {
     setup()
     await loaded()
-    expect(card('Cost paid').querySelector('svg[viewBox="0 0 100 32"]')).toBeNull()
+    const none = card(NAMES.social)
+    expect(none).toHaveAttribute('data-status', 'not_connected')
+    expect(within(none).getByText('Sursă neconectată')).toBeInTheDocument()
+    expect(within(none).queryByText(/^\d/)).toBeNull()
   })
 
-  it('perioada și comparația din URL se aplică pe carduri', async () => {
-    const { providers } = setup({ route: '/brands/brand-urinal/overview?period=7d' })
-    const spy = vi.spyOn(providers.metrics, 'metrics')
-    await loaded()
-    await waitFor(() => expect(spy).not.toHaveBeenCalledWith(expect.objectContaining({ brandId: 'brand-minimartieni' }), expect.anything()))
-    expect(screen.getByRole('region', { name: 'Context' })).toBeInTheDocument()
-  })
-
-  it('brandul curent determină datele: Minimartieni are alte valori decât Urinal', async () => {
+  it('performanță socială cu Planable conectat (Minimartieni): valoare din `brand_social`, sursă și nota despre engagement rate', async () => {
     setup({ route: '/brands/brand-minimartieni/overview' })
     await loaded()
-    const c = card('Clicks (Search Console)')
-    expect(c).toHaveAttribute('data-status', 'ok')
+    const c = card(NAMES.social)
+    expect(within(c).getByText(/^\d{1,3}(\.\d{3})*$/)).toBeInTheDocument()
+    expect(c).toHaveTextContent('Planable')
+    expect(c).toHaveTextContent('Engagement rate nu are încă definiție în registru; până atunci arătăm interacțiunile.')
+  })
+
+  it('acțiuni importante: spune că e număr de evenimente, nu rata sesiunilor cu key event', async () => {
+    setup({ route: '/brands/brand-minimartieni/overview' })
+    await loaded()
+    expect(card(NAMES.events)).toHaveTextContent('Număr de evenimente, nu de sesiuni: rata sesiunilor cu key event nu se colectează încă.')
+  })
+
+  it('stările parțial, învechit și neconectat apar cu motivul lor, nu ca zero', async () => {
+    setup()
+    await loaded()
+    expect(card(NAMES.ai)).toHaveAttribute('data-status', 'partial')
+    expect(card(NAMES.ai)).toHaveTextContent(/Date disponibile pentru \d+% din zilele intervalului/)
+    expect(card(NAMES.ai)).toHaveTextContent('Definiție provizorie')
+    expect(card(NAMES.events)).toHaveAttribute('data-status', 'stale')
+    expect(card(NAMES.events)).toHaveTextContent(/Ultimele date sunt din/)
+    const seo = card(NAMES.seo)
+    expect(seo).toHaveAttribute('data-status', 'not_connected')
+    expect(within(seo).getByText('Sursă neconectată')).toBeInTheDocument()
+    expect(within(seo).queryByText(/^\d/)).toBeNull()
+  })
+
+  it('perioada din URL se aplică pe carduri, iar brandul curent determină datele', async () => {
+    setup({ route: '/brands/brand-urinal/overview?period=7d' })
+    await loaded()
+    const week = within(card(NAMES.sessions)).getByText(/^\d{1,3}(\.\d{3})*$/).textContent
+    await userEvent.click(screen.getByRole('link', { name: 'Trafic pe site: Canale și landing pages' }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/traffic?period=7d'))
+    expect(week).toBeTruthy()
+  })
+
+  it('Minimartieni are alte valori decât Urinal', async () => {
+    const a = setup()
+    await loaded()
+    const urinal = within(card(NAMES.sessions)).getByText(/^\d{1,3}(\.\d{3})*$/).textContent
+    expect(a.providers.kind).toBe('fixtures')
+    const other = (await a.providers.metrics.metrics({ brandId: 'brand-minimartieni', period: { preset: '28d', from: '2026-09-08', to: '2026-10-05' }, comparison: 'previous', filters: {} }, ['ga4_sessions'])).items[0]
+    expect(String(other?.value)).not.toBe(urinal?.replace(/\./g, ''))
+  })
+})
+
+describe('Overview: „Ce s-a schimbat"', () => {
+  it('oportunitatea și riscul sunt cele mai mari variații, favorabilă și nefavorabilă, etichetate ca semnale automate neconfirmate', async () => {
+    setup({ wrap: withChanges({ ga4_sessions: { relative_change: 12.9, status: 'ok' }, ai_mention_rate: { relative_change: -9, absolute_change: -3.8, status: 'ok' } }) })
+    await loaded()
+    const list = within(section('Ce s-a schimbat')).getAllByRole('listitem')
+    expect(list.map((l) => l.getAttribute('aria-label'))).toEqual(['Oportunitate', 'Risc', 'Decizie'])
+    expect(list[0]).toHaveTextContent('Sesiuni: +12,9 %')
+    expect(list[0]).toHaveTextContent('Google Analytics 4')
+    expect(list[0]).toHaveTextContent('Semnal automat, neconfirmat')
+    expect(list[0]).toHaveTextContent('Față de')
+    expect(list[1]).toHaveTextContent('AI Mention Rate: −3,8 p.p.')
+    expect(list[1]).toHaveTextContent('SEOmonitor')
+  })
+
+  it('un semnal pe date parțiale o spune; „Vezi dovada" deschide dovezile metricii', async () => {
+    setup({ wrap: withChanges({ ai_mention_rate: { relative_change: 20, absolute_change: 6 } }) })
+    await loaded()
+    const opp = within(section('Ce s-a schimbat')).getByRole('listitem', { name: 'Oportunitate' })
+    expect(opp).toHaveTextContent('Semnal automat, pe date parțiale')
+    await userEvent.click(within(opp).getByRole('button', { name: 'Vezi dovada' }))
+    const dlg = await screen.findByRole('dialog', { name: 'Dovezi' })
+    expect(dlg).toHaveTextContent('AI Mention Rate')
+  })
+
+  it('fără variații de cel puțin 5 %, nu se inventează semnale', async () => {
+    setup({ wrap: withChanges({}) })
+    await loaded()
+    const s = section('Ce s-a schimbat')
+    expect(within(s).getByRole('listitem', { name: 'Oportunitate' })).toHaveTextContent('Niciun indicator principal nu are o variație favorabilă de cel puțin 5 % în acest interval.')
+    expect(within(s).getByRole('listitem', { name: 'Risc' })).toHaveTextContent('Niciun indicator principal nu are o variație nefavorabilă de cel puțin 5 % în acest interval.')
+  })
+
+  it('decizia vine din ultima analiză publicată: prima acțiune deschisă, cu responsabil și termen', async () => {
+    setup()
+    await loaded()
+    const d = within(section('Ce s-a schimbat')).getByRole('listitem', { name: 'Decizie' })
+    expect(d).toHaveTextContent('Verifică paginile citate pentru Prevenție ITU')
+    expect(d).toHaveTextContent('Andrei Vasile')
+    expect(d).toHaveTextContent('Din analiza publicată de AdSymphony')
+  })
+
+  it('fără analize disponibile, decizia rămâne goală, cu explicație', async () => {
+    setup({ wrap: (b) => ({ ...b, insights: { list: async () => notConnected('Analizele vor fi disponibile după configurarea fluxului editorial.') } }) })
+    await loaded()
+    expect(within(section('Ce s-a schimbat')).getByRole('listitem', { name: 'Decizie' })).toHaveTextContent('Nicio acțiune deschisă în ultima analiză publicată.')
   })
 })
 
 describe('Overview: dovezi (EvidenceDrawer)', () => {
-  it('fiecare KPI deschide dovezile: definiție, interval, înregistrări și hash; Esc închide și restituie focusul', async () => {
+  it('un card deschide dovezile: definiție, interval, înregistrări și hash; Esc închide și restituie focusul', async () => {
     setup()
     await loaded()
-    const open = within(card('Sesiuni')).getByRole('button', { name: 'Deschide dovezile pentru Sesiuni' })
+    const open = within(card(NAMES.sessions)).getByRole('button', { name: 'Deschide dovezile pentru Sesiuni' })
     await userEvent.click(open)
     const dlg = await screen.findByRole('dialog', { name: 'Dovezi' })
     expect(dlg).toHaveTextContent('Overview')
@@ -179,7 +262,7 @@ describe('Overview: dovezi (EvidenceDrawer)', () => {
     expect(open).toHaveFocus()
   })
 
-  it.each(KPI_SLOTS.map((s) => s.label === 'Clicks organic' ? 'Clicks (Search Console)' : s.label))('%s se poate deschide cu tastatura (Enter)', async (name) => {
+  it.each([NAMES.ai, NAMES.seo, NAMES.mentions, NAMES.sessions, NAMES.events])('%s se poate deschide cu tastatura (Enter)', async (name) => {
     setup()
     await loaded()
     within(card(name)).getByRole('button', { name: `Deschide dovezile pentru ${name}` }).focus()
@@ -187,10 +270,10 @@ describe('Overview: dovezi (EvidenceDrawer)', () => {
     expect(await screen.findByRole('dialog', { name: 'Dovezi' })).toBeInTheDocument()
   })
 
-  it('un KPI din afara registrului: „Sursă neconectată", fără valori estimate, cu acțiune doar pentru agency_admin', async () => {
+  it('o sursă neconectată: „Sursă neconectată", fără valori estimate, cu acțiune spre surse doar pentru agency_admin', async () => {
     setup()
     await loaded()
-    await userEvent.click(within(card('Cost paid')).getByRole('button', { name: 'Deschide dovezile pentru Cost paid' }))
+    await userEvent.click(within(card(NAMES.seo)).getByRole('button', { name: `Deschide dovezile pentru ${NAMES.seo}` }))
     const dlg = await screen.findByRole('dialog', { name: 'Dovezi' })
     expect((await within(dlg).findAllByText(/Nu afișăm valori estimate/)).length).toBeGreaterThan(0)
     await userEvent.click(within(dlg).getByRole('button', { name: 'Vezi sursele' }))
@@ -200,7 +283,7 @@ describe('Overview: dovezi (EvidenceDrawer)', () => {
   it('pentru strategist nu apare acțiunea spre Surse', async () => {
     setup({ role: 'strategist' })
     await loaded()
-    await userEvent.click(within(card('Cost paid')).getByRole('button', { name: 'Deschide dovezile pentru Cost paid' }))
+    await userEvent.click(within(card(NAMES.seo)).getByRole('button', { name: `Deschide dovezile pentru ${NAMES.seo}` }))
     const dlg = await screen.findByRole('dialog', { name: 'Dovezi' })
     await within(dlg).findAllByText(/Nu afișăm valori estimate/)
     expect(within(dlg).queryByRole('button', { name: 'Vezi sursele' })).toBeNull()
@@ -212,7 +295,7 @@ describe('Overview: dovezi (EvidenceDrawer)', () => {
       wrap: (b) => ({ ...b, metrics: { ...b.metrics, evidence: async (id, q) => (++n === 1 ? failed('Timeout.') : b.metrics.evidence(id, q)) } }),
     })
     await loaded()
-    await userEvent.click(within(card('Sesiuni')).getByRole('button', { name: 'Deschide dovezile pentru Sesiuni' }))
+    await userEvent.click(within(card(NAMES.sessions)).getByRole('button', { name: 'Deschide dovezile pentru Sesiuni' }))
     const dlg = await screen.findByRole('dialog', { name: 'Dovezi' })
     expect(await within(dlg).findByText('Timeout.')).toBeInTheDocument()
     await userEvent.click(within(dlg).getByRole('button', { name: 'Reîncearcă' }))
@@ -220,188 +303,198 @@ describe('Overview: dovezi (EvidenceDrawer)', () => {
   })
 })
 
-describe('Overview: evoluția', () => {
-  it('patru serii comutabile, cu AI neconectat (nu o linie la zero)', async () => {
-    setup()
+describe('Overview: evoluția brandului', () => {
+  it('patru grafice pe aceeași perioadă, câte unul pentru AI, search, trafic și mențiuni, fără scări suprapuse', async () => {
+    setup({ route: '/brands/brand-urinal/overview?period=custom&from=2026-09-08&to=2026-10-05' })
     await loaded()
-    const tabs = within(await screen.findByRole('tablist', { name: 'Seria afișată' })).getAllByRole('tab')
-    expect(tabs.map((t) => t.textContent)).toEqual(['AI', 'Search', 'Trafic', 'Mențiuni'])
-    expect(await screen.findByText('Sursă neconectată', { selector: 'p' })).toBeInTheDocument()
-    expect(screen.queryByTestId('chart-gap')).toBeNull()
+    const s = section('Evoluția brandului')
+    expect(s).toHaveTextContent('Aceeași perioadă pentru toate graficele: 8 sept. - 5 oct. 2026.')
+    expect(within(s).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual(['AI · AI Mention Rate', 'Search · Clicks (Search Console)', 'Trafic · Sesiuni', 'Mențiuni · Mențiuni (Planable Listening)'])
+    // Fiecare grafic are doar seria lui și comparația: nicio serie cu altă unitate pe aceeași axă.
+    for (const key of ['ai_mention_rate', 'gsc_clicks', 'ga4_sessions', 'mentions_count']) {
+      const legend = within(screen.getByTestId(`trend-${key}`)).getAllByRole('button', { pressed: true })
+      expect(legend).toHaveLength(2)
+      expect(legend[1]).toHaveTextContent('Perioada de comparație')
+    }
   })
 
-  it('seria Search: grafic cu comparația punctată și zilele fără date hașurate, nu zero', async () => {
+  it('zilele fără date sunt goluri marcate, nu zero; tabelul alternativ păstrează „Fără date"', async () => {
     setup()
     await loaded()
-    await userEvent.click(await screen.findByRole('tab', { name: 'Search' }))
-    const fig = await screen.findByRole('figure', { name: /Evoluție: Clicks \(Search Console\)/ })
-    expect(within(fig).getByRole('button', { name: 'Clicks (Search Console)' })).toBeInTheDocument()
-    expect(within(fig).getByRole('button', { name: 'Perioada de comparație' })).toBeInTheDocument()
-    expect(within(fig).getAllByTestId('chart-gap').length).toBeGreaterThan(0)
-    // Linia seriei principale se întrerupe la zilele fără date (două segmente), nu coboară la zero.
-    expect((fig.querySelector('svg path')?.getAttribute('d') ?? '').match(/M/g)?.length).toBeGreaterThan(1)
-    expect(screen.getByText('Zilele fără date apar hașurate; nu sunt zero.')).toBeInTheDocument()
+    const search = screen.getByTestId('trend-gsc_clicks')
+    expect(search).toHaveTextContent('Zilele fără date apar hașurate; nu sunt zero.')
+    await userEvent.click(within(search).getByRole('button', { name: 'Vezi ca tabel' }))
+    expect(within(search).getAllByText('Fără date').length).toBeGreaterThan(0)
   })
 
-  it('tabelul alternativ al graficului păstrează „Fără date" pentru zilele lipsă', async () => {
-    setup()
+  it('o serie fără sursă arată „Sursă neconectată", nu o linie la zero (Proenzi, mențiuni)', async () => {
+    setup({ route: '/brands/brand-proenzi/overview' })
     await loaded()
-    await userEvent.click(await screen.findByRole('tab', { name: 'Search' }))
-    await userEvent.click(await screen.findByRole('button', { name: 'Vezi ca tabel' }))
-    expect(screen.getAllByText('Fără date').length).toBeGreaterThan(0)
+    const m = screen.getByTestId('trend-mentions_count')
+    expect(within(m).getByText('Sursă neconectată')).toBeInTheDocument()
+    expect(within(m).queryByRole('img')).toBeNull()
   })
 
-  it('seria Trafic: o singură serie cu comparație; Mențiuni neconectat', async () => {
-    setup()
-    await loaded()
-    await userEvent.click(await screen.findByRole('tab', { name: 'Trafic' }))
-    expect(await screen.findByRole('figure', { name: /Evoluție: Sesiuni/ })).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('tab', { name: 'Mențiuni' }))
-    expect(await screen.findByText('Sursă neconectată', { selector: 'p' })).toBeInTheDocument()
-  })
-
-  it('o eroare la serii: mesaj cu „Reîncearcă", iar cardurile și restul paginii rămân', async () => {
+  it('o eroare la serii: mesaj cu „Reîncearcă" în fiecare grafic, iar cardurile și restul paginii rămân', async () => {
     let n = 0
-    setup({ wrap: (b) => ({ ...b, metrics: { ...b.metrics, trends: async (c, k) => (++n === 1 ? Promise.reject(new Error('Serii indisponibile.')) : b.metrics.trends(c, k)) } }) })
+    setup({ wrap: (b) => ({ ...b, metrics: { ...b.metrics, trends: async (c, k) => (++n === 1 ? Promise.reject(new Error('Seriile nu au putut fi încărcate.')) : b.metrics.trends(c, k)) } }) })
     await loaded()
-    expect(await screen.findByText('Serii indisponibile.')).toBeInTheDocument()
-    expect(within(screen.getByTestId('kpi-grid')).getAllByRole('article')).toHaveLength(6)
-    await userEvent.click(screen.getByRole('button', { name: 'Reîncearcă' }))
-    await waitFor(() => expect(screen.queryByText('Serii indisponibile.')).toBeNull())
+    const s = section('Evoluția brandului')
+    expect(await within(s).findAllByText('Seriile nu au putut fi încărcate.')).toHaveLength(4)
+    expect(within(card(NAMES.sessions)).getByText(/^\d{1,3}(\.\d{3})*$/)).toBeInTheDocument()
+    await userEvent.click(within(s).getAllByRole('button', { name: 'Reîncearcă' })[0]!)
+    await waitFor(() => expect(within(s).queryByText('Seriile nu au putut fi încărcate.')).toBeNull())
   })
 })
 
-describe('Overview: ultima analiză și oportunități', () => {
-  it('agenția vede ultima analiză publicată cu badge de status, autor, perioadă și limite', async () => {
+describe('Overview: poziția față de competitori', () => {
+  it('brand + C1-C3 pe AI, SEO și conversații, din aceeași matrice ca pagina Concurență, cu versiunea setului', async () => {
     setup()
     await loaded()
-    const sec = await screen.findByRole('heading', { level: 2, name: 'Ultima analiză publicată' })
-    const region = sec.closest('section')!
-    expect(await within(region).findByText('Vizibilitatea în răspunsurile AI scade pe criteriile de alegere')).toBeInTheDocument()
-    expect(within(region).getByText('Publicat')).toBeInTheDocument()
-    expect(within(region).getByText('Ioana Popescu')).toBeInTheDocument()
-    expect(within(region).getByText(/Cohortă de 80 de răspunsuri valide/)).toBeInTheDocument()
+    const s = section('Poziția față de competitori')
+    const table = within(s).getByRole('table', { name: 'Poziția față de competitori' })
+    const heads = within(table).getAllByRole('columnheader').map((h) => h.textContent ?? '')
+    for (const h of ['Metrică', 'Urinal', 'C1', 'C2', 'C3']) expect(heads.some((t) => t.includes(h)), h).toBe(true)
+    expect(s).toHaveTextContent('Set de competitori v3')
+    expect(within(table).getAllByRole('rowheader')).toHaveLength(3)
+    expect(table).toHaveTextContent('Mention Rate')
+    expect(table).toHaveTextContent('Keywords în Top 10')
+    expect(table).toHaveTextContent('Mențiuni eligibile')
   })
 
-  it('clientul vede aceeași analiză, fără badge de status', async () => {
-    setup({ role: 'client_viewer' })
-    await loaded()
-    const region = (await screen.findByRole('heading', { level: 2, name: 'Ultima analiză publicată' })).closest('section')!
-    expect(await within(region).findByText('Vizibilitatea în răspunsurile AI scade pe criteriile de alegere')).toBeInTheDocument()
-    expect(within(region).queryByText('Publicat')).toBeNull()
-  })
-
-  it('analiza în review sau draft nu apare niciodată ca „ultima publicată"', async () => {
-    setup({
-      wrap: (b) => ({
-        ...b,
-        insights: { list: async (c) => { const r = await b.insights.list(c); return r.kind === 'ready' ? ready(r.data.filter((i: Insight) => i.status !== 'published')) : r } },
-      }),
-    })
-    await loaded()
-    expect(await screen.findByText('Nicio analiză publicată')).toBeInTheDocument()
-    expect(screen.queryByText(/Vizibilitatea în răspunsurile AI/)).toBeNull()
-  })
-
-  it('„Vezi toate analizele" duce la modul Analize, cu perioada păstrată', async () => {
-    setup({ route: '/brands/brand-urinal/overview?period=7d' })
-    await loaded()
-    expect(await screen.findByRole('link', { name: 'Vezi toate analizele' })).toHaveAttribute('href', '/brands/brand-urinal/insights?period=7d')
-  })
-
-  it('dovada din analiză deschide EvidenceDrawer cu metrica ei', async () => {
+  it('locul în set se afișează separat pe fiecare dimensiune; fără scor general', async () => {
     setup()
     await loaded()
-    const region = (await screen.findByRole('heading', { level: 2, name: 'Ultima analiză publicată' })).closest('section')!
-    await userEvent.click(await within(region).findByRole('button', { name: 'Clicks din search' }))
-    const dlg = await screen.findByRole('dialog', { name: 'Dovezi' })
-    expect(await within(dlg).findByText('Clicks (Search Console)')).toBeInTheDocument()
+    const ranks = within(section('Poziția față de competitori')).getByRole('list', { name: 'Locul în set, pe dimensiune' })
+    const items = within(ranks).getAllByRole('listitem').map((i) => i.textContent)
+    expect(items[0]).toMatch(/^AI locul \d din 4$/)
+    expect(items[1]).toMatch(/^SEO locul \d din 4$/)
+    expect(items[2]).toMatch(/^Listening fără clasament: /)
+    expect(screen.queryByText(/scor de brand|scor general/i)).toBeNull()
   })
 
-  it('oportunități: maximum 3, doar acțiuni deschise, cu responsabil, termen și status, în ordinea termenului', async () => {
+  it('competitorii fără sursă rămân N/A cu motiv, nu 0', async () => {
     setup()
     await loaded()
-    const region = (await screen.findByRole('heading', { level: 2, name: 'Oportunități' })).closest('section')!
-    const items = await within(region).findAllByRole('listitem')
-    expect(items.length).toBeLessThanOrEqual(3)
-    expect(items.map((i) => within(i).getByRole('heading').textContent)).toEqual(['Verifică paginile citate pentru Prevenție ITU', 'Extinde conținutul despre merișor și D-manoză'])
-    expect(within(items[0]!).getByText('Andrei Vasile')).toBeInTheDocument()
-    expect(within(items[0]!).getByText(/Responsabil, Account manager/)).toBeInTheDocument()
-    expect(within(items[0]!).getByText('În lucru')).toBeInTheDocument()
-    expect(within(items[1]!).getByText('Deschisă')).toBeInTheDocument()
-    expect(within(region).queryByText('Actualizează titlurile paginilor de categorie')).toBeNull() // acțiune finalizată, din analiza înlocuită
-  })
-
-  it('„Deschide dovezile" din oportunitate deschide drawerul', async () => {
-    setup()
-    await loaded()
-    const region = (await screen.findByRole('heading', { level: 2, name: 'Oportunități' })).closest('section')!
-    await userEvent.click((await within(region).findAllByRole('button', { name: 'Deschide dovezile' }))[0]!)
-    expect(await screen.findByRole('dialog', { name: 'Dovezi' })).toBeInTheDocument()
-  })
-
-  it('fără acțiuni deschise: stare goală cu explicație', async () => {
-    setup({ route: '/brands/brand-minimartieni/overview', wrap: (b) => ({ ...b, insights: { list: async (c) => { const r = await b.insights.list(c); return r.kind === 'ready' ? ready(r.data.map((i) => ({ ...i, actions: [] }))) : r } } }) })
-    await loaded()
-    expect(await screen.findByText('Nicio oportunitate deschisă')).toBeInTheDocument()
-  })
-
-  it('analize indisponibile (provider neconectat): motivul, în ambele secțiuni, fără listă goală', async () => {
-    setup({ wrap: (b) => ({ ...b, insights: { list: async () => notConnected('Analizele nu sunt încă disponibile pentru acest brand.') } }) })
-    await loaded()
-    await waitFor(() => expect(screen.getAllByText('Analizele nu sunt încă disponibile pentru acest brand.')).toHaveLength(2))
-  })
-})
-
-describe('Overview: comparația cu competitorii', () => {
-  it('coloane brand + C1-C3, versiunea setului și data efectivă; competitorii sunt N/A cu motiv, nu 0', async () => {
-    setup()
-    await loaded()
-    const region = (await screen.findByRole('heading', { level: 2, name: 'Comparație cu competitorii' })).closest('section')!
-    const table = await within(region).findByRole('table')
-    expect(within(table).getByRole('columnheader', { name: 'Uronova' })).toBeInTheDocument()
-    expect(within(table).getByRole('columnheader', { name: 'Cisticare' })).toBeInTheDocument()
-    expect(within(table).getByRole('columnheader', { name: 'Vitamerin' })).toBeInTheDocument()
-    expect(within(region).getByText('v3')).toBeInTheDocument()
-    expect(within(region).getByText(/1 sept\.?\s2026/)).toBeInTheDocument()
-    expect(within(region).getAllByText(/Nu există încă o sursă de date pentru competitori/).length).toBeGreaterThan(0)
-    expect(within(table).queryByText('Cea mai bună valoare:')).toBeNull()
-  })
-
-  it('brandul își arată valoarea acolo unde există (SEO) și N/A unde nu există (AI, Listening)', async () => {
-    setup({ route: '/brands/brand-minimartieni/overview' })
-    await loaded()
-    const region = (await screen.findByRole('heading', { level: 2, name: 'Comparație cu competitorii' })).closest('section')!
-    await within(region).findByRole('table')
-    const seo = within(region).getByRole('row', { name: /Visibility SEOmonitor/ })
-    expect(within(seo).getAllByRole('cell')[0]).not.toHaveTextContent('N/A')
-    const ai = within(region).getByRole('row', { name: /AI Mention Rate/ })
-    expect(within(ai).getAllByRole('cell')[0]).toHaveTextContent('N/A')
+    const s = section('Poziția față de competitori')
+    expect(within(s).getAllByText('N/A').length).toBeGreaterThanOrEqual(3)
+    expect(s).toHaveTextContent('Pentru competitori nu există sursă de Listening conectată.')
   })
 
   it('link spre comparația completă, cu perioada păstrată', async () => {
     setup({ route: '/brands/brand-urinal/overview?period=7d' })
     await loaded()
-    expect(await screen.findByRole('link', { name: 'Toată comparația' })).toHaveAttribute('href', '/brands/brand-urinal/competition?period=7d')
+    await userEvent.click(screen.getByRole('link', { name: 'Toată comparația' }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/brands/brand-urinal/competition?period=7d'))
   })
 
   it('setul de competitori neconfigurat: motivul, nu o tabelă goală', async () => {
-    setup({ wrap: (b) => ({ ...b, brands: { ...b.brands, competitorSet: async () => notConnected('Setul de competitori nu e configurat pentru acest brand.') } }) })
+    setup({ wrap: (b) => ({ ...b, competition: { ...b.competition, matrix: async () => notConnected('Setul de competitori nu e configurat pentru acest brand.') } }) })
     await loaded()
-    expect(await screen.findByText('Setul de competitori nu e configurat pentru acest brand.')).toBeInTheDocument()
+    const s = section('Poziția față de competitori')
+    expect(await within(s).findByText('Setul de competitori nu e configurat pentru acest brand.')).toBeInTheDocument()
+    expect(within(s).queryByRole('table')).toBeNull()
+  })
+})
+
+describe('Overview: prioritățile următoare și interpretarea AdSymphony', () => {
+  const published = 'Vizibilitatea în răspunsurile AI scade pe criteriile de alegere'
+
+  it('agenția vede ultima analiză publicată cu badge de status, autor, perioadă, data publicării și limite', async () => {
+    setup()
+    await loaded()
+    const c = await screen.findByRole('article', { name: published })
+    expect(within(c).getByText('Publicat')).toBeInTheDocument()
+    expect(c).toHaveTextContent('Ioana Popescu')
+    expect(c).toHaveTextContent('Publicată la')
+    expect(c).toHaveTextContent('Limite:')
+  })
+
+  it('clientul vede aceeași analiză, fără badge de status', async () => {
+    setup({ role: 'client_viewer' })
+    await loaded()
+    const c = await screen.findByRole('article', { name: published })
+    expect(within(c).queryByText('Publicat')).toBeNull()
+  })
+
+  it('analiza în review sau draft nu apare niciodată ca interpretare publicată', async () => {
+    const drafts = (list: Insight[]): Insight[] => list.map((i) => ({ ...i, status: i.status === 'published' ? 'in_review' : i.status, published_at: null }))
+    setup({ wrap: (b) => ({ ...b, insights: { list: async (c) => { const r = await b.insights.list(c); return r.kind === 'ready' ? ready(drafts(r.data)) : r } } }) })
+    await loaded()
+    expect(await screen.findByText('Nicio analiză publicată')).toBeInTheDocument()
+    expect(screen.queryByRole('article', { name: published })).toBeNull()
+  })
+
+  it('„Vezi toate analizele" duce la modul Analize, cu perioada păstrată', async () => {
+    setup({ route: '/brands/brand-urinal/overview?period=7d' })
+    await loaded()
+    await userEvent.click(screen.getByRole('link', { name: 'Vezi toate analizele' }))
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/brands/brand-urinal/insights?period=7d'))
+  })
+
+  it('dovada din analiză deschide EvidenceDrawer cu metrica ei', async () => {
+    setup()
+    await loaded()
+    const c = await screen.findByRole('article', { name: published })
+    await userEvent.click(within(c).getByRole('button', { name: 'Clicks din search' }))
+    expect(await screen.findByRole('dialog', { name: 'Dovezi' })).toHaveTextContent('Clicks')
+  })
+
+  it('priorități: maximum 3, doar acțiuni deschise, cu responsabil, termen și status, în ordinea termenului', async () => {
+    setup()
+    await loaded()
+    const items = within(section('Prioritățile următoare')).getAllByRole('listitem')
+    expect(items.length).toBeGreaterThan(0)
+    expect(items.length).toBeLessThanOrEqual(3)
+    expect(items[0]).toHaveTextContent('Verifică paginile citate pentru Prevenție ITU')
+    expect(items[0]).toHaveTextContent('În lucru')
+    expect(items[0]).toHaveTextContent('Andrei Vasile')
+    expect(items[0]).toHaveTextContent('Termen')
+    for (const i of items) expect(i).not.toHaveTextContent(/Finalizată|Anulată/)
+  })
+
+  it('efortul și KPI-ul urmărit apar doar când au fost completate', async () => {
+    const withPlan = (list: Insight[]): Insight[] => list.map((i) => ({ ...i, actions: i.actions.map((a, n) => (n === 0 ? { ...a, effort: '2 zile', tracked_metric: { metric_key: 'ai_mention_rate', label: 'AI Mention Rate' } } : a)) }))
+    setup({ wrap: (b) => ({ ...b, insights: { list: async (c) => { const r = await b.insights.list(c); return r.kind === 'ready' ? ready(withPlan(r.data)) : r } } }) })
+    await loaded()
+    const items = within(section('Prioritățile următoare')).getAllByRole('listitem')
+    expect(items[0]).toHaveTextContent('Efort2 zile')
+    expect(items[0]).toHaveTextContent('KPI urmăritAI Mention Rate')
+    if (items[1]) expect(items[1]).not.toHaveTextContent('Efort')
+  })
+
+  it('„Deschide dovezile" dintr-o prioritate deschide drawerul', async () => {
+    setup()
+    await loaded()
+    await userEvent.click(within(section('Prioritățile următoare')).getAllByRole('button', { name: 'Deschide dovezile' })[0]!)
+    expect(await screen.findByRole('dialog', { name: 'Dovezi' })).toBeInTheDocument()
+  })
+
+  it('fără acțiuni deschise: stare goală cu explicație', async () => {
+    const closed = (list: Insight[]): Insight[] => list.map((i) => ({ ...i, actions: i.actions.map((a) => ({ ...a, status: 'done' as const })) }))
+    setup({ wrap: (b) => ({ ...b, insights: { list: async (c) => { const r = await b.insights.list(c); return r.kind === 'ready' ? ready(closed(r.data)) : r } } }) })
+    await loaded()
+    expect(await screen.findByText('Nicio prioritate deschisă')).toBeInTheDocument()
+  })
+
+  it('analize indisponibile (provider neconectat): motivul, în ambele secțiuni, fără listă goală', async () => {
+    setup({ wrap: (b) => ({ ...b, insights: { list: async () => notConnected('Analizele vor fi disponibile după configurarea fluxului editorial.') } }) })
+    await loaded()
+    expect(await screen.findAllByText('Analizele vor fi disponibile după configurarea fluxului editorial.')).toHaveLength(2)
   })
 })
 
 describe('Overview: izolarea secțiunilor și providerul real', () => {
-  it('metrici căzute: cardurile arată eroarea cu „Reîncearcă", iar analiza și comparația se încarcă oricum', async () => {
+  it('metrici căzute: cardurile arată eroarea cu „Reîncearcă", iar analiza și poziția se încarcă oricum', async () => {
     let n = 0
-    // Cade doar cererea cardurilor KPI (prima care conține `ga4_sessions`); comparația cere alte chei.
-    setup({ wrap: (b) => ({ ...b, metrics: { ...b.metrics, metrics: async (c, k) => (k.includes('ga4_sessions') && ++n === 1 ? Promise.reject(new Error('Serverul nu a răspuns.')) : b.metrics.metrics(c, k)) } }) })
+    setup({ wrap: (b) => ({ ...b, metrics: { ...b.metrics, metrics: async (c, k) => (++n === 1 ? Promise.reject(new Error('Serverul nu a răspuns.')) : b.metrics.metrics(c, k)) } }) })
     await screen.findByRole('heading', { level: 1, name: 'Overview' })
-    expect((await screen.findAllByText('Nu am putut încărca datele')).length).toBeGreaterThanOrEqual(6)
+    const grid = await screen.findByTestId('kpi-grid')
+    await waitFor(() => expect(within(grid).getAllByText('Nu am putut încărca datele')).toHaveLength(5))
     expect(await screen.findByText('Vizibilitatea în răspunsurile AI scade pe criteriile de alegere')).toBeInTheDocument()
-    await userEvent.click(screen.getAllByRole('button', { name: 'Reîncearcă' })[0]!)
-    await waitFor(() => expect(screen.queryAllByText('Nu am putut încărca datele')).toHaveLength(0))
+    expect(await within(section('Poziția față de competitori')).findByRole('table')).toBeInTheDocument()
+    await userEvent.click(within(grid).getAllByRole('button', { name: 'Reîncearcă' })[0]!)
+    await waitFor(() => expect(within(grid).queryAllByText('Nu am putut încărca datele')).toHaveLength(0))
   })
 
   it('cu providerul supabase (neconectat): niciun card nu inventează valori sau definiții', async () => {
@@ -421,6 +514,7 @@ describe('Overview: izolarea secțiunilor și providerul real', () => {
     expect(within(grid).queryAllByRole('img')).toHaveLength(0)
     await userEvent.click(within(grid).getAllByRole('button', { name: 'Ce înseamnă indicatorul' })[1]!)
     expect(screen.getByRole('tooltip')).toHaveTextContent('Definiția acestui indicator nu este încă în registrul de metrici.')
+    expect(within(section('Ce s-a schimbat')).queryByText(/Semnal automat/)).toBeNull()
     expect(screen.queryByText(/supabase|stack/i)).toBeNull()
   })
 

@@ -26,6 +26,10 @@ export interface InsightAction {
   owner: Person
   due: IsoDate | null
   status: ActionStatus
+  /** Efortul estimat, în text (de ex. „2 zile"); `null` sau absent când nu a fost completat. */
+  effort?: string | null
+  /** Indicatorul din registru urmărit după implementare; absent când nu a fost ales. */
+  tracked_metric?: { metric_key: string; label: string } | null
 }
 
 export interface Insight {

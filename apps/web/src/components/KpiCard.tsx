@@ -1,4 +1,5 @@
 import { ArrowDownRightIcon, ArrowUpRightIcon, ClockIcon, MinusIcon, PlugsIcon, WarningCircleIcon, WarningIcon } from '@phosphor-icons/react'
+import type { ReactNode } from 'react'
 import type { MetricDirection, MetricItem, TrendPoint } from '../contracts'
 import { formatDate } from '../lib/format'
 import { cn } from '../lib/cn'
@@ -26,6 +27,12 @@ export interface KpiCardProps {
   compareLabel?: string
   /** Înlocuiește motivul stării goale (de ex. indicator fără definiție în registru); nu schimbă starea. */
   emptyReason?: string | null
+  /** Întrebarea la care răspunde cardul în Overview (de ex. „Vizibilitate AI"); eticheta rămâne numele exact al metricii. */
+  category?: string
+  /** Un rând în plus, deja calculat de server și formatat de apelant (de ex. ponderea negativă revizuită). */
+  extra?: string | null
+  /** Link spre detaliul din modul, cu aceleași filtre; apelantul îl construiește (cardul nu știe de rute). */
+  detail?: ReactNode
   onOpen: () => void
   onRetry?: () => void
 }
@@ -42,7 +49,7 @@ const DELTA_ICON: Record<DeltaDirection, typeof ArrowUpRightIcon> = {
   flat: MinusIcon,
 }
 
-export function KpiCard({ label, definition, metric, loading = false, error = null, spark, direction = 'higher_is_better', qualifier = null, compareLabel, emptyReason = null, onOpen, onRetry }: KpiCardProps) {
+export function KpiCard({ label, definition, metric, loading = false, error = null, spark, direction = 'higher_is_better', qualifier = null, compareLabel, emptyReason = null, category, extra = null, detail = null, onOpen, onRetry }: KpiCardProps) {
   const base = metric ? metricView(metric) : null
   const view = base && emptyReason && !base.hasValue ? { ...base, emptyReason } : base
   const paths = spark ? sparkPaths(spark) : { line: '', area: '' }
@@ -64,6 +71,12 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
         className="absolute inset-0 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2"
       />
       <div className="pointer-events-none relative flex min-h-5 flex-wrap items-center gap-1.5 max-sm:col-start-1 max-sm:row-start-1 max-sm:min-h-6">
+        {(category || detail) && (
+          <span className="flex basis-full items-center justify-between gap-2 max-sm:hidden">
+            <span className="text-[11px] font-semibold uppercase leading-none tracking-[0.06em] text-text-3">{category}</span>
+            {detail && <span className="pointer-events-auto relative z-10 flex-none">{detail}</span>}
+          </span>
+        )}
         <span className="text-[13px] font-semibold leading-snug text-text-2">{label}</span>
         {qualifier && <span className="text-[11.5px] leading-snug text-text-3">{qualifier}</span>}
         <span className="pointer-events-auto relative z-10">
@@ -145,6 +158,7 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
             {view.notes.map((n) => (
               <p key={n} className="text-[12px] leading-snug text-text-2 max-sm:col-span-2">{n}</p>
             ))}
+            {extra && <p className="text-[12px] leading-snug text-text-2 max-sm:col-span-2">{extra}</p>}
           </>
         )}
       </div>

@@ -21,6 +21,8 @@ export interface SessionUser {
 export interface Brand {
   id: BrandId
   tenant_id: TenantId
+  /** Numele clientului (tenantului), pentru bara de context; `null` dacă nu a putut fi citit. */
+  tenant_name: string | null
   name: string
   category: string | null
   domain: string | null

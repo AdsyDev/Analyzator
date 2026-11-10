@@ -10,8 +10,11 @@ export function createSupabaseBrands(client: DataClient, now: () => Date = () =>
       const { data, error } = await client.from('brands').select('id, tenant_id, name, domain').eq('status', 'active').order('name')
       if (error) return failed(QUERY_FAILED)
       const rows = (data ?? []) as unknown as Array<{ id: string; tenant_id: string; name: string; domain: string | null }>
+      // Numele clientului e doar o etichetă în bara de context: dacă nu se poate citi, brandurile rămân utilizabile.
+      const tenants = rows.length === 0 ? { data: [], error: null } : await client.from('tenants').select('id, name').in('id', [...new Set(rows.map((r) => r.tenant_id))])
+      const tenantName = new Map((tenants.error ? [] : ((tenants.data ?? []) as unknown as Array<{ id: string; name: string }>)).map((t) => [t.id, t.name]))
       // Nu există încă o categorie în schemă: `null`, nu un text presupus.
-      return ready(rows.map((r) => ({ id: r.id, tenant_id: r.tenant_id, name: r.name, category: null, domain: r.domain })))
+      return ready(rows.map((r) => ({ id: r.id, tenant_id: r.tenant_id, tenant_name: tenantName.get(r.tenant_id) ?? null, name: r.name, category: null, domain: r.domain })))
     },
 
     async competitorSet(brandId) {

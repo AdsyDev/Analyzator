@@ -7,7 +7,7 @@ import { metricView, type CoverageState } from '../../lib/metricView'
 const ORDER: CoverageState[] = ['complete', 'partial', 'stale', 'unavailable']
 
 /**
- * Bara de context (spec cap. 12): brand, țară, perioadă, comparație, „Date până la" și acoperirea
+ * Bara de context (spec cap. 12; propunerea din 10 nov. 2026 adaugă clientul): client, brand, țară, perioadă, comparație, „Date până la" și acoperirea
  * indicatorilor. Datele vin din metricile cerute; fiecare card își păstrează propriul `data_as_of`.
  */
 export function ContextBar({ brand, ctx, items }: { brand: Brand; ctx: QueryContext; items: MetricItem[] | null }) {
@@ -22,6 +22,11 @@ export function ContextBar({ brand, ctx, items }: { brand: Brand; ctx: QueryCont
 
   return (
     <section aria-label="Context" className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-border bg-surface px-4 py-3 text-[12.5px] text-text-2 shadow-1">
+      {brand.tenant_name && (
+        <span>
+          Client <strong className="font-semibold text-text">{brand.tenant_name}</strong>
+        </span>
+      )}
       <span>
         Brand <strong className="font-semibold text-text">{brand.name}</strong>
       </span>

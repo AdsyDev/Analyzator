@@ -28,6 +28,18 @@ export interface SourceStatusInfo {
   note: string | null
 }
 
+/**
+ * Actualitatea datelor unei surse, așa cum o poate vedea și clientul (vederea `source_freshness`, spec cap. 27):
+ * doar „date până la" și dacă sunt la zi. Fără conexiuni, erori sau credențiale.
+ */
+export type FreshnessState = 'no_data' | 'current' | 'delayed'
+export interface SourceFreshness {
+  provider: SourceProviderId
+  /** Ultima zi cu date reale; `null` = nicio zi (sursă neconectată sau fără date, clientul nu le poate deosebi). */
+  data_as_of: IsoDate | null
+  freshness: FreshnessState
+}
+
 /** Valorile din `source_connections.credential_status`. */
 export type CredentialStatus = 'missing' | 'unverified' | 'valid' | 'invalid'
 

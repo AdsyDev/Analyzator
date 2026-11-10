@@ -14,9 +14,12 @@ export const PROVIDER_LABELS: Record<SourceProviderId, { name: string; mono: str
   csv_import: { name: 'Import CSV', mono: 'CSV' },
 }
 
+/** `primary_source` din registru care nu e un card de conexiune: Planable scrie separat Analytics și Listening. */
+const REGISTRY_SOURCE_NAMES: Record<string, string> = { planable_listening: 'Planable Listening', planable_analytics: 'Planable Analytics' }
+
 /** Numele afișat pentru o cheie de sursă; o cheie necunoscută se afișează ca atare, nu se ghicește. */
 export function sourceName(key: string): string {
-  return (PROVIDER_LABELS as Record<string, { name: string } | undefined>)[key]?.name ?? key
+  return (PROVIDER_LABELS as Record<string, { name: string } | undefined>)[key]?.name ?? REGISTRY_SOURCE_NAMES[key] ?? key
 }
 
 /** Ce aduce fiecare sursă, în română; folosit în pagina de status și în sursele fiecărui site. */

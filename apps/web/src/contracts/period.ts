@@ -1,6 +1,7 @@
 import type { BrandId, IsoDate } from './common'
 
-export const PERIOD_PRESETS = ['7d', '28d', 'month', 'custom'] as const
+/** `90d` și `365d` sunt „trimestru” și „an” din propunerea din 10 nov. 2026: intervale mobile, încheiate ieri. */
+export const PERIOD_PRESETS = ['7d', '28d', 'month', '90d', '365d', 'custom'] as const
 export type PeriodPreset = (typeof PERIOD_PRESETS)[number]
 
 /** Intervalul rezolvat, inclusiv capetele, în Europe/Bucharest. */

@@ -33,6 +33,8 @@ const PRESET_LABELS: Record<PeriodPreset, string> = {
   '7d': 'Ultimele 7 zile',
   '28d': 'Ultimele 28 de zile',
   month: 'Luna curentă',
+  '90d': 'Ultimele 90 de zile',
+  '365d': 'Ultimele 365 de zile',
   custom: 'Interval personalizat',
 }
 const COMPARISON_LABELS: Record<ComparisonMode, string> = { previous: 'perioada anterioară', year_ago: 'anul trecut' }
@@ -141,7 +143,7 @@ function FilterSheet({ value, filterDefs, yearAgoAvailable, now, onApply, onClos
       <div className="flex flex-col gap-5">
         <fieldset className="flex flex-col gap-2">
           <legend className="mb-2 text-[12.5px] font-semibold text-text-2">Perioadă</legend>
-          {(['7d', '28d', 'month', 'custom'] as const).map((p) => {
+          {(['7d', '28d', 'month', '90d', '365d', 'custom'] as const).map((p) => {
             const r = p === 'custom' ? null : resolvePeriod(p, now)
             return <SheetOption key={p} name={`${name}-period`} checked={preset === p} onSelect={() => setPreset(p)} label={PRESET_LABELS[p]} hint={r ? formatRange(r.from, r.to) : undefined} />
           })}
@@ -212,7 +214,7 @@ export function FilterBar({ value, onChange, onReset, filterDefs = [], yearAgoAv
   const { period, comparison, filters } = value
   const compare = comparisonRange(period, comparison)
 
-  const periodOptions: MenuOption[] = (['7d', '28d', 'month'] as const).map((p) => {
+  const periodOptions: MenuOption[] = (['7d', '28d', 'month', '90d', '365d'] as const).map((p) => {
     const r = resolvePeriod(p, now)
     return { value: p, label: PRESET_LABELS[p], hint: formatRange(r.from, r.to) }
   })

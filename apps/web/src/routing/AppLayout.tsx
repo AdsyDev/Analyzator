@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useMatch, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import { useAuth, useUser } from '../auth/AuthContext'
 import { AppShell } from '../components/AppShell'
+import { ModuleFreshness } from '../components/ModuleFreshness'
 import { FilterBar } from '../components/FilterBar'
 import type { Brand, ProviderResult, QueryContext, SessionUser } from '../contracts'
 import type { FilterBarChange } from '../components/FilterBar'
@@ -36,16 +37,20 @@ export interface LayoutContext {
 export const useLayout = () => useOutletContext<LayoutContext>()
 
 const BRAND_KEY = 'az-brand'
+/**
+ * Ultimul brand ales se reține pe dispozitiv, între sesiuni (propunerea din 10 nov. 2026). E doar o preferință:
+ * un ID care nu mai e printre brandurile permise utilizatorului curent e ignorat (vezi `rememberedBrand`).
+ */
 function readBrand(): string | null {
   try {
-    return window.sessionStorage.getItem(BRAND_KEY)
+    return window.localStorage.getItem(BRAND_KEY) ?? window.sessionStorage.getItem(BRAND_KEY)
   } catch {
     return null
   }
 }
 function writeBrand(id: string) {
   try {
-    window.sessionStorage.setItem(BRAND_KEY, id)
+    window.localStorage.setItem(BRAND_KEY, id)
   } catch {
     // Stocarea poate fi blocată; brandul rămâne valabil cât ține pagina.
   }
@@ -113,13 +118,21 @@ export function AppLayout() {
     () => (shellBrand ? providers.sources.statuses(shellBrand.id) : Promise.resolve(null)),
     [providers, shellBrand?.id, user.role],
   )
+  // Actualitatea pe sursă e vizibilă și clientului (vederea `source_freshness`); starea conexiunilor, doar agenției.
+  const { state: freshnessState } = useAsync(
+    () => (shellBrand ? providers.sources.freshness(shellBrand.id) : Promise.resolve(null)),
+    [providers, shellBrand?.id, user.role],
+  )
+  const freshness = freshnessState.status === 'done' && freshnessState.value?.kind === 'ready' ? freshnessState.value.data : null
   const { dataAsOf, lastRefreshAt } = useMemo(() => {
-    if (sourcesState.status !== 'done' || sourcesState.value?.kind !== 'ready') return { dataAsOf: null, lastRefreshAt: null }
+    const fresh = (freshness ?? []).map((f) => f.data_as_of).filter((d): d is string => !!d).sort()
+    if (sourcesState.status !== 'done' || sourcesState.value?.kind !== 'ready') return { dataAsOf: fresh[0] ?? null, lastRefreshAt: null }
     const live = sourcesState.value.data.filter((s) => s.state !== 'not_connected')
     const dates = live.map((s) => s.data_as_of).filter((d): d is string => !!d).sort()
     const imports = live.map((s) => s.imported_at).filter((d): d is string => !!d).sort()
-    return { dataAsOf: dates[0] ?? null, lastRefreshAt: imports[imports.length - 1] ?? null }
-  }, [sourcesState])
+    // Clientul nu vede conexiunile, deci „Date până la" îi vine din actualitatea surselor.
+    return { dataAsOf: dates[0] ?? fresh[0] ?? null, lastRefreshAt: imports[imports.length - 1] ?? null }
+  }, [sourcesState, freshness])
 
   const title = module?.title ?? adminModule?.title ?? (siteMatch ? 'Site și surse' : 'Analyzator')
   const subtitle = module?.subtitle(shellBrand?.name ?? '') ?? adminModule?.subtitle(shellBrand?.name ?? null) ?? (siteMatch ? 'Detaliile site-ului, sursele lui de date și istoricul sincronizărilor.' : undefined)
@@ -146,8 +159,16 @@ export function AppLayout() {
     content = <NoAccessPage homeBrandId={homeBrandId} />
   } else {
     const context: LayoutContext = { user, brands, brand: urlBrand, activeBrand: shellBrand, ctx, homeBrandId, changeFilters: change, reloadBrands, selectBrand: onBrandChange }
-    // `key` pe rol: la comutarea rolului în previzualizare, ecranele se reîncarcă cu datele noului rol.
-    content = <Outlet key={user.role} context={context} />
+    // Starea datelor apare pe fiecare modul de brand care depinde de surse; cât nu se poate citi, nu ocupă loc.
+    // Structura rămâne aceeași cu sau fără fâșie, ca pagina să nu se remonteze (și să nu-și reia cererile) când apare.
+    const showFreshness = module && urlBrand && module.sources.length > 0 && freshnessState.status !== 'failed' && (freshnessState.status === 'loading' || freshness !== null)
+    content = (
+      <div className="flex min-w-0 flex-col gap-5">
+        {showFreshness ? <ModuleFreshness sources={module.sources} freshness={freshness} syncedAt={lastRefreshAt} /> : null}
+        {/* `key` pe rol: la comutarea rolului în previzualizare, ecranele se reîncarcă cu datele noului rol. */}
+        <Outlet key={user.role} context={context} />
+      </div>
+    )
   }
 
   return (

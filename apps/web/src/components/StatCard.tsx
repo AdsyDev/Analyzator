@@ -1,6 +1,8 @@
 import { ArrowDownRightIcon, ArrowUpRightIcon, MinusIcon, PlugsIcon, WarningIcon } from '@phosphor-icons/react'
-import type { MetricStatus } from '../contracts'
+import type { ReactNode } from 'react'
+import type { IsoDate, MetricStatus } from '../contracts'
 import { cn } from '../lib/cn'
+import { formatDate } from '../lib/format'
 import { CoverageBadge } from './CoverageBadge'
 import { InfoTip } from './ui/InfoTip'
 import { coverageStateFor } from '../lib/metricView'
@@ -20,6 +22,14 @@ export interface StatCardProps {
   note?: string | null
   compareLabel?: string
   loading?: boolean
+  /** Ca la KpiCard: întrebarea la care răspunde cardul în Overview. */
+  category?: string
+  /** Numele sursei și ultima zi cu date, când apelantul le are. */
+  sourceLabel?: string | null
+  dataAsOf?: IsoDate | null
+  detail?: ReactNode
+  /** Titlul stării fără valoare; implicit lipsa datelor în interval, „Sursă neconectată" când sursa lipsește. */
+  emptyTitle?: string
 }
 
 const ICON = { up: ArrowUpRightIcon, down: ArrowDownRightIcon, flat: MinusIcon }
@@ -28,7 +38,7 @@ const ICON = { up: ArrowUpRightIcon, down: ArrowDownRightIcon, flat: MinusIcon }
  * Card pentru indicatori care nu sunt metrici din registru (Paid, Social): date importate, calculate de server.
  * Nu are EvidenceDrawer; arată definiția, valoarea sau lipsa explicată, variația și starea.
  */
-export function StatCard({ label, definition, valueText, deltaText = null, deltaDirection = null, goodWhen = 'neutral', status, note = null, compareLabel, loading = false }: StatCardProps) {
+export function StatCard({ label, definition, valueText, deltaText = null, deltaDirection = null, goodWhen = 'neutral', status, note = null, compareLabel, loading = false, category, sourceLabel = null, dataAsOf = null, detail = null, emptyTitle = 'Fără date pentru interval' }: StatCardProps) {
   const empty = valueText === null
   const tone =
     !deltaDirection || deltaDirection === 'flat' || goodWhen === 'neutral' ? 'text-text-2' : (deltaDirection === goodWhen ? 'text-pos-text' : 'text-neg-text')
@@ -38,6 +48,12 @@ export function StatCard({ label, definition, valueText, deltaText = null, delta
     // Sub `sm` (telefon), compact ca KpiCard: eticheta și starea sus, valoarea și variația jos.
     <article aria-label={label} data-status={status} className="flex h-full flex-col gap-3 rounded-xl border border-border bg-surface px-4 pb-3 pt-4 shadow-1 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_auto] max-sm:items-start max-sm:gap-x-3 max-sm:gap-y-2 max-sm:pt-3">
       <div className="flex min-h-5 flex-wrap items-center gap-1.5 max-sm:col-start-1 max-sm:row-start-1 max-sm:min-h-6">
+        {(category || detail) && (
+          <span className="flex basis-full items-center justify-between gap-2 max-sm:hidden">
+            <span className="text-[11px] font-semibold uppercase leading-none tracking-[0.06em] text-text-3">{category}</span>
+            {detail && <span className="flex-none">{detail}</span>}
+          </span>
+        )}
         <span className="text-[13px] font-semibold leading-snug text-text-2">{label}</span>
         <InfoTip>{definition}</InfoTip>
       </div>
@@ -50,7 +66,7 @@ export function StatCard({ label, definition, valueText, deltaText = null, delta
         <div className="flex flex-1 flex-col justify-center gap-1.5 py-1 max-sm:col-span-2 max-sm:row-start-2 max-sm:py-0">
           <div className="flex items-center gap-2 font-display text-[15px] font-semibold">
             <PlugsIcon size={18} className="text-text-2" aria-hidden="true" />
-            Fără date pentru interval
+            {emptyTitle}
           </div>
           {note && <p className="text-[13px] leading-snug text-text-2">{note}</p>}
         </div>
@@ -74,8 +90,15 @@ export function StatCard({ label, definition, valueText, deltaText = null, delta
           )}
         </div>
       )}
-      <div className="mt-auto flex items-center border-t border-border pt-2.5 max-sm:col-start-2 max-sm:row-start-1 max-sm:mt-0 max-sm:min-h-6 max-sm:border-t-0 max-sm:pt-0">
+      <div className="mt-auto flex min-w-0 items-center gap-2 whitespace-nowrap border-t border-border pt-2.5 text-[11.5px] text-text-2 max-sm:col-start-2 max-sm:row-start-1 max-sm:mt-0 max-sm:min-h-6 max-sm:border-t-0 max-sm:pt-0">
+        {sourceLabel && <span className="flex-none font-semibold text-text max-sm:hidden">{sourceLabel}</span>}
+        {dataAsOf && (
+          <span className="min-w-0 overflow-hidden text-ellipsis max-sm:hidden">
+            Date până la <span className="font-mono text-[11px]">{formatDate(dataAsOf)}</span>
+          </span>
+        )}
         <span className="flex-1 max-sm:hidden" />
+
         <CoverageBadge state={coverageStateFor(status)} />
       </div>
     </article>

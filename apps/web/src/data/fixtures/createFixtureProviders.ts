@@ -24,6 +24,7 @@ import {
   type TenantConnection,
   type SourceProviderId,
   type SourceState,
+  type SourceFreshness,
   type SourceStatusInfo,
   type SourcesProvider,
   type SyncRun,
@@ -282,6 +283,19 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
         })),
       )
     },
+    freshness: async (brandId) => {
+      const denied = guard<never>(brandId)
+      if (denied) return denied
+      return ready(
+        (statusesFile[brandId] ?? [])
+          .filter((s) => s.provider !== 'csv_import' && s.provider !== 'airbyte')
+          .map<SourceFreshness>((s) => ({
+            provider: s.provider as SourceProviderId,
+            data_as_of: s.data_days_ago === null ? null : daysAgo(s.data_days_ago),
+            freshness: s.data_days_ago === null ? 'no_data' : s.state === 'stale' ? 'delayed' : 'current',
+          })),
+      )
+    },
     connections: async (brandId) => {
       const denied = guard<never>(brandId)
       if (denied) return denied
@@ -457,7 +471,7 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
   }
 
   const brands: BrandsProvider = {
-    list: async () => ready(brandsFile.brands.map<Brand>((b) => ({ ...b, tenant_id: brandsFile.tenant_id }))),
+    list: async () => ready(brandsFile.brands.map<Brand>((b) => ({ ...b, tenant_id: brandsFile.tenant_id, tenant_name: 'STADA România' }))),
     competitorSet: async (brandId) => {
       const denied = guard<never>(brandId)
       if (denied) return denied

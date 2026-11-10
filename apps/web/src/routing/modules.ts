@@ -156,7 +156,7 @@ const AI_GROUPS: DynamicFilter = {
 
 /** Titlurile și subtitlurile din design (`PAGES`). Filtrele sunt allowlist-ul cheilor din URL pentru fiecare modul. */
 export const BRAND_MODULES: Record<string, BrandModule> = {
-  overview: { segment: 'overview', title: 'Overview', subtitle: () => 'Starea brandului pe toate sursele. Apasă pe orice indicator ca să vezi înregistrările din spatele lui.', sources: ['ga4', 'gsc', 'seomonitor'], filters: [] },
+  overview: { segment: 'overview', title: 'Overview', subtitle: () => 'Starea brandului pe toate sursele. Apasă pe orice indicator ca să vezi înregistrările din spatele lui.', sources: ['seomonitor', 'gsc', 'ga4', 'planable'], filters: [] },
   ai: { segment: 'ai', title: 'AI Visibility', subtitle: () => 'Cum apare brandul în răspunsurile asistenților AI, pe aceleași întrebări rulate zilnic.', sources: ['seomonitor'], filters: [ENGINE_FILTER], dynamicFilter: AI_GROUPS },
   seo: { segment: 'seo', title: 'SEO și Search', subtitle: () => 'Prezența în Google: clicks, poziții și subiectele pe care competitorii le acoperă înaintea ta.', sources: ['seomonitor', 'gsc'], filters: [KEYWORD_TYPE_FILTER] },
   traffic: { segment: 'traffic', title: 'Trafic și conversii', subtitle: () => 'Ce se întâmplă după click: vizite, acțiuni importante și calitatea măsurării.', sources: ['ga4'], filters: [DEVICE_FILTER] },

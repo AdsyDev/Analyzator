@@ -348,15 +348,26 @@ describe('Administrare: acces pe roluri', () => {
   })
 
   it('/admin/sources (vechea pagină și întoarcerea OAuth) duce la site-ul ales, cu parametrii păstrați', async () => {
-    window.sessionStorage.setItem('az-brand', 'brand-minimartieni')
+    window.localStorage.setItem('az-brand', 'brand-minimartieni')
     try {
       setup('/admin/sources?oauth=tiktok_ads&result=ok')
       expect(await screen.findByText('TikTok Ads a fost conectat.')).toBeInTheDocument()
       await waitFor(() => expect(where()).toBe('/admin/clients/brand-minimartieni?source=tiktok_ads'))
       expect(screen.getByRole('heading', { level: 2, name: 'Minimartieni' })).toBeInTheDocument()
     } finally {
-      window.sessionStorage.removeItem('az-brand')
+      window.localStorage.removeItem('az-brand')
     }
+  })
+
+  it('ultimul brand ales se reține între sesiuni (localStorage) și deschide Overview-ul lui la intrare', async () => {
+    setup('/brands/brand-proenzi/overview')
+    await waitFor(() => expect(window.localStorage.getItem('az-brand')).toBe('brand-proenzi'))
+  })
+
+  it('un brand reținut care nu mai e permis e ignorat: intrarea duce la primul brand permis', async () => {
+    window.localStorage.setItem('az-brand', 'brand-strain')
+    setup('/')
+    await waitFor(() => expect(where()).toBe('/brands/brand-urinal/overview'))
   })
 
   it('Configurare are conținutul real: competitori, aliasuri, maparea SEOmonitor', async () => {

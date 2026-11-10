@@ -91,6 +91,7 @@ const mentions: MentionsProvider = {
 
 const sources: SourcesProvider = {
   statuses: async () => notConnected('Starea surselor nu este încă disponibilă pentru acest brand.'),
+  freshness: async () => notConnected('Actualitatea surselor nu este încă disponibilă pentru acest brand.'),
   connections: async () => notConnected('Conexiunile surselor nu sunt încă disponibile pentru acest brand.'),
   syncRuns: async () => notConnected('Istoricul sincronizărilor nu este încă disponibil pentru acest brand.'),
   createConnection: async () => notConnected('Conexiunile surselor nu sunt încă disponibile.'),

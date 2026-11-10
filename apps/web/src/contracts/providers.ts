@@ -10,7 +10,7 @@ import type { PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from '
 import type { ContentGap, LandingPage, SearchFilters, SearchKeyword } from './search'
 import type { SocialCalendarItem, SocialCompetitor, SocialFilters, SocialGroups, SocialPost, SocialSummary } from './social'
 import type { ClientsProvider, ConfigProvider, UsersProvider } from './admin'
-import type { NewConnection, NewTenantConnection, OAuthProvider, SourceConnection, SourceStatusInfo, SyncRun, TenantConnection, TokenSaved, ValidationOutcome, AccountList, AirbyteInspection, DiscoverKind } from './source'
+import type { NewConnection, NewTenantConnection, OAuthProvider, SourceConnection, SourceFreshness, SourceStatusInfo, SyncRun, TenantConnection, TokenSaved, ValidationOutcome, AccountList, AirbyteInspection, DiscoverKind } from './source'
 import type { AiReferrals, ClarityDevices, Device, TrackingQuality, TrafficChannels } from './traffic'
 
 /**
@@ -46,6 +46,8 @@ export interface MentionsProvider {
 
 export interface SourcesProvider {
   statuses(brandId: BrandId): Promise<ProviderResult<SourceStatusInfo[]>>
+  /** Actualitatea datelor pe sursă, vizibilă oricui are acces la brand (inclusiv clientul). */
+  freshness(brandId: BrandId): Promise<ProviderResult<SourceFreshness[]>>
   /** Doar agenția (agency_admin pentru credențiale). */
   connections(brandId: BrandId): Promise<ProviderResult<SourceConnection[]>>
   syncRuns(brandId: BrandId): Promise<ProviderResult<SyncRun[]>>
