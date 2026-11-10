@@ -3,7 +3,7 @@
 Răspunsul la cele patru întrebări din mesajul lui Alex, pentru call. Corespunde **Etapei 1** din propunere („Validarea situației existente”) și notează cererea de scop cu impact în timp și cost (regula 6 din `CLAUDE.md`; intrarea F din `docs/decisions.md`).
 
 - **Ce s-a verificat:** codul, migrațiile, contractele, testele și jurnalul de decizii din acest repo, la commitul din 10 nov. 2026.
-- **Ce nu s-a verificat:** datele din staging. Sesiunea nu a avut acces la baza de date, deci coloanele „date primite” și „reconciliat” se citesc din aplicație înainte de call (secțiunea 6 spune de unde).
+- **Ce nu s-a verificat:** datele reale din aplicația live (app.analyzator.ro). Sesiunea nu a avut acces la baza de date, deci coloanele „date primite” și „reconciliat” se citesc din aplicație înainte de call (secțiunea 6 spune de unde).
 - **Exemplul pentru Proenzi:** `docs/design/reference/dashboard-client-proenzi.html`, o simulare a propunerii cu date demonstrative marcate permanent, plus matricea de pregătire din secțiunea 6.
 
 ## Pe scurt
@@ -81,7 +81,7 @@ Fundația de acces și RLS, registrul de metrici și contractul de răspuns, to�
 
 ### Etapa 1: validare (2–3 zile)
 
-- Matricea din secțiunea 6 completată din staging pentru fiecare site STADA.
+- Matricea din secțiunea 6 completată din aplicația live pentru fiecare site STADA.
 - Reconciliere GA4 și Search Console pe o săptămână și o lună, pe un brand.
 - Probe la furnizori: modelele AI active în abonamentul SEOmonitor (inclusiv Claude și AI Overviews), ruta Planable pentru competitor analytics și listening pe competitori, costul per brand din paginile de Billing.
 
@@ -144,7 +144,7 @@ Backup cu restaurare testată, job de retenție, suita de izolare extinsă la ex
 
 | Ce verificăm | Ce există deja | Ce adăugăm |
 |---|---|---|
-| Izolarea brandurilor | `npm run test:security`: pgTAP pe RLS, atacuri prin API (ID-uri străine, JWT falsificat, revocare, RPC, storage, GraphQL), funcțiile server, 13 mutații care slăbesc protecțiile și trebuie prinse. În interfață: brand nepermis în URL = același mesaj ca brand inexistent, fără nicio cerere | Aceleași atacuri pentru fiecare suprafață nouă înainte de livrare: export, link de fișier, chat, căutare semantică, cache. Azi aceste suprafețe nu există, deci nu au ce testa. Un test manual cu două conturi de client pe staging |
+| Izolarea brandurilor | `npm run test:security`: pgTAP pe RLS, atacuri prin API (ID-uri străine, JWT falsificat, revocare, RPC, storage, GraphQL), funcțiile server, 13 mutații care slăbesc protecțiile și trebuie prinse. În interfață: brand nepermis în URL = același mesaj ca brand inexistent, fără nicio cerere | Aceleași atacuri pentru fiecare suprafață nouă înainte de livrare: export, link de fișier, chat, căutare semantică, cache. Azi aceste suprafețe nu există, deci nu au ce testa. Un test manual cu două conturi de client de test în aplicația live |
 | Corectitudinea metricilor | Formule doar în SQL, testate pe reguli (CTR agregat din numărători, puncte procentuale, bază zero, reach nesumabil, eșantion minim). Reconciliere automată GA4 și Search Console | Lista celor zece metrici principale, fiecare reconciliată pe o săptămână și o lună cu exportul sursei, cu toleranță și cauză notate. Reconciliere pentru ads și SEOmonitor |
 | Stări fără date | 8 statusuri de metrică; `null`, zero și eroare sunt distincte și testate pe fiecare componentă și ecran. Un build cu date fictive pentru production sau staging eșuează | Stările noi din propunere: „integrare oprită”, „permisiune insuficientă”, „AI oprit” |
 | Actualizarea surselor | Importuri idempotente testate cu rulare dublă; reimport pe 35 de zile pentru date întârziate; alerte la eșec și parțial | Marcajul vizibil pentru date corectate; „Următoarea actualizare estimată”; test pe o zi Clarity pierdută |
@@ -169,7 +169,7 @@ Gate-ul fiecărei livrări rămâne cel din `CLAUDE.md`: `typecheck`, `test` com
 
 ## 6. Matricea de pregătire, exemplu pentru Proenzi
 
-Formatul cerut la Etapa 1: autorizat, conectat, date primite, reconciliat, istoric, limitări. Coloanele „din repo” sunt fapte verificate aici. „De citit” înseamnă valoare din staging, luată din Administrare → Clienți și site-uri → Proenzi (cardul sursei și „Istoricul sincronizărilor”) și din `source_reconciliations`.
+Formatul cerut la Etapa 1: autorizat, conectat, date primite, reconciliat, istoric, limitări. Coloanele „din repo” sunt fapte verificate aici. „De citit” înseamnă valoare din aplicația live, luată din Administrare → Clienți și site-uri → Proenzi (cardul sursei și „Istoricul sincronizărilor”) și din `source_reconciliations`.
 
 | Sursă | Autorizat și conectat | Date primite | Reconciliat | Istoric | Limitări pentru Proenzi |
 |---|---|---|---|---|---|
