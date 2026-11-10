@@ -26,6 +26,17 @@ export interface EvidenceLink {
   evidence_query: EvidenceQuery
 }
 
+/** O recomandare: problema, ce propunem și ce ne așteptăm să se schimbe. Se editează doar cât analiza e ciornă. */
+export interface InsightRecommendation {
+  id: string
+  problem: string
+  action: string
+  expected_benefit: string
+  /** 1–3, fără zecimale (spec 2.8); 1 = prioritatea cea mai mare. */
+  priority: 1 | 2 | 3
+}
+export type NewRecommendation = Omit<InsightRecommendation, 'id'>
+
 export interface InsightAction {
   id: string
   title: string
@@ -55,6 +66,10 @@ export interface Insight {
   /** Interpretarea echipei (separată de constatare); obligatorie la trimiterea în review. */
   interpretation?: string
   version?: number
+  /** Analiza publicată pe care o înlocuiește această versiune, când e cazul. */
+  supersedes_id?: string | null
+  /** Recomandările analizei, în ordinea priorității (1 = cea mai mare). */
+  recommendations?: InsightRecommendation[]
   /** „Limite": ce nu arată analiza. */
   limits: string | null
   actions: InsightAction[]
@@ -78,6 +93,8 @@ export type InsightTransition = 'in_review' | 'draft' | 'published'
 
 export interface NewAction {
   title: string
+  /** Responsabilul; `null` = utilizatorul curent. Trebuie să fie un membru activ al agenției (verificat de server). */
+  owner_id?: string | null
   due: IsoDate | null
   effort: string | null
   tracked_metric_key: string | null

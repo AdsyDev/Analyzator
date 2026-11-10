@@ -42,6 +42,10 @@ describe('resolvePeriod', () => {
     expect(resolvePeriod('90d', NOW)).toEqual({ preset: '90d', from: '2026-07-08', to: '2026-10-05' })
     expect(resolvePeriod('365d', NOW)).toEqual({ preset: '365d', from: '2025-10-06', to: '2026-10-05' })
     expect(serverPeriodKind('90d')).toBe('custom')
+    // Comparația cu anul trecut are tipul ei pe server, indiferent de interval (inclusiv luna curentă).
+    expect(serverPeriodKind('28d', 'year_ago')).toBe('yoy')
+    expect(serverPeriodKind('month', 'year_ago')).toBe('yoy')
+    expect(serverPeriodKind('month', 'previous')).toBe('mtd')
     expect(comparisonRange(resolvePeriod('90d', NOW), 'previous')).toEqual({ from: '2026-04-09', to: '2026-07-07' })
   })
   it('interval personalizat valid', () => {

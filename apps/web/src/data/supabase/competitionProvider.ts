@@ -13,7 +13,7 @@ const rpcError = (e: { code?: string } | null) => (e?.code === '42501' ? 'Nu ai 
 export function createSupabaseCompetition(client: DataClient): CompetitionProvider {
   return {
     async matrix(ctx) {
-      const { data, error } = await client.rpc('brand_competition', { p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to, p_kind: serverPeriodKind(ctx.period.preset) })
+      const { data, error } = await client.rpc('brand_competition', { p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to, p_kind: serverPeriodKind(ctx.period.preset, ctx.comparison) })
       if (error) return failed(rpcError(error))
       const d = data as (CompetitionMatrix & { has_set?: boolean }) | null
       if (!d || typeof d.has_set !== 'boolean') return failed(CONTRACT)

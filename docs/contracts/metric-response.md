@@ -78,3 +78,15 @@ Ordinea = gravitatea; se alege prima condiție îndeplinită.
 | 2 | 8 oct 2026 | Unitatea `currency` și câmpul `currency` (ISO 4217; null pentru unitățile nemonetare; obligatoriu pentru `unit = currency` cu `value` non-null). Costul, CPC și CPA (Google Ads, Meta Ads, TikTok Ads) trec de pe `count` provizoriu pe `currency` (versiunea 2 a definițiilor). `metrics.compute` emite mereu câmpul `currency`. |
 
 **În `analytics/contracts/metric-response.ts`** versiunea 2 este aditivă: `METRIC_FIELDS`, `MetricUnit` și `MetricResponse` rămân cele ale versiunii 1, iar versiunea 2 are `METRIC_FIELDS_V2`, `METRIC_UNITS_V2`, `MetricUnitV2`, `MetricResponseV2` și `metricInvariantViolations`. Motiv: `apps/web` verifică la compilare lista de câmpuri și caracterul exhaustiv al unităților; până când sesiunea UI trece pe v2 (și mută numele canonice pe v2), schimbarea numelor existente ar rupe compilarea lui `apps/web`. SQL-ul emite deja forma v2 (câmpul `currency` în plus nu deranjează consumatorii v1).
+
+## Tipul de perioadă (`p_kind`)
+
+| `p_kind` | Perioada de comparație | Note |
+|---|---|---|
+| `custom` | perioada anterioară de aceeași lungime | implicit |
+| `mtd` | aceeași porțiune din luna anterioară | perioada e marcată „incompletă” |
+| `yoy` | același interval, cu un an înainte (29 feb. → 28 feb.) | din 10 nov. 2026 (H-1); perioada rămâne una obișnuită, nu „incompletă” |
+
+`metrics.comparison_period` mai are `ytd` (folosit la îngheț, nu de ecrane). Un tip necunoscut e refuzat cu `22023`. Forma răspunsului
+nu se schimbă: `comparison_period` din `meta` spune intervalul folosit, iar unde sursa nu are date atât de vechi, `comparison_value`,
+`absolute_change` și `relative_change` rămân `null` (nu zero) și apare avertismentul de comparație lipsă.

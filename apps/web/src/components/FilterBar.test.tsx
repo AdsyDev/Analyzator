@@ -57,19 +57,21 @@ describe('FilterBar', () => {
     expect(screen.getByRole('menuitemradio', { name: /Luna curentă/ })).toHaveFocus()
   })
 
-  it('anul trecut e dezactivat implicit (serverul nu îl calculează încă), cu motiv', async () => {
-    setup()
+  it('anul trecut se poate alege: serverul compară cu același interval de acum un an (H-1)', async () => {
+    const { onChange } = setup()
+    await userEvent.click(screen.getByRole('button', { name: 'Comparație' }))
+    const opt = screen.getByRole('menuitemradio', { name: 'Anul trecut' })
+    expect(opt).toBeEnabled()
+    await userEvent.click(opt)
+    expect(onChange).toHaveBeenCalledWith({ comparison: 'year_ago' })
+  })
+
+  it('un ecran fără comparație pe an o poate dezactiva, cu motiv', async () => {
+    setup(base, { yearAgoAvailable: false })
     await userEvent.click(screen.getByRole('button', { name: 'Comparație' }))
     const opt = screen.getByRole('menuitemradio', { name: 'Anul trecut' })
     expect(opt).toBeDisabled()
-    expect(opt).toHaveAttribute('title', 'Comparația cu anul trecut nu e disponibilă încă pentru acest interval.')
-  })
-
-  it('anul trecut se poate activa explicit (de ex. când providerul îl servește)', async () => {
-    const { onChange } = setup(base, { yearAgoAvailable: true })
-    await userEvent.click(screen.getByRole('button', { name: 'Comparație' }))
-    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Anul trecut' }))
-    expect(onChange).toHaveBeenCalledWith({ comparison: 'year_ago' })
+    expect(opt).toHaveAttribute('title', 'Comparația cu anul trecut nu e disponibilă pe acest ecran.')
   })
 
   it('pentru „Luna curentă" arată comparația MTD, ca la server', () => {
@@ -175,11 +177,18 @@ describe('FilterBar', () => {
       expect(within(sheet).getByText(/data de început înaintea/)).toBeInTheDocument()
     })
 
-    it('anul trecut rămâne dezactivat, cu motivul scris (pe telefon nu există tooltip)', async () => {
+    it('anul trecut se poate alege și arată intervalul comparat; dezactivat, își scrie motivul (pe telefon nu există tooltip)', async () => {
       setup()
       const sheet = await openSheet()
+      expect(within(sheet).getByRole('radio', { name: /Anul trecut/ })).toBeEnabled()
+      expect(within(sheet).getByRole('radio', { name: /Anul trecut/ })).toHaveAccessibleName(/2025/)
+    })
+
+    it('dezactivat explicit, anul trecut își scrie motivul', async () => {
+      setup(base, { yearAgoAvailable: false })
+      const sheet = await openSheet()
       expect(within(sheet).getByRole('radio', { name: /Anul trecut/ })).toBeDisabled()
-      expect(within(sheet).getByText('Comparația cu anul trecut nu e disponibilă încă pentru acest interval.')).toBeInTheDocument()
+      expect(within(sheet).getByText('Comparația cu anul trecut nu e disponibilă pe acest ecran.')).toBeInTheDocument()
     })
   })
 })

@@ -81,7 +81,8 @@ describe('fixtures ↔ registrul de metrici', () => {
 
   it('cheile din registru.md = cheile de nivel A din toate migrațiile (nivelul B e în registry-b.md)', () => {
     const md = readFileSync(join(ROOT, 'docs/metrics/registry.md'), 'utf8')
-    const keys = [...md.matchAll(/^\| `([a-z0-9_]+)` \| \d+ \|/gm)].map((m) => m[1])
+    // O cheie cu două versiuni (de ex. metricile AI, H-2) apare pe două rânduri în document; aici contează cheile.
+    const keys = [...new Set([...md.matchAll(/^\| `([a-z0-9_]+)` \| \d+ \|/gm)].map((m) => m[1]))]
     const levelB = new Set([...readFileSync(join(ROOT, 'docs/metrics/registry-b.md'), 'utf8').matchAll(/^\| `([a-z0-9_]+)` \| \d+ \|/gm)].map((m) => m[1]))
     const all = readdirSync(migrations)
       .filter((f) => f.endsWith('.sql'))

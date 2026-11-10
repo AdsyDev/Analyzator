@@ -62,8 +62,12 @@ function shiftYear(iso: IsoDate, years: number): IsoDate {
   return fromUtc(d)
 }
 
-/** `kind` trimis la `metrics.compute`: „Luna curentă" e MTD, restul intervalelor sunt `custom`. */
-export function serverPeriodKind(preset: PeriodPreset): ServerPeriodKind {
+/**
+ * `kind` trimis la `metrics.compute`: „Luna curentă" e MTD, restul intervalelor sunt `custom`. Comparația cu anul
+ * trecut are tipul ei (`yoy`), indiferent de interval: serverul compară cu aceleași zile de acum un an.
+ */
+export function serverPeriodKind(preset: PeriodPreset, comparison: ComparisonMode = 'previous'): ServerPeriodKind {
+  if (comparison === 'year_ago') return 'yoy'
   return preset === 'month' ? 'mtd' : 'custom'
 }
 

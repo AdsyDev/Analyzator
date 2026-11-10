@@ -220,11 +220,11 @@ După evaluare, Etapa 2 a fost cerută direct în aplicație (deciziile G din `d
 |---|---|---|---|
 | Overview după propunere | Construit | Șase carduri cu întrebare, metrică exactă și link spre detaliu; „Ce s-a schimbat”; patru grafice aliniate; poziția față de competitori cu locul în set; priorități cu efort și KPI; interpretarea cu data publicării | Definiții în registru pentru engagement rate, rata sesiunilor cu key event și mențiuni eligibile (G-1). Pragurile semnalelor pe brand (G-3) |
 | Dovezile din spatele indicatorilor | Construit | RPC `brand_metric_evidence` și sertarul de dovezi pe date reale | Ora importului și hash-ul payloadului pe observație |
-| Editor de analize și acțiuni | Construit | Ciornă, editare, review, publicare, returnare, ștergere; acțiuni cu termen, efort și KPI; pașii acțiunii până la rezultat | Formular pentru recomandări și pentru înlocuirea unei analize publicate; alegerea altui responsabil |
-| Trimestru, an, comparația cu anul anterior, backfill GA4 | Parțial | Perioade de 90 și 365 de zile | Comparația cu anul trecut (mod nou de calcul pe server); backfill GA4 și SEOmonitor |
-| AI: AI Overviews separat, filtre, ieșirea din `draft` | Neînceput | — | Schimbă valorile afișate clientului, deci cere decizia din secțiunea 5, punctul 7, și o săptămână reconciliată |
+| Editor de analize și acțiuni | Construit | Ciornă, editare, review, publicare, returnare, ștergere; recomandări; versiune nouă a unei analize publicate; acțiuni cu responsabil, termen, efort și KPI; pașii acțiunii până la rezultat | — |
+| Trimestru, an, comparația cu anul anterior, backfill GA4 | Construit, mai puțin SEOmonitor | Perioade de 90 și 365 de zile; comparația cu anul trecut pe toate ecranele (H-1); reimport GA4 la cerere, până la 16 luni (H-3) | Reimport SEOmonitor: cere o decizie despre maparea folosită pentru zilele vechi. Reimportul GA4 trebuie rulat pe fiecare site |
+| AI: AI Overviews separat, filtre, ieșirea din `draft` | Parțial | Metricile AI numără doar asistenții (versiunea 2); AI Overviews are metrica și cardul lui (H-2) | Ieșirea din `draft` (o săptămână reconciliată pe date reale); filtre pe intenție și brand/non-brand |
 | Starea surselor pe modul, client, brand reținut | Construit | Fâșia „Starea datelor” pe fiecare modul; clientul vede „Date până la”; următoarea actualizare estimată; numele clientului; brandul reținut între sesiuni | „Sincronizat la” pentru client (decizie de securitate, G-7); „Acoperire” pe sursă pentru client |
 
-Efort rămas din Etapa 2, estimat: 6–9 zile (comparația cu anul trecut și backfill 3–5, AI 3–4), plus validarea definițiilor de către strategie.
+Rămas din Etapa 2 după a doua rundă (deciziile H): reimportul SEOmonitor, ieșirea metricilor din `draft`, filtrele AI și cele trei definiții care așteaptă strategia. Estimare: 3–5 zile de lucru, toate condiționate de decizii sau de date reale.
 
 Înainte de a arăta clientului: `npm run test:security` complet (rulează în `supabase-deploy` la merge) și o trecere pe date reale a noului Overview pentru fiecare brand, cu atenție la cardul de mențiuni și la poziția față de competitori.

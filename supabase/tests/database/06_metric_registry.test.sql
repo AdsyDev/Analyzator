@@ -512,7 +512,12 @@ select results_eq(
 select is_empty($$ select metric_key from public.metric_definitions where min_sample is not null and primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') and metric_key not like 'ai\_%' $$,
   'D1: nivelul A (fără AI) nu are prag de eșantion');
 -- Metricile AI (D-15): cinci definiții draft; ratele au pragul de 50 de răspunsuri valide (spec cap. 10).
-select is((select count(*)::int from public.metric_definitions_current where metric_key like 'ai\_%'), 5, 'D1: 5 metrici AI în registru');
+-- H-2 (10 nov 2026): a șasea, pentru Google AI Overviews; patru dintre cele cinci au versiunea 2 (doar asistenții AI).
+select is((select count(*)::int from public.metric_definitions_current where metric_key like 'ai\_%'), 6, 'D1: 6 metrici AI în registru');
+select results_eq(
+  $$ select metric_key::text collate "C", version from public.metric_definitions_current where metric_key like 'ai\_%' order by 1 $$,
+  $$ values ('ai_mention_rate'::text collate "C", 2), ('ai_overviews_mention_rate', 1), ('ai_owned_citation_rate', 2), ('ai_recommendation_rate', 1), ('ai_sov', 2), ('ai_valid_answers', 2) $$,
+  'D1: versiunile curente ale metricilor AI');
 select is_empty($$ select metric_key from public.metric_definitions where metric_key like 'ai\_%' and lifecycle <> 'draft' $$, 'D1: metricile AI sunt draft până la prima rulare reală');
 select is_empty($$ select metric_key from public.metric_definitions where metric_key like 'ai\_%' and aggregation = 'ratio' and min_sample is distinct from 50 $$,
   'D1: ratele AI au pragul de 50 de răspunsuri valide');

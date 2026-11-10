@@ -50,7 +50,7 @@ export function createSupabasePaid(client: DataClient): PaidProvider {
     if (!p) {
       p = (async () => {
         const { data, error } = await client.rpc('brand_paid', {
-          p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to, p_kind: serverPeriodKind(ctx.period.preset),
+          p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to, p_kind: serverPeriodKind(ctx.period.preset, ctx.comparison),
           p_platform: f.platform && (PAID_PLATFORMS as readonly string[]).includes(f.platform) ? f.platform : null,
         })
         if (error) return failed<Report>(error.code === '42501' ? 'Nu ai acces la acest spațiu de brand.' : 'Datele de Paid Media nu au putut fi citite. Reîncearcă.')

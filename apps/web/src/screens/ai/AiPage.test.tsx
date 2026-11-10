@@ -13,7 +13,7 @@ describe('AI Visibility: structura din spec cap. 13', () => {
   it('are KPI-urile, engine-urile, trendurile, matricea, sursele citate și Answer Explorer', async () => {
     renderApp({ route: ROUTE })
     await open()
-    expect(within(screen.getByTestId('kpi-grid')).getAllByRole('article')).toHaveLength(5)
+    expect(within(screen.getByTestId('kpi-grid')).getAllByRole('article')).toHaveLength(6)
     for (const h of ['Mention Rate pe engine', 'Trenduri pe engine', 'Subiecte și competitori', 'Surse citate', 'Answer Explorer']) {
       expect(screen.getByRole('heading', { level: 2, name: h })).toBeInTheDocument()
     }
@@ -26,10 +26,10 @@ describe('AI Visibility: structura din spec cap. 13', () => {
     expect(c).not.toHaveAttribute('data-status', 'not_connected')
     expect(c).toHaveTextContent('Definiție provizorie')
     await userEvent.click(within(c).getByRole('button', { name: 'Ce înseamnă indicatorul' }))
-    expect(within(c).getByRole('tooltip')).toHaveTextContent('răspunsuri valide cu brandul menționat')
+    expect(within(c).getByRole('tooltip')).toHaveTextContent('Google AI Overviews se raportează separat')
   })
 
-  it.each(['Recommendation Rate', 'Owned Citation Rate', 'SoV în setul urmărit', 'Răspunsuri valide'])('KPI „%s": not_connected, fără cifră și fără definiție inventată', async (name) => {
+  it.each(['Recommendation Rate', 'Owned Citation Rate', 'SoV în setul urmărit', 'Răspunsuri valide', 'AI Overviews: Mention Rate'])('KPI „%s": not_connected, fără cifră și fără definiție inventată', async (name) => {
     renderApp({ route: ROUTE })
     await open()
     const c = screen.getByRole('article', { name })

@@ -7,7 +7,7 @@
 # (Settings → Secrets and variables → Actions → Variables). workflow_dispatch funcționează oricând.
 #
 # Reimportul istoricului Search Console al unui site (de ex. după trecerea pe Domain property, D-27): Run workflow cu
-# only = gsc, brand = ID-ul site-ului și from = prima zi (cel mult 16 luni în urmă). Pașii: docs/runbook.md.
+# only = gsc sau ga4, brand = ID-ul site-ului și from = prima zi (cel mult 16 luni în urmă). Pașii: docs/runbook.md.
 #
 # Secrete în environment-ul GitHub ales (implicit „staging"): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
 # Service account-ul Google NU e aici: stă în Supabase Vault (source_connections, provider google_service_account)
@@ -35,7 +35,7 @@ on:
         type: string
         default: ''
       from:
-        description: 'Reimport Search Console de la această zi, YYYY-MM-DD, cel mult 16 luni în urmă (cere only = gsc și brand; gol = ultimele 35 de zile)'
+        description: 'Reimportul istoricului de la această zi, YYYY-MM-DD, cel mult 16 luni în urmă (cere only = gsc sau ga4 și brand; gol = ultimele 35 de zile)'
         type: string
         default: ''
 

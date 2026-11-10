@@ -2,7 +2,7 @@ import type { AiAnswerDetail, AiAnswerSummary, AiCitedSource, AiEngineStat, AiEn
 import type { Brand, CompetitorSet } from './brand'
 import type { CompetitionGap, CompetitionMatrix } from './competition'
 import type { BrandId, ProviderResult, TenantId } from './common'
-import type { ActionTransition, Insight, InsightDraft, InsightTransition, NewAction } from './insight'
+import type { ActionTransition, Insight, InsightDraft, InsightTransition, NewAction, NewRecommendation } from './insight'
 import type { Mention, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnapshot, SentimentDistribution } from './mention'
 import type { Evidence, EvidenceQuery, MetricDefinition, MetricsBundle, TrendSeries } from './metric'
 import type { QueryContext } from './period'
@@ -40,7 +40,12 @@ export interface InsightsProvider {
   deleteDraft(id: string): Promise<ProviderResult<null>>
   /** `in_review` (trimite), `draft` (returnează, cu motiv), `published` (publică și îngheață metricile citate). */
   transition(id: string, to: InsightTransition, reason?: string): Promise<ProviderResult<null>>
-  /** Acțiune nouă pe o analiză; responsabilul e utilizatorul curent. */
+  /** O versiune nouă, în ciornă, a unei analize publicate; serverul îi copiază dovezile și recomandările. */
+  supersede(brand: Brand, insight: Insight): Promise<ProviderResult<{ id: string }>>
+  /** Recomandările se adaugă și se șterg doar cât analiza e ciornă. */
+  addRecommendation(brand: Brand, insightId: string, rec: NewRecommendation): Promise<ProviderResult<null>>
+  deleteRecommendation(id: string): Promise<ProviderResult<null>>
+  /** Acțiune nouă pe o analiză; fără `owner_id`, responsabilul e utilizatorul curent. */
   addAction(brand: Brand, insightId: string, action: NewAction): Promise<ProviderResult<null>>
   transitionAction(actionId: string, transition: ActionTransition): Promise<ProviderResult<null>>
 }

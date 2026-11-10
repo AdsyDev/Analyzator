@@ -34,13 +34,20 @@ Calculul: `metrics.compute` (SQL). Contractul răspunsului: `docs/contracts/metr
 | `clarity_dead_click_sessions` | 1 | Sesiuni cu dead clicks | Clarity | count | sum | — | 1 | draft |
 | `clarity_quickback_sessions` | 1 | Sesiuni cu quick backs | Clarity | count | sum | — | 1 | draft |
 | `clarity_scroll_depth` | 1 | Scroll depth mediu | Clarity | percent | weighted_mean | sesiuni | 1 | draft |
-| `ai_mention_rate` | 1 | AI Mention Rate | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft |
+| `ai_mention_rate` | 1 | AI Mention Rate | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft (înlocuită de v2) |
 | `ai_recommendation_rate` | 1 | AI Recommendation Rate | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft |
-| `ai_owned_citation_rate` | 1 | Owned Citation Rate | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft |
-| `ai_sov` | 1 | AI SoV în setul urmărit | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft |
-| `ai_valid_answers` | 1 | Răspunsuri AI valide | SEOmonitor (AI) | count | sum | — | 7 | draft |
+| `ai_owned_citation_rate` | 1 | Owned Citation Rate | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft (înlocuită de v2) |
+| `ai_sov` | 1 | AI SoV în setul urmărit | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft (înlocuită de v2) |
+| `ai_valid_answers` | 1 | Răspunsuri AI valide | SEOmonitor (AI) | count | sum | — | 7 | draft (înlocuită de v2) |
+| `ai_mention_rate` | 2 | AI Mention Rate | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft |
+| `ai_owned_citation_rate` | 2 | Owned Citation Rate | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft |
+| `ai_sov` | 2 | AI SoV în setul urmărit | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft |
+| `ai_valid_answers` | 2 | Răspunsuri AI valide | SEOmonitor (AI) | count | sum | — | 7 | draft |
+| `ai_overviews_mention_rate` | 1 | AI Overviews: Mention Rate | SEOmonitor (AI) | percent | ratio (×100) | — | 7 | draft |
 
 Metricile GA4, GSC, SEOmonitor și Clarity au `valid_from = 2026-10-01` și `min_sample = null`. Metricile AI (migrația `20261012230000_ai_metrics.sql`, D-15) au `valid_from = 2026-10-12` și pragul din spec cap. 10: **50 de răspunsuri valide** (`min_sample = 50`, sub prag `insufficient_sample`); acoperirea sub 100% dă `partial`.
+
+**Versiunea 2 a metricilor AI (migrația `20261110120000_stage2_yoy_ai_overviews.sql`, decizia H-2, `valid_from = 2026-11-10`):** `ai_mention_rate`, `ai_owned_citation_rate`, `ai_sov` și `ai_valid_answers` numără doar răspunsurile asistenților AI (`ai_answers.surface = 'ai_search'`: ChatGPT, Gemini, Perplexity). Google AI Overviews e o suprafață de căutare și are metrica lui, `ai_overviews_mention_rate`. Versiunile 1 (toate engine-urile la un loc) rămân în registru ca istoric; analizele publicate înainte își păstrează instantaneul cu versiunea 1.
 
 ## Metrici de nivel B (import CSV)
 
@@ -111,7 +118,10 @@ Scroll depth Clarity, medie ponderată cu sesiunile fiecărei zile (80% pe 100 d
 ### ai_mention_rate
 _Sursa observațiilor AI: view-ul `ai_metric_observations`, pe ziua colectării; răspunsurile AI SEOmonitor (`ai_answers`)._
 
-100 × răspunsuri valide cu brandul menționat / toate răspunsurile valide (spec cap. 11). **Valid** = orice stare în afară de eroare tehnică: refuzul motorului intră la numitor și scade rata, eroarea tehnică iese din numitor și scade acoperirea (spec 2.2). Un brand prezent de mai multe ori într-un răspuns contează o dată. Toate engine-urile urmărite, **neponderat**. **Acoperirea:** colectarea e săptămânală (un răspuns pe întrebare și engine), deci o zi e acoperită dacă a existat o colectare validă în ultimele 7 zile. **Draft** până la prima rulare reală SEOmonitor.
+100 × răspunsuri valide ale asistenților AI cu brandul menționat / toate răspunsurile lor valide (spec cap. 11; din versiunea 2, fără Google AI Overviews). **Valid** = orice stare în afară de eroare tehnică: refuzul motorului intră la numitor și scade rata, eroarea tehnică iese din numitor și scade acoperirea (spec 2.2). Un brand prezent de mai multe ori într-un răspuns contează o dată. Toate engine-urile urmărite, **neponderat**. **Acoperirea:** colectarea e săptămânală (un răspuns pe întrebare și engine), deci o zi e acoperită dacă a existat o colectare validă în ultimele 7 zile. **Draft** până la prima rulare reală SEOmonitor.
+
+### ai_overviews_mention_rate
+100 × Google AI Overviews valide în care apare brandul / toate AI Overviews valide colectate, desktop și mobil (`ai_answers.surface = 'ai_overview'`). Aceleași stări ca la asistenți: refuzul intră la numitor, eroarea tehnică nu. Nu se adună și nu se mediază cu `ai_mention_rate`: sunt suprafețe diferite. Colectarea depinde de add-onul din abonamentul SEOmonitor; fără observații, metrica apare `unavailable`. **Draft.**
 
 ### ai_recommendation_rate
 100 × răspunsuri valide care **recomandă explicit** brandul / răspunsuri valide. SEOmonitor marchează doar prezența și poziția brandului în răspuns, nu recomandarea explicită; metrica nu are observații și apare `unavailable`, fără valoare estimată. **Draft** până la o sursă care dă semnalul.

@@ -53,15 +53,15 @@ Fixtures: `tests/fixtures/google/docs-derived/` (**derivate din documentație, n
 - Zilele fără date lipsesc din răspuns: sunt **neconfirmate**, nu zero.
 - Poziția medie GSC ≠ rankul SEOmonitor; păstrează numele complet.
 
-## Reimportul istoricului (Search Console)
+## Reimportul istoricului (Search Console și GA4)
 
 `npm run collect:google -- --only gsc --brand <uuid> --from YYYY-MM-DD` (sau `google-weekly` → Run workflow cu `only`, `brand`, `from`). Folosit când se schimbă proprietatea unui site, ca toată seria să vină din aceeași proprietate (D-27).
 
-- Doar Search Console și doar un brand: altfel conectorul refuză înainte de orice citire. `from` nu poate fi mai vechi de 16 luni (`GSC_HISTORY_MONTHS`): mesajul spune cea mai veche zi permisă.
+- O singură sursă și un singur brand: altfel conectorul refuză înainte de orice citire. `from` nu poate fi mai vechi de 16 luni (`GSC_HISTORY_MONTHS`): mesajul spune cea mai veche zi permisă.
 - Intervalul de la `from` până la sfârșitul ferestrei obișnuite se împarte în ferestre de 35 de zile, rulate **de la cea mai veche**; ultima e chiar fereastra obișnuită. Fiecare fereastră are `sync_run`-ul ei, reconcilierea ei și acoperirea raportată la zilele ei (prima poate fi mai scurtă). Ultima rulare rămâne astfel cea de zi cu zi, iar starea sursei (`source_status`, după ultima rulare) nu arată o fereastră veche.
 - La prima fereastră `failed` (de ex. `access_denied` pe proprietatea nouă), reimportul se oprește; datele existente rămân. Se reia cu aceeași comandă (upsert idempotent).
 - Rândurile se scriu pe aceleași chei naturale: o zi reimportată își înlocuiește rândurile, nu le dublează. `source_id` devine conexiunea nouă.
-- GA4 nu are reimport de istoric (intervalele utilizatorilor activi sunt legate de data rulării).
+- **GA4 (H-3, 10 nov. 2026):** aceeași comandă cu `--only ga4` reimportă `web_daily` și `web_key_events` pe aceleași ferestre, cel mult 16 luni în urmă (`GA4_HISTORY_MONTHS`, limita noastră de volum, nu a furnizorului). Utilizatorii activi (`web_active_users_interval`) sunt rapoarte pe intervale relative la azi: îi aduce doar fereastra obișnuită, ultima din reimport; ferestrele vechi nu îi cer și nu raportează acoperire pentru ei. Reconcilierea rulează pe fiecare fereastră. `--from` cere acum o singură sursă (`--only gsc` sau `--only ga4`).
 
 **Verificarea și trecerea mai multor site-uri:** `npm run gsc:properties` (sau workflow-ul `gsc-properties`). Fără `--apply`, doar citește: conexiunile `gsc`, site-urile active și proprietățile văzute de cheia clientului (aceeași listare ca selectorul, `discover`; o cerere per client). Acțiunea pe fiecare site e `switch`, `connect`, `keep` sau ceva de lămurit. Cu `--apply --brand <uuid>… [--from …]`, trece doar site-urile `switch` / `connect`, numai când cheia vede `sc-domain:<domeniul site-ului>` și proprietatea veche ține de același domeniu, apoi rulează colectarea de mai sus. Toate site-urile se verifică înainte de prima scriere. Scrierile filtrează pe `tenant_id`, `brand_id` și `provider`; dacă adăugarea conexiunii noi eșuează, cea veche se reactivează.
 

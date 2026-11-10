@@ -14,13 +14,16 @@ export interface PeriodSelection extends DateRange {
   preset: PeriodPreset
 }
 
-/** `kind` din `metrics.compute`: `mtd` compară cu aceeași porțiune din luna anterioară, `custom` cu perioada anterioară de aceeași lungime. */
-export type ServerPeriodKind = 'custom' | 'mtd'
+/**
+ * `kind` trimis serverului: `mtd` compară cu aceeași porțiune din luna anterioară, `custom` cu perioada anterioară de
+ * aceeași lungime, `yoy` cu același interval de acum un an (H-1).
+ */
+export type ServerPeriodKind = 'custom' | 'mtd' | 'yoy'
 
 /**
  * `previous`: comparația implicită (spec 2.3), calculată de server după `kind`.
- * `year_ago`: același interval cu un an înainte. Serverul nu o calculează încă pentru intervale
- * arbitrare (`metrics.comparison_period` are doar `custom`, `mtd`, `ytd`); până atunci rămâne dezactivată.
+ * `year_ago`: același interval cu un an înainte (`kind = yoy` în `metrics.comparison_period`). Unde istoricul sursei
+ * nu ajunge atât de departe, comparația rămâne lipsă, cu motivul afișat; nu se estimează.
  */
 export type ComparisonMode = 'previous' | 'year_ago'
 

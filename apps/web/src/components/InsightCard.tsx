@@ -62,6 +62,21 @@ export function InsightCard({ insight, agencyView = false, onOpenEvidence }: Ins
           ))}
         </div>
       )}
+      {(insight.recommendations?.length ?? 0) > 0 && (
+        <div className="flex flex-col gap-2">
+          <span className="text-[12px] font-semibold text-text-2">Recomandări</span>
+          <ol className="flex flex-col gap-2">
+            {insight.recommendations!.map((r) => (
+              <li key={r.id} className="rounded-lg border border-border px-3 py-2 text-[13px] leading-snug">
+                <span className="font-medium text-text">{r.action}</span>
+                <span className="mt-0.5 block text-[12.5px] text-text-2">
+                  <span className="text-text-3">Problema:</span> {r.problem} <span className="text-text-3">Beneficiu așteptat:</span> {r.expected_benefit}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
       {insight.limits && (
         <p className="rounded-lg bg-neutral-soft px-3 py-2 text-[12.5px] leading-snug text-text-2">
           <strong className="font-semibold text-text">Limite:</strong> {insight.limits}

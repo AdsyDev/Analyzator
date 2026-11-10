@@ -1,6 +1,7 @@
 // Colectorul GA4 și Search Console. Rulare: npm run collect:google [-- --only ga4|gsc] [--brand <uuid>]
-// Reimportul istoricului Search Console al unui site (de ex. după trecerea pe Domain property):
-//   npm run collect:google -- --only gsc --brand <uuid> --from YYYY-MM-DD
+// Reimportul istoricului unui site, pe o singură sursă (cel mult 16 luni în urmă):
+//   npm run collect:google -- --only gsc --brand <uuid> --from YYYY-MM-DD   (de ex. după trecerea pe Domain property)
+//   npm run collect:google -- --only ga4 --brand <uuid> --from YYYY-MM-DD   (istoric pentru perioade lungi și comparația pe an)
 // Configurare: source_connections (google_service_account per tenant, ga4 și gsc per brand); service account în Vault.
 // Contract: docs/contracts/google.md.
 

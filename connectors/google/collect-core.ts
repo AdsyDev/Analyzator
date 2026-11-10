@@ -27,6 +27,7 @@ import {
   GOOGLE_SCHEMA_VERSION,
   GSC_DATA_STATE,
   GSC_FINAL_LAG_DAYS,
+  GA4_HISTORY_MONTHS,
   GSC_HISTORY_MONTHS,
   GSC_MAX_PAGES,
   GSC_ROW_LIMIT,
@@ -98,9 +99,22 @@ export function gscEarliestDate(now: Date): string {
   return addMonthsIso(calendarDateIn(now, GSC_TIMEZONE), -GSC_HISTORY_MONTHS)
 }
 
-/** Începutul unui reimport: o dată YYYY-MM-DD, nu mai veche de cât păstrează Search Console. Altfel aruncă. */
-export function assertBackfillFrom(from: string, now: Date): void {
+/** Cea mai veche zi a unui reimport GA4 (limita noastră de volum, în aceeași zi calendaristică de referință ca la GSC). */
+export function ga4EarliestDate(now: Date): string {
+  return addMonthsIso(calendarDateIn(now, GSC_TIMEZONE), -GA4_HISTORY_MONTHS)
+}
+
+/**
+ * Începutul unui reimport: o dată YYYY-MM-DD, nu mai veche de cât păstrează Search Console, respectiv de limita de
+ * volum a reimportului GA4. Altfel aruncă.
+ */
+export function assertBackfillFrom(from: string, now: Date, source: GoogleSource = 'gsc'): void {
   if (!isIsoDate(from)) throw new Error(`--from nu e o dată YYYY-MM-DD: ${JSON.stringify(from)}`)
+  if (source === 'ga4') {
+    const earliest = ga4EarliestDate(now)
+    if (from < earliest) throw new Error(`Reimportul GA4 e limitat la ${GA4_HISTORY_MONTHS} luni: cea mai veche zi care se poate cere azi e ${earliest}.`)
+    return
+  }
   const earliest = gscEarliestDate(now)
   if (from < earliest) throw new Error(`Search Console păstrează ${GSC_HISTORY_MONTHS} luni: cea mai veche zi care se poate cere azi e ${earliest}.`)
 }
@@ -188,7 +202,7 @@ const KEYS = {
 
 /**
  * Punctul de intrare: colectează toate conexiunile ga4/gsc active (sau doar una dintre surse, doar un brand). Cu
- * `options.from`, reimportă istoricul Search Console al brandului ales.
+ * `options.from`, reimportă istoricul unei surse (Search Console sau GA4, H-3) pentru brandul ales.
  */
 export async function collectGoogle(deps: GoogleDeps, only?: GoogleSource, options: GoogleRunOptions = {}): Promise<GoogleOutcome[]> {
   const { db } = deps
@@ -196,9 +210,9 @@ export async function collectGoogle(deps: GoogleDeps, only?: GoogleSource, optio
   // Verificările vin înaintea oricărei citiri: un reimport greșit nu pornește deloc.
   if (options.brandId !== undefined) assertUuid(options.brandId, 'brand_id')
   if (options.from !== undefined) {
-    if (only !== 'gsc') throw new Error('Reimportul istoricului (--from) e doar pentru Search Console: adaugă --only gsc.')
+    if (only === undefined) throw new Error('Reimportul istoricului (--from) se face pe o singură sursă: adaugă --only gsc sau --only ga4.')
     if (options.brandId === undefined) throw new Error('Reimportul istoricului (--from) se face pe un singur site: adaugă --brand <uuid>.')
-    assertBackfillFrom(options.from, now())
+    assertBackfillFrom(options.from, now(), only)
   }
   const brandFilter = options.brandId ? `&brand_id=eq.${options.brandId}` : ''
 
@@ -241,8 +255,10 @@ export async function collectGoogle(deps: GoogleDeps, only?: GoogleSource, optio
         outcomes.push(await runConnection(deps, brandConn, credential.id, regularWindow(brandConn, now())))
         continue
       }
-      for (const window of backfillWindows(options.from, regularWindow(brandConn, now()), GOOGLE_LOOKBACK_DAYS)) {
-        const outcome = await runConnection(deps, brandConn, credential.id, window)
+      const regular = regularWindow(brandConn, now())
+      for (const window of backfillWindows(options.from, regular, GOOGLE_LOOKBACK_DAYS)) {
+        // Utilizatorii activi GA4 se cer pe intervale fixe față de azi: doar fereastra obișnuită (ultima) îi aduce.
+        const outcome = await runConnection(deps, brandConn, credential.id, window, { historyWindow: window.end !== regular.end })
         outcomes.push(outcome)
         // Un eșec (de ex. acces refuzat la proprietate) s-ar repeta pe fiecare fereastră: reimportul se oprește aici.
         if (outcome.status === 'failed') break
@@ -276,8 +292,11 @@ async function runConnection(
   conn: BrandConnection & { brand_id: string },
   credentialConnectionId: string,
   window: { start: string; end: string },
-  /** `strictWindow`: rândurile Search Console din afara ferestrei se sar (istoricul unei proprietăți arhivate). */
-  opts: { strictWindow?: boolean } = {},
+  /**
+   * `strictWindow`: rândurile Search Console din afara ferestrei se sar (istoricul unei proprietăți arhivate).
+   * `historyWindow`: fereastră veche dintr-un reimport GA4; nu se mai cer rapoartele pe intervale relative la azi.
+   */
+  opts: { strictWindow?: boolean; historyWindow?: boolean } = {},
 ): Promise<GoogleOutcome> {
   const { db } = deps
   const now = deps.now ?? (() => new Date())
@@ -304,7 +323,7 @@ async function runConnection(
       } else {
         const clients = (deps.createClients ?? createGoogleClients)(credentials.value)
         const ctxBase = { tenant_id: conn.tenant_id, brand_id: conn.brand_id, source_id: conn.id, sync_run_id: handle.id, schema_version: GOOGLE_SCHEMA_VERSION }
-        if (source === 'ga4') await collectGa4(deps, clients.ga4, conn, ctxBase, window, state, now)
+        if (source === 'ga4') await collectGa4(deps, clients.ga4, conn, ctxBase, window, state, now, opts.historyWindow === true)
         else await collectGsc(deps, clients.gsc, conn, ctxBase, window, state, now, opts.strictWindow === true)
       }
     }
@@ -403,6 +422,7 @@ async function collectGa4(
   window: { start: string; end: string },
   state: RunState,
   now: () => Date,
+  historyWindow = false,
 ): Promise<void> {
   const sleep = deps.sleep ?? defaultSleep
   const retry = { sleep, attempts: RETRY_ATTEMPTS, baseDelayMs: RETRY_BASE_DELAY_MS }
@@ -562,9 +582,10 @@ async function collectGa4(
     }
   }
 
-  // 4. utilizatori activi: câte un raport pe fiecare interval cerut (nesumabili)
-  const active = state.fatal ? null : await prepare({ name: 'web_active_users_interval', dimensions: [], metrics: ['activeUsers'] })
-  const intervals = activeUsersIntervals(calendarDateIn(now(), conn.timezone))
+  // 4. utilizatori activi: câte un raport pe fiecare interval cerut (nesumabili). Intervalele sunt relative la azi,
+  // deci o fereastră veche dintr-un reimport nu le mai cere: le aduce fereastra obișnuită, ultima din reimport.
+  const active = state.fatal || historyWindow ? null : await prepare({ name: 'web_active_users_interval', dimensions: [], metrics: ['activeUsers'] })
+  const intervals = historyWindow ? [] : activeUsersIntervals(calendarDateIn(now(), conn.timezone))
   let intervalsCovered = 0
   if (active && !state.fatal) {
     for (const interval of intervals) {
@@ -582,11 +603,12 @@ async function collectGa4(
   }
 
   // Acoperire: zile cu rânduri / zile așteptate. O zi fără rânduri e neconfirmată, nu zero.
-  const expectedDays = GOOGLE_LOOKBACK_DAYS
+  // Zilele așteptate sunt ale ferestrei rulate: 35 la rularea obișnuită, mai puține pe prima fereastră a unui reimport.
+  const expectedDays = daysInclusive(window.start, window.end)
   const cov = (covered: number, expected: number) => ({ expected_days: expected, covered_days: covered, coverage: Math.round((covered / expected) * 10_000) / 10_000 })
   state.coverage.web_daily = cov(daysSeen.web_daily.size, expectedDays)
   state.coverage.web_key_events = cov(daysSeen.web_key_events.size, expectedDays)
-  state.coverage.web_active_users_interval = cov(intervalsCovered, intervals.length)
+  if (!historyWindow) state.coverage.web_active_users_interval = cov(intervalsCovered, intervals.length)
   void usedTz
 }
 

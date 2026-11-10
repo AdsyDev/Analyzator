@@ -107,6 +107,8 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
           brand_id: i.brand_id,
           title: i.title,
           summary: i.summary,
+          // Fixtures nu au text separat de interpretare; o analiză trimisă la review are mereu una, deci nu rămâne goală.
+          interpretation: i.summary,
           author: person(i.author),
           period,
           status: i.status as Insight['status'],
@@ -144,6 +146,8 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
       }))
   }
   const findInsight = (id: string): Insight | null => brandsFile.brands.flatMap((b) => allInsights(b.id)).find((i) => i.id === id) ?? null
+  /** Analiza așa cum e stocată (fără acțiunile adăugate și stările lor, pe care `allInsights` le alipește la citire). */
+  const rawInsight = (id: string): Insight | null => edited.get(id) ?? brandsFile.brands.flatMap((b) => insightsFor(b.id)).find((i) => i.id === id) ?? null
   const agencyOnly = <T,>(): ProviderResult<T> | null => (isAgencyRole(getRole()) ? null : failed<T>('Doar echipa agenției poate scrie analize și acțiuni.'))
 
   const insights: InsightsProvider = {
@@ -158,8 +162,8 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
     saveDraft: async (brand, id, draft) => {
       const denied = guard<{ id: string }>(brand.id) ?? agencyOnly<{ id: string }>()
       if (denied) return denied
-      const current = id === null ? null : findInsight(id)
-      if (id !== null && (!current || current.status !== 'draft')) return failed('Doar o ciornă se poate edita.')
+      const current = id === null ? null : rawInsight(id)
+      if (id !== null && (!current || current.status !== 'draft' || removed.has(current.id))) return failed('Doar o ciornă se poate edita.')
       const cmp = comparisonRange({ preset: 'custom', ...draft.period }, 'previous')
       const next: Insight = {
         id: current?.id ?? `insight-preview-${++insightSeq}`,
@@ -171,12 +175,14 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
         period: draft.period,
         status: 'draft',
         version: current?.version ?? 1,
+        supersedes_id: current?.supersedes_id ?? null,
+        recommendations: current?.recommendations ?? [],
         evidence: [...new Set(draft.evidence_keys)].map((k) => ({
           label: FIXTURE_DEFINITIONS.find((d) => d.metric_key === k)?.label ?? k,
           evidence_query: { metric_key: k, version: 1, brand_id: brand.id, period: { start: draft.period.from, end: draft.period.to }, comparison_period: { start: cmp.from, end: cmp.to } },
         })),
         limits: draft.limits.trim() || null,
-        actions: current?.actions.filter((a) => !(addedActions.get(current.id) ?? []).some((x) => x.id === a.id)) ?? [],
+        actions: current?.actions ?? [],
         updated_at: now().toISOString(),
         published_at: null,
       }
@@ -195,7 +201,7 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
     transition: async (id, to, reason) => {
       const denied = agencyOnly<null>()
       if (denied) return denied
-      const i = findInsight(id)
+      const i = removed.has(id) ? null : rawInsight(id)
       if (!i) return failed('Analiză inexistentă sau fără acces.')
       const reviewer = getRole() === 'strategist' || getRole() === 'agency_admin'
       if (i.status === 'draft' && to === 'in_review') {
@@ -208,8 +214,41 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
         edited.set(id, { ...i, status: 'draft', updated_at: now().toISOString() })
       } else if (i.status === 'in_review' && to === 'published') {
         if (!reviewer) return failed('Doar strategist sau agency_admin poate publica.')
+        const old = i.supersedes_id ? rawInsight(i.supersedes_id) : null
+        if (i.supersedes_id && old?.status !== 'published') return failed('Versiunea înlocuită nu mai e publicată.')
         edited.set(id, { ...i, status: 'published', updated_at: now().toISOString(), published_at: now().toISOString() })
+        if (old) edited.set(old.id, { ...old, status: 'superseded' })
       } else return failed(`Tranziție nepermisă: ${i.status} → ${to}.`)
+      return ready(null)
+    },
+    supersede: async (brand, insight) => {
+      const denied = guard<{ id: string }>(brand.id) ?? agencyOnly<{ id: string }>()
+      if (denied) return denied
+      const old = removed.has(insight.id) ? null : rawInsight(insight.id)
+      if (!old || old.status !== 'published' || old.brand_id !== brand.id) return failed('Se poate înlocui doar o analiză publicată din același brand.')
+      if ([...edited.values()].some((i) => i.supersedes_id === old.id && !removed.has(i.id))) return failed('Analiza are deja o versiune de înlocuire în lucru.')
+      const id = `insight-preview-${++insightSeq}`
+      edited.set(id, { ...old, id, status: 'draft', author: me(), version: (old.version ?? 1) + 1, supersedes_id: old.id, actions: [], recommendations: [...(old.recommendations ?? [])], updated_at: now().toISOString(), published_at: null })
+      return ready({ id })
+    },
+    addRecommendation: async (brand, insightId, rec) => {
+      const denied = guard<null>(brand.id) ?? agencyOnly<null>()
+      if (denied) return denied
+      const i = removed.has(insightId) ? null : rawInsight(insightId)
+      if (!i) return failed('Analiză inexistentă sau fără acces.')
+      if (i.status !== 'draft') return failed('Recomandările se modifică doar cât analiza e în draft.')
+      const recs = [...(i.recommendations ?? []), { id: `rec-preview-${++insightSeq}`, problem: rec.problem.trim(), action: rec.action.trim(), expected_benefit: rec.expected_benefit.trim(), priority: rec.priority }]
+      edited.set(i.id, { ...i, recommendations: recs.sort((a, b) => a.priority - b.priority) })
+      return ready(null)
+    },
+    deleteRecommendation: async (id) => {
+      const denied = agencyOnly<null>()
+      if (denied) return denied
+      const i = brandsFile.brands.flatMap((b) => allInsights(b.id)).find((x) => (x.recommendations ?? []).some((r) => r.id === id))
+      const raw = i ? rawInsight(i.id) : null
+      if (!raw) return failed('Recomandare inexistentă sau fără acces.')
+      if (raw.status !== 'draft') return failed('Recomandările se modifică doar cât analiza e în draft.')
+      edited.set(raw.id, { ...raw, recommendations: (raw.recommendations ?? []).filter((r) => r.id !== id) })
       return ready(null)
     },
     addAction: async (brand, insightId, action) => {
@@ -221,7 +260,15 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
       const def = action.tracked_metric_key ? FIXTURE_DEFINITIONS.find((d) => d.metric_key === action.tracked_metric_key) : null
       if (action.tracked_metric_key && !def) return failed(`Indicatorul urmărit nu există în registrul de metrici: ${action.tracked_metric_key}.`)
       const list = addedActions.get(insightId) ?? []
-      list.push({ id: `action-preview-${++insightSeq}`, title: action.title.trim(), owner: me(), due: action.due, status: 'open', stage: 'proposed', effort: action.effort?.trim() || null, tracked_metric: def ? { metric_key: def.metric_key, label: def.label } : null, result_note: null })
+      let owner = me()
+      if (action.owner_id) {
+        // Ca triggerul `actions_before_write`: responsabilul e un membru activ al agenției, nu un client.
+        const all = await admin.users.people()
+        const p = all.kind === 'ready' ? all.data.find((x) => x.user_id === action.owner_id && x.membership_active && x.role !== 'client_viewer') : undefined
+        if (!p) return failed('Responsabilul trebuie să fie un membru activ al agenției.')
+        owner = { id: p.user_id, name: p.name ?? p.email ?? p.user_id, role: 'Echipa agenției' }
+      }
+      list.push({ id: `action-preview-${++insightSeq}`, title: action.title.trim(), owner, due: action.due, status: 'open', stage: 'proposed', effort: action.effort?.trim() || null, tracked_metric: def ? { metric_key: def.metric_key, label: def.label } : null, result_note: null })
       addedActions.set(insightId, list)
       return ready(null)
     },
