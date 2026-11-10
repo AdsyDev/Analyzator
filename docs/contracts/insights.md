@@ -75,3 +75,27 @@ Analyzator nu stabilește dacă este o reacție adversă, nu răspunde public ș
 ## Audit
 
 `audit_events` primește `insights`, `recommendations`, `actions` și `pv_contacts` (actorul din JWT). Marcajele PV **nu** intră în `audit_events` (textul sensibil nu se duplică); jurnalul lor este `pv_flag_events`.
+
+## Planul unei acțiuni și editorul din interfață (Etapa 2, 10 nov. 2026)
+
+Migrația `20261110090000_stage2_evidence_action_plan.sql`, deciziile G-5 și G-6.
+
+| Câmp nou pe `actions` | Note |
+|---|---|
+| `effort` | text scurt (1–120 de caractere, de ex. „2 zile”); `NULL` când nu e completat. Nu e o metrică și nu se agregă |
+| `tracked_metric_key` | indicatorul urmărit după implementare; trebuie să existe în `metric_definitions_current` (altfel `23514`) |
+
+Ambele se scriu la inserare și la actualizare de aceleași roluri ca restul acțiunii (RLS neschimbat).
+
+`brand_insights` întoarce în plus, fără să schimbe poarta sau rândurile:
+
+- pe analiză: `interpretation`, `version`, `supersedes_id`, `recommendations` (`id`, `problem`, `action`, `expected_benefit`, `priority`);
+- pe dovadă: `id`;
+- pe acțiune: `stage` (statusul exact din `actions.status`), `effort`, `tracked_metric` (`metric_key` și numele din registru) și `result_note`.
+
+Clientul primește în continuare doar ce permite RLS: analize publicate și acțiuni agreate sau mai departe.
+
+**Editorul** (`apps/web/src/screens/insights`) scrie prin sesiunea utilizatorului, direct în tabele: `insights` (ciornă), `evidence_links`
+(metricile citate; SEOmonitor primește `options.device = desktop`), `insight_transitions`, `actions` (responsabilul e utilizatorul
+curent) și `action_transitions`. Nu apare nicio funcție nouă în `public`. Mesajele triggerelor (de ex. ce lipsește la trimiterea în
+review) ajung la utilizator; erorile de schemă rămân generice. Recomandările și înlocuirea unei analize publicate nu au încă formular.

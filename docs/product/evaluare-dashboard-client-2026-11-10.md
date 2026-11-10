@@ -6,6 +6,8 @@ Răspunsul la cele patru întrebări din mesajul lui Alex, pentru call. Corespun
 - **Ce nu s-a verificat:** datele reale din aplicația live (app.analyzator.ro). Sesiunea nu a avut acces la baza de date, deci coloanele „date primite” și „reconciliat” se citesc din aplicație înainte de call (secțiunea 6 spune de unde).
 - **Exemplul pentru Proenzi:** `docs/design/reference/dashboard-client-proenzi.html`, o simulare a propunerii cu date demonstrative marcate permanent, plus matricea de pregătire din secțiunea 6.
 
+> **Actualizare, 10 nov. 2026:** secțiunile 1–7 descriu aplicația dinainte de Etapa 2. Ce s-a construit între timp și ce a rămas e în secțiunea 8.
+
 ## Pe scurt
 
 1. Majoritatea modulelor propuse există și rulează pe date reale: accesul pe brand, Overview, AI Visibility, SEO, Trafic, User experience, Paid, Social, Listening cu farmacovigilență, Concurență, Analize și acțiuni (doar citire).
@@ -209,3 +211,20 @@ limit 20;
 3. Punctele 1, 2, 3, 7 și 9 din secțiunea 5.
 4. Cine validează definițiile metricilor noi din Overview și până când.
 5. Cine aduce costul real per brand de la SEOmonitor și Planable.
+
+## 8. Starea după construirea Etapei 2 (10 nov. 2026)
+
+După evaluare, Etapa 2 a fost cerută direct în aplicație (deciziile G din `docs/decisions.md`). Tabelul compară cu lucrările din secțiunea 3.
+
+| Lucrare din Etapa 2 | Stare | Ce s-a construit | Ce a rămas |
+|---|---|---|---|
+| Overview după propunere | Construit | Șase carduri cu întrebare, metrică exactă și link spre detaliu; „Ce s-a schimbat”; patru grafice aliniate; poziția față de competitori cu locul în set; priorități cu efort și KPI; interpretarea cu data publicării | Definiții în registru pentru engagement rate, rata sesiunilor cu key event și mențiuni eligibile (G-1). Pragurile semnalelor pe brand (G-3) |
+| Dovezile din spatele indicatorilor | Construit | RPC `brand_metric_evidence` și sertarul de dovezi pe date reale | Ora importului și hash-ul payloadului pe observație |
+| Editor de analize și acțiuni | Construit | Ciornă, editare, review, publicare, returnare, ștergere; acțiuni cu termen, efort și KPI; pașii acțiunii până la rezultat | Formular pentru recomandări și pentru înlocuirea unei analize publicate; alegerea altui responsabil |
+| Trimestru, an, comparația cu anul anterior, backfill GA4 | Parțial | Perioade de 90 și 365 de zile | Comparația cu anul trecut (mod nou de calcul pe server); backfill GA4 și SEOmonitor |
+| AI: AI Overviews separat, filtre, ieșirea din `draft` | Neînceput | — | Schimbă valorile afișate clientului, deci cere decizia din secțiunea 5, punctul 7, și o săptămână reconciliată |
+| Starea surselor pe modul, client, brand reținut | Construit | Fâșia „Starea datelor” pe fiecare modul; clientul vede „Date până la”; următoarea actualizare estimată; numele clientului; brandul reținut între sesiuni | „Sincronizat la” pentru client (decizie de securitate, G-7); „Acoperire” pe sursă pentru client |
+
+Efort rămas din Etapa 2, estimat: 6–9 zile (comparația cu anul trecut și backfill 3–5, AI 3–4), plus validarea definițiilor de către strategie.
+
+Înainte de a arăta clientului: `npm run test:security` complet (rulează în `supabase-deploy` la merge) și o trecere pe date reale a noului Overview pentru fiecare brand, cu atenție la cardul de mențiuni și la poziția față de competitori.

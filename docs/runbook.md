@@ -41,6 +41,7 @@ Rutele aplicației sunt în browser (`/brands/:brandId/<modul>`, `/admin/<pagin�
 - Supabase → Authentication → URL Configuration: Site URL `https://app.analyzator.ro`, Redirect URLs `https://app.analyzator.ro/login`. Fără ele, linkurile de invitație și resetare parolă duc în altă parte.
 - `APP_BASE_URL=https://app.analyzator.ro`: ca GitHub Variable (citită de `weekly-refresh` și `notifications-dispatch`) și ca secret al funcției `notify` în Supabase (linkurile din notificări).
 - Variabilele de build se citesc la build: după o schimbare, rulează din nou deploy-ul (Retry build).
+- **Ordinea la un merge cu migrații (de ex. Etapa 2, 10 nov. 2026):** aplicația web și migrațiile se publică separat. Workers Builds publică interfața imediat; `supabase-deploy` rulează întâi gate-ul și abia apoi `db push`. În fereastra dintre ele, interfața nouă merge pe baza veche: sertarul de dovezi arată „Dovezile nu au putut fi încărcate”, iar o acțiune cu efort sau KPI nu se salvează. Restul ecranelor nu depind de migrație. Dacă `supabase-deploy` pică, interfața rămâne în această stare până la reparare; verifică rularea din Actions după fiecare merge care atinge `supabase/`.
 
 Build-ul de staging și cel de producție se fac fără `VITE_DESIGN_PREVIEW`: variabila oprește build-ul în orice mod în afară de `development` și `design-preview` (vezi README, „Previzualizare design"). Nu o seta în mediul CI.
 

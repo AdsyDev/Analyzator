@@ -239,7 +239,7 @@ describe('Overview: „Ce s-a schimbat"', () => {
   })
 
   it('fără analize disponibile, decizia rămâne goală, cu explicație', async () => {
-    setup({ wrap: (b) => ({ ...b, insights: { list: async () => notConnected('Analizele vor fi disponibile după configurarea fluxului editorial.') } }) })
+    setup({ wrap: (b) => ({ ...b, insights: { ...b.insights, list: async () => notConnected('Analizele vor fi disponibile după configurarea fluxului editorial.') } }) })
     await loaded()
     expect(within(section('Ce s-a schimbat')).getByRole('listitem', { name: 'Decizie' })).toHaveTextContent('Nicio acțiune deschisă în ultima analiză publicată.')
   })
@@ -419,7 +419,7 @@ describe('Overview: prioritățile următoare și interpretarea AdSymphony', () 
 
   it('analiza în review sau draft nu apare niciodată ca interpretare publicată', async () => {
     const drafts = (list: Insight[]): Insight[] => list.map((i) => ({ ...i, status: i.status === 'published' ? 'in_review' : i.status, published_at: null }))
-    setup({ wrap: (b) => ({ ...b, insights: { list: async (c) => { const r = await b.insights.list(c); return r.kind === 'ready' ? ready(drafts(r.data)) : r } } }) })
+    setup({ wrap: (b) => ({ ...b, insights: { ...b.insights, list: async (c) => { const r = await b.insights.list(c); return r.kind === 'ready' ? ready(drafts(r.data)) : r } } }) })
     await loaded()
     expect(await screen.findByText('Nicio analiză publicată')).toBeInTheDocument()
     expect(screen.queryByRole('article', { name: published })).toBeNull()
@@ -455,7 +455,7 @@ describe('Overview: prioritățile următoare și interpretarea AdSymphony', () 
 
   it('efortul și KPI-ul urmărit apar doar când au fost completate', async () => {
     const withPlan = (list: Insight[]): Insight[] => list.map((i) => ({ ...i, actions: i.actions.map((a, n) => (n === 0 ? { ...a, effort: '2 zile', tracked_metric: { metric_key: 'ai_mention_rate', label: 'AI Mention Rate' } } : a)) }))
-    setup({ wrap: (b) => ({ ...b, insights: { list: async (c) => { const r = await b.insights.list(c); return r.kind === 'ready' ? ready(withPlan(r.data)) : r } } }) })
+    setup({ wrap: (b) => ({ ...b, insights: { ...b.insights, list: async (c) => { const r = await b.insights.list(c); return r.kind === 'ready' ? ready(withPlan(r.data)) : r } } }) })
     await loaded()
     const items = within(section('Prioritățile următoare')).getAllByRole('listitem')
     expect(items[0]).toHaveTextContent('Efort2 zile')
@@ -472,13 +472,13 @@ describe('Overview: prioritățile următoare și interpretarea AdSymphony', () 
 
   it('fără acțiuni deschise: stare goală cu explicație', async () => {
     const closed = (list: Insight[]): Insight[] => list.map((i) => ({ ...i, actions: i.actions.map((a) => ({ ...a, status: 'done' as const })) }))
-    setup({ wrap: (b) => ({ ...b, insights: { list: async (c) => { const r = await b.insights.list(c); return r.kind === 'ready' ? ready(closed(r.data)) : r } } }) })
+    setup({ wrap: (b) => ({ ...b, insights: { ...b.insights, list: async (c) => { const r = await b.insights.list(c); return r.kind === 'ready' ? ready(closed(r.data)) : r } } }) })
     await loaded()
     expect(await screen.findByText('Nicio prioritate deschisă')).toBeInTheDocument()
   })
 
   it('analize indisponibile (provider neconectat): motivul, în ambele secțiuni, fără listă goală', async () => {
-    setup({ wrap: (b) => ({ ...b, insights: { list: async () => notConnected('Analizele vor fi disponibile după configurarea fluxului editorial.') } }) })
+    setup({ wrap: (b) => ({ ...b, insights: { ...b.insights, list: async () => notConnected('Analizele vor fi disponibile după configurarea fluxului editorial.') } }) })
     await loaded()
     expect(await screen.findAllByText('Analizele vor fi disponibile după configurarea fluxului editorial.')).toHaveLength(2)
   })

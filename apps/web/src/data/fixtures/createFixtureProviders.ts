@@ -10,8 +10,12 @@ import {
   type Brand,
   type BrandsProvider,
   type DataProviders,
+  ACTION_NEXT,
+  type ActionStage,
   type Insight,
+  type InsightAction,
   type InsightsProvider,
+  type ProviderResult,
   type Mention,
   type MentionsProvider,
   type MetricsProvider,
@@ -117,13 +121,121 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
         }
       })
 
+  // Scrierile din previzualizare rămân în memorie cât ține sesiunea; regulile oglindesc triggerele din `insights_pv`.
+  const STAGE_STATUS: Record<ActionStage, InsightAction['status']> = { proposed: 'open', agreed: 'open', in_progress: 'in_progress', done: 'done', measured: 'done', cancelled: 'cancelled' }
+  const STATUS_STAGE: Record<InsightAction['status'], ActionStage> = { open: 'agreed', in_progress: 'in_progress', done: 'done', cancelled: 'cancelled' }
+  const edited = new Map<string, Insight>()
+  const removed = new Set<string>()
+  const addedActions = new Map<string, InsightAction[]>()
+  const actionState = new Map<string, Pick<InsightAction, 'status' | 'stage' | 'result_note'>>()
+  let insightSeq = 0
+  const me = (): Insight['author'] => {
+    const role = getRole()
+    return role === 'account' ? person('av') : person('ip')
+  }
+  const allInsights = (brandId: string): Insight[] => {
+    const base = insightsFor(brandId).map((i) => edited.get(i.id) ?? i)
+    const created = [...edited.values()].filter((i) => i.brand_id === brandId && !base.some((x) => x.id === i.id))
+    return [...created, ...base]
+      .filter((i) => !removed.has(i.id))
+      .map((i) => ({
+        ...i,
+        actions: [...i.actions, ...(addedActions.get(i.id) ?? [])].map((a) => ({ ...a, stage: a.stage ?? STATUS_STAGE[a.status], ...(actionState.get(a.id) ?? {}) })),
+      }))
+  }
+  const findInsight = (id: string): Insight | null => brandsFile.brands.flatMap((b) => allInsights(b.id)).find((i) => i.id === id) ?? null
+  const agencyOnly = <T,>(): ProviderResult<T> | null => (isAgencyRole(getRole()) ? null : failed<T>('Doar echipa agenției poate scrie analize și acțiuni.'))
+
   const insights: InsightsProvider = {
     list: async (ctx) => {
       const denied = guard<Insight[]>(ctx.brandId)
       if (denied) return denied
-      const all = insightsFor(ctx.brandId)
-      // Ca RLS pe server: clientul primește doar analizele publicate.
-      return ready(isAgencyRole(getRole()) ? all : all.filter((i) => i.status === 'published'))
+      const all = allInsights(ctx.brandId)
+      // Ca RLS pe server: clientul primește doar analizele publicate și acțiunile agreate sau mai departe.
+      if (isAgencyRole(getRole())) return ready(all)
+      return ready(all.filter((i) => i.status === 'published').map((i) => ({ ...i, actions: i.actions.filter((a) => a.stage !== 'proposed' && a.stage !== 'cancelled') })))
+    },
+    saveDraft: async (brand, id, draft) => {
+      const denied = guard<{ id: string }>(brand.id) ?? agencyOnly<{ id: string }>()
+      if (denied) return denied
+      const current = id === null ? null : findInsight(id)
+      if (id !== null && (!current || current.status !== 'draft')) return failed('Doar o ciornă se poate edita.')
+      const cmp = comparisonRange({ preset: 'custom', ...draft.period }, 'previous')
+      const next: Insight = {
+        id: current?.id ?? `insight-preview-${++insightSeq}`,
+        brand_id: brand.id,
+        title: draft.title.trim(),
+        summary: draft.summary.trim(),
+        interpretation: draft.interpretation.trim(),
+        author: current?.author ?? me(),
+        period: draft.period,
+        status: 'draft',
+        version: current?.version ?? 1,
+        evidence: [...new Set(draft.evidence_keys)].map((k) => ({
+          label: FIXTURE_DEFINITIONS.find((d) => d.metric_key === k)?.label ?? k,
+          evidence_query: { metric_key: k, version: 1, brand_id: brand.id, period: { start: draft.period.from, end: draft.period.to }, comparison_period: { start: cmp.from, end: cmp.to } },
+        })),
+        limits: draft.limits.trim() || null,
+        actions: current?.actions.filter((a) => !(addedActions.get(current.id) ?? []).some((x) => x.id === a.id)) ?? [],
+        updated_at: now().toISOString(),
+        published_at: null,
+      }
+      edited.set(next.id, next)
+      return ready({ id: next.id })
+    },
+    deleteDraft: async (id) => {
+      const denied = agencyOnly<null>()
+      if (denied) return denied
+      const i = findInsight(id)
+      if (!i) return failed('Analiză inexistentă sau fără acces.')
+      if (i.status !== 'draft') return failed(`O analiză ${i.status} nu se șterge; istoricul se păstrează.`)
+      removed.add(id)
+      return ready(null)
+    },
+    transition: async (id, to, reason) => {
+      const denied = agencyOnly<null>()
+      if (denied) return denied
+      const i = findInsight(id)
+      if (!i) return failed('Analiză inexistentă sau fără acces.')
+      const reviewer = getRole() === 'strategist' || getRole() === 'agency_admin'
+      if (i.status === 'draft' && to === 'in_review') {
+        const missing = [!i.title.trim() && 'titlu', !i.summary.trim() && 'constatare', !(i.interpretation ?? '').trim() && 'interpretare', !(i.limits ?? '').trim() && 'limite', i.evidence.length === 0 && 'dovezi'].filter(Boolean)
+        if (missing.length > 0) return failed(`Analiza nu poate fi trimisă la review; lipsesc: ${missing.join(', ')}.`)
+        edited.set(id, { ...i, status: 'in_review', updated_at: now().toISOString() })
+      } else if (i.status === 'in_review' && to === 'draft') {
+        if (!reviewer) return failed('Doar strategist sau agency_admin poate returna o analiză la draft.')
+        if (!reason?.trim()) return failed('Returnarea la draft cere un motiv.')
+        edited.set(id, { ...i, status: 'draft', updated_at: now().toISOString() })
+      } else if (i.status === 'in_review' && to === 'published') {
+        if (!reviewer) return failed('Doar strategist sau agency_admin poate publica.')
+        edited.set(id, { ...i, status: 'published', updated_at: now().toISOString(), published_at: now().toISOString() })
+      } else return failed(`Tranziție nepermisă: ${i.status} → ${to}.`)
+      return ready(null)
+    },
+    addAction: async (brand, insightId, action) => {
+      const denied = guard<null>(brand.id) ?? agencyOnly<null>()
+      if (denied) return denied
+      const i = findInsight(insightId)
+      if (!i) return failed('Analiză inexistentă sau fără acces.')
+      if (i.status === 'superseded') return failed('Nu se adaugă acțiuni la o analiză înlocuită.')
+      const def = action.tracked_metric_key ? FIXTURE_DEFINITIONS.find((d) => d.metric_key === action.tracked_metric_key) : null
+      if (action.tracked_metric_key && !def) return failed(`Indicatorul urmărit nu există în registrul de metrici: ${action.tracked_metric_key}.`)
+      const list = addedActions.get(insightId) ?? []
+      list.push({ id: `action-preview-${++insightSeq}`, title: action.title.trim(), owner: me(), due: action.due, status: 'open', stage: 'proposed', effort: action.effort?.trim() || null, tracked_metric: def ? { metric_key: def.metric_key, label: def.label } : null, result_note: null })
+      addedActions.set(insightId, list)
+      return ready(null)
+    },
+    transitionAction: async (actionId, t) => {
+      const denied = agencyOnly<null>()
+      if (denied) return denied
+      const a = brandsFile.brands.flatMap((b) => allInsights(b.id)).flatMap((i) => i.actions).find((x) => x.id === actionId)
+      if (!a) return failed('Acțiune inexistentă sau fără acces.')
+      const from = a.stage ?? STATUS_STAGE[a.status]
+      if (!ACTION_NEXT[from].includes(t.to)) return failed(`Tranziție nepermisă: ${from} → ${t.to}.`)
+      if (t.to === 'cancelled' && !t.reason?.trim()) return failed('Anularea cere un motiv.')
+      if (t.to === 'measured' && !t.result_note?.trim()) return failed('Starea measured cere rezultatul urmărit (result_note).')
+      actionState.set(actionId, { stage: t.to, status: STAGE_STATUS[t.to], result_note: t.to === 'measured' ? (t.result_note?.trim() ?? null) : (a.result_note ?? null) })
+      return ready(null)
     },
   }
 
