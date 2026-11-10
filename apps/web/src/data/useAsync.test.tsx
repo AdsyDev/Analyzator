@@ -35,6 +35,24 @@ describe('useAsync', () => {
     expect(result.current.state).toEqual({ status: 'done', value: 'B' })
   })
 
+  it('la schimbarea dependențelor (brand, perioadă) niciun render nu arată valoarea cererii vechi', async () => {
+    // Fiecare render e înregistrat: un singur cadru cu cifrele brandului precedent sub numele celui nou e deja o eroare.
+    const seen: Array<{ id: string; state: unknown }> = []
+    const { result, rerender } = renderHook(
+      ({ id }) => {
+        const r = useAsync(async () => id.toUpperCase(), [id])
+        seen.push({ id, state: r.state })
+        return r
+      },
+      { initialProps: { id: 'a' } },
+    )
+    await waitFor(() => expect(result.current.state).toEqual({ status: 'done', value: 'A' }))
+    rerender({ id: 'b' })
+    await waitFor(() => expect(result.current.state).toEqual({ status: 'done', value: 'B' }))
+    expect(seen.filter((s) => s.id === 'b').map((s) => s.state)).not.toContainEqual({ status: 'done', value: 'A' })
+    expect(seen.find((s) => s.id === 'b')?.state).toEqual({ status: 'loading' })
+  })
+
   it('reload reia cererea', async () => {
     let n = 0
     const { result } = renderHook(() => useAsync(async () => ++n, []))
