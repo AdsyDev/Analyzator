@@ -1,5 +1,5 @@
 import type { EvidenceQuery, Insight, InsightStatus } from '../contracts'
-import { formatRange } from '../lib/format'
+import { formatDate, formatRange } from '../lib/format'
 import { Avatar } from './ui/Avatar'
 import { StatusChip, type ChipTone } from './ui/Chip'
 
@@ -37,6 +37,14 @@ export function InsightCard({ insight, agencyView = false, onOpenEvidence }: Ins
         <span>{insight.author.role}</span>
         <span aria-hidden="true">·</span>
         <span className="font-mono text-[12px]">{formatRange(insight.period.from, insight.period.to)}</span>
+        {insight.published_at && (
+          <>
+            <span aria-hidden="true">·</span>
+            <span>
+              Publicată la <span className="font-mono text-[12px]">{formatDate(insight.published_at.slice(0, 10))}</span>
+            </span>
+          </>
+        )}
       </div>
       <p className="text-[13.5px] leading-relaxed text-text">{insight.summary}</p>
       {insight.evidence.length > 0 && (

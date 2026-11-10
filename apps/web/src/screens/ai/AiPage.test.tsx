@@ -19,7 +19,17 @@ describe('AI Visibility: structura din spec cap. 13', () => {
     }
   })
 
-  it.each(['Mention Rate', 'Recommendation Rate', 'Owned Citation Rate', 'SoV în setul urmărit', 'Răspunsuri valide'])('KPI „%s": not_connected, fără cifră și fără definiție inventată', async (name) => {
+  it('KPI „AI Mention Rate": din registru (definiție provizorie), cu valoare și formula în tooltip', async () => {
+    renderApp({ route: ROUTE })
+    await open()
+    const c = screen.getByRole('article', { name: 'AI Mention Rate' })
+    expect(c).not.toHaveAttribute('data-status', 'not_connected')
+    expect(c).toHaveTextContent('Definiție provizorie')
+    await userEvent.click(within(c).getByRole('button', { name: 'Ce înseamnă indicatorul' }))
+    expect(within(c).getByRole('tooltip')).toHaveTextContent('răspunsuri valide cu brandul menționat')
+  })
+
+  it.each(['Recommendation Rate', 'Owned Citation Rate', 'SoV în setul urmărit', 'Răspunsuri valide'])('KPI „%s": not_connected, fără cifră și fără definiție inventată', async (name) => {
     renderApp({ route: ROUTE })
     await open()
     const c = screen.getByRole('article', { name })

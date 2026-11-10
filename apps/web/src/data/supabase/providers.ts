@@ -78,7 +78,15 @@ const metrics: MetricsProvider = {
   evidence: async () => notConnected(NO_SOURCE),
 }
 
-const insights: InsightsProvider = { list: async () => notConnected('Analizele nu sunt încă disponibile pentru acest brand.') }
+const INSIGHTS_OFF = 'Analizele nu sunt încă disponibile pentru acest brand.'
+const insights: InsightsProvider = {
+  list: async () => notConnected(INSIGHTS_OFF),
+  saveDraft: async () => notConnected(INSIGHTS_OFF),
+  deleteDraft: async () => notConnected(INSIGHTS_OFF),
+  transition: async () => notConnected(INSIGHTS_OFF),
+  addAction: async () => notConnected(INSIGHTS_OFF),
+  transitionAction: async () => notConnected(INSIGHTS_OFF),
+}
 
 const mentions: MentionsProvider = {
   list: async () => notConnected('Sursa de Listening nu este conectată pentru acest brand.'),
@@ -91,6 +99,7 @@ const mentions: MentionsProvider = {
 
 const sources: SourcesProvider = {
   statuses: async () => notConnected('Starea surselor nu este încă disponibilă pentru acest brand.'),
+  freshness: async () => notConnected('Actualitatea surselor nu este încă disponibilă pentru acest brand.'),
   connections: async () => notConnected('Conexiunile surselor nu sunt încă disponibile pentru acest brand.'),
   syncRuns: async () => notConnected('Istoricul sincronizărilor nu este încă disponibil pentru acest brand.'),
   createConnection: async () => notConnected('Conexiunile surselor nu sunt încă disponibile.'),

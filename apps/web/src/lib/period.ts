@@ -47,6 +47,8 @@ export function resolvePeriod(preset: PeriodPreset, now: Date = new Date(), cust
   }
   if (preset === '7d') return { preset, from: addDays(end, -6), to: end }
   if (preset === 'month') return { preset, from: `${end.slice(0, 8)}01`, to: end }
+  if (preset === '90d') return { preset, from: addDays(end, -89), to: end }
+  if (preset === '365d') return { preset, from: addDays(end, -364), to: end }
   // '28d', precum și un `custom` invalid, revin la implicit.
   return { preset: '28d', from: addDays(end, -27), to: end }
 }

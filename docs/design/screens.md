@@ -54,12 +54,16 @@ Fără signup. Cinci stări în același cadru: **autentificare** (email de serv
 
 ## Overview (`/brands/:id/overview`)
 
-1. 6 KpiCards: AI Mention Rate, clicks din search, sessions, key events, cost paid, mențiuni eligibile (+ AI SoV în design). Fiecare deschide EvidenceDrawer.
-2. „Acoperirea indicatorilor": rezumat pe stări de acoperire.
-3. „Evoluție sincronizată": TrendChart indexat (prima zi = 100), serii comutabile din legendă.
-4. „Ultima analiză publicată": titlu, autor, perioadă, rezumat, dovezi atașate, „Limite", „Vezi toate analizele".
-5. „Comparație cu competitorii": tabel brand + C1-C3; cea mai bună valoare pe rând evidențiată; N/A explicat („pentru <competitori> nu avem sursă de Listening conectată").
-6. „Oportunități": max 3, cu titlu, motiv, responsabil, „Deschide dovezile".
+Structura de mai jos e cea din propunerea din 10 nov. 2026 („Overview pentru decizii rapide"), construită în Etapa 2 (deciziile G). Designul inițial (spec cap. 12) e păstrat în tabelul de diferențe.
+
+1. „Starea datelor" (pe orice modul cu surse): date până la, pe sursă; ultima sincronizare unde utilizatorul o poate vedea; următoarea actualizare estimată.
+2. Bara de context: client, brand, țară, perioadă, comparație, acoperirea indicatorilor.
+3. Șase carduri, fiecare cu întrebarea la care răspunde, numele exact al metricii și link spre detaliu cu aceleași filtre: Vizibilitate AI (AI Mention Rate), Vizibilitate organică (Visibility SEOmonitor), Conversații relevante (mențiuni + ponderea negativă revizuită, cu numere absolute), Performanță socială (interacțiuni), Trafic pe site (sesiuni), Acțiuni importante (key events). Fiecare deschide EvidenceDrawer.
+4. „Ce s-a schimbat": Oportunitate și Risc (cea mai mare variație favorabilă și nefavorabilă, de cel puțin 5 %, etichetate „semnal automat, neconfirmat") și Decizie (prima acțiune deschisă din ultima analiză publicată). Fiecare cu mărime, sursă, perioadă și confirmare.
+5. „Evoluția brandului": patru grafice pe aceeași perioadă (AI, search, trafic, mențiuni), fiecare cu scara ei.
+6. „Poziția față de competitori": un rând pe AI, SEO și conversații din matricea de Concurență, cu locul în set pe fiecare dimensiune. Fără scor general.
+7. „Prioritățile următoare": max 3 acțiuni deschise, cu responsabil, termen și, unde sunt completate, efort și KPI urmărit; „Deschide dovezile".
+8. „Interpretarea AdSymphony": ultima analiză publicată, cu autor, perioadă, data publicării, dovezi, „Limite", „Vezi toate analizele".
 
 ## AI Visibility (`/brands/:id/ai`)
 
@@ -95,7 +99,9 @@ Antet cu „Set de competitori v<n>", „Efectiv din <data>", „Date până la 
 
 ## Analize și acțiuni (`/brands/:id/insights`)
 
-Taburi (agenție: „Flux editorial" și vederea publicată; client: doar publicate); tabel cu titlu, autor, perioadă, status (Draft, În review, Publicat, Înlocuit), actualizat; detaliu cu rezumat, dovezi atașate, „Limite", tabel „Acțiuni" (acțiune, responsabil, termen, status); „Analiză nouă" pentru agenție.
+**Etapa 2 (10 nov. 2026):** agenția lucrează în pagină: „Analiză nouă" și „Editează" (titlu, perioadă, constatare, interpretare, limite, metrici citate), „Trimite la review", „Publică" și „Returnează la draft" (doar strategist și agency_admin, cu motiv), „Șterge ciorna", „Adaugă acțiune" (termen, efort, KPI urmărit) și pașii acțiunii în tabel (agreată, în lucru, finalizată, rezultat, anulare cu motiv). Clientul nu vede niciunul dintre controale.
+
+Designul inițial: Taburi (agenție: „Flux editorial" și vederea publicată; client: doar publicate); tabel cu titlu, autor, perioadă, status (Draft, În review, Publicat, Înlocuit), actualizat; detaliu cu rezumat, dovezi atașate, „Limite", tabel „Acțiuni" (acțiune, responsabil, termen, status); „Analiză nouă" pentru agenție.
 
 ## Administrare (doar agenție)
 
@@ -148,6 +154,7 @@ Ce s-a implementat diferit de designul din `docs/design/reference/` și de ce. N
 
 | Design / spec cap. 12 | Implementat | Motiv |
 |---|---|---|
+| (10 nov. 2026) Rândurile de mai jos descriu Overview-ul dinainte de Etapa 2 | Vezi structura actuală în secțiunea „Overview (`/brands/:id/overview`)" și deciziile G | Păstrate ca istoric al diferențelor față de designul inițial |
 | „Evoluții prioritare" (max 3 schimbări semnificative) | Lipsește | Nu există sursă de semnale, nici praguri configurate; calculul „semnificativ" nu are voie să stea în UI (regula 4). Cere un contract server. |
 | „AI Mention Rate pe engine selectat", „key events selectate" | Fără selectoare | Contractul nu are dimensiune de engine și nici selecție de key events. |
 | Un grafic cu serii indexate (prima zi = 100) | O serie pe rând, cu unitatea ei, plus comparația punctată | Indexarea e o transformare calculată în UI; spec cere „fiecare cu unitatea proprie". |

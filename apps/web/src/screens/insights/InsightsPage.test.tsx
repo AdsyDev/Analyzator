@@ -56,7 +56,7 @@ describe('Analize și acțiuni — vederea clientului', () => {
     renderApp({
       route: URINAL,
       role: 'client_viewer',
-      wrap: (b) => ({ ...b, insights: { list: async (ctx) => { const r = await b.insights.list({ ...ctx }); return r } } }),
+      wrap: (b) => ({ ...b, insights: { ...b.insights, list: async (ctx) => { const r = await b.insights.list({ ...ctx }); return r } } }),
     })
     await pageReady('Analize și acțiuni')
     expect((await cards()).every((c) => c.getAttribute('data-status') === 'published')).toBe(true)
@@ -72,7 +72,7 @@ describe('Analize și acțiuni — stări', () => {
   })
 
   it('listă goală: mesaj diferit pentru agenție și pentru client', async () => {
-    const empty = (b: Parameters<NonNullable<Parameters<typeof renderApp>[0]['wrap']>>[0]) => ({ ...b, insights: { list: async () => ({ kind: 'ready' as const, data: [] }) } })
+    const empty = (b: Parameters<NonNullable<Parameters<typeof renderApp>[0]['wrap']>>[0]) => ({ ...b, insights: { ...b.insights, list: async () => ({ kind: 'ready' as const, data: [] }) } })
     renderApp({ route: URINAL, wrap: empty })
     expect(await screen.findByText(/nici măcar ciornă/)).toBeInTheDocument()
   })

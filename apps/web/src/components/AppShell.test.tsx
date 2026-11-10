@@ -12,8 +12,8 @@ const strategist: SessionUser = { ...agency, id: 'u3', role: 'strategist' }
 const client: SessionUser = { id: 'u2', name: 'Elena Dobre', email: 'elena@stada.ro', role: 'client_viewer', organization: 'STADA' }
 const brands = (): ProviderResult<Brand[]> =>
   ready([
-    { id: 'b1', tenant_id: 't1', name: 'Urinal', category: 'Sănătate urinară', domain: 'urinal.ro' },
-    { id: 'b2', tenant_id: 't1', name: 'Minimartieni', category: 'Vitamine pentru copii', domain: null },
+    { id: 'b1', tenant_id: 't1', tenant_name: 'STADA România', name: 'Urinal', category: 'Sănătate urinară', domain: 'urinal.ro' },
+    { id: 'b2', tenant_id: 't1', tenant_name: 'STADA România', name: 'Minimartieni', category: 'Vitamine pentru copii', domain: null },
   ])
 
 function setup(over: Partial<AppShellProps> = {}, route = '/brands/b1/overview?period=7d&device=mobile') {

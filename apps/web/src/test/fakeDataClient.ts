@@ -4,7 +4,7 @@ type Row = Record<string, unknown>
 export interface Call {
   table: string
   filters: Array<[string, string, unknown]>
-  op: 'select' | 'insert' | 'update'
+  op: 'select' | 'insert' | 'update' | 'delete'
   payload?: unknown
 }
 
@@ -64,6 +64,10 @@ export function fakeDataClient(opts: Opts = {}) {
         call.payload = payload
         return b
       },
+      delete: () => {
+        call.op = 'delete'
+        return b
+      },
       eq: (c: string, v: unknown) => (call.filters.push([c, 'eq', v]), b),
       is: (c: string, v: unknown) => (call.filters.push([c, 'is', v]), b),
       lte: (c: string, v: unknown) => (call.filters.push([c, 'lte', v]), b),
@@ -78,6 +82,10 @@ export function fakeDataClient(opts: Opts = {}) {
         if (err) result = { data: null, error: err }
         else if (call.op === 'update') {
           for (const r of rows()) Object.assign(r, call.payload as Row)
+          result = { data: null, error: null }
+        } else if (call.op === 'delete') {
+          const gone = new Set(rows())
+          tables[table] = (tables[table] ?? []).filter((r) => !gone.has(r))
           result = { data: null, error: null }
         } else if (call.op === 'insert') result = { data: single ? { ...(call.payload as Row), id: 'new-id', credential_status: 'missing' } : call.payload, error: null }
         else {

@@ -1,7 +1,30 @@
-import { METRIC_STATUSES, METRIC_UNITS, notConnected, type MetricDefinition, type MetricsProvider, type MetricStatus, type MetricUnit, type TrendSeries } from '../../contracts'
+import { METRIC_STATUSES, METRIC_UNITS, failed, notConnected, ready, type Evidence, type EvidenceRecord, type MetricDefinition, type MetricsProvider, type MetricStatus, type MetricUnit, type TrendSeries } from '../../contracts'
 import { serverPeriodKind } from '../../lib/period'
 import type { DataClient } from './dataClient'
 import { MetricContractError, parseDefinitions, parseMetricsEnvelope } from './mapMetrics'
+
+/** Câte observații cere EvidenceDrawer („Cele mai recente N din total"). */
+const EVIDENCE_LIMIT = 10
+const EVIDENCE_CONTRACT = 'Răspunsul serverului nu respectă contractul dovezilor.'
+const EVIDENCE_NUMBER = new Intl.NumberFormat('ro-RO', { maximumFractionDigits: 2 })
+const EVIDENCE_DATE = new Intl.DateTimeFormat('ro-RO', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+
+/** Coloanele depind de agregarea din registru: o rată arată numărătorul și numitorul, nu rata gata calculată. */
+function evidenceColumns(aggregation: string | null, rows: ReadonlyArray<Record<string, unknown>>): Evidence['columns'] {
+  const currency = rows.some((r) => typeof r.currency === 'string') ? [{ key: 'currency', label: 'Monedă' }] : []
+  if (aggregation === 'interval_report_only') return [{ key: 'start', label: 'Început' }, { key: 'end', label: 'Sfârșit' }, { key: 'value', label: 'Valoare' }]
+  if (aggregation === 'ratio') return [{ key: 'date', label: 'Dată' }, { key: 'numerator', label: 'Numărător' }, { key: 'denominator', label: 'Numitor' }, ...currency]
+  if (aggregation === 'weighted_mean') return [{ key: 'date', label: 'Dată' }, { key: 'value', label: 'Valoare' }, { key: 'weight', label: 'Pondere' }]
+  return [{ key: 'date', label: 'Dată' }, { key: 'value', label: 'Valoare' }, ...currency]
+}
+
+/** Doar formatare. `null` rămâne `null` („Fără date" în drawer), nu devine zero. */
+function evidenceCell(key: string, v: unknown): string | number | null {
+  if (v === null || v === undefined) return null
+  if ((key === 'date' || key === 'start' || key === 'end') && typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v)) return EVIDENCE_DATE.format(new Date(`${v.slice(0, 10)}T00:00:00Z`))
+  const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) && key !== 'currency' ? Number(v) : null
+  return n === null ? String(v) : EVIDENCE_NUMBER.format(n)
+}
 
 const DEFINITION_COLUMNS = 'metric_key, version, name_ro, formula_ro, unit, primary_source, aggregation_label, direction, lifecycle, lifecycle_note, doc_ref'
 
@@ -81,7 +104,22 @@ export function createSupabaseMetrics(client: DataClient): MetricsProvider {
       })
     },
 
-    // Dovezile (EvidenceDrawer) cer rândurile sursă per metrică: contract separat, încă neconstruit.
-    evidence: async () => notConnected('Dovezile pentru această metrică nu sunt încă disponibile.'),
+    // Dovezile (EvidenceDrawer): observațiile din spatele metricii, prin `brand_metric_evidence` (INVOKER, E8). Serverul
+    // trimite rândurile și agregarea din registru; etichetele coloanelor și formatarea sunt aici, fără niciun calcul.
+    async evidence(brandId, q) {
+      const { data, error } = await client.rpc('brand_metric_evidence', { p_brand_id: brandId, p_metric_key: q.metric_key, p_start: q.period.start, p_end: q.period.end, p_device: null, p_limit: EVIDENCE_LIMIT })
+      if (error) return failed(error.code === '42501' ? 'Nu ai acces la acest spațiu de brand.' : 'Dovezile nu au putut fi încărcate. Reîncearcă.')
+      const r = data as { status?: unknown; aggregation?: unknown; total_records?: unknown; records?: unknown } | null
+      if (!r || typeof r.status !== 'string' || !Array.isArray(r.records) || typeof r.total_records !== 'number') return failed(EVIDENCE_CONTRACT)
+      if (r.status === 'not_connected') return notConnected('Indicatorul nu are o sursă conectată pentru acest brand.')
+      if (r.status !== 'ok' && r.status !== 'unavailable') return failed(EVIDENCE_CONTRACT)
+      const rows = r.records as Array<Record<string, unknown>>
+      const columns = evidenceColumns(typeof r.aggregation === 'string' ? r.aggregation : null, rows)
+      const records: EvidenceRecord[] = rows.map((row, i) => ({
+        id: `${q.metric_key}:${String(row.date ?? row.end ?? i)}`,
+        fields: Object.fromEntries(columns.map((c) => [c.key, evidenceCell(c.key, row[c.key])])),
+      }))
+      return ready<Evidence>({ evidence_query: q, metric_key: q.metric_key, total_records: r.total_records, records, columns, imported_at: null, payload_hash: null })
+    },
   }
 }

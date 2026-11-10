@@ -42,3 +42,78 @@ describe('createSupabaseInsights', () => {
     expect((await createSupabaseInsights(bad.client).list(ctx)).kind).toBe('error')
   })
 })
+
+describe('analize: scrieri (Supabase)', () => {
+  const brand = { id: 'b1', tenant_id: 't1', tenant_name: 'Client', name: 'Brand', category: null, domain: null }
+  const draft = { title: '  Trafic în scădere ', period: { from: '2026-10-01', to: '2026-10-07' }, summary: 'Constatare', interpretation: 'Interpretare', limits: 'Limite', evidence_keys: ['ga4_sessions', 'seomonitor_visibility_latest'] }
+
+  it('ciornă nouă: tenantul și brandul vin din brand, autorul din sesiune; statusul nu se trimite niciodată', async () => {
+    const { client, calls } = fakeDataClient({ userId: 'me' })
+    const r = await createSupabaseInsights(client).saveDraft(brand, null, draft)
+    expect(r).toEqual({ kind: 'ready', data: { id: 'new-id' } })
+    const insert = calls.find((c) => c.table === 'insights' && c.op === 'insert')?.payload as Record<string, unknown>
+    expect(insert).toEqual({ tenant_id: 't1', brand_id: 'b1', author_id: 'me', title: 'Trafic în scădere', period_start: '2026-10-01', period_end: '2026-10-07', period_kind: 'custom', summary: 'Constatare', interpretation: 'Interpretare', limits: 'Limite' })
+    expect(insert).not.toHaveProperty('status')
+    // Dovezile: câte un rând pe metrică; SEOmonitor primește device-ul cerut la îngheț.
+    expect(calls.find((c) => c.table === 'evidence_links' && c.op === 'insert')?.payload).toEqual([
+      { tenant_id: 't1', brand_id: 'b1', insight_id: 'new-id', kind: 'metric', metric_key: 'ga4_sessions', options: {} },
+      { tenant_id: 't1', brand_id: 'b1', insight_id: 'new-id', kind: 'metric', metric_key: 'seomonitor_visibility_latest', options: { device: 'desktop' } },
+    ])
+  })
+
+  it('editare: actualizează doar ciorna brandului și potrivește dovezile (scoate ce nu mai e bifat, adaugă ce lipsește)', async () => {
+    const tables = { evidence_links: [{ id: 'e1', insight_id: 'i1', kind: 'metric', metric_key: 'ga4_sessions' }, { id: 'e2', insight_id: 'i1', kind: 'metric', metric_key: 'gsc_clicks' }, { id: 'e9', insight_id: 'alta', kind: 'metric', metric_key: 'gsc_clicks' }] }
+    const { client, calls } = fakeDataClient({ tables })
+    const r = await createSupabaseInsights(client).saveDraft(brand, 'i1', { ...draft, evidence_keys: ['ga4_sessions', 'mentions_count'] })
+    expect(r).toEqual({ kind: 'ready', data: { id: 'i1' } })
+    expect(calls.find((c) => c.table === 'insights' && c.op === 'update')?.filters).toEqual([['id', 'eq', 'i1'], ['brand_id', 'eq', 'b1']])
+    expect(calls.find((c) => c.table === 'evidence_links' && c.op === 'delete')?.filters).toEqual([['id', 'in', ['e2']]])
+    expect(calls.find((c) => c.table === 'evidence_links' && c.op === 'insert')?.payload).toEqual([{ tenant_id: 't1', brand_id: 'b1', insight_id: 'i1', kind: 'metric', metric_key: 'mentions_count', options: {} }])
+    // Dovada altei analize rămâne neatinsă.
+    expect(tables.evidence_links.map((e) => e.id).sort()).toEqual(['e1', 'e9'])
+  })
+
+  it('fără sesiune nu se scrie nimic', async () => {
+    const { client, calls } = fakeDataClient({ userId: null })
+    expect((await createSupabaseInsights(client).saveDraft(brand, null, draft)).kind).toBe('error')
+    expect((await createSupabaseInsights(client).addAction(brand, 'i1', { title: 'x', due: null, effort: null, tracked_metric_key: null })).kind).toBe('error')
+    expect(calls).toHaveLength(0)
+  })
+
+  it('statusul se schimbă doar prin jurnalele de tranziții', async () => {
+    const { client, calls } = fakeDataClient()
+    const p = createSupabaseInsights(client)
+    await p.transition('i1', 'draft', '  Lipsește comparația  ')
+    await p.transition('i1', 'published')
+    await p.transitionAction('a1', { to: 'measured', result_note: ' +3 p.p. ' })
+    await p.transitionAction('a1', { to: 'cancelled', reason: 'Nu mai e nevoie' })
+    expect(calls.map((c) => [c.table, c.op, c.payload])).toEqual([
+      ['insight_transitions', 'insert', { insight_id: 'i1', to_status: 'draft', reason: 'Lipsește comparația' }],
+      ['insight_transitions', 'insert', { insight_id: 'i1', to_status: 'published', reason: null }],
+      ['action_transitions', 'insert', { action_id: 'a1', to_status: 'measured', reason: null, result_note: '+3 p.p.' }],
+      ['action_transitions', 'insert', { action_id: 'a1', to_status: 'cancelled', reason: 'Nu mai e nevoie', result_note: null }],
+    ])
+  })
+
+  it('acțiune nouă: responsabilul e utilizatorul curent; efortul și indicatorul goale rămân NULL', async () => {
+    const { client, calls } = fakeDataClient({ userId: 'me' })
+    await createSupabaseInsights(client).addAction(brand, 'i1', { title: ' Rescrie pagina ', due: '2026-11-20', effort: '  ', tracked_metric_key: null })
+    expect(calls[0]?.payload).toEqual({ tenant_id: 't1', brand_id: 'b1', insight_id: 'i1', title: 'Rescrie pagina', responsible_user_id: 'me', due_date: '2026-11-20', effort: null, tracked_metric_key: null })
+  })
+
+  it('mesajele triggerelor noastre ajung la utilizator; erorile de schemă rămân generice', async () => {
+    const ask = async (error: { code?: string; message: string }) => createSupabaseInsights(fakeDataClient({ errors: { 'insight_transitions:insert': error } }).client).transition('i1', 'in_review')
+    expect(await ask({ code: '23514', message: 'Analiza nu poate fi trimisă la review; lipsesc: limite, dovezi' })).toEqual({ kind: 'error', message: 'Analiza nu poate fi trimisă la review; lipsesc: limite, dovezi.' })
+    expect(await ask({ code: '42501', message: 'Doar strategist sau agency_admin poate publica' })).toEqual({ kind: 'error', message: 'Doar strategist sau agency_admin poate publica.' })
+    expect(await ask({ code: '42501', message: 'new row violates row-level security policy for table "insight_transitions"' })).toEqual({ kind: 'error', message: 'Nu ai dreptul să faci această modificare.' })
+    expect(await ask({ code: '23514', message: 'new row for relation "insights" violates check constraint "insights_title_check"' })).toEqual({ kind: 'error', message: 'Statusul analizei nu a putut fi schimbat. Reîncearcă.' })
+    expect(await ask({ code: 'XX000', message: 'Tranziție nepermisă' })).toEqual({ kind: 'error', message: 'Statusul analizei nu a putut fi schimbat. Reîncearcă.' })
+  })
+
+  it('ștergerea țintește doar analiza cerută', async () => {
+    const tables = { insights: [{ id: 'i1' }, { id: 'i2' }] }
+    const { client } = fakeDataClient({ tables })
+    expect(await createSupabaseInsights(client).deleteDraft('i1')).toEqual({ kind: 'ready', data: null })
+    expect(tables.insights).toEqual([{ id: 'i2' }])
+  })
+})

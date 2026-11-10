@@ -6,7 +6,7 @@ import { fakeDataClient } from '../../test/fakeDataClient'
 import { pageReady, renderApp, where } from '../../test/renderApp'
 
 const URL = '/admin/config'
-const useBrand = (id: string) => window.sessionStorage.setItem('az-brand', id)
+const useBrand = (id: string) => window.localStorage.setItem('az-brand', id)
 const section = async (name: string) => (await screen.findByRole('heading', { level: 2, name })).closest('section')!
 
 describe('Administrare → Configurare (fixtures de previzualizare)', () => {

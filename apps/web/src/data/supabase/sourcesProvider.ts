@@ -1,4 +1,4 @@
-import { failed, ready, TENANT_PROVIDERS, type AccountList, type AccountListOutcome, type AirbyteInspection, type AirbyteOutcome, type CredentialStatus, type DiscoveredAccount, type ProviderResult, type SourceConnection, type SourcesProvider, type TenantConnection, type TenantProviderId, type TokenSaved, type ValidationOutcome, type ValidationOutcomeKind } from '../../contracts'
+import { failed, ready, SOURCE_PROVIDERS, TENANT_PROVIDERS, type FreshnessState, type SourceFreshness, type SourceProviderId, type AccountList, type AccountListOutcome, type AirbyteInspection, type AirbyteOutcome, type CredentialStatus, type DiscoveredAccount, type ProviderResult, type SourceConnection, type SourcesProvider, type TenantConnection, type TenantProviderId, type TokenSaved, type ValidationOutcome, type ValidationOutcomeKind } from '../../contracts'
 import type { DataClient } from './dataClient'
 import { QUERY_FAILED } from './dataClient'
 import { deriveStatuses, mapConnection, mapSyncRun, SourceContractError, type ConnectionRow, type ImportBatchRow, type SyncRunRow } from './mapSources'
@@ -166,6 +166,21 @@ export function createSupabaseSources(client: DataClient, now: () => Date = () =
             }),
         ])
         return deriveStatuses(connections, runs, batches)
+      }),
+
+    // Vederea `source_freshness` trece prin RLS pentru orice utilizator cu acces la brand; Planable Analytics apare ca `planable`.
+    freshness: (brandId) =>
+      guarded(async () => {
+        const { data, error } = await client.from('source_freshness').select('source, data_as_of, freshness').eq('brand_id', brandId)
+        if (error) throw new Error(QUERY_FAILED)
+        const out: SourceFreshness[] = []
+        for (const r of (data ?? []) as unknown as Array<{ source: string; data_as_of: string | null; freshness: string }>) {
+          const provider = r.source === 'planable_analytics' ? 'planable' : r.source
+          if (!(SOURCE_PROVIDERS as readonly string[]).includes(provider)) continue
+          const freshness: FreshnessState = r.freshness === 'current' || r.freshness === 'delayed' ? r.freshness : 'no_data'
+          out.push({ provider: provider as SourceProviderId, data_as_of: r.data_as_of, freshness })
+        }
+        return out
       }),
 
     connections: (brandId) =>

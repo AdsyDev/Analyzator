@@ -2,7 +2,7 @@ import type { AiAnswerDetail, AiAnswerSummary, AiCitedSource, AiEngineStat, AiEn
 import type { Brand, CompetitorSet } from './brand'
 import type { CompetitionGap, CompetitionMatrix } from './competition'
 import type { BrandId, ProviderResult, TenantId } from './common'
-import type { Insight } from './insight'
+import type { ActionTransition, Insight, InsightDraft, InsightTransition, NewAction } from './insight'
 import type { Mention, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnapshot, SentimentDistribution } from './mention'
 import type { Evidence, EvidenceQuery, MetricDefinition, MetricsBundle, TrendSeries } from './metric'
 import type { QueryContext } from './period'
@@ -10,7 +10,7 @@ import type { PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from '
 import type { ContentGap, LandingPage, SearchFilters, SearchKeyword } from './search'
 import type { SocialCalendarItem, SocialCompetitor, SocialFilters, SocialGroups, SocialPost, SocialSummary } from './social'
 import type { ClientsProvider, ConfigProvider, UsersProvider } from './admin'
-import type { NewConnection, NewTenantConnection, OAuthProvider, SourceConnection, SourceStatusInfo, SyncRun, TenantConnection, TokenSaved, ValidationOutcome, AccountList, AirbyteInspection, DiscoverKind } from './source'
+import type { NewConnection, NewTenantConnection, OAuthProvider, SourceConnection, SourceFreshness, SourceStatusInfo, SyncRun, TenantConnection, TokenSaved, ValidationOutcome, AccountList, AirbyteInspection, DiscoverKind } from './source'
 import type { AiReferrals, ClarityDevices, Device, TrackingQuality, TrafficChannels } from './traffic'
 
 /**
@@ -30,6 +30,19 @@ export interface MetricsProvider {
 export interface InsightsProvider {
   /** Clientul primește doar analizele publicate (RLS); agenția primește toate statusurile. */
   list(ctx: QueryContext): Promise<ProviderResult<Insight[]>>
+  /**
+   * Scrierile de mai jos sunt ale echipei agenției (RLS și triggerele verifică rolul, nu interfața). Statusul nu se
+   * scrie direct: `transition` și `transitionAction` inserează în jurnalele de tranziții, care aplică regulile.
+   */
+  /** Creează o ciornă (`id` null) sau îi rescrie textele și dovezile. */
+  saveDraft(brand: Brand, id: string | null, draft: InsightDraft): Promise<ProviderResult<{ id: string }>>
+  /** Doar ciornele se șterg; o analiză trimisă sau publicată își păstrează istoricul. */
+  deleteDraft(id: string): Promise<ProviderResult<null>>
+  /** `in_review` (trimite), `draft` (returnează, cu motiv), `published` (publică și îngheață metricile citate). */
+  transition(id: string, to: InsightTransition, reason?: string): Promise<ProviderResult<null>>
+  /** Acțiune nouă pe o analiză; responsabilul e utilizatorul curent. */
+  addAction(brand: Brand, insightId: string, action: NewAction): Promise<ProviderResult<null>>
+  transitionAction(actionId: string, transition: ActionTransition): Promise<ProviderResult<null>>
 }
 
 export interface MentionsProvider {
@@ -46,6 +59,8 @@ export interface MentionsProvider {
 
 export interface SourcesProvider {
   statuses(brandId: BrandId): Promise<ProviderResult<SourceStatusInfo[]>>
+  /** Actualitatea datelor pe sursă, vizibilă oricui are acces la brand (inclusiv clientul). */
+  freshness(brandId: BrandId): Promise<ProviderResult<SourceFreshness[]>>
   /** Doar agenția (agency_admin pentru credențiale). */
   connections(brandId: BrandId): Promise<ProviderResult<SourceConnection[]>>
   syncRuns(brandId: BrandId): Promise<ProviderResult<SyncRun[]>>

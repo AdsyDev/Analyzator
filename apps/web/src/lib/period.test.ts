@@ -38,6 +38,11 @@ describe('resolvePeriod', () => {
     expect(resolvePeriod('7d', NOW)).toEqual({ preset: '7d', from: '2026-09-29', to: '2026-10-05' })
     expect(resolvePeriod('28d', NOW)).toEqual({ preset: '28d', from: '2026-09-08', to: '2026-10-05' })
     expect(resolvePeriod('month', NOW)).toEqual({ preset: 'month', from: '2026-10-01', to: '2026-10-05' })
+    // „Trimestru” și „an”: intervale mobile de 90 și 365 de zile, încheiate ieri; pe server sunt `custom`.
+    expect(resolvePeriod('90d', NOW)).toEqual({ preset: '90d', from: '2026-07-08', to: '2026-10-05' })
+    expect(resolvePeriod('365d', NOW)).toEqual({ preset: '365d', from: '2025-10-06', to: '2026-10-05' })
+    expect(serverPeriodKind('90d')).toBe('custom')
+    expect(comparisonRange(resolvePeriod('90d', NOW), 'previous')).toEqual({ from: '2026-04-09', to: '2026-07-07' })
   })
   it('interval personalizat valid', () => {
     expect(resolvePeriod('custom', NOW, { from: '2026-07-01', to: '2026-09-30' })).toEqual({ preset: 'custom', from: '2026-07-01', to: '2026-09-30' })

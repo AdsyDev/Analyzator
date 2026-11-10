@@ -53,6 +53,11 @@ Eticheta, `?` cu tooltip de definiție, valoare mare (Sora, cifre tabulare), var
 
 Sub 640 px (telefon, E-7), cardul e compact, pe două rânduri: eticheta, `?` și CoverageBadge sus; valoarea, variația și un sparkline mic jos. Sursa, „Date până la" și perioada de comparație se văd în EvidenceDrawer, care se deschide la atingere. Notele (`partial`, `stale`), „Sursă neconectată" cu motivul și eroarea rămân în card. StatCard (Paid, Social) urmează aceeași așezare.
 
+### ModuleFreshness
+Fâșia „Starea datelor" de deasupra fiecărui modul de brand care depinde de surse (Etapa 2, G-7): pe fiecare sursă, „date până la" și starea (La zi, Întârziat, Fără date); „Sincronizat la" doar unde utilizatorul vede rulările (agenția); „Următoarea actualizare estimată" din programul colectării (`lib/schedule.ts`). O sursă absentă din răspuns apare „Fără date", nu dispare. Stări: încărcare (schelet), fără surse (nimic), fără nicio sursă cu date (fără estimare).
+
+În Overview, KpiCard și StatCard primesc `category` (întrebarea la care răspunde cardul), `detail` (link spre modul, cu aceleași filtre) și, la KpiCard, `extra` (un rând deja calculat de server, de ex. ponderea negativă revizuită).
+
 ### CoverageBadge
 Pilulă de 20 px: Complet (verde), Parțial cu procent în mono (galben), Învechit (gri), Indisponibil (contur). Titlul explică starea.
 

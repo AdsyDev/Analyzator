@@ -133,7 +133,26 @@ export function createSupabaseMentions(client: DataClient): MentionsProvider {
   }
 }
 
-/** Analizele brandului (`brand_insights`, INVOKER): clientul primește doar ce permite RLS (publicate). */
+/**
+ * Mesajul unei scrieri refuzate. Triggerele analizelor ridică erori cu text în română scris de noi (de ex. ce
+ * lipsește la trimiterea în review): acela se arată. Orice altceva (constrângeri, nume de tabele) rămâne generic.
+ */
+function writeError(e: { code?: string; message?: string } | null, fallback: string): string {
+  if (e?.code === '42501' && !e.message) return 'Nu ai dreptul să faci această modificare.'
+  const m = e?.message ?? ''
+  const ours = ['22023', '23514', '42501', '23505', '40001'].includes(e?.code ?? '') && m !== '' && !/violates|constraint|relation|column|permission denied|row-level|syntax|duplicate key/i.test(m)
+  if (ours) return m.endsWith('.') ? m : `${m}.`
+  return e?.code === '42501' ? 'Nu ai dreptul să faci această modificare.' : fallback
+}
+
+/** Metricile SEOmonitor cer un device la îngheț (B7-5); ca pe carduri, implicit desktop. */
+const evidenceOptions = (key: string) => (key.startsWith('seomonitor_') ? { device: 'desktop' } : {})
+
+/**
+ * Analizele brandului. Citirea: `brand_insights` (INVOKER), deci clientul primește doar ce permite RLS (publicate).
+ * Scrierea: direct în tabele, prin sesiunea utilizatorului. RLS și triggerele din `insights_pv` verifică rolul și
+ * regulile; statusul se schimbă doar prin jurnalele de tranziții (B7-1).
+ */
 export function createSupabaseInsights(client: DataClient): InsightsProvider {
   return {
     async list(ctx) {
@@ -143,6 +162,70 @@ export function createSupabaseInsights(client: DataClient): InsightsProvider {
       const list = data as Insight[]
       if (list.some((i) => !(INSIGHT_STATUSES as readonly string[]).includes(i.status) || !Array.isArray(i.evidence) || !Array.isArray(i.actions))) return failed(CONTRACT)
       return ready(list)
+    },
+
+    async saveDraft(brand, id, draft) {
+      const fields = { title: draft.title.trim(), period_start: draft.period.from, period_end: draft.period.to, period_kind: 'custom', summary: draft.summary.trim(), interpretation: draft.interpretation.trim(), limits: draft.limits.trim() }
+      let insightId = id
+      if (insightId === null) {
+        const me = await currentUser(client)
+        if (!me) return failed('Sesiunea a expirat. Autentifică-te din nou.')
+        const { data, error } = await client.from('insights').insert({ tenant_id: brand.tenant_id, brand_id: brand.id, author_id: me, ...fields }).select('id').single()
+        if (error) return failed(writeError(error, 'Ciorna nu a putut fi creată. Reîncearcă.'))
+        insightId = (data as { id?: string } | null)?.id ?? null
+        if (!insightId) return failed(CONTRACT)
+      } else {
+        const { error } = await client.from('insights').update(fields).eq('id', insightId).eq('brand_id', brand.id)
+        if (error) return failed(writeError(error, 'Ciorna nu a putut fi salvată. Reîncearcă.'))
+      }
+
+      // Dovezile: se adaugă ce lipsește și se scoate ce nu mai e bifat; restul rămâne neatins.
+      const existing = await client.from('evidence_links').select('id, metric_key').eq('insight_id', insightId).eq('kind', 'metric')
+      if (existing.error) return failed(writeError(existing.error, 'Dovezile nu au putut fi citite.'))
+      const links = (existing.data ?? []) as unknown as Array<{ id: string; metric_key: string }>
+      const wanted = [...new Set(draft.evidence_keys)]
+      const drop = links.filter((l) => !wanted.includes(l.metric_key)).map((l) => l.id)
+      const add = wanted.filter((k) => !links.some((l) => l.metric_key === k))
+      if (drop.length > 0) {
+        const { error } = await client.from('evidence_links').delete().in('id', drop)
+        if (error) return failed(writeError(error, 'Dovezile nu au putut fi actualizate.'))
+      }
+      if (add.length > 0) {
+        const { error } = await client.from('evidence_links').insert(add.map((k) => ({ tenant_id: brand.tenant_id, brand_id: brand.id, insight_id: insightId, kind: 'metric', metric_key: k, options: evidenceOptions(k) })))
+        if (error) return failed(writeError(error, 'Dovezile nu au putut fi actualizate.'))
+      }
+      return ready({ id: insightId })
+    },
+
+    async deleteDraft(id) {
+      const { error } = await client.from('insights').delete().eq('id', id)
+      return error ? failed(writeError(error, 'Ciorna nu a putut fi ștearsă.')) : ready(null)
+    },
+
+    async transition(id, to, reason) {
+      const { error } = await client.from('insight_transitions').insert({ insight_id: id, to_status: to, reason: reason?.trim() || null })
+      return error ? failed(writeError(error, 'Statusul analizei nu a putut fi schimbat. Reîncearcă.')) : ready(null)
+    },
+
+    async addAction(brand, insightId, action) {
+      const me = await currentUser(client)
+      if (!me) return failed('Sesiunea a expirat. Autentifică-te din nou.')
+      const { error } = await client.from('actions').insert({
+        tenant_id: brand.tenant_id,
+        brand_id: brand.id,
+        insight_id: insightId,
+        title: action.title.trim(),
+        responsible_user_id: me,
+        due_date: action.due,
+        effort: action.effort?.trim() || null,
+        tracked_metric_key: action.tracked_metric_key,
+      })
+      return error ? failed(writeError(error, 'Acțiunea nu a putut fi adăugată. Reîncearcă.')) : ready(null)
+    },
+
+    async transitionAction(actionId, t) {
+      const { error } = await client.from('action_transitions').insert({ action_id: actionId, to_status: t.to, reason: t.reason?.trim() || null, result_note: t.result_note?.trim() || null })
+      return error ? failed(writeError(error, 'Statusul acțiunii nu a putut fi schimbat. Reîncearcă.')) : ready(null)
     },
   }
 }

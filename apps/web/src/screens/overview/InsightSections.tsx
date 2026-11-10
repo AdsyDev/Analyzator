@@ -48,7 +48,7 @@ export function LatestInsight({ state, agencyView, allHref, onRetry, onOpenEvide
     )
   }
   return (
-    <Section plain id="latest-insight" title="Ultima analiză publicată" action={link}>
+    <Section plain id="latest-insight" title="Interpretarea AdSymphony" description="Cea mai recentă analiză publicată de echipă." action={link}>
       {body}
     </Section>
   )
@@ -74,7 +74,7 @@ export const ACTION_LABEL: Record<InsightAction['status'], { label: string; tone
   cancelled: { label: 'Anulată', tone: 'neutral' },
 }
 
-/** Acțiunile deschise ale ultimei analize publicate, cele mai apropiate de termen întâi; maximum 3 (spec cap. 12). */
+/** Acțiunile deschise ale ultimei analize publicate, cele mai apropiate de termen întâi; maximum 3 (spec cap. 12, propunerea din 10 nov. 2026). */
 export function opportunitiesFrom(insight: Insight | null): InsightAction[] {
   if (!insight) return []
   return insight.actions
@@ -100,7 +100,7 @@ export function Opportunities({ state, onRetry, onOpenEvidence }: OppProps) {
     const evidence = latest?.evidence[0] ?? null
     body =
       items.length === 0 ? (
-        <EmptyState compact title="Nicio oportunitate deschisă" text="Ultima analiză publicată nu are acțiuni deschise." />
+        <EmptyState compact title="Nicio prioritate deschisă" text="Ultima analiză publicată nu are acțiuni deschise." />
       ) : (
         <ul className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {items.map((a) => {
@@ -112,9 +112,22 @@ export function Opportunities({ state, onRetry, onOpenEvidence }: OppProps) {
                   <StatusChip tone={st.tone}>{st.label}</StatusChip>
                 </div>
                 <Owner person={a.owner} />
-                <p className="text-[12.5px] text-text-2">
-                  Termen <span className="font-mono text-[12px] text-text">{a.due ? formatDate(a.due) : 'nesetat'}</span>
-                </p>
+                <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-[12.5px] text-text-2">
+                  <dt>Termen</dt>
+                  <dd className="font-mono text-[12px] text-text">{a.due ? formatDate(a.due) : 'nesetat'}</dd>
+                  {a.effort && (
+                    <>
+                      <dt>Efort</dt>
+                      <dd className="text-text">{a.effort}</dd>
+                    </>
+                  )}
+                  {a.tracked_metric && (
+                    <>
+                      <dt>KPI urmărit</dt>
+                      <dd className="text-text">{a.tracked_metric.label}</dd>
+                    </>
+                  )}
+                </dl>
                 {evidence && (
                   <Button onClick={() => onOpenEvidence(evidence.evidence_query, evidence.label)} className="self-start">
                     Deschide dovezile
@@ -127,7 +140,7 @@ export function Opportunities({ state, onRetry, onOpenEvidence }: OppProps) {
       )
   }
   return (
-    <Section id="opportunities" title="Oportunități" description="Acțiunile deschise din ultima analiză publicată de echipa AdSymphony.">
+    <Section id="opportunities" title="Prioritățile următoare" description="Cel mult trei acțiuni deschise din ultima analiză publicată, cu responsabil, termen și, unde au fost completate, efortul și indicatorul urmărit.">
       {body}
     </Section>
   )

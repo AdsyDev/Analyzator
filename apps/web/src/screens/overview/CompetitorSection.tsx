@@ -1,33 +1,28 @@
 import { Link } from 'react-router-dom'
-import type { Brand, CompetitorSet, MetricItem, QueryContext } from '../../contracts'
-import { ComparisonTable, type ComparisonColumn, type ComparisonGroup } from '../../components/ComparisonTable'
+import type { QueryContext } from '../../contracts'
+import { ComparisonTable, type ComparisonGroup } from '../../components/ComparisonTable'
 import { useProviders } from '../../data/DataProvidersContext'
-import { useDefinitions, useMetrics } from '../../data/hooks'
+import { ctxKey } from '../../data/hooks'
 import { useAsync } from '../../data/useAsync'
 import { ProviderProblem } from '../../routing/pages'
+import { toComparison } from '../competition/CompetitionPage'
 import { Section } from '../shared/Section'
-
-/** Rândurile comparației: brandul vine din provider; competitorii nu au (încă) o sursă de date. */
-const ROWS: Array<{ group: string; source?: string; key: string; label: string }> = [
-  { group: 'AI', source: 'SEOmonitor', key: 'ai_mention_rate', label: 'AI Mention Rate' },
-  { group: 'SEO', source: 'SEOmonitor', key: 'seomonitor_visibility_latest', label: 'Visibility SEOmonitor' },
-  { group: 'Listening', key: 'listening_sov', label: 'Listening SoV' },
-]
-const KEYS = ROWS.map((r) => r.key)
-
-const NO_COMPETITOR_DATA = 'Nu există încă o sursă de date pentru competitori; comparația apare când sursa e conectată.'
+import { positionRows } from './position'
 
 interface Props {
-  brand: Brand
   ctx: QueryContext
   fullHref: string
 }
 
-export function CompetitorSection({ brand, ctx, fullHref }: Props) {
+/**
+ * „Poziția față de competitori" (propunerea din 10 nov. 2026): brandul și competitorii validați pe AI, SEO și
+ * conversații, din aceeași matrice ca pagina Concurență (`brand_competition`), deci cu aceleași definiții și aceeași
+ * perioadă. Locul în set se afișează separat pe fiecare dimensiune; nu există un scor general. Ce sursa nu oferă
+ * rămâne N/A, nu zero.
+ */
+export function CompetitorSection({ ctx, fullHref }: Props) {
   const providers = useProviders()
-  const set = useAsync(() => providers.brands.competitorSet(brand.id), [providers, brand.id])
-  const metrics = useMetrics(ctx, KEYS)
-  const { byKey } = useDefinitions(KEYS)
+  const matrix = useAsync(() => providers.competition.matrix(ctx), [providers, ctxKey(ctx)])
   const link = (
     <Link to={fullHref} className="text-[13px] font-medium text-accent-text hover:underline">
       Toată comparația
@@ -35,40 +30,41 @@ export function CompetitorSection({ brand, ctx, fullHref }: Props) {
   )
 
   let body
-  if (set.state.status === 'loading' || metrics.state.status === 'loading') {
-    body = <ComparisonTable caption="Comparație cu competitorii" columns={[]} groups={[]} loading />
-  } else if (set.state.status === 'failed') {
-    body = <ProviderProblem result={{ kind: 'error', message: set.state.message }} onRetry={set.reload} />
-  } else if (metrics.state.status === 'failed') {
-    body = <ProviderProblem result={{ kind: 'error', message: metrics.state.message }} onRetry={metrics.reload} />
-  } else if (set.state.value.kind !== 'ready') {
-    body = <ProviderProblem result={set.state.value} onRetry={set.reload} />
+  if (matrix.state.status === 'loading') {
+    body = <ComparisonTable caption="Poziția față de competitori" columns={[]} groups={[]} loading />
+  } else if (matrix.state.status === 'failed') {
+    body = <ProviderProblem result={{ kind: 'error', message: matrix.state.message }} onRetry={matrix.reload} />
+  } else if (matrix.state.value.kind !== 'ready') {
+    body = <ProviderProblem result={matrix.state.value} onRetry={matrix.reload} />
   } else {
-    const comp: CompetitorSet = set.state.value.data
-    const items = metrics.state.status === 'done' ? metrics.state.value.items : []
-    const columns: ComparisonColumn[] = [
-      { key: 'brand', short: brand.name, full: brand.name, kind: 'brand' },
-      ...comp.competitors.map<ComparisonColumn>((c) => ({ key: c.id, short: c.label, full: c.name, kind: 'competitor' })),
-    ]
-    const groups: ComparisonGroup[] = []
-    for (const r of ROWS) {
-      const item: MetricItem | undefined = items.find((i) => i.metric_key === r.key)
-      if (!item) continue
-      let g = groups.find((x) => x.name === r.group)
-      if (!g) groups.push((g = { name: r.group, source: r.source, rows: [] }))
-      g.rows.push({
-        key: r.key,
-        label: byKey.get(r.key)?.label ?? r.label,
-        direction: byKey.get(r.key)?.direction,
-        cells: { brand: item, ...Object.fromEntries(comp.competitors.map((c) => [c.id, { unavailable: NO_COMPETITOR_DATA }])) },
-      })
-    }
-    const dates = items.map((i) => i.data_as_of).filter((d): d is string => !!d).sort()
-    body = <ComparisonTable caption="Comparație cu competitorii" columns={columns} groups={groups} setVersion={comp.version} effectiveFrom={comp.effective_from} dataAsOf={dates[0] ?? null} />
+    const m = matrix.state.value.data
+    const rows = positionRows(m)
+    const { columns } = toComparison(m)
+    const groups: ComparisonGroup[] = rows.map((r) => ({ name: r.title, source: r.source ?? undefined, rows: [{ key: r.row.key, label: r.row.label, definition: r.row.definition, direction: r.row.direction, cells: r.row.cells }] }))
+    body = (
+      <>
+        <ComparisonTable caption="Poziția față de competitori" columns={columns} groups={groups} setVersion={m.set_version} effectiveFrom={m.effective_from} dataAsOf={m.data_as_of} />
+        <ul aria-label="Locul în set, pe dimensiune" className="flex flex-wrap gap-x-5 gap-y-1.5 text-[12.5px] text-text-2">
+          {rows.map((r) => (
+            <li key={r.dimension} title={r.rankReason ?? undefined}>
+              <span className="font-semibold text-text">{r.title}</span>{' '}
+              {r.rank ? (
+                <>
+                  locul <span className="font-mono text-[12px] text-text">{r.rank.place}</span> din <span className="font-mono text-[12px] text-text">{r.rank.of}</span>
+                </>
+              ) : (
+                <span>fără clasament: {r.rankReason}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+        <p className="text-[12px] leading-snug text-text-3">Locul se stabilește doar între entitățile cu valoare. Share of Voice în panel nu este cotă de piață.</p>
+      </>
+    )
   }
 
   return (
-    <Section id="competitors" title="Comparație cu competitorii" action={link}>
+    <Section id="competitors" title="Poziția față de competitori" action={link}>
       {body}
     </Section>
   )

@@ -31,6 +31,51 @@ describe('createSupabaseMetrics', () => {
     await expect(createSupabaseMetrics(bad.client).trends(ctx, ['x'])).rejects.toThrow(/status invalid/)
   })
 
+  describe('dovezi (brand_metric_evidence)', () => {
+    const q = { metric_key: 'meta_ads_spend', version: 2, brand_id: 'b1', period: { start: '2026-09-10', end: '2026-10-07' }, comparison_period: { start: '2026-08-13', end: '2026-09-09' } }
+
+    it('cere observațiile metricii pe perioada dovezii; valorile vin neschimbate, doar formatate, cu totalul lor', async () => {
+      const { client, rpcs } = fakeDataClient({ rpc: () => ({ data: { status: 'ok', aggregation: 'sum', total_records: 28, records: [{ date: '2026-10-07', value: 1234.5, currency: 'RON' }, { date: '2026-10-06', value: null, currency: 'RON' }] } }) })
+      const r = await createSupabaseMetrics(client).evidence('b1', q)
+      expect(rpcs[0]).toEqual({ fn: 'brand_metric_evidence', args: { p_brand_id: 'b1', p_metric_key: 'meta_ads_spend', p_start: '2026-09-10', p_end: '2026-10-07', p_device: null, p_limit: 10 } })
+      expect(r.kind).toBe('ready')
+      if (r.kind !== 'ready') return
+      expect(r.data.total_records).toBe(28)
+      expect(r.data.columns.map((c) => c.label)).toEqual(['Dată', 'Valoare', 'Monedă'])
+      expect(r.data.records[0]).toEqual({ id: 'meta_ads_spend:2026-10-07', fields: { date: '7 oct. 2026', value: '1.234,5', currency: 'RON' } })
+      // O zi fără valoare rămâne lipsă, nu zero.
+      expect(r.data.records[1]?.fields.value).toBeNull()
+      expect(r.data.evidence_query).toBe(q)
+      expect(r.data.payload_hash).toBeNull()
+    })
+
+    it('o rată arată numărătorul și numitorul; o medie ponderată, ponderea; raportul pe interval, capetele', async () => {
+      const cols = async (aggregation: string, row: Record<string, unknown>) => {
+        const { client } = fakeDataClient({ rpc: () => ({ data: { status: 'ok', aggregation, total_records: 1, records: [row] } }) })
+        const r = await createSupabaseMetrics(client).evidence('b1', q)
+        return r.kind === 'ready' ? r.data.columns.map((c) => c.key) : r.kind
+      }
+      expect(await cols('ratio', { date: '2026-10-07', numerator: 10, denominator: 100 })).toEqual(['date', 'numerator', 'denominator'])
+      expect(await cols('weighted_mean', { date: '2026-10-07', value: 52, weight: 300 })).toEqual(['date', 'value', 'weight'])
+      expect(await cols('interval_report_only', { start: '2026-09-10', end: '2026-10-07', value: 900 })).toEqual(['start', 'end', 'value'])
+    })
+
+    it('sursă neconectată, interval fără observații și eroare de acces sunt trei răspunsuri diferite', async () => {
+      const ask = async (rpc: () => { data?: unknown; error?: unknown }) => createSupabaseMetrics(fakeDataClient({ rpc }).client).evidence('b1', q)
+      expect(await ask(() => ({ data: { status: 'not_connected', aggregation: null, total_records: 0, records: [] } }))).toEqual({ kind: 'not_connected', reason: 'Indicatorul nu are o sursă conectată pentru acest brand.' })
+      const empty = await ask(() => ({ data: { status: 'unavailable', aggregation: 'sum', total_records: 0, records: [] } }))
+      expect(empty.kind === 'ready' && empty.data.records).toEqual([])
+      expect(await ask(() => ({ error: { code: '42501', message: 'x' } }))).toEqual({ kind: 'error', message: 'Nu ai acces la acest spațiu de brand.' })
+    })
+
+    it('un răspuns în afara contractului e eroare, nu o listă goală', async () => {
+      const ask = async (data: unknown) => createSupabaseMetrics(fakeDataClient({ rpc: () => ({ data }) }).client).evidence('b1', q)
+      for (const bad of [null, { status: 'ok' }, { status: 'inventat', total_records: 0, records: [] }, { status: 'ok', total_records: '3', records: [] }]) {
+        expect((await ask(bad)).kind).toBe('error')
+      }
+    })
+  })
+
   it('definițiile vin din registru, filtrate pe chei', async () => {
     const { client } = fakeDataClient({ tables: { metric_definitions_current: [def, { ...def, metric_key: 'altceva' }] } })
     const r = await createSupabaseMetrics(client).definitions(['meta_ads_spend'])

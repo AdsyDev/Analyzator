@@ -24,10 +24,31 @@ const nullable = (s: string) => (s === 'null' ? null : text(s.slice(1, -1)))
 const ROW =
   /\('([a-z0-9_]+)', (\d+), '((?:[^']|'')*)', '((?:[^']|'')*)', '(\w+)', '(\w+)', '\w+', [\d.]+, (?:null|'\w+'),\s*(null|'(?:[^']|'')*'), '(\w+)', (?:null|[\d.]+), \d+, '(\w+)', (null|'(?:[^']|'')*'), '[\d-]+', '([^']*)'\)/g
 
+/** Cheile intrate în registru după nivelul A pe care fixtures le acoperă (Overview): rândul lor curent vine din migrația care le-a adăugat. */
+const EXTRA_KEYS = ['ai_mention_rate', 'mentions_count']
+
+function rowsFrom(text: string) {
+  return [...text.matchAll(ROW)].map(toRow)
+}
+
+/** Versiunea curentă a unei chei, căutată în toate migrațiile (ordinea fișierelor = ordinea aplicării). */
+function currentRow(key: string) {
+  const all = readdirSync(migrations)
+    .filter((f) => f.endsWith('.sql'))
+    .sort()
+    .flatMap((f) => rowsFrom(readFileSync(join(migrations, f), 'utf8')))
+    .filter((r) => r.metric_key === key && r.lifecycle !== 'retired')
+  return all.sort((a, b) => b.version - a.version)[0]
+}
+
 function registryFromSql() {
   expect(sql, 'nu am găsit migrația cu definițiile registrului').toBeDefined()
   const block = sql!.slice(sql!.indexOf('insert into public.metric_definitions'))
-  return [...block.matchAll(ROW)].map((m) => ({
+  return rowsFrom(block)
+}
+
+function toRow(m: RegExpMatchArray) {
+  return {
     metric_key: m[1]!,
     version: Number(m[2]),
     name_ro: text(m[3]!),
@@ -39,7 +60,14 @@ function registryFromSql() {
     lifecycle: m[9]!,
     lifecycle_note: nullable(m[10]!),
     doc_ref: m[11]!,
-  }))
+  }
+}
+
+/** Rândurile pe care trebuie să le oglindească fixtures: nivelul A din prima migrație, apoi cheile suplimentare. */
+function fixtureRegistry() {
+  const extra = EXTRA_KEYS.map((k) => currentRow(k))
+  expect(extra.every(Boolean), 'o cheie suplimentară nu mai există în migrații').toBe(true)
+  return [...registryFromSql(), ...extra.map((r) => r!)]
 }
 
 describe('fixtures ↔ registrul de metrici', () => {
@@ -47,8 +75,8 @@ describe('fixtures ↔ registrul de metrici', () => {
     expect(registryFromSql().length).toBeGreaterThanOrEqual(16)
   })
 
-  it('definitions.json = rândurile din migrație (chei, versiuni, nume, formule, unități, surse, direcții, stare)', () => {
-    expect(FIXTURE_DEFINITIONS).toEqual(parseDefinitions(registryFromSql()))
+  it('definitions.json = rândurile din migrații: nivelul A și cheile suplimentare ale Overview (chei, versiuni, nume, formule, unități, surse, direcții, stare)', () => {
+    expect(FIXTURE_DEFINITIONS).toEqual(parseDefinitions(fixtureRegistry()))
   })
 
   it('cheile din registru.md = cheile de nivel A din toate migrațiile (nivelul B e în registry-b.md)', () => {
@@ -65,12 +93,12 @@ describe('fixtures ↔ registrul de metrici', () => {
     expect(levelA.slice(0, registryFromSql().length)).toEqual(registryFromSql().map((r) => r.metric_key))
   })
 
-  it('profilurile de date fictive acoperă exact cheile din registru, nimic în plus', () => {
-    expect(Object.keys(profilesFile.profiles)).toEqual(registryFromSql().map((r) => r.metric_key))
+  it('profilurile de date fictive acoperă exact cheile oglindite din registru, nimic în plus', () => {
+    expect(Object.keys(profilesFile.profiles)).toEqual(fixtureRegistry().map((r) => r.metric_key))
   })
 
   it('unitatea din profil e cea din registru', () => {
-    const units = Object.fromEntries(registryFromSql().map((r) => [r.metric_key, r.unit]))
+    const units = Object.fromEntries(fixtureRegistry().map((r) => [r.metric_key, r.unit]))
     for (const [key, p] of Object.entries(profilesFile.profiles)) expect(p.unit, key).toBe(units[key])
   })
 })
