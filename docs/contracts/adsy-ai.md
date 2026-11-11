@@ -161,6 +161,10 @@ Funcția `adsy-ai` cheamă `brand_document_search` cu sesiunea utilizatorului ș
 
 Spre furnizorul modelului pleacă, pe lângă cele de mai sus, textul fragmentelor potrivite întrebării. **Documentele nu trebuie să conțină date personale.**
 
+## Evaluare (deciziile Q)
+
+`npm run eval:ai` rulează cazurile din `tests/fixtures/adsy-ai/eval-cases.json` pe modelul real și judecă ce ar ajunge la utilizator după `verifyAnswer`. Fiecare caz are `context`, `question`, `expected` (statusurile acceptate), `must_cite` și `must_not_include`. Cod de ieșire 1 la orice caz nesigur sau sub 85 % reușite. Cere `GEMINI_API_KEY` în mediu; opțiuni: `--model a,b`, `--cases cale.json`, `--group nume`. Se rulează înainte de a schimba modelul sau promptul.
+
 ## Neconstruit încă
 
-Încărcarea de fișiere, căutarea semantică și setul de evaluare pe 100 de exemple etichetate.
+Încărcarea de fișiere, căutarea semantică, setul de 100 de exemple etichetate pe brand și un set de evaluare pentru ciornele generate.

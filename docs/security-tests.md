@@ -295,6 +295,24 @@ Am setat un token cu valoare unică prin `rpc/set_source_token` (service role), 
 
 Setări locale relevante: `log_statement = ddl`, `log_min_duration_statement = -1`, `log_parameter_max_length = -1`, `log_parameter_max_length_on_error = 0`. `anon` și `authenticated` au SELECT pe `extensions.pg_stat_statements`, dar schema nu e expusă prin API (`PGRST_DB_SCHEMAS = public,graphql_public`). Vezi S8.
 
+## N. AdSy AI prin HTTP (`tests/security/edge-adsy-ai.test.mjs`)
+
+Funcția `adsy-ai` servită local, fără cheie de model: după porți, răspunsul e `not_configured` și niciun model nu e chemat. Nu a putut fi rulat pe mașina de dezvoltare (fără Supabase CLI); prima rulare e în gate-ul din `supabase-deploy`.
+
+| ID | Încercare | Rezultat așteptat |
+|---|---|---|
+| N1 | Fără `Authorization`, cheia anon sau service ca Bearer, JWT cu alt secret, `alg: none`, expirat, utilizator inexistent | Refuz la `status`, `chat` și `generate_insight`; nimic scris în `ai_requests` |
+| N2 | Client fără acces, adminul altui client, strategist sau client pe alt brand al aceluiași client | 403, cu același corp ca pentru un brand inexistent |
+| N3 | Fără politică salvată | `ai_off` pentru oricine; politica o scrie doar `agency_admin`, în nume propriu |
+| N3 | Politica pornită, preferința personală, generare fără afișare, clientul cere o ciornă | `not_configured`, `ai_off` (preferință), `ai_off` (politică), 403; politica unui brand nu pornește alt brand |
+| N4 | Scriere, rescriere sau ștergere în `ai_requests` din sesiunea unui utilizator | Refuz; răspunsul din cache rămâne cel scris de server |
+| N4 | Citirea unei cereri | Doar autorul și `agency_admin` al clientului |
+| N4 | Ciornă `adsy_ai` de către client, alt utilizator, altă perioadă, cerere inexistentă; rescrierea etichetei; publicare directă | Refuz; ciorna rămâne `draft`, `adsy_ai`, invizibilă clientului și altui client |
+| N4 | `brand_insights` cu afișarea oprită | Analiza generată lipsește; cu afișarea pornită apare echipei, marcată |
+| N5 | Document introdus de client sau de alt client; fragment agățat de documentul altui brand | Refuz |
+| N5 | Căutare în ciorne, în documente retrase, în alt brand, de către cineva fără acces, cu caractere speciale în întrebare | Nimic sau refuz; întrebarea e tratată ca text |
+| N5 | Aprobare sau retragere de către client; rescrierea unui document aprobat, inclusiv cu cheia de service | Fără efect sau refuz; textul aprobat rămâne neschimbat |
+
 ## M. Mutații (`scripts/test-guard-mutations.sh`, `npm run test:guards`)
 
 Ultima rulare: 7 oct 2026, 13/13 mutații prinse.
