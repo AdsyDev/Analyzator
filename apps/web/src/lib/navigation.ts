@@ -20,6 +20,7 @@ export const BRAND_NAV: readonly NavItem[] = [
   { segment: 'overview', label: 'Overview', icon: 'SquaresFour' },
   { segment: 'ai', label: 'AI Visibility', icon: 'ChatCircleText' },
   { segment: 'seo', label: 'SEO și Search', icon: 'MagnifyingGlass' },
+  { segment: 'indexing', label: 'Indexare', icon: 'ListMagnifyingGlass', parent: 'seo' },
   { segment: 'traffic', label: 'Trafic și conversii', icon: 'ChartLineUp' },
   { segment: 'ux', label: 'User experience', icon: 'CursorClick' },
   { segment: 'paid', label: 'Paid Media', icon: 'MegaphoneSimple' },

@@ -9,6 +9,7 @@ import { ClientsPage } from '../screens/admin/ClientsPage'
 import { ConfigPage } from '../screens/admin/ConfigPage'
 import { SitePage, SourcesRedirect } from '../screens/admin/SitePage'
 import { UsersPage } from '../screens/admin/UsersPage'
+import { IndexingPage } from '../screens/indexing/IndexingPage'
 import { InsightsPage } from '../screens/insights/InsightsPage'
 import { AiPage } from '../screens/ai/AiPage'
 import { CompetitionPage } from '../screens/competition/CompetitionPage'
@@ -48,6 +49,7 @@ function BrandModulePage() {
   if (module.segment === 'overview') return <OverviewPage />
   if (module.segment === 'ai') return <AiPage />
   if (module.segment === 'seo') return <SeoPage />
+  if (module.segment === 'indexing') return <IndexingPage />
   if (module.segment === 'traffic') return <TrafficPage />
   if (module.segment === 'ux') return <UxPage />
   if (module.segment === 'paid') return <PaidPage />

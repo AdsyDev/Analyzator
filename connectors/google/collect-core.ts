@@ -361,7 +361,7 @@ async function runConnection(
   }
 }
 
-async function loadCredentials(db: Db, credentialConnectionId: string): Promise<{ ok: true; value: ServiceAccount } | { ok: false; code: string; message: string }> {
+export async function loadCredentials(db: Db, credentialConnectionId: string): Promise<{ ok: true; value: ServiceAccount } | { ok: false; code: string; message: string }> {
   let raw: string
   try {
     raw = await getSourceToken(db, credentialConnectionId)

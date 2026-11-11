@@ -24,6 +24,8 @@ export interface BrandModule {
   disconnected?: (brandName: string) => string
   /** Sursa pe care o conectează acțiunea „Conectează …" (doar agency_admin). */
   connectLabel?: string
+  /** Modulul arată ultima stare cunoscută, nu o perioadă: bara de perioadă și comparație nu apare. */
+  noPeriod?: boolean
 }
 
 export const DEVICE_FILTER: FilterDef = {
@@ -159,6 +161,8 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
   overview: { segment: 'overview', title: 'Overview', subtitle: () => 'Starea brandului pe toate sursele. Apasă pe orice indicator ca să vezi înregistrările din spatele lui.', sources: ['seomonitor', 'gsc', 'ga4', 'planable'], filters: [] },
   ai: { segment: 'ai', title: 'AI Visibility', subtitle: () => 'Cum apare brandul în răspunsurile asistenților AI, pe aceleași întrebări rulate zilnic.', sources: ['seomonitor'], filters: [ENGINE_FILTER], dynamicFilter: AI_GROUPS },
   seo: { segment: 'seo', title: 'SEO și Search', subtitle: () => 'Prezența în Google: clicks, poziții și subiectele pe care competitorii le acoperă înaintea ta.', sources: ['seomonitor', 'gsc'], filters: [KEYWORD_TYPE_FILTER] },
+  // Fără `sources`: fâșia „Starea datelor” ar arăta actualitatea Search Analytics, nu ziua inspecției (pe care pagina o spune singură).
+  indexing: { segment: 'indexing', title: 'Indexare', subtitle: () => 'Care pagini sunt în indexul Google și care nu, după ultima inspecție Search Console.', sources: [], filters: [], noPeriod: true },
   traffic: { segment: 'traffic', title: 'Trafic și conversii', subtitle: () => 'Ce se întâmplă după click: vizite, acțiuni importante și calitatea măsurării.', sources: ['ga4'], filters: [DEVICE_FILTER] },
   ux: { segment: 'ux', title: 'User experience', subtitle: () => 'Cum folosesc vizitatorii site-ul, din Microsoft Clarity: rage clicks, dead clicks, quick backs și scroll, pe device.', sources: ['clarity'], filters: [] },
   paid: {

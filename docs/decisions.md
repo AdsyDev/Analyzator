@@ -222,3 +222,15 @@ Aceeași cerere ca la J. Trei lucrări fără dependențe externe și fără sch
 | K-3 | Portofoliul | (a) RPC nou care agregă brandurile; (b) câte o cerere `brand_metrics` pe brand | **(b).** Fiecare brand e citit separat, prin poarta existentă, deci nu apare o cale nouă peste mai multe branduri. Indicatorii sunt cei de pe cardurile din Overview. Nu există totaluri pe portofoliu: metricile nu se adună între branduri (rate, vizibilitate) și nu avem o definiție pentru asta. La multe branduri (zeci), pagina va avea nevoie de un RPC dedicat. |
 | K-4 | Impact | — | Doar `apps/web` și documentația. Un modul nou în meniu („Rapoarte”) și un link nou („Portofoliu”, de la două branduri în sus). |
 
+## L — Etapa 3, a treia felie: Indexare (2026-11-11)
+
+Aceeași cerere ca la J. Modulul lipsea cu totul. Contract: `docs/contracts/google.md`, secțiunea „Indexare”.
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| L-1 | Ce URL-uri se inspectează | (a) doar lista de la client; (b) lista agenției plus paginile cu cele mai multe clickuri | **(b).** Lista de URL-uri prioritare de la client nu există încă (dependență din evaluare), deci agenția o introduce din ecran (cel mult 150 pe brand), iar rularea adaugă singură cele mai bune 50 de pagini după clickuri din ultimele 28 de zile. Plafon: 200 de URL-uri pe brand și rulare, sub cota Google (2.000 pe zi, pe proprietate). Modulul are date și înainte de a primi lista. |
+| L-2 | Clasificarea verdictului | — | `metrics.index_state`: `PASS` = în index; `FAIL` și `NEUTRAL` = în afara indexului; restul, inclusiv lipsa verdictului = necunoscut. **Derivată din documentația API-ului, neconfirmată pe un cont real.** Motivul Google (`coverageState`) se arată neschimbat. |
+| L-3 | Indicator de indexare | (a) „rată de indexare” în registru; (b) doar numere de URL-uri | **(b).** Numerele sunt ale listei inspectate, nu ale site-ului: un procent ar fi citit ca „cât din site e indexat”, ceea ce nu măsurăm. Fără metrică nouă în registru. |
+| L-4 | Rularea | — | Workflow separat, `gsc-index-weekly` (marți 05:30 UTC, după Search Console), cu aceeași variabilă de activare ca `google-weekly`. Rulările se scriu în `sync_runs` cu `source = gsc_index` și nu schimbă starea cardului Search Console. Istoricul inspecțiilor se păstrează (un rând pe URL și zi). |
+| L-5 | Ce nu s-a construit | — | Inventarul complet de URL-uri (sitemap), trimiterea la indexare, evoluția în timp a stării în ecran (datele se păstrează, ecranul arată ultima stare). **Neverificat pe date reale:** conectorul nu a rulat niciodată contra API-ului Google. |
+

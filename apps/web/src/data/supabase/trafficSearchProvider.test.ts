@@ -86,4 +86,51 @@ describe('createSupabaseSearch', () => {
     expect((await createSupabaseSearch(client).landingPages(ctx)).kind).toBe('not_connected')
     expect((await createSupabaseSearch(client).contentGaps(ctx)).kind).toBe('not_connected')
   })
+
+  it('indexarea: starea și numerele vin clasificate de server; lipsa rămâne null', async () => {
+    const url = { url: 'https://site.test/a', priority: true, state: 'not_indexed', verdict: 'NEUTRAL', coverage_state: 'Crawled - currently not indexed', indexing_state: '', robots_txt_state: null, page_fetch_state: null, crawled_as: null, last_crawl_time: null, google_canonical: null, user_canonical: null, canonical_matches: null, inspected_on: '2026-11-10' }
+    const data = { connected: true, inspected_on: '2026-11-10', summary: { total: 1, indexed: 0, not_indexed: 1, unknown: 0, canonical_mismatch: 0 }, urls: [url], priority_urls: [{ id: 'p1', url: 'https://site.test/a', inspected: true }] }
+    const { client, rpcs } = fakeDataClient({ rpc: () => ({ data }) })
+    const r = await createSupabaseSearch(client).indexStatus('b1')
+    expect(rpcs[0]).toEqual({ fn: 'brand_index_status', args: { p_brand_id: 'b1' } })
+    if (r.kind !== 'ready') throw new Error('așteptam date')
+    expect(r.data.summary).toEqual({ total: 1, indexed: 0, not_indexed: 1, unknown: 0, canonical_mismatch: 0 })
+    expect(r.data.urls[0]).toMatchObject({ state: 'not_indexed', indexing_state: null, canonical_matches: null, priority: true })
+    expect(r.data.priority_urls).toEqual([{ id: 'p1', url: 'https://site.test/a', inspected: true }])
+  })
+
+  it('indexarea: neconectat, stare necunoscută și sumar incomplet', async () => {
+    const off = fakeDataClient({ rpc: () => ({ data: { connected: false } }) })
+    expect((await createSupabaseSearch(off.client).indexStatus('b1')).kind).toBe('not_connected')
+    const base = { connected: true, inspected_on: null, priority_urls: [] }
+    const badState = fakeDataClient({ rpc: () => ({ data: { ...base, summary: { total: 1, indexed: 0, not_indexed: 0, unknown: 1, canonical_mismatch: 0 }, urls: [{ url: 'https://site.test/a', state: 'inventat', inspected_on: '2026-11-10' }] } }) })
+    expect((await createSupabaseSearch(badState.client).indexStatus('b1')).kind).toBe('error')
+    const noSummary = fakeDataClient({ rpc: () => ({ data: { ...base, summary: { total: 0 }, urls: [] } }) })
+    expect((await createSupabaseSearch(noSummary.client).indexStatus('b1')).kind).toBe('error')
+  })
+
+  it('lista prioritară: scrierea trimite brandul, clientul și autorul; md5-ul îl calculează baza', async () => {
+    const { client, calls } = fakeDataClient({ userId: 'u1' })
+    const brand = { id: 'b1', tenant_id: 't1' } as Parameters<ReturnType<typeof createSupabaseSearch>['addIndexUrl']>[0]
+    expect((await createSupabaseSearch(client).addIndexUrl(brand, '  https://site.test/a  ')).kind).toBe('ready')
+    expect(calls[0]).toMatchObject({ table: 'index_urls', op: 'insert', payload: { tenant_id: 't1', brand_id: 'b1', url: 'https://site.test/a', created_by: 'u1' } })
+    expect(Object.keys(calls[0]!.payload as object)).not.toContain('url_md5')
+    expect((await createSupabaseSearch(client).removeIndexUrl('p1')).kind).toBe('ready')
+    expect(calls[1]).toMatchObject({ table: 'index_urls', op: 'delete', filters: [['id', 'eq', 'p1']] })
+  })
+
+  it('lista prioritară: mesaje pentru dublură, plafon, adresă invalidă și lipsa dreptului', async () => {
+    const brand = { id: 'b1', tenant_id: 't1' } as Parameters<ReturnType<typeof createSupabaseSearch>['addIndexUrl']>[0]
+    const msg = async (error: { code: string; message: string }) => {
+      const r = await createSupabaseSearch(fakeDataClient({ userId: 'u1', errors: { index_urls: error } }).client).addIndexUrl(brand, 'https://site.test/a')
+      return r.kind === 'error' ? r.message : r.kind
+    }
+    expect(await msg({ code: '23505', message: 'duplicate' })).toBe('URL-ul e deja în listă.')
+    expect(await msg({ code: '23514', message: 'Un brand poate avea cel mult 150 de URL-uri prioritare' })).toMatch(/150 de URL-uri/)
+    expect(await msg({ code: '23514', message: 'check' })).toMatch(/http:\/\/ sau https:\/\//)
+    expect(await msg({ code: '42501', message: 'rls' })).toBe('Nu ai dreptul să modifici lista de URL-uri a acestui brand.')
+    const anon = fakeDataClient({ userId: null })
+    expect((await createSupabaseSearch(anon.client).addIndexUrl(brand, 'https://site.test/a')).kind).toBe('error')
+    expect(anon.calls).toHaveLength(0)
+  })
 })

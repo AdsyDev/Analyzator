@@ -7,7 +7,7 @@ import type { Mention, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnap
 import type { Evidence, EvidenceQuery, MetricDefinition, MetricsBundle, TrendSeries } from './metric'
 import type { QueryContext } from './period'
 import type { NewPaidBudget, PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from './paid'
-import type { ContentGap, LandingPage, SearchFilters, SearchKeyword } from './search'
+import type { ContentGap, IndexStatus, LandingPage, SearchFilters, SearchKeyword } from './search'
 import type { SocialCalendarItem, SocialCompetitor, SocialFilters, SocialGroups, SocialPost, SocialSummary } from './social'
 import type { ClientsProvider, ConfigProvider, UsersProvider } from './admin'
 import type { NewConnection, NewTenantConnection, OAuthProvider, SourceConnection, SourceFreshness, SourceStatusInfo, SyncRun, TenantConnection, TokenSaved, ValidationOutcome, AccountList, AirbyteInspection, DiscoverKind } from './source'
@@ -119,6 +119,11 @@ export interface SearchProvider {
   keywords(ctx: QueryContext, f: SearchFilters): Promise<ProviderResult<SearchKeyword[]>>
   landingPages(ctx: QueryContext): Promise<ProviderResult<LandingPage[]>>
   contentGaps(ctx: QueryContext): Promise<ProviderResult<ContentGap[]>>
+  /** Ultima inspecție a fiecărui URL și lista prioritară; nu depinde de perioada aleasă. */
+  indexStatus(brandId: BrandId): Promise<ProviderResult<IndexStatus>>
+  /** Lista prioritară o scrie echipa agenției cu acces la brand (RLS verifică rolul, nu interfața). */
+  addIndexUrl(brand: Brand, url: string): Promise<ProviderResult<null>>
+  removeIndexUrl(id: string): Promise<ProviderResult<null>>
 }
 
 /** Trafic și conversii (spec cap. 16). KPI-urile GA4 și Clarity ale brandului vin din registru prin `MetricsProvider`. */

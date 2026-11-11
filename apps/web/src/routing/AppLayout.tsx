@@ -184,7 +184,7 @@ export function AppLayout() {
       lastRefreshAt={lastRefreshAt}
       onSignOut={() => void signOut()}
       roleSwitcher={preview ? { role: user.role, onChange: preview.setRole } : undefined}
-      filterBar={module && ctx && urlBrand ? <FilterBar value={ctx} onChange={change} onReset={reset} filterDefs={visibleFilterDefs} /> : undefined}
+      filterBar={module && !module.noPeriod && ctx && urlBrand ? <FilterBar value={ctx} onChange={change} onReset={reset} filterDefs={visibleFilterDefs} /> : undefined}
     >
       {content}
     </AppShell>

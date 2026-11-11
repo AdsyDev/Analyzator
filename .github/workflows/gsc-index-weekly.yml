@@ -1,0 +1,83 @@
+# Indexare: Search Console URL Inspection pentru URL-urile prioritare ale fiecărui brand și pentru paginile lui cu cele
+# mai multe clickuri (cel mult 200 pe brand; cota Google e de 2.000 de inspecții pe zi, pe proprietate).
+#
+# Programare: marți la 05:30 UTC, după colectarea Search Console (google-weekly, 04:00 UTC), ca paginile cu clickuri să fie
+# cele din săptămâna curentă. Cron-ul GitHub e în UTC și nu urmează ora de vară: vezi nota DST din docs/runbook.md.
+#
+# Rularea programată e DEZACTIVATĂ până când variabila CONNECTOR_GOOGLE_ENABLED = "true" (aceeași ca la google-weekly).
+# workflow_dispatch funcționează oricând.
+#
+# Secrete în environment-ul GitHub ales (implicit „staging"): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+# Service account-ul Google NU e aici: stă în Supabase Vault și se citește la rulare prin get_source_token.
+
+name: gsc-index-weekly
+
+on:
+  schedule:
+    - cron: '30 5 * * 2'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment GitHub cu secretele Supabase'
+        type: choice
+        options: [staging]
+        default: staging
+      brand:
+        description: 'Doar un site: ID-ul din adresa paginii site-ului, /admin/clients/<id> (gol = toate)'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gsc-index-weekly
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: github.event_name == 'workflow_dispatch' || vars.CONNECTOR_GOOGLE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dependențe
+        run: npm ci
+
+      - name: Teste conector (fără rețea)
+        run: node --experimental-strip-types --test 'connectors/google/**/*.test.ts' 'connectors/shared/**/*.test.ts'
+
+      - name: Inspecția URL-urilor
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Câmpul text trece prin mediu, nu direct în script (fără injecție de comenzi); conectorul îl validează.
+          BRAND: ${{ inputs.brand }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Lipsesc secretele SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY în environment-ul ${{ inputs.environment || 'staging' }}."
+            exit 1
+          fi
+          ARGS=()
+          if [ -n "$BRAND" ]; then ARGS+=(--brand "$BRAND"); fi
+          node --experimental-strip-types connectors/google/index-collect.ts "${ARGS[@]}" | tee collect.log
+
+      - name: Rezumat
+        if: always()
+        run: |
+          {
+            echo "### Indexare (URL Inspection): $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo
+            echo '```'
+            [ -f collect.log ] && cat collect.log || echo "fără output"
+            echo '```'
+            echo
+            echo "Detalii: sync_runs (source = gsc_index, errors) și index_inspections."
+          } >> "$GITHUB_STEP_SUMMARY"

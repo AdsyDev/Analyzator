@@ -1,4 +1,4 @@
-import { DEVICES, failed, METRIC_STATUSES, notConnected, ready, type AiReferrals, type ClarityDevices, type Device, type LandingPage, type SearchKeyword, type SearchProvider, type TrackingCheck, type TrackingQuality, type TrackingStatus, type TrafficChannels, type TrafficProvider } from '../../contracts'
+import { DEVICES, failed, INDEX_STATES, METRIC_STATUSES, notConnected, ready, type AiReferrals, type ClarityDevices, type Device, type IndexState, type IndexStatus, type IndexedUrl, type LandingPage, type SearchKeyword, type SearchProvider, type TrackingCheck, type TrackingQuality, type TrackingStatus, type TrafficChannels, type TrafficProvider } from '../../contracts'
 import { formatDate, formatMetricValue } from '../../lib/format'
 import { serverPeriodKind } from '../../lib/period'
 import type { DataClient } from './dataClient'
@@ -144,6 +144,14 @@ export function createSupabaseTraffic(client: DataClient): TrafficProvider {
   }
 }
 
+/** Refuzul RLS și regulile listei prioritare, în română; restul erorilor nu își arată detaliile. */
+function indexWriteError(e: { code?: string; message?: string }, fallback: string): string {
+  if (e.code === '42501') return 'Nu ai dreptul să modifici lista de URL-uri a acestui brand.'
+  if (e.code === '23505') return 'URL-ul e deja în listă.'
+  if (e.code === '23514') return /150/.test(e.message ?? '') ? 'Lista are deja 150 de URL-uri prioritare. Șterge unul ca să adaugi altul.' : 'Adresa trebuie să înceapă cu http:// sau https:// și să nu conțină spații.'
+  return fallback
+}
+
 /** SEO din SQL (D-14): keywords SEOmonitor și landing pages Search Console. */
 export function createSupabaseSearch(client: DataClient): SearchProvider {
   return {
@@ -178,5 +186,56 @@ export function createSupabaseSearch(client: DataClient): SearchProvider {
 
     // SEOmonitor nu dă pozițiile organice ale concurenților (doar în AI Search): golurile nu se pot calcula încă.
     contentGaps: async () => notConnected('Pozițiile organice ale concurenților nu sunt colectate; golurile de conținut apar după adăugarea lor.'),
+
+    // Indexare (L): starea și numărul de URL-uri vin clasificate de `brand_index_status`.
+    async indexStatus(brandId) {
+      const { data, error } = await client.rpc('brand_index_status', { p_brand_id: brandId })
+      if (error) return failed(rpcError(error))
+      const d = data as { connected?: boolean; inspected_on?: string | null; summary?: Record<string, unknown>; urls?: Array<Record<string, unknown>>; priority_urls?: Array<Record<string, unknown>> } | null
+      if (!d || typeof d.connected !== 'boolean') return failed(CONTRACT)
+      if (!d.connected) return notConnected('Search Console nu este conectat pentru acest brand.')
+      const s = d.summary
+      if (!s || !Array.isArray(d.urls) || !Array.isArray(d.priority_urls)) return failed(CONTRACT)
+      const count = (k: string) => num(s[k])
+      const summary = { total: count('total'), indexed: count('indexed'), not_indexed: count('not_indexed'), unknown: count('unknown'), canonical_mismatch: count('canonical_mismatch') }
+      if (Object.values(summary).some((v) => v === null)) return failed(CONTRACT)
+      const str = (v: unknown) => (typeof v === 'string' && v !== '' ? v : null)
+      try {
+        const out: IndexStatus = {
+          inspected_on: str(d.inspected_on),
+          summary: summary as IndexStatus['summary'],
+          urls: d.urls.map((u): IndexedUrl => {
+            if (typeof u.url !== 'string' || typeof u.inspected_on !== 'string' || !(INDEX_STATES as readonly string[]).includes(String(u.state))) throw new Error(CONTRACT)
+            return {
+              url: u.url, priority: u.priority === true, state: u.state as IndexState,
+              verdict: str(u.verdict), coverage_state: str(u.coverage_state), indexing_state: str(u.indexing_state), robots_txt_state: str(u.robots_txt_state),
+              page_fetch_state: str(u.page_fetch_state), crawled_as: str(u.crawled_as), last_crawl_time: str(u.last_crawl_time),
+              google_canonical: str(u.google_canonical), user_canonical: str(u.user_canonical),
+              canonical_matches: typeof u.canonical_matches === 'boolean' ? u.canonical_matches : null, inspected_on: u.inspected_on,
+            }
+          }),
+          priority_urls: d.priority_urls.map((p) => {
+            if (typeof p.id !== 'string' || typeof p.url !== 'string') throw new Error(CONTRACT)
+            return { id: p.id, url: p.url, inspected: p.inspected === true }
+          }),
+        }
+        return ready(out)
+      } catch {
+        return failed(CONTRACT)
+      }
+    },
+
+    async addIndexUrl(brand, url) {
+      const { data: auth } = await client.auth.getSession()
+      const me = auth.session?.user.id
+      if (!me) return failed('Sesiunea a expirat. Autentifică-te din nou.')
+      const { error } = await client.from('index_urls').insert({ tenant_id: brand.tenant_id, brand_id: brand.id, url: url.trim(), created_by: me })
+      return error ? failed(indexWriteError(error, 'URL-ul nu a putut fi adăugat. Reîncearcă.')) : ready(null)
+    },
+
+    async removeIndexUrl(id) {
+      const { error } = await client.from('index_urls').delete().eq('id', id)
+      return error ? failed(indexWriteError(error, 'URL-ul nu a putut fi șters. Reîncearcă.')) : ready(null)
+    },
   }
 }

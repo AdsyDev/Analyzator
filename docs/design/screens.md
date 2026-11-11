@@ -73,6 +73,10 @@ KPI-uri; „Mention Rate pe engine" (card per engine, cu variație și număr de
 
 „Keywords urmărite" (keyword, URL, volum, rank mobil, rank desktop, trend de poziții, competitor în top 10 sau „Niciun competitor în top 10", paginare); „Landing pages din search" (clicks, CTR, poziție); „Content gaps" (căutări în care un competitor e în top 10, iar brandul nu are pagină: volum lunar, competitor, poziție).
 
+## SEO → Indexare (`/brands/:id/indexing`)
+
+**Etapa 3 (11 nov. 2026, L).** Submeniu al SEO, fără bară de perioadă (arată ultima stare cunoscută). „Starea indexării”: cinci numere din lista inspectată (URL-uri inspectate, În index, În afara indexului, Stare necunoscută, Canonical diferit), cu ziua inspecției; fără inspecții: „Nicio inspecție încă”. „URL-uri inspectate”: tabel cu URL, Prioritar, Stare, Motiv (Google), Ultima accesare, Canonical, Canonical ales de Google, Inspectat la; export CSV. „URL-uri prioritare”: lista agenției, cu „Neinspectat încă” pe cele noi; echipa agenției adaugă și șterge, clientul doar vede.
+
 ## Trafic și conversii (`/brands/:id/traffic`)
 
 Filtre Device și Canal; „Canale" (sessions, pondere, variație); „AI referrals" (sursă, sessions, key events, rată); „Tracking quality" (listă de verificări zilnice cu titlu, notă, status).

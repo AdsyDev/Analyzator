@@ -137,6 +137,9 @@ const search: SearchProvider = {
   keywords: async () => notConnected(SEARCH_UNAVAILABLE),
   landingPages: async () => notConnected(SEARCH_UNAVAILABLE),
   contentGaps: async () => notConnected(SEARCH_UNAVAILABLE),
+  indexStatus: async () => notConnected(SEARCH_UNAVAILABLE),
+  addIndexUrl: async () => notConnected(SEARCH_UNAVAILABLE),
+  removeIndexUrl: async () => notConnected(SEARCH_UNAVAILABLE),
 }
 
 const TRAFFIC_UNAVAILABLE = 'Datele de trafic nu sunt încă disponibile pentru acest brand.'
