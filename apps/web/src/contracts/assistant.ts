@@ -20,6 +20,8 @@ export interface AiSettings {
   /** Politica și preferința împreună: ce e pornit de fapt pentru acest utilizator. */
   effective: AiControls
   can_edit_policy: boolean
+  /** Utilizatorul poate cere o ciornă de analiză (rolurile care scriu analize). Controalele se verifică separat. */
+  can_generate: boolean
   /** Tokenii consumați de brand în luna curentă; `null` pentru cine nu vede consumul brandului. */
   month_tokens: number | null
 }
@@ -65,4 +67,19 @@ export interface AiReply {
   cached: boolean
   model_id: string | null
   prompt_version: string | null
+}
+
+export const AI_DRAFT_STATUSES = ['ok', 'insufficient_evidence', 'rejected', 'ai_off', 'not_configured', 'budget_exhausted', 'rate_limited', 'model_error'] as const
+export type AiDraftStatus = (typeof AI_DRAFT_STATUSES)[number]
+
+/**
+ * Rezultatul cererii de ciornă. La `ok`, ciorna e deja în lista de analize, marcată ca generată; textul ei nu vine pe
+ * aici. Orice alt status înseamnă că nu s-a salvat nimic.
+ */
+export interface AiDraftResult {
+  status: AiDraftStatus
+  insight_id: string | null
+  /** Pe aceleași date exista deja o ciornă generată: s-a întors aceea, fără o cerere nouă către model. */
+  existing: boolean
+  blocked_by: 'policy' | 'preference' | null
 }

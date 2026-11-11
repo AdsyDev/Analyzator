@@ -29,8 +29,16 @@ export function InsightCard({ insight, agencyView = false, onOpenEvidence }: Ins
     <article aria-label={insight.title} data-status={insight.status} className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-1 sm:p-5">
       <header className="flex items-start gap-3">
         <h3 className="flex-1 font-display text-[16px] font-semibold leading-snug tracking-[-0.01em]">{insight.title}</h3>
+        {insight.origin === 'adsy_ai' && <StatusChip tone="lav">Generată de AdSy AI</StatusChip>}
         {agencyView && <StatusChip tone={status.tone}>{status.label}</StatusChip>}
       </header>
+      {insight.origin === 'adsy_ai' && (
+        <p className="rounded-lg bg-lav-soft px-3 py-2 text-[12.5px] leading-snug text-text">
+          {insight.status === 'published' || insight.status === 'superseded'
+            ? 'Ciorna a fost scrisă de AdSy AI din indicatorii perioadei, apoi revizuită și publicată de echipa AdSymphony.'
+            : 'Ciornă scrisă de AdSy AI din indicatorii perioadei. Cifrele sunt verificate față de dovezile citate; interpretarea și recomandările sunt ipoteze până le revizuiește echipa.'}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-text-2">
         <Avatar name={insight.author.name} size="sm" tone="accent" />
         <span className="font-medium text-text">{insight.author.name}</span>

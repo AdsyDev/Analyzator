@@ -5,7 +5,7 @@ import { createSupabaseAssistant } from './assistantProvider'
 
 const ctx: QueryContext = { brandId: 'b1', period: { preset: '28d', from: '2026-10-14', to: '2026-11-10' }, comparison: 'year_ago', filters: {} }
 const brand = { id: 'b1', tenant_id: 't1' } as Brand
-const settings = { tenant_id: 't1', policy: { chat: true, generation: false, display: true, monthly_token_cap: '2000000', updated_at: '2026-11-11T09:00:00+00:00' }, preference: { chat: true, display: false }, effective: { chat: true, generation: false, display: false }, can_edit_policy: true, month_tokens: 1500 }
+const settings = { tenant_id: 't1', policy: { chat: true, generation: false, display: true, monthly_token_cap: '2000000', updated_at: '2026-11-11T09:00:00+00:00' }, preference: { chat: true, display: false }, effective: { chat: true, generation: false, display: false }, can_edit_policy: true, can_generate: true, month_tokens: 1500 }
 const answer = { summary: 'Sesiunile au fost 21.611.', evidence: [{ id: 'metric:ga4_sessions', kind: 'metric', label: 'Sesiuni', metric_key: 'ga4_sessions' }, { id: 'insight:i1', kind: 'insight', label: 'Analiză', insight_id: 'i1' }], metric_keys: ['ga4_sessions'], limitations: 'Fără conversii.', proposed_action: null, period: { start: '2026-10-14', end: '2026-11-10' }, requires_review: true }
 
 describe('createSupabaseAssistant', () => {
@@ -13,7 +13,32 @@ describe('createSupabaseAssistant', () => {
     const { client, rpcs } = fakeDataClient({ rpc: () => ({ data: settings }) })
     const r = await createSupabaseAssistant(client).settings('b1')
     expect(rpcs[0]).toEqual({ fn: 'brand_ai_settings', args: { p_brand_id: 'b1' } })
-    expect(r.kind === 'ready' && r.data).toEqual({ policy: { chat: true, generation: false, display: true, monthly_token_cap: 2000000, updated_at: '2026-11-11T09:00:00+00:00' }, preference: { chat: true, display: false }, effective: { chat: true, generation: false, display: false }, can_edit_policy: true, month_tokens: 1500 })
+    expect(r.kind === 'ready' && r.data).toEqual({ policy: { chat: true, generation: false, display: true, monthly_token_cap: 2000000, updated_at: '2026-11-11T09:00:00+00:00' }, preference: { chat: true, display: false }, effective: { chat: true, generation: false, display: false }, can_edit_policy: true, can_generate: true, month_tokens: 1500 })
+  })
+
+  it('fără `can_generate` de la server (versiune mai veche), generarea nu se oferă', async () => {
+    const { can_generate: _omit, ...old } = settings
+    const { client } = fakeDataClient({ rpc: () => ({ data: old }) })
+    const r = await createSupabaseAssistant(client).settings('b1')
+    expect(r.kind === 'ready' && r.data.can_generate).toBe(false)
+  })
+
+  it('ciorna se cere funcției server cu brandul, perioada și comparația; întoarce doar id-ul ciornei, nu textul', async () => {
+    const { client, invocations } = fakeDataClient({ invoke: () => ({ data: { status: 'ok', insight_id: 'i-9', existing: false, cached: false, model_id: 'm', prompt_version: 'insight-v1', title: 'nu trebuie să treacă' } }) })
+    const r = await createSupabaseAssistant(client).generateInsight(ctx)
+    expect(invocations[0]).toEqual({ name: 'adsy-ai', body: { action: 'generate_insight', brand_id: 'b1', period: { start: '2026-10-14', end: '2026-11-10' }, comparison: 'year_ago' } })
+    expect(r).toEqual({ kind: 'ready', data: { status: 'ok', insight_id: 'i-9', existing: false, blocked_by: null } })
+  })
+
+  it('ciornă: stările fără salvare trec ca atare; `ok` fără id sau o stare necunoscută încalcă contractul', async () => {
+    const off = fakeDataClient({ invoke: () => ({ data: { status: 'ai_off', blocked_by: 'preference' } }) })
+    expect(await createSupabaseAssistant(off.client).generateInsight(ctx)).toEqual({ kind: 'ready', data: { status: 'ai_off', insight_id: null, existing: false, blocked_by: 'preference' } })
+    const existing = fakeDataClient({ invoke: () => ({ data: { status: 'ok', insight_id: 'i-1', existing: true } }) })
+    expect(await createSupabaseAssistant(existing.client).generateInsight(ctx)).toEqual({ kind: 'ready', data: { status: 'ok', insight_id: 'i-1', existing: true, blocked_by: null } })
+    for (const data of [{ status: 'ok' }, { status: 'out_of_scope' }, { status: 'published', insight_id: 'i-1' }, null]) {
+      const bad = fakeDataClient({ invoke: () => ({ data }) })
+      expect((await createSupabaseAssistant(bad.client).generateInsight(ctx)).kind).toBe('error')
+    }
   })
 
   it('setări incomplete încalcă contractul; fără acces, mesajul de acces', async () => {

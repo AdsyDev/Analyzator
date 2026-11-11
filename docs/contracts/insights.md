@@ -105,3 +105,10 @@ review) ajung la utilizator; erorile de schemă rămân generice. Recomandările
 - **Recomandări:** `InsightsProvider.addRecommendation` și `deleteRecommendation` scriu în `recommendations` (problemă, recomandare, beneficiu așteptat, prioritate 1–3). Triggerul existent le permite doar cât analiza e ciornă. `brand_insights` le întoarce în ordinea priorității, iar analiza publicată le arată și clientului.
 - **Versiune nouă:** `supersede` inserează o analiză cu `supersedes_id`; versiunea, dovezile și recomandările le copiază serverul. O analiză publicată are cel mult o versiune de înlocuire în lucru; la publicarea ei, cea veche devine `superseded`.
 - **Responsabil:** `NewAction.owner_id` e opțional. Selectorul apare doar pentru `agency_admin` (numele membrilor vin prin funcția `users`, E10) și listează membrii activi cu rol de agenție din clientul brandului. Serverul verifică oricum (`actions_before_write`).
+
+## Proveniența: analize generate de AdSy AI (Etapa 4, 11 nov. 2026, deciziile O)
+
+`insights.origin` (`human` implicit, `adsy_ai`) și `insights.ai_request_id`. O ciornă `adsy_ai` o scrie funcția `adsy-ai` cu sesiunea utilizatorului, după verificarea cifrelor; regulile sunt în `docs/contracts/adsy-ai.md`. Tranzițiile, snapshotul la publicare și vizibilitatea pentru client sunt cele de mai sus, neschimbate: o ciornă generată nu se publică fără review.
+
+`brand_insights` întoarce `origin` și omite analizele `adsy_ai` când controlul „afișare” e oprit pentru brand sau pentru utilizator.
+

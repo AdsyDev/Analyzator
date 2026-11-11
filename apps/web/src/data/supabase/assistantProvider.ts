@@ -1,4 +1,4 @@
-import { AI_REPLY_STATUSES, failed, ready, type AiAnswer, type AiEvidenceRef, type AiReply, type AiReplyStatus, type AiSettings, type AssistantProvider } from '../../contracts'
+import { AI_DRAFT_STATUSES, AI_REPLY_STATUSES, failed, ready, type AiAnswer, type AiDraftResult, type AiDraftStatus, type AiEvidenceRef, type AiReply, type AiReplyStatus, type AiSettings, type AssistantProvider } from '../../contracts'
 import type { DataClient } from './dataClient'
 import { QUERY_FAILED } from './dataClient'
 import { functionError } from './sourcesProvider'
@@ -37,7 +37,7 @@ export function createSupabaseAssistant(client: DataClient): AssistantProvider {
     async settings(brandId) {
       const { data, error } = await client.rpc('brand_ai_settings', { p_brand_id: brandId })
       if (error) return failed(error.code === '42501' ? 'Nu ai acces la acest spațiu de brand.' : QUERY_FAILED)
-      const d = data as { policy?: Record<string, unknown>; preference?: Record<string, unknown>; effective?: Record<string, unknown>; can_edit_policy?: unknown; month_tokens?: unknown } | null
+      const d = data as { policy?: Record<string, unknown>; preference?: Record<string, unknown>; effective?: Record<string, unknown>; can_edit_policy?: unknown; can_generate?: unknown; month_tokens?: unknown } | null
       const p = d?.policy
       const pref = d?.preference
       const eff = d?.effective
@@ -47,6 +47,8 @@ export function createSupabaseAssistant(client: DataClient): AssistantProvider {
         preference: { chat: pref.chat, display: pref.display },
         effective: { chat: eff.chat, generation: eff.generation, display: eff.display },
         can_edit_policy: d.can_edit_policy as boolean,
+        // Un server mai vechi nu trimite câmpul: fără el, generarea nu se oferă.
+        can_generate: d.can_generate === true,
         month_tokens: num(d.month_tokens),
       }
       return ready(out)
@@ -103,6 +105,24 @@ export function createSupabaseAssistant(client: DataClient): AssistantProvider {
       } catch {
         return failed(CONTRACT)
       }
+    },
+
+    async generateInsight(ctx) {
+      const { data, error } = await client.functions.invoke(FUNCTION, {
+        body: { action: 'generate_insight', brand_id: ctx.brandId, period: { start: ctx.period.from, end: ctx.period.to }, comparison: ctx.comparison },
+      })
+      if (error) return failed(await functionError(error))
+      const d = data as Record<string, unknown> | null
+      if (!d || !(AI_DRAFT_STATUSES as readonly string[]).includes(String(d.status))) return failed(CONTRACT)
+      // `ok` fără id-ul ciornei ar însemna o ciornă pe care interfața nu o poate arăta: e în afara contractului.
+      if (d.status === 'ok' && typeof d.insight_id !== 'string') return failed(CONTRACT)
+      const result: AiDraftResult = {
+        status: d.status as AiDraftStatus,
+        insight_id: typeof d.insight_id === 'string' ? d.insight_id : null,
+        existing: d.existing === true,
+        blocked_by: d.blocked_by === 'policy' || d.blocked_by === 'preference' ? d.blocked_by : null,
+      }
+      return ready(result)
     },
   }
 }

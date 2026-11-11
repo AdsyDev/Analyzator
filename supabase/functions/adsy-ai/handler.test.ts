@@ -2,7 +2,7 @@ import { test, describe, beforeEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { bucharestMonthStart, comparisonPeriod, handle, MAX_USER_REQUESTS_PER_DAY, parseChat, type HandlerDeps } from './handler.ts'
 import { GEMINI_HOST } from './gemini.ts'
-import { PROMPT_VERSION } from './contract.ts'
+import { GENERATE_PROMPT_VERSION, PROMPT_VERSION } from './contract.ts'
 
 // Răspunsurile modelului sunt simulate după forma generateContent din SDK-ul oficial: neconfirmate pe un cont real.
 
@@ -18,9 +18,14 @@ type Call = { url: string; method: string; headers: Record<string, string>; body
 type State = {
   token: string | null
   access: boolean
-  settings: { policyChat: boolean; prefChat: boolean; cap: number | null }
+  settings: { policyChat: boolean; prefChat: boolean; cap: number | null; generation: boolean; display: boolean; prefDisplay: boolean; canGenerate: boolean }
   metricValue: number | null
   insights: Array<Record<string, unknown>>
+  /** Ciornele scrise în `insights`, cu dovezile și recomandările lor; `failWrite` simulează un refuz al bazei. */
+  drafts: Array<Record<string, unknown>>
+  links: Array<Record<string, unknown>>
+  recs: Array<Record<string, unknown>>
+  failWrite: 'insights' | 'evidence_links' | 'recommendations' | null
   requests: Array<Record<string, unknown>>
   model: (body: Record<string, unknown>) => { status: number; body: unknown }
   calls: Call[]
@@ -52,7 +57,8 @@ function fakeFetch(): HandlerDeps['fetch'] {
     if (u.pathname === '/rest/v1/ai_requests') {
       if (!service) return ok({ code: '42501' }, 403)
       if (method === 'POST') {
-        const row = { id: `req-${state.requests.length + 1}`, created_at: NOW.toISOString(), ...body }
+        // Cererile primesc UUID-uri, ca în bază: handlerul le folosește în filtre.
+        const row = { id: state.requests.length < 9 ? `50000000-0000-0000-0000-00000000000${state.requests.length + 1}` : `req-${state.requests.length + 1}`, created_at: NOW.toISOString(), ...body }
         state.requests.push(row)
         return ok([row], 201)
       }
@@ -61,6 +67,8 @@ function fakeFetch(): HandlerDeps['fetch'] {
       let rows = state.requests.filter((r) => (!eq('tenant_id') || r.tenant_id === eq('tenant_id')) && (!eq('brand_id') || r.brand_id === eq('brand_id')) && (!eq('user_id') || r.user_id === eq('user_id')) && (!eq('cache_key') || r.cache_key === eq('cache_key')))
       if (q.get('cached_from') === 'is.null') rows = rows.filter((r) => r.cached_from === null || r.cached_from === undefined)
       if (q.get('status')?.startsWith('in.')) rows = rows.filter((r) => q.get('status')!.includes(String(r.status)))
+      if (q.get('status')?.startsWith('eq.')) rows = rows.filter((r) => r.status === eq('status'))
+      if (q.get('task')) rows = rows.filter((r) => r.task === eq('task'))
       if (q.get('total_tokens') === 'gt.0') rows = rows.filter((r) => Number(r.total_tokens) > 0)
       return ok(rows.slice().reverse())
     }
@@ -69,7 +77,34 @@ function fakeFetch(): HandlerDeps['fetch'] {
     if (u.pathname === '/rest/v1/rpc/brand_ai_settings') {
       if (!state.access || body!.p_brand_id !== B1) return ok({ code: '42501' }, 403)
       const s = state.settings
-      return ok({ tenant_id: T1, policy: { chat: s.policyChat, generation: false, display: false, monthly_token_cap: s.cap }, preference: { chat: s.prefChat, display: true }, effective: { chat: s.policyChat && s.prefChat, generation: false, display: false }, can_edit_policy: false, month_tokens: null })
+      return ok({
+        tenant_id: T1,
+        policy: { chat: s.policyChat, generation: s.generation, display: s.display, monthly_token_cap: s.cap },
+        preference: { chat: s.prefChat, display: s.prefDisplay },
+        effective: { chat: s.policyChat && s.prefChat, generation: s.generation, display: s.display && s.prefDisplay },
+        can_edit_policy: false, can_generate: s.canGenerate, month_tokens: null,
+      })
+    }
+    if (u.pathname === '/rest/v1/insights') {
+      if (method === 'POST') {
+        if (state.failWrite === 'insights') return ok({ code: '42501', message: 'new row violates row-level security policy' }, 403)
+        const row = { id: `40000000-0000-0000-0000-00000000000${state.drafts.length + 1}`, status: 'draft', ...body }
+        state.drafts.push(row)
+        return ok([{ id: row.id }], 201)
+      }
+      if (method === 'DELETE') {
+        const id = u.searchParams.get('id')!.replace(/^eq\./, '')
+        state.drafts = state.drafts.filter((d) => d.id !== id)
+        return ok(null, 200)
+      }
+      const wanted = (u.searchParams.get('ai_request_id') ?? '').replace(/^in\.\(|\)$/g, '').split(',')
+      return ok(state.drafts.filter((d) => wanted.includes(String(d.ai_request_id))).map((d) => ({ id: d.id })))
+    }
+    if (u.pathname === '/rest/v1/evidence_links' || u.pathname === '/rest/v1/recommendations') {
+      const table = u.pathname.endsWith('evidence_links') ? 'evidence_links' : 'recommendations'
+      if (state.failWrite === table) return ok({ code: '23514', message: 'constrângere' }, 400)
+      ;(table === 'evidence_links' ? state.links : state.recs).push(...(JSON.parse(String(init.body)) as Array<Record<string, unknown>>))
+      return ok(null, 201)
     }
     if (u.pathname === '/rest/v1/brands') return ok([{ id: B1, tenant_id: T1, name: 'Brand de test' }])
     if (u.pathname === '/rest/v1/rpc/brand_metrics') {
@@ -82,10 +117,13 @@ function fakeFetch(): HandlerDeps['fetch'] {
 }
 
 beforeEach(() => {
-  state = { token: 'user-jwt', access: true, settings: { policyChat: true, prefChat: true, cap: 2_000_000 }, metricValue: 21611, insights: [], requests: [], model: () => modelAnswer(), calls: [] }
+  state = {
+    token: 'user-jwt', access: true, settings: { policyChat: true, prefChat: true, cap: 2_000_000, generation: true, display: true, prefDisplay: true, canGenerate: true },
+    metricValue: 21611, insights: [], drafts: [], links: [], recs: [], failWrite: null, requests: [], model: () => modelAnswer(), calls: [],
+  }
 })
 
-const deps = (over: Partial<typeof env> = {}): HandlerDeps => ({ env: { ...env, ...over }, fetch: fakeFetch(), now: () => NOW })
+const deps = (over: Partial<typeof env> = {}): HandlerDeps => ({ env: { ...env, ...over }, fetch: fakeFetch(), now: () => NOW, wait: async () => undefined })
 const call = async (body: unknown, d: HandlerDeps = deps(), token: string | null = 'user-jwt') => {
   const res = await handle(new Request('http://fn.test/adsy-ai', { method: 'POST', headers: token ? { authorization: `Bearer ${token}` } : {}, body: JSON.stringify(body) }), d)
   return { status: res.status, body: (await res.json()) as Record<string, unknown> }
@@ -242,7 +280,7 @@ describe('adsy-ai: chat', () => {
     const again = await call(chat({ question: '  cum au  mers SESIUNILE? ' }))
     assert.deepEqual([again.body.status, again.body.cached], ['ok', true])
     assert.equal(modelCalls().length, 1)
-    assert.deepEqual([state.requests[1]!.cached_from, state.requests[1]!.total_tokens], ['req-1', 0])
+    assert.deepEqual([state.requests[1]!.cached_from, state.requests[1]!.total_tokens], [state.requests[0]!.id, 0])
   })
 
   test('cache: date schimbate, altă întrebare sau alt model înseamnă cerere nouă', async () => {
@@ -284,6 +322,217 @@ describe('adsy-ai: chat', () => {
     await call(chat({ comparison: 'year_ago' }))
     const metrics = state.calls.find((c) => c.url.includes('rpc/brand_metrics'))!
     assert.deepEqual([metrics.body!.p_kind, metrics.body!.p_start, metrics.body!.p_end, metrics.body!.p_brand_id], ['yoy', '2026-10-14', '2026-11-10', B1])
+  })
+})
+
+const modelDraft = (o: Record<string, unknown> = {}) => ({
+  status: 200,
+  body: {
+    candidates: [{
+      content: { parts: [{ text: JSON.stringify({
+        finding_type: 'draft', title: 'Sesiuni în creștere', summary: 'Sesiunile au fost 21.611, față de 18.663.', interpretation: 'Creșterea poate veni din campaniile perioadei; e o ipoteză.',
+        limits: 'Fără date despre conversii.', evidence_ids: ['metric:ga4_sessions'],
+        recommendations: [{ problem: 'Nu știm ce canal a adus creșterea.', action: 'Verifică sursele de trafic.', expected_benefit: 'O explicație verificabilă.', priority: 1 }], ...o,
+      }) }] },
+      finishReason: 'STOP',
+    }],
+    usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 600, totalTokenCount: 1800 },
+  },
+})
+const generate = (o: Record<string, unknown> = {}) => ({ action: 'generate_insight', brand_id: B1, period: { start: '2026-10-14', end: '2026-11-10' }, ...o })
+
+describe('adsy-ai: ciorne generate', () => {
+  beforeEach(() => {
+    state.model = () => modelDraft()
+  })
+
+  test('scrie o ciornă marcată adsy_ai, cu dovezi și recomandări, prin sesiunea utilizatorului', async () => {
+    const r = await call(generate())
+    assert.equal(r.status, 200)
+    assert.deepEqual([r.body.status, r.body.existing, r.body.cached, r.body.prompt_version], ['ok', false, false, GENERATE_PROMPT_VERSION])
+    assert.equal(state.drafts.length, 1)
+    const d = state.drafts[0]!
+    assert.equal(r.body.insight_id, d.id)
+    assert.deepEqual([d.tenant_id, d.brand_id, d.author_id, d.origin, d.ai_request_id], [T1, B1, USER, 'adsy_ai', state.requests[0]!.id])
+    assert.deepEqual([d.title, d.period_start, d.period_end], ['Sesiuni în creștere', '2026-10-14', '2026-11-10'])
+    assert.ok(!('status' in (state.calls.find((c) => c.url.includes('/rest/v1/insights') && c.method === 'POST')!.body ?? {})), 'statusul nu se trimite: ciorna rămâne ciornă')
+    assert.deepEqual(state.links, [{ tenant_id: T1, brand_id: B1, insight_id: d.id, kind: 'metric', metric_key: 'ga4_sessions', options: {} }])
+    assert.deepEqual(state.recs.map((x) => [x.insight_id, x.priority, x.action]), [[d.id, 1, 'Verifică sursele de trafic.']])
+    const log = state.requests[0]!
+    assert.deepEqual([log.task, log.status, log.user_id, log.question, log.total_tokens], ['generate_insight', 'ok', USER, null, 1800])
+    // Scrierile în tabelele de analize se fac cu sesiunea utilizatorului, niciodată cu cheia de service.
+    for (const c of state.calls.filter((x) => /insights|evidence_links|recommendations/.test(x.url))) assert.equal(c.headers.Authorization, 'Bearer user-jwt', c.url)
+    assert.ok(!('insight_transitions' in r.body) && !state.calls.some((c) => c.url.includes('insight_transitions')), 'nimic nu se trimite la review și nimic nu se publică de aici')
+  })
+
+  test('clientul nu poate cere o ciornă: 403 înaintea oricărei citiri', async () => {
+    state.settings.canGenerate = false
+    const r = await call(generate())
+    assert.equal(r.status, 403)
+    assert.equal(modelCalls().length + dataCalls().length + state.requests.length + state.drafts.length, 0)
+  })
+
+  test('generare sau afișare oprită: nimic nu pleacă spre date sau spre model', async () => {
+    const cases: Array<[Partial<State['settings']>, string]> = [[{ generation: false }, 'policy'], [{ display: false }, 'policy'], [{ prefDisplay: false }, 'preference']]
+    for (const [over, by] of cases) {
+      Object.assign(state.settings, { generation: true, display: true, prefDisplay: true }, over)
+      state.calls = []
+      assert.deepEqual((await call(generate())).body, { status: 'ai_off', blocked_by: by })
+      assert.equal(modelCalls().length + dataCalls().length, 0)
+    }
+    assert.equal(state.drafts.length, 0)
+  })
+
+  test('chatul oprit nu oprește generarea, iar fără cheie rămâne neconfigurat', async () => {
+    state.settings.policyChat = false
+    assert.equal((await call(generate())).body.status, 'ok')
+    assert.deepEqual((await call(generate(), deps({ geminiApiKey: undefined }))).body, { status: 'not_configured' })
+  })
+
+  test('fără niciun indicator cu valoare: dovezi insuficiente, fără apel către model și fără tokeni', async () => {
+    state.metricValue = null
+    state.model = () => modelDraft()
+    const fetchNoValues = deps()
+    const original = fetchNoValues.fetch
+    fetchNoValues.fetch = async (url, init) => (url.includes('rpc/brand_metrics') ? new Response(JSON.stringify({ data: [{ metric_key: 'ga4_sessions', value: null, unit: 'count', comparison_value: null, absolute_change: null, relative_change: null, status: 'not_connected', data_as_of: null }] })) : original(url, init))
+    assert.deepEqual((await call(generate(), fetchNoValues)).body, { status: 'insufficient_evidence' })
+    assert.equal(modelCalls().length + state.requests.length + state.drafts.length, 0)
+  })
+
+  test('o cifră care nu e în indicatorii citați: ciorna nu se salvează și textul nu ajunge la utilizator', async () => {
+    const cases: Array<Record<string, unknown>> = [
+      { summary: 'Sesiunile au crescut cu 40 %.' },
+      { interpretation: 'Campania a adus 5.000 de vizite.' },
+      { recommendations: [{ problem: 'CTR mic.', action: 'Crește bugetul cu 300 de lei.', expected_benefit: 'Mai mult trafic.', priority: 2 }] },
+      { evidence_ids: ['metric:gsc_clicks'] },
+      { evidence_ids: [] },
+    ]
+    for (const over of cases) {
+      state.requests = []
+      state.model = () => modelDraft(over)
+      const r = await call(generate())
+      assert.deepEqual([r.body.status, 'insight_id' in r.body], ['insufficient_evidence', false], JSON.stringify(over))
+      assert.ok(!JSON.stringify(r.body).includes('5.000') && !JSON.stringify(r.body).includes('40 %'))
+      assert.equal(state.requests[0]!.status, 'insufficient_evidence', 'cererea rămâne în jurnal, cu motivul')
+    }
+    assert.equal(state.drafts.length + state.links.length + state.recs.length, 0)
+  })
+
+  test('în afara contractului: respinsă (text lipsă, prioritate invalidă, prea multe recomandări, JSON stricat)', async () => {
+    const rec = { problem: 'p', action: 'a', expected_benefit: 'b', priority: 1 }
+    for (const over of [{ limits: '  ' }, { title: 7 }, { recommendations: [{ ...rec, priority: 5 }] }, { recommendations: [rec, rec, rec, rec] }, { finding_type: 'answer' }]) {
+      state.requests = []
+      state.model = () => modelDraft(over)
+      assert.equal((await call(generate())).body.status, 'rejected', JSON.stringify(over))
+    }
+    state.requests = []
+    state.model = () => ({ status: 200, body: { candidates: [{ content: { parts: [{ text: 'nu e json' }] }, finishReason: 'STOP' }] } })
+    assert.equal((await call(generate())).body.status, 'rejected')
+    assert.equal(state.drafts.length, 0)
+  })
+
+  test('modelul spune că datele nu ajung: dovezi insuficiente, fără ciornă', async () => {
+    state.model = () => modelDraft({ finding_type: 'insufficient_evidence', title: '', summary: '', interpretation: '', limits: 'Lipsesc datele.', evidence_ids: [], recommendations: [] })
+    assert.equal((await call(generate())).body.status, 'insufficient_evidence')
+    assert.equal(state.drafts.length, 0)
+  })
+
+  test('aceleași date a doua oară: întoarce ciorna existentă, fără apel, fără tokeni și fără dublură', async () => {
+    const first = await call(generate())
+    const again = await call(generate())
+    assert.deepEqual([again.body.status, again.body.insight_id, again.body.existing, again.body.cached], ['ok', first.body.insight_id, true, true])
+    assert.equal(modelCalls().length, 1)
+    assert.equal(state.drafts.length, 1)
+    assert.equal(state.requests.length, 1, 'ciorna existentă nu mai scrie nimic în jurnal')
+  })
+
+  test('ciorna ștearsă se reface din răspunsul salvat: cerere nouă în jurnal, fără tokeni, legată de utilizatorul curent', async () => {
+    await call(generate())
+    state.drafts = []
+    state.links = []
+    state.recs = []
+    const again = await call(generate())
+    assert.deepEqual([again.body.status, again.body.existing, again.body.cached], ['ok', false, true])
+    assert.equal(modelCalls().length, 1)
+    assert.deepEqual([state.requests[1]!.cached_from, state.requests[1]!.total_tokens, state.requests[1]!.status, state.requests[1]!.user_id], [state.requests[0]!.id, 0, 'ok', USER])
+    assert.equal(state.drafts[0]!.ai_request_id, state.requests[1]!.id)
+    assert.equal(state.links.length, 1)
+  })
+
+  test('ciorna altui brand sau a altui client nu se refolosește', async () => {
+    await call(generate())
+    state.requests = [{ ...state.requests[0], tenant_id: T2, brand_id: B2 }]
+    state.drafts = []
+    const r = await call(generate())
+    assert.deepEqual([r.body.cached, modelCalls().length], [false, 2])
+  })
+
+  test('baza refuză ciorna (RLS): 403, fără dovezi sau recomandări scrise', async () => {
+    state.failWrite = 'insights'
+    const r = await call(generate())
+    assert.equal(r.status, 403)
+    assert.equal(state.drafts.length + state.links.length + state.recs.length, 0)
+  })
+
+  test('dovezile sau recomandările nu se pot scrie: ciorna se șterge, nu rămâne pe jumătate', async () => {
+    for (const table of ['evidence_links', 'recommendations'] as const) {
+      state.requests = []
+      state.failWrite = table
+      const r = await call(generate())
+      assert.equal(r.status, 500)
+      assert.equal(state.drafts.length, 0, table)
+      assert.ok(!JSON.stringify(r.body).includes('constrângere'), 'mesajul bazei nu ajunge la utilizator')
+    }
+  })
+
+  test('plafonul lunar și limita zilnică opresc și generarea', async () => {
+    state.settings.cap = 1000
+    state.requests = [{ id: 'old', tenant_id: T1, brand_id: B1, user_id: USER, cache_key: 'x', task: 'chat', status: 'ok', total_tokens: 1000, cached_from: null }]
+    assert.deepEqual((await call(generate())).body, { status: 'budget_exhausted' })
+    assert.equal(modelCalls().length, 0)
+  })
+
+  test('metricile SEOmonitor primesc dispozitivul pe dovadă, ca în editor', async () => {
+    const d = deps()
+    const original = d.fetch
+    d.fetch = async (url, init) => {
+      if (url.includes('rpc/brand_metrics')) return new Response(JSON.stringify({ data: [{ metric_key: 'seomonitor_visibility_latest', value: 48.3, unit: 'index', comparison_value: 47.7, absolute_change: 0.6, relative_change: 1.3, status: 'ok', data_as_of: '2026-11-10' }] }))
+      if (url.includes('metric_definitions_current')) return new Response(JSON.stringify([{ metric_key: 'seomonitor_visibility_latest', name_ro: 'Visibility SEOmonitor' }]))
+      return original(url, init)
+    }
+    state.model = () => modelDraft({ title: 'Vizibilitate stabilă', summary: 'Vizibilitatea a fost 48,3.', evidence_ids: ['metric:seomonitor_visibility_latest'], recommendations: [] })
+    assert.equal((await call(generate(), d)).body.status, 'ok')
+    assert.deepEqual(state.links[0]!.options, { device: 'desktop' })
+    assert.equal(state.recs.length, 0)
+  })
+
+  test('cereri invalide și brand nepermis', async () => {
+    assert.equal((await call(generate({ period: { start: '2026-11-10', end: '2026-10-14' } }))).status, 400)
+    assert.equal((await call(generate({ brand_id: B2 }))).status, 403)
+    state.access = false
+    assert.equal((await call(generate())).status, 403)
+    assert.equal(modelCalls().length + state.drafts.length, 0)
+  })
+})
+
+describe('adsy-ai: reîncercarea apelului către model', () => {
+  test('o eroare temporară (503) se reîncearcă o singură dată; a doua reușită dă răspunsul', async () => {
+    let n = 0
+    state.model = () => (++n === 1 ? { status: 503, body: {} } : modelAnswer())
+    assert.equal((await call(chat())).body.status, 'ok')
+    assert.equal(modelCalls().length, 2)
+  })
+  test('două erori temporare la rând: model_error, fără a treia încercare', async () => {
+    state.model = () => ({ status: 503, body: {} })
+    assert.deepEqual([(await call(chat())).body.code, modelCalls().length], ['unavailable', 2])
+  })
+  test('limita furnizorului (429) și cheia refuzată nu se reîncearcă', async () => {
+    for (const status of [429, 403, 404]) {
+      state.calls = []
+      state.model = () => ({ status, body: {} })
+      await call(chat({ question: `Întrebare ${status}?` }))
+      assert.equal(modelCalls().length, 1, String(status))
+    }
   })
 })
 

@@ -2,7 +2,7 @@
 
 Etapa 4, prima felie (deciziile M din `docs/decisions.md`). Migrația `20261112090000_stage4_adsy_ai_controls_chat.sql`, funcția server `supabase/functions/adsy-ai`. Specificația: `docs/product/spec.md`, cap. 23.
 
-**Forma apelului către model e luată din SDK-ul oficial `@google/genai` (v3.1.0) și nu a fost confirmată pe un cont real.** Până când serverul nu are cheia și modelul, AdSy AI răspunde „neconfigurat” și nu pleacă nicio cerere.
+Forma apelului către model e cea din SDK-ul oficial `@google/genai` (v3.1.0), confirmată pe un cont real la 11 nov. 2026. Până când serverul nu are cheia, AdSy AI răspunde „neconfigurat” și nu pleacă nicio cerere.
 
 ## Controale
 
@@ -52,7 +52,7 @@ Regimul E8 (`SECURITY INVOKER`, `has_brand_access` în corp).
 
 1. Sesiunea, la GoTrue.
 2. Accesul la brand și controalele, prin `brand_ai_settings` chemat **cu sesiunea utilizatorului**. Cu chatul oprit, funcția răspunde `ai_off` și se oprește: nu citește date și nu cheamă modelul.
-3. Configurarea: `GEMINI_API_KEY` și `ADSY_AI_MODEL` în mediul funcției. Lipsă: `not_configured`.
+3. Configurarea: `GEMINI_API_KEY` în mediul funcției; modelul are o valoare implicită, pe care `ADSY_AI_MODEL` o înlocuiește. Fără cheie: `not_configured`.
 4. Contextul, citit tot cu sesiunea utilizatorului (RLS): `brand_metrics` pentru 18 metrici din registru, numele lor din `metric_definitions_current` și cel mult cinci analize **publicate** din `brand_insights`. Modelul vede doar ce vede utilizatorul. Nu primește mențiuni brute, răspunsuri AI brute, nume de autori, e-mailuri sau chei.
 5. Cache: aceeași întrebare, pe aceleași date, cu același model și aceeași versiune de prompt întoarce răspunsul salvat, fără apel și fără tokeni.
 6. Plafoane: tokenii lunii pe brand (`monthly_token_cap`) și 60 de cereri pe utilizator în 24 de ore. Depășire: `budget_exhausted`, respectiv `rate_limited`.
@@ -87,12 +87,51 @@ Motivul intern al respingerii (`rejection_reason`) rămâne în `ai_requests`.
 
 `data_snapshot_id` = SHA-256 al contextului trimis modelului. `cache_key` = SHA-256 din tenant, brand, sarcină, `data_snapshot_id`, `model_id`, `prompt_version` și întrebarea normalizată. Căutarea în cache e mereu pe `tenant_id` și `brand_id`. Fiecare cerere are `prompt_tokens`, `output_tokens` (inclusiv tokenii de „gândire”) și `total_tokens`; cele din cache au zero.
 
-`model_id` și `prompt_version` nu sunt fixate în cod pentru totdeauna: modelul vine din `ADSY_AI_MODEL`, iar versiunea promptului (`chat-v1`) se schimbă odată cu promptul și intră în cheia de cache.
+`model_id` și `prompt_version` nu sunt fixate în cod pentru totdeauna: modelul vine din `ADSY_AI_MODEL` sau din valoarea implicită, iar versiunea promptului (`chat-v2` la chat, `insight-v1` la ciorne) se schimbă odată cu promptul și intră în cheia de cache.
 
 ## Ce pleacă spre furnizorul modelului
 
 Numele brandului, perioada, valorile agregate ale celor 18 indicatori, textele analizelor publicate de echipă și întrebarea utilizatorului. Nu pleacă: date personale, mențiuni sau răspunsuri AI brute, chei, identificatori de utilizator. Termenii de procesare ai furnizorului trebuie validați înainte de pornirea politicii pe un brand.
 
-## Neconstruit în această felie
+## Ciorne generate (a doua felie, deciziile O)
 
-Analizele generate (controlul „generare”), ascunderea conținutului generat (controlul „afișare” e salvat, dar încă nu are conținut de ascuns în afara răspunsurilor din chat), baza de documente aprobate, setul de evaluare pe 100 de exemple.
+Migrația `20261112120000_stage4_generated_insights.sql`. Acțiunea `generate_insight`:
+
+| Corp | Răspuns |
+|---|---|
+| `{ action, brand_id, period: { start, end }, comparison? }` | `{ status, insight_id?, existing?, cached?, model_id?, prompt_version?, request_id? }` |
+
+`status`: `ok`, `insufficient_evidence`, `rejected`, `ai_off`, `not_configured`, `budget_exhausted`, `rate_limited`, `model_error`. La orice alt status decât `ok` nu se salvează nimic. Textul ciornei nu vine în răspuns: interfața îl citește din lista de analize.
+
+Ordinea verificărilor:
+
+1. Sesiunea, apoi `brand_ai_settings` cu sesiunea utilizatorului. `can_generate` fals (client): `403`. Politica fără generare sau fără afișare, ori preferința fără afișare: `ai_off`, fără nicio altă citire.
+2. Configurarea, apoi contextul: aceiași 18 indicatori ca la chat, **fără** analizele anterioare. Fără niciun indicator cu valoare: `insufficient_evidence`, fără apel.
+3. Cache pe `tenant_id`, `brand_id`, date, model și `insight-v1`: ciorna existentă se întoarce (`existing: true`); una ștearsă se reface din răspunsul salvat, cu o cerere nouă în jurnal, fără tokeni.
+4. Plafoanele, apelul către model, verificarea (`verifyDraft`): contractul JSON, cele patru texte completate, dovezi care sunt indicatori din context, cel mult trei recomandări cu prioritate 1–3 și **fiecare cifră din orice text** regăsită în indicatorii citați.
+5. Jurnalul (`ai_requests`, `task = generate_insight`), apoi scrierea, **cu sesiunea utilizatorului**: `insights` (ciornă, `origin = adsy_ai`, `ai_request_id`), `evidence_links` (SEOmonitor cu `device = desktop`), `recommendations`. Dacă dovezile sau recomandările nu se pot scrie, ciorna se șterge.
+
+Funcția nu trimite nimic la review și nu publică nimic. Fluxul de după e cel din `docs/contracts/insights.md`.
+
+### Proveniența
+
+| Câmp pe `insights` | Reguli |
+|---|---|
+| `origin` | `human` (implicit) sau `adsy_ai`. Nu se modifică după inserare, nici cu cheia de service |
+| `ai_request_id` | Obligatoriu la `adsy_ai`, interzis altfel. La inserare, baza cere ca cererea să existe, să fie `generate_insight` cu `status = ok`, a aceluiași utilizator, brand și perioadă (`42501` altfel). O cerere produce o singură ciornă |
+
+Versiunea nouă a unei analize generate (`supersedes_id`) moștenește ambele câmpuri, orice ar trimite clientul.
+
+### Controlul „afișare”
+
+`brand_insights` întoarce `origin` pe fiecare analiză și **omite analizele cu `origin = adsy_ai`** când afișarea efectivă e oprită: politica brandului (`display_enabled`, fals fără politică) ȘI preferința utilizatorului (`display_enabled`, adevărat fără preferință). Se aplică tuturor rolurilor și oricărui status. Analizele scrise de echipă nu sunt afectate. E un control de prezentare: RLS pe `insights` rămâne cel vechi.
+
+`brand_ai_settings` întoarce în plus `can_generate` (rolurile care scriu analize pe brand).
+
+## Modelul și erorile temporare
+
+Modelul implicit e `gemini-3.5-flash-lite` (`DEFAULT_MODEL_ID` în `gemini.ts`, decizia O-9); `ADSY_AI_MODEL` îl înlocuiește. Fără `GEMINI_API_KEY`, funcția rămâne „neconfigurat”. O eroare temporară a furnizorului (500, 503, rețea, timeout de 25 s) se reîncearcă o singură dată; 429 și erorile de cheie nu.
+
+## Neconstruit încă
+
+Baza de documente aprobate și setul de evaluare pe 100 de exemple etichetate.

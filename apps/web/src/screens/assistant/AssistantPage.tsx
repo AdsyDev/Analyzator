@@ -242,7 +242,7 @@ function Controls({ brand, settings: s, onChanged }: { brand: Brand; settings: A
           <fieldset disabled={busy} className="flex flex-col gap-3 rounded-xl border border-border px-4 py-3">
             <legend className="px-1 text-[12.5px] font-semibold">Politica brandului</legend>
             <Toggle label="Chat" hint="Utilizatorii brandului pot pune întrebări lui AdSy AI." checked={s.policy.chat} onChange={(v) => void policy({ chat: v })} />
-            <Toggle label="Generare" hint="Echipa poate cere lui AdSy AI ciorne de analize; se publică doar după revizuire." checked={s.policy.generation} onChange={(v) => void policy({ generation: v })} />
+            <Toggle label="Generare" hint="Echipa poate cere, din Analize, ciorne scrise de AdSy AI. Se publică doar după revizuire și au nevoie și de afișare." checked={s.policy.generation} onChange={(v) => void policy({ generation: v })} />
             <Toggle label="Afișare" hint="Conținutul generat de AdSy AI e vizibil utilizatorilor brandului." checked={s.policy.display} onChange={(v) => void policy({ display: v })} />
             <div className="flex flex-wrap items-end gap-2">
               <div className="flex flex-col gap-1.5">

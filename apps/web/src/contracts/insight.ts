@@ -62,6 +62,11 @@ export interface Insight {
   period: DateRange
   /** Clientul primește doar `published`; filtrarea se face în server (RLS), nu în UI. */
   status: InsightStatus
+  /**
+   * Proveniența textului: scris de echipă sau ciornă generată de AdSy AI, apoi revizuită de echipă. Marcajul îl pune
+   * serverul și nu se poate șterge; lipsa lui înseamnă `human`.
+   */
+  origin?: 'human' | 'adsy_ai'
   evidence: EvidenceLink[]
   /** Interpretarea echipei (separată de constatare); obligatorie la trimiterea în review. */
   interpretation?: string

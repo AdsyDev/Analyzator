@@ -209,6 +209,7 @@ const assistant: AssistantProvider = {
   savePolicy: async () => notConnected(AI_OFF),
   savePreference: async () => notConnected(AI_OFF),
   ask: async () => notConnected(AI_OFF),
+  generateInsight: async () => notConnected(AI_OFF),
 }
 
 export interface SupabaseProvidersDeps {

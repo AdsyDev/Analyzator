@@ -1,4 +1,5 @@
 // Intrarea Deno pentru Edge Function. Logica e în handler.ts.
+import { DEFAULT_MODEL_ID } from './gemini.ts'
 import { handle } from './handler.ts'
 
 declare const Deno: {
@@ -17,9 +18,10 @@ const env = {
   serviceRoleKey: required('SUPABASE_SERVICE_ROLE_KEY'),
   anonKey: required('SUPABASE_ANON_KEY'),
   allowedOrigin: Deno.env.get('ANALYZATOR_APP_ORIGIN'),
-  // Opționale: fără ele funcția răspunde „neconfigurat” și nu cheamă niciun model.
+  // Fără cheie, funcția răspunde „neconfigurat” și nu cheamă niciun model. Modelul are o valoare implicită, pe care mediul
+  // o poate înlocui fără o nouă publicare a codului.
   geminiApiKey: Deno.env.get('GEMINI_API_KEY'),
-  modelId: Deno.env.get('ADSY_AI_MODEL'),
+  modelId: Deno.env.get('ADSY_AI_MODEL')?.trim() || DEFAULT_MODEL_ID,
 }
 
 Deno.serve((req) => handle(req, { env, fetch }))
