@@ -73,5 +73,6 @@ API-ul Planable e nou și câteva lucruri nu sunt clare din documentație: dacă
 | Listening `not_connected`: „niciun cuvânt de tip brand” | Workspace-ul nu urmărește cuvinte de tip „brand” | Adaugă cuvintele în Planable Listening. Cele de tip „topic” și „competitor” nu se colectează. |
 | 403 pe metricile unei pagini | Add-on-ul Analytics e inactiv sau tokenul nu vede pagina | Verifică abonamentul Planable și accesul tokenului. |
 | Pagină sărită („nu e conectată în Planable”) | Canalul social e deconectat în Planable | Reconectează canalul în Planable. |
+| Listening: puține mențiuni față de Planable | Planable trimite mențiuni fără URL sau fără dată; acestea nu pot fi scrise | Jurnalul rulării arată „N mențiuni sărite din <rețea>: <motiv>”. Rândurile se numără acolo, nu se pierd în tăcere; dacă o rețea întreagă e sărită, anunță echipa tehnică. |
 
 Importul CSV (`docs/connectors/csv.md`) rămâne o variantă de rezervă și scrie în aceleași tabele. O mențiune venită din ambele surse nu se dublează. Sentimentul corectat de echipă nu e suprascris nici de API, nici de CSV.

@@ -187,3 +187,13 @@ Cererea proprietarului produsului, 10 nov. 2026, după publicarea secțiunii G: 
 | H-4 | Formularele lipsă din editor | — | Recomandări (doar pe ciornă), „Versiune nouă” pentru o analiză publicată și alegerea responsabilului de către `agency_admin`. Toate folosesc tabelele și triggerele existente; nicio schimbare de schemă. Recomandările apar acum în analiza publicată, deci le vede și clientul. |
 | H-5 | Ce nu s-a construit | — | **Ieșirea metricilor AI și Clarity din `draft`:** cere o săptămână de date reale reconciliate; nu se poate face fără acces la bază. **Filtre AI pe intenție și brand/non-brand:** cer șase RPC-uri rescrise și un semnal de intenție pe care sursa nu îl dă. **Definițiile pentru engagement rate, rata sesiunilor cu key event și mențiuni eligibile** (G-1): așteaptă strategia. **„Sincronizat la” pentru client** (G-7): decizie de securitate. |
 | H-6 | Gate-ul rulării | — | `typecheck` și `test` complet au rulat; toate cele 26 de fișiere pgTAP (920 de verificări) au trecut pe imaginea Postgres a Supabase. Nivelul API din `test:security` nu a rulat aici (aceeași limită ca la G-11); la merge-ul anterior, `supabase-deploy` l-a rulat și a trecut înainte de `db push`. |
+
+## I — Listening: mențiunile sărite, pe rețea și motiv (2026-11-11)
+
+La prima colectare Planable pentru al doilea site (10 nov. 2026), Listening a scris 16 mențiuni și a sărit 1.062, cu o singură notă generică („fără URL sau dată validă”) repetată pe fiecare mențiune. Cererea proprietarului produsului: „fă schimbarea la Listening și urcă”.
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| I-1 | Ce se notează despre o mențiune sărită | (a) nota generică, una pe mențiune; (b) o notă pe rețea și motiv, cu numărul lor | **(b).** Trei motive distincte (fără URL, URL care nu începe cu http(s), fără dată de publicare validă), grupate pe `platform`. Notele rămân `parser_note` (nu schimbă statusul), au `dimension = mentions_skipped` și apar în jurnalul rulării. Nu conțin URL-ul sau textul mențiunii. |
+| I-2 | Ce nu se schimbă | — | Regula de scriere rămâne aceeași: fără URL http(s) nu există cheie naturală (`native_id` = hash-ul URL-ului), iar fără dată rândul nu intră în `mentions`. **Nu se deduce o cheie sau o dată** (regula 8). Dacă jurnalul arată că o rețea întreagă vine fără URL, cheia pentru acele mențiuni e o decizie separată, cu impact pe deduplicarea CSV ↔ API. |
+| I-3 | Impact | — | Doar conectorul (`connectors/planable`) și documentația; fără migrație, fără schimbări în `apps/web`. Timp: sub o jumătate de zi. Cost de rulare: neschimbat (aceleași cereri). `sync_runs.errors` scade de la o intrare pe mențiune sărită la una pe grup. |

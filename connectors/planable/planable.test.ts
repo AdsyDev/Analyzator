@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { collectPlanable } from './collect-core.ts'
-import { mentionNativeId, pageMetrics, platformOf } from './normalize.ts'
+import { collectPlanable, MENTIONS_SKIPPED } from './collect-core.ts'
+import { MentionsSchema, mentionNativeId, mentionSkipReasons, pageMetrics, platformOf } from './normalize.ts'
 import { FakeDb, fakeFetch, noSleep, type FakeResponse } from '../shared/test-helpers.ts'
 
 // Răspunsurile sunt construite după schema OpenAPI publică (api.planable.io/api/v1/openapi.json, 2026-10-12):
@@ -99,6 +99,16 @@ describe('normalizare Planable', () => {
   test('native_id identic cu importul CSV fără ID (hash-ul URL-ului)', () => {
     assert.match(mentionNativeId('https://x.com/a/1'), /^h:[0-9a-f]{32}$/)
   })
+
+  test('motivele pentru care o mențiune e sărită: fără URL, URL fără http(s), dată invalidă; validă = niciun motiv', () => {
+    const m = (o: Record<string, unknown>) => MentionsSchema.parse({ data: [{ ...mention('https://x.com/a/1'), ...o }], pagination: { nextCursor: null } }).data[0]!
+    assert.deepEqual(mentionSkipReasons(m({})), [])
+    assert.deepEqual(mentionSkipReasons(m({ url: '' })), ['url_missing'])
+    assert.deepEqual(mentionSkipReasons(m({ url: '   ' })), ['url_missing'])
+    assert.deepEqual(mentionSkipReasons(m({ url: 'www.exemplu.ro/articol' })), ['url_not_http'])
+    assert.deepEqual(mentionSkipReasons(m({ publishedAt: 'ieri' })), ['date_invalid'])
+    assert.deepEqual(mentionSkipReasons(m({ url: '', publishedAt: '' })), ['url_missing', 'date_invalid'])
+  })
 })
 
 describe('collectPlanable', () => {
@@ -175,6 +185,41 @@ describe('collectPlanable', () => {
     assert.equal(by('https://tt.test/x'), false, 'același nume pe altă platformă nu e contul propriu')
     assert.equal(by('https://ig.test/none'), null)
     assert.ok(db.tables.mentions!.every((m) => !('author' in m) && !JSON.stringify(m).includes('Ana Popescu')), 'numele autorilor nu se salvează')
+  })
+
+  test('mențiunile sărite: o notă pe rețea și motiv, cu numărul lor; cele valide se scriu, statusul rămâne succeeded', async () => {
+    const { db } = setup()
+    const bad = (o: Record<string, unknown>) => ({ ...mention('https://x.com/ok'), ...o })
+    const data = [
+      mention('https://x.com/ok'),
+      bad({ platform: 'Facebook', url: '' }), bad({ platform: 'facebook', url: '' }), bad({ platform: ' facebook ', url: '' }),
+      bad({ platform: 'news', url: 'exemplu.ro/stire' }),
+      bad({ platform: 'tiktok', url: '', publishedAt: 'necunoscut' }),
+      bad({ platform: 'tiktok', publishedAt: '' }),
+    ]
+    const f = routes({ '/api/v1/keywords/k1/mentions': json({ data, pagination: { nextCursor: null, total: data.length } }) })
+    const out = await collectPlanable({ db, fetch: f.fetch, sleep: noSleep().sleep, now: () => NOW })
+    const l = out.find((o) => o.source === 'planable_listening')!
+    assert.equal(l.status, 'succeeded', 'notele nu schimbă statusul')
+    assert.equal(l.rows_written, 1)
+    assert.deepEqual(db.tables.mentions!.map((m) => m.url), ['https://x.com/ok'])
+    const notes = l.errors.filter((e) => e.dimension === MENTIONS_SKIPPED)
+    assert.deepEqual(notes.map((e) => [e.code, e.message]), [
+      ['parser_note', '3 mențiuni sărite din facebook: fără URL'],
+      ['parser_note', '1 mențiune sărită din news: URL care nu începe cu http(s)'],
+      ['parser_note', '1 mențiune sărită din tiktok: fără dată de publicare validă'],
+      ['parser_note', '1 mențiune sărită din tiktok: fără URL și fără dată de publicare validă'],
+    ])
+    assert.equal(l.errors.length, 4, 'o notă pe grup, nu una pe mențiune')
+    const run = db.tables.sync_runs!.find((r) => r.source === 'planable_listening')!
+    assert.deepEqual((run.errors as Array<{ dimension?: string }>).filter((e) => e.dimension === MENTIONS_SKIPPED).length, 4, 'notele ajung în sync_runs.errors')
+    assert.ok(!JSON.stringify(run.errors).includes('exemplu.ro'), 'URL-ul mențiunii sărite nu se scrie în note')
+  })
+
+  test('fără mențiuni sărite nu apare nicio notă despre ele', async () => {
+    const { db } = setup()
+    const out = await collectPlanable({ db, fetch: routes().fetch, sleep: noSleep().sleep, now: () => NOW })
+    assert.equal(out.find((o) => o.source === 'planable_listening')!.errors.filter((e) => e.dimension === MENTIONS_SKIPPED).length, 0)
   })
 
   test('sentimentul revizuit de om nu se suprascrie; un rând CSV cu aceeași cheie devine rând API', async () => {

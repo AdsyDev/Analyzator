@@ -64,6 +64,8 @@ Aceleași tabele și chei ca importul CSV (`docs/contracts/csv-planable-analytic
 
 **Cont propriu (D-22):** `author.name` / `author.username` ale mențiunii se compară cu numele paginilor workspace-ului (`GET /pages`, aceeași platformă); se salvează doar `author_is_owned`, nu și numele autorului.
 
+**Mențiuni sărite:** o mențiune se scrie doar cu URL `http(s)` (din el se calculează `native_id`) și cu `publishedAt` valid; nu se deduce nimic în locul lor. Cele sărite se numără pe rețea (`platform`) și motiv (fără URL, URL care nu începe cu http(s), fără dată de publicare validă) și devin câte o notă `parser_note` cu `dimension = mentions_skipped` în `sync_runs.errors`, de forma „1040 mențiuni sărite din facebook: fără URL”. Notele nu schimbă statusul rulării și nu conțin URL-ul sau textul mențiunii. O mențiune găsită de două cuvinte urmărite se numără de două ori. `collect.ts` le scrie și în jurnalul rulării.
+
 **Sentiment:** `positive` / `negative` / `neutral` din API; lipsă → `unknown`. **Corecțiile umane (`sentiment_reviewed_by`) au prioritate** și nu se suprascriu (ca la CSV).
 
 ## Rulare
