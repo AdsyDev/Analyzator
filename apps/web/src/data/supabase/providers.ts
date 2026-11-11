@@ -91,6 +91,8 @@ const insights: InsightsProvider = {
   deleteRecommendation: async () => notConnected(INSIGHTS_OFF),
   addAction: async () => notConnected(INSIGHTS_OFF),
   transitionAction: async () => notConnected(INSIGHTS_OFF),
+  respondToRecommendation: async () => notConnected(INSIGHTS_OFF),
+  addComment: async () => notConnected(INSIGHTS_OFF),
 }
 
 const mentions: MentionsProvider = {

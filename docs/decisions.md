@@ -327,3 +327,20 @@ Rularea din 11 nov. 2026 a arătat că Planable trimite mențiunile de pe web f�
 | R-8 | Dacă Planable începe să trimită linkul | — | Aceeași mențiune ar primi o cheie nouă (`h:`), iar rândul `s:` ar rămâne ca dublură. Nu se rezolvă automat: fără link nu se poate ști care rând `s:` e aceeași mențiune. La acel moment, rândurile `s:` ale rețelei din fereastra colectată se șterg printr-o migrație. Mesajul către suportul Planable (11 nov.) întreabă exact asta. |
 | R-9 | Impact | — | Conectorul Planable, o migrație aditivă, două funcții SQL și ecranul Listening. Timp: o jumătate de zi. Cost de rulare: neschimbat (aceleași cereri). |
 
+## S — Răspunsul clientului la recomandări și comentariile pe analize (2026-11-11)
+
+Lucrarea din Etapa 3 „client manager, comentarii, acceptarea recomandării” (evaluare, secțiunea 3). Decizia de roluri a proprietarului produsului, 11 nov. 2026: „avem deja rol de client”; apoi: „continuă cu comentariile și acceptarea recomandărilor de către client”. Migrația `20261113120000_client_feedback.sql`. Contract: `docs/contracts/insights.md`.
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| S-1 | Rolul | (a) rol nou „client manager”; (b) rolul de client existent | **(b)**, cum a decis proprietarul produsului. Orice utilizator `client_viewer` cu acces la brand poate răspunde și comenta. Niciun rol nou, nicio politică de acces existentă schimbată. Consecință: nu se poate deosebi, între utilizatorii clientului, cine are voie să accepte; dacă va fi nevoie, e o schimbare de roluri separată. |
+| S-2 | Ce poate face clientul | — | Pe o recomandare dintr-o analiză **publicată**: „Acceptă” sau „Solicită ajustare”, cu motiv obligatoriu. Pe analiza publicată: comentarii. Pe ciorne, analize în review sau înlocuite: nimic, cu același mesaj ca pentru o analiză inexistentă. |
+| S-3 | Ce poate face echipa | — | Vede răspunsul și comentariile și răspunde prin comentariu. **Nu poate accepta în numele clientului**: baza refuză, nu doar interfața. |
+| S-4 | Istoricul | (a) un răspuns care se suprascrie; (b) jurnal | **(b).** Fiecare răspuns e un rând nou; ultimul e cel în vigoare. Răspunsurile și comentariile nu se editează și nu se șterg, nici cu cheia de service. Clientul se poate răzgândi: se vede și că s-a răzgândit. |
+| S-5 | Acceptarea și acțiunile | (a) acceptarea mută acțiunea în „agreată”; (b) nu mută nimic | **(b).** Acceptarea e o informație pentru echipă, care decide acțiunea și statusul ei. O legătură automată ar schimba ce vede clientul în registrul de acțiuni fără ca echipa să fi confirmat. |
+| S-6 | Numele | — | Nu se arată (excepția E10 rămâne): „Tu”, „Client” sau „Echipa AdSymphony” în discuție; pe răspuns, „de tine” sau „Utilizator” plus opt caractere din ID. Rolul autorului unui comentariu se fixează la scriere. |
+| S-7 | Comentariile și AdSy AI | — | Comentariile nu intră în contextul trimis modelului: sunt text liber scris de oricine are acces la brand. |
+| S-8 | După înlocuirea analizei | — | Versiunea nouă pornește fără răspunsuri și fără comentarii. Cele vechi rămân la analiza înlocuită, vizibile doar echipei. |
+| S-9 | Ce nu s-a construit | — | Notificarea echipei la un răspuns sau comentariu nou (se văd doar în pagina Analize); butonul general „Solicită ajustare” pentru configurarea dashboardului (specificație, cap. 1): aici „Solicită ajustare” e răspunsul la o recomandare. |
+| S-10 | Impact | — | O migrație aditivă (două tabele, `brand_insights` cu două câmpuri în plus), ecranul Analize. Timp: o zi. Cost de rulare: zero. |
+

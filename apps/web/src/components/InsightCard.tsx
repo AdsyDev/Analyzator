@@ -1,4 +1,5 @@
-import type { EvidenceQuery, Insight, InsightStatus } from '../contracts'
+import type { ReactNode } from 'react'
+import type { ClientResponse, EvidenceQuery, Insight, InsightRecommendation, InsightStatus } from '../contracts'
 import { formatDate, formatRange } from '../lib/format'
 import { Avatar } from './ui/Avatar'
 import { StatusChip, type ChipTone } from './ui/Chip'
@@ -15,13 +16,34 @@ interface InsightCardProps {
   /** Vederea agenției: arată badge-ul de status. Clientul nu-l vede. */
   agencyView?: boolean
   onOpenEvidence?: (evidenceQuery: EvidenceQuery) => void
+  /** Butoanele clientului pe o recomandare („Acceptă”, „Solicită ajustare”); lipsesc acolo unde cardul e doar de citit. */
+  recommendationActions?: (recommendation: InsightRecommendation) => ReactNode
+}
+
+export const CLIENT_RESPONSE_LABELS: Record<ClientResponse['response'], { label: string; tone: ChipTone }> = {
+  accepted: { label: 'Acceptată de client', tone: 'pos' },
+  adjustment_requested: { label: 'Ajustare cerută de client', tone: 'warn' },
+}
+
+/** Răspunsul în vigoare al clientului la o recomandare. Fără răspuns nu se afișează nimic: lipsa nu e acceptare. */
+function ClientResponseNote({ response }: { response: ClientResponse }) {
+  const s = CLIENT_RESPONSE_LABELS[response.response]
+  return (
+    <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-text-2">
+      <StatusChip tone={s.tone}>{s.label}</StatusChip>
+      <span>
+        {response.own ? 'de tine' : response.by}, <span className="font-mono text-[12px]">{formatDate(response.at.slice(0, 10))}</span>
+      </span>
+      {response.comment && <span className="basis-full text-text">„{response.comment}”</span>}
+    </span>
+  )
 }
 
 /**
  * Clientul vede doar analize publicate. Filtrarea reală e în server (RLS); aici componenta refuză
  * să randeze o analiză nepublicată în vederea clientului, ca a doua barieră.
  */
-export function InsightCard({ insight, agencyView = false, onOpenEvidence }: InsightCardProps) {
+export function InsightCard({ insight, agencyView = false, onOpenEvidence, recommendationActions }: InsightCardProps) {
   if (!agencyView && insight.status !== 'published') return null
   const status = INSIGHT_STATUS_LABELS[insight.status]
 
@@ -80,6 +102,8 @@ export function InsightCard({ insight, agencyView = false, onOpenEvidence }: Ins
                 <span className="mt-0.5 block text-[12.5px] text-text-2">
                   <span className="text-text-3">Problema:</span> {r.problem} <span className="text-text-3">Beneficiu așteptat:</span> {r.expected_benefit}
                 </span>
+                {r.client_response && <ClientResponseNote response={r.client_response} />}
+                {recommendationActions && <span className="mt-2 flex flex-wrap items-center gap-2">{recommendationActions(r)}</span>}
               </li>
             ))}
           </ol>

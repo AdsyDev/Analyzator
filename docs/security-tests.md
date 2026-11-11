@@ -125,6 +125,7 @@ Migrația `20261012180000_brand_metrics_rpc.sql`, decizia D-11.
 - **M (11 nov. 2026):** `brand_ai_settings` intră în același regim (lista A10). Tabele noi: `ai_brand_policies` (scrie doar `agency_admin`; fără `DELETE`), `ai_user_preferences` (fiecare doar rândul lui, pe un brand la care are acces) și `ai_requests` (scrie doar funcția server). pgTAP: `28_stage4_adsy_ai_controls.test.sql` (51 de verificări). Funcția `adsy-ai`: 23 de teste pentru poartă (chat oprit = nicio cerere spre date sau spre model), izolare (datele se citesc cu sesiunea utilizatorului, cache-ul e pe client și brand), verificarea dovezilor și secrete (cheia modelului pleacă doar spre Google; nu apare în jurnal, în răspuns sau în prompt). **Neacoperit:** testele HTTP reale din `tests/security` pentru această funcție și un test cu două conturi de client în aplicația live.
 - **O (11 nov. 2026):** ciorne generate de AdSy AI. `insights.origin` și `ai_request_id` nu se pot rescrie (nici cu cheia de service); marcajul `adsy_ai` cere o cerere de generare reușită a aceluiași utilizator, brand și perioadă; clientul nu poate scrie o ciornă nici cu o cerere a lui; o ciornă generată nu sare peste review. `brand_insights` și `brand_ai_settings` rămân `SECURITY INVOKER` cu `has_brand_access` (E8); controlul „afișare” e prezentare, nu acces. pgTAP: `29_stage4_generated_insights.test.sql` (50 de verificări). Funcția server scrie ciorna cu sesiunea utilizatorului; testele ei (`supabase/functions/adsy-ai/handler.test.ts`) verifică refuzul pentru client, oprirea înaintea oricărei citiri când generarea sau afișarea e oprită, respingerea cifrelor nesusținute și ștergerea ciornei când dovezile nu se pot scrie.
 - **P (11 nov. 2026):** documente aprobate. `brand_document_search` intră în regimul E8 (lista A10). Tabele noi: `brand_documents` și `brand_document_fragments`, cu SELECT pe `accessible_brand_ids()` (29 de politici în R1). Clientul nu introduce, nu aprobă, nu retrage și nu șterge; `account` nu aprobă; un document aprobat nu se rescrie nici cu cheia de service; căutarea nu întoarce ciorne, documente retrase, expirate sau ale altui brand, iar întrebarea e tratată ca text (nu ca SQL). pgTAP: `30_stage4_brand_documents.test.sql` (72 de verificări). În funcția server, căutarea se face cu sesiunea utilizatorului, iar un fragment pe care căutarea nu l-a întors nu poate fi citat.
+- **S (11 nov. 2026):** răspunsul clientului la recomandări și comentariile. Tabele noi: `recommendation_responses` și `insight_comments`, doar de adăugare, cu SELECT pe `accessible_brand_ids()` (31 de politici în R1). Echipa nu răspunde în numele clientului; nimeni nu semnează cu alt utilizator, brand sau rol; pe ciorne nu se scrie; istoricul nu se rescrie nici cu cheia de service. pgTAP: `32_client_feedback.test.sql` (60 de verificări). Prin HTTP: `tests/security/client-feedback.test.mjs` (secțiunea O).
 - **L (11 nov. 2026):** `brand_index_status` intră în același regim (lista A10). Tabele noi: `index_urls` (citire cu acces la brand; scriere doar pentru rolurile agenției cu acces la brand; fără `UPDATE`; `url_md5` calculat de bază) și `index_inspections` (citire cu acces la brand; scrie doar workerul). Conectorul verifică din nou clientul și brandul pe fiecare rând citit cu service role. pgTAP: `27_stage3_indexing.test.sql` (48 de verificări).
 - **J (11 nov. 2026):** `brand_ai_referrals`, `brand_tracking_quality` și `brand_paid_budget` intră în același regim (lista A10). Tabelul nou `paid_budgets` are RLS cu politici pe toate cele patru comenzi: citire cu acces la brand, scriere doar pentru rolurile agenției cu acces la brand, fără `UPDATE`. pgTAP: `26_stage3_ai_referrals_tracking_budget.test.sql` (83 de verificări: reguli, stări, roluri, izolare între clienți, audit).
 - **H-1, H-2 (10 nov. 2026):** `private.ai_assistant_scope` (INVOKER, `ai_scope` fără Google AI Overviews) intră în lista funcțiilor private executabile de `authenticated`, pentru matricea de Concurență. Tipul de perioadă `yoy` se adaugă în validarea din `brand_metrics`, `brand_paid` și `brand_competition`; refuzurile fără acces rămân identice. Teste: `25_stage2_yoy_ai_overviews.test.sql` (Y1–Y3, O1–O5).
@@ -312,6 +313,22 @@ Funcția `adsy-ai` servită local, fără cheie de model: după porți, răspuns
 | N5 | Document introdus de client sau de alt client; fragment agățat de documentul altui brand | Refuz |
 | N5 | Căutare în ciorne, în documente retrase, în alt brand, de către cineva fără acces, cu caractere speciale în întrebare | Nimic sau refuz; întrebarea e tratată ca text |
 | N5 | Aprobare sau retragere de către client; rescrierea unui document aprobat, inclusiv cu cheia de service | Fără efect sau refuz; textul aprobat rămâne neschimbat |
+
+## O. Răspunsul clientului și comentariile prin HTTP (`tests/security/client-feedback.test.mjs`)
+
+Nu a putut fi rulat pe mașina de dezvoltare (fără Supabase CLI); prima rulare e în gate-ul din `supabase-deploy`.
+
+| ID | Încercare | Rezultat așteptat |
+|---|---|---|
+| O1 | Răspuns la o recomandare de către echipă, un client fără acces, alt client sau anon | Refuz; nimic scris |
+| O1 | Răspuns pe o ciornă, pe o recomandare inexistentă, cu valoare necunoscută sau ajustare fără motiv | Refuz |
+| O1 | Răspuns semnat cu alt utilizator, alt brand, alt client, altă analiză sau altă dată | Refuz (fără drept pe coloană) |
+| O1 | Rescrierea sau ștergerea istoricului, de către autor, echipă sau cu cheia de service | Refuz ori zero rânduri atinse |
+| O1 | Acceptarea | Nu schimbă analiza și nu creează acțiuni |
+| O2 | Comentariu pe o ciornă, de către cineva fără acces, anon, semnat cu alt autor sau cu rolul „agency” | Refuz |
+| O2 | Editarea sau ștergerea unui comentariu | Refuz |
+| O3 | Citirea răspunsurilor și a comentariilor fără acces la brand | Listă goală |
+| O3 | `brand_insights` | Ultimul răspuns și discuția, fără nume sau e-mailuri; `own` doar pentru autor |
 
 ## M. Mutații (`scripts/test-guard-mutations.sh`, `npm run test:guards`)
 
