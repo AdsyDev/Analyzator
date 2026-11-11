@@ -232,7 +232,7 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 - Conexiuni: `planable_account` per client (tokenul, din pagina oricărui site al clientului → cardul Planable → pasul 1, cu test) și `planable` per brand (workspace-ul).
 - Rulare: `.github/workflows/planable-weekly.yml`, marți 04:00 UTC, activ când `CONNECTOR_PLANABLE_ENABLED = true`; manual: Actions → planable-weekly → Run workflow, sau local `npm run collect:planable`.
 - Verificare: `sync_runs` (`source` = `planable_analytics` / `planable_listening`: `status`, `errors`, `coverage`), `provider_api_calls` (apelul `/workspaces` e pe conexiunea clientului, restul pe conexiunea brandului).
-- Mesaje: `access_denied` la `/workspaces` = token refuzat (marcat `invalid`; token nou din Planable). `workspace_not_found` = ID greșit sau token fără acces la workspace. `parser_note` = câmp invalid sau postare fără metrici; nu schimbă statusul. La Listening, „N mențiuni sărite din <rețea>: <motiv>” (`dimension = mentions_skipped`) spune câte mențiuni nu au putut fi scrise și de ce; apar în jurnalul rulării, sub rândul brandului.
+- Mesaje: `access_denied` la `/workspaces` = token refuzat (marcat `invalid`; token nou din Planable). `workspace_not_found` = ID greșit sau token fără acces la workspace. `parser_note` = câmp invalid sau postare fără metrici; nu schimbă statusul. La Listening, „N mențiuni sărite din <rețea>: <motiv>” (`dimension = mentions_skipped`) spune câte mențiuni nu au putut fi scrise și de ce, iar „câmpurile lor (<rețea>): …” arată ce câmpuri aveau (doar numele); apar în jurnalul rulării, sub rândul brandului.
 - Planable nu e încă în orchestratorul `weekly-refresh` (rulează pe workflow propriu, la aceeași oră).
 
 ## Colectare săptămânală Meta Ads
