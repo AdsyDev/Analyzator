@@ -1,6 +1,6 @@
 import { useId, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import type { AiReply, AiSettings, Brand, QueryContext } from '../../contracts'
+import type { AiReply, AiSettings, Brand, QueryContext, Role } from '../../contracts'
 import { EmptyState } from '../../components/EmptyState'
 import { Button } from '../../components/ui/Button'
 import { StatusChip } from '../../components/ui/Chip'
@@ -12,6 +12,7 @@ import { useLayout } from '../../routing/AppLayout'
 import { EvidenceHost, type EvidenceTarget } from '../shared/EvidenceHost'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
+import { Documents } from './Documents'
 
 /**
  * AdSy AI (Etapa 4, deciziile M): întrebări despre brand, cu răspunsuri verificate pe server față de dovezi, și cele trei
@@ -21,10 +22,11 @@ import { Section } from '../shared/Section'
 export function AssistantPage() {
   const { brand, ctx, user } = useLayout()
   if (!brand || !ctx) return null
-  return <Assistant brand={brand} ctx={ctx} canManageSources={user.role === 'agency_admin'} />
+  return <Assistant brand={brand} ctx={ctx} role={user.role} />
 }
 
-function Assistant({ brand, ctx, canManageSources }: { brand: Brand; ctx: QueryContext; canManageSources: boolean }) {
+function Assistant({ brand, ctx, role }: { brand: Brand; ctx: QueryContext; role: Role }) {
+  const canManageSources = role === 'agency_admin'
   const providers = useProviders()
   const settings = useAsync(() => providers.assistant.settings(brand.id), [providers, brand.id])
   return (
@@ -32,6 +34,7 @@ function Assistant({ brand, ctx, canManageSources }: { brand: Brand; ctx: QueryC
       {(s) => (
         <div className="flex flex-col gap-5">
           <Chat brand={brand} ctx={ctx} settings={s} canManageSources={canManageSources} />
+          <Documents brand={brand} role={role} />
           <Controls brand={brand} settings={s} onChanged={settings.reload} />
         </div>
       )}
@@ -138,7 +141,7 @@ function Chat({ brand, ctx, settings, canManageSources }: { brand: Brand; ctx: Q
         />
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="primary" type="submit" loading={busy} disabled={question.trim().length < 3}>Întreabă</Button>
-          <p className="text-[12px] leading-snug text-text-2">AdSy AI vede doar indicatorii și analizele publicate ale acestui brand. Nu da sfaturi medicale pe baza răspunsurilor.</p>
+          <p className="text-[12px] leading-snug text-text-2">AdSy AI vede doar indicatorii, analizele publicate și documentele aprobate ale acestui brand. Nu da sfaturi medicale pe baza răspunsurilor.</p>
         </div>
       </form>
       <EvidenceHost brand={brand} target={target} onClose={() => setTarget(null)} canManageSources={canManageSources} />
@@ -179,6 +182,10 @@ export function Reply({ brandId, reply, period, onOpenMetric }: { brandId: strin
               <button key={e.id} type="button" onClick={() => onOpenMetric(e.metric_key as string, e.label)} className="rounded-full border border-border px-2.5 py-1 text-[12.5px] text-accent-text hover:bg-surface">
                 {e.label}
               </button>
+            ) : e.kind === 'document' ? (
+              <Link key={e.id} to={{ pathname: brandPath(brandId, 'assistant'), hash: '#ai-documents' }} className="rounded-full border border-border px-2.5 py-1 text-[12.5px] text-lav-text hover:bg-surface">
+                Document aprobat: {e.label}
+              </Link>
             ) : (
               <Link key={e.id} to={brandPath(brandId, 'insights')} className="rounded-full border border-border px-2.5 py-1 text-[12.5px] text-accent-text hover:bg-surface">
                 Analiză: {e.label}
@@ -242,7 +249,7 @@ function Controls({ brand, settings: s, onChanged }: { brand: Brand; settings: A
           <fieldset disabled={busy} className="flex flex-col gap-3 rounded-xl border border-border px-4 py-3">
             <legend className="px-1 text-[12.5px] font-semibold">Politica brandului</legend>
             <Toggle label="Chat" hint="Utilizatorii brandului pot pune întrebări lui AdSy AI." checked={s.policy.chat} onChange={(v) => void policy({ chat: v })} />
-            <Toggle label="Generare" hint="Echipa poate cere lui AdSy AI ciorne de analize; se publică doar după revizuire." checked={s.policy.generation} onChange={(v) => void policy({ generation: v })} />
+            <Toggle label="Generare" hint="Echipa poate cere, din Analize, ciorne scrise de AdSy AI. Se publică doar după revizuire și au nevoie și de afișare." checked={s.policy.generation} onChange={(v) => void policy({ generation: v })} />
             <Toggle label="Afișare" hint="Conținutul generat de AdSy AI e vizibil utilizatorilor brandului." checked={s.policy.display} onChange={(v) => void policy({ display: v })} />
             <div className="flex flex-wrap items-end gap-2">
               <div className="flex flex-col gap-1.5">

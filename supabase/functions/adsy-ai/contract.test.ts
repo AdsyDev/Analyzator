@@ -80,6 +80,17 @@ describe('verifyAnswer', () => {
   test('o zi din perioadă nu trece drept valoare: „creștere de 10 %” fără dovadă e respinsă', () => {
     assert.match(verifyAnswer(answer({ summary: 'Sesiunile au crescut cu 10 %.' }), ctx(), 'q?').reason!, /^unverified_number:10/)
     assert.equal(withoutDates('din 14 octombrie 2026 până la 2026-11-10 și 01.11.2026, 14 - 20 nov., apoi 12 sesiuni').replace(/\s+/g, ' ').trim(), 'din până la și , , apoi 12 sesiuni')
+    // Forme întâlnite la modelul real (11 nov. 2026): „noi.” pentru noiembrie, cu sau fără punct, și „sept.”.
+    assert.equal(withoutDates('de la 14 oct. 2026 până la 10 noi 2026, apoi 10 noi. 2026 și 3 sept. 2026: 21611 sesiuni').replace(/\s+/g, ' ').trim(), 'de la până la , apoi și : 21611 sesiuni')
+    // „noi” ca pronume nu e lună dacă nu urmează unei zile, iar un număr urmat de alt cuvânt rămâne număr.
+    assert.equal(withoutDates('noi am avut 10 mențiuni').trim(), 'noi am avut 10 mențiuni')
+    // Cuvinte obișnuite care seamănă cu o lună nu ascund un număr de verificare.
+    for (const text of ['cu 12 mai multe sesiuni', 'avem 10 noi clienți', 'au urmat 3 decizii', 'cele 5 mari branduri', 'o creștere de 40 mai mare', 'în 32 oct. nu există']) {
+      assert.equal(withoutDates(text), text, text)
+    }
+    assert.equal(withoutDates('din 5 mai 2026 până în 9 mai, apoi 1 mai.').replace(/\s+/g, ' ').trim(), 'din până în , apoi')
+    assert.equal(withoutDates('Sesiunile din Google Analytics 4 au fost 4 la număr.').replace(/\s+/g, ' ').trim(), 'Sesiunile din au fost 4 la număr.')
+    assert.equal(withoutDates('între 3 mar. și 14 martie, 2 sept, 1 aug.').replace(/\s+/g, ' ').trim(), 'între și , ,')
   })
   test('și cifrele din pasul propus sau din limite sunt verificate', () => {
     assert.equal(verifyAnswer(answer({ proposed_action: 'Creșteți bugetul cu 40 %.' }), ctx(), 'q?').status, 'insufficient_evidence')

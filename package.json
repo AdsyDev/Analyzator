@@ -15,6 +15,7 @@
     "collect:clarity": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/clarity/collect.ts",
     "set-source-token": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/set-source-token.ts",
     "test:guards": "scripts/test-guard-mutations.sh",
+    "eval:ai": "node --experimental-strip-types --env-file-if-exists=.env.local analytics/adsy-ai-eval/run.ts",
     "dev:preview": "npm --prefix apps/web run dev:preview",
     "build:staging": "npm --prefix apps/web run build:staging",
     "build:preview": "npm --prefix apps/web run build:preview",

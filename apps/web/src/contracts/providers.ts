@@ -1,5 +1,5 @@
 import type { AiAnswerDetail, AiAnswerSummary, AiCitedSource, AiEngineStat, AiEngineTrend, AiFilters, AiTopicMatrix } from './ai'
-import type { AiPolicyInput, AiPreferenceInput, AiReply, AiServerStatus, AiSettings } from './assistant'
+import type { AiPolicyInput, AiPreferenceInput, AiDraftResult, AiReply, BrandDocument, NewBrandDocument, AiServerStatus, AiSettings } from './assistant'
 import type { Brand, CompetitorSet } from './brand'
 import type { CompetitionGap, CompetitionMatrix } from './competition'
 import type { BrandId, ProviderResult, TenantId } from './common'
@@ -176,6 +176,19 @@ export interface AssistantProvider {
   savePreference(brand: Brand, preference: AiPreferenceInput): Promise<ProviderResult<null>>
   /** O întrebare despre brand, pe perioada din context. Serverul verifică din nou controalele și dovezile. */
   ask(ctx: QueryContext, question: string): Promise<ProviderResult<AiReply>>
+  /**
+   * Cere o ciornă de analiză pe perioada din context. Serverul o scrie în `insights` ca ciornă marcată „generată”, doar
+   * dacă a trecut verificarea cifrelor; publicarea rămâne a echipei, prin review.
+   */
+  generateInsight(ctx: QueryContext): Promise<ProviderResult<AiDraftResult>>
+  /** Documentele brandului: toate statusurile pentru echipă, doar cele aprobate pentru client (RLS). */
+  documents(brandId: BrandId): Promise<ProviderResult<BrandDocument[]>>
+  /** Adaugă un document ca ciornă, cu textul împărțit în fragmente. Introducerea nu îl aprobă. */
+  addDocument(brand: Brand, doc: NewBrandDocument): Promise<ProviderResult<{ id: string }>>
+  /** `approved` (doar strategist sau agency_admin; cere responsabil și început de valabilitate) sau `retired`. */
+  setDocumentStatus(brand: Brand, id: string, status: 'approved' | 'retired'): Promise<ProviderResult<null>>
+  /** Doar ciornele se șterg. */
+  deleteDocument(brand: Brand, id: string): Promise<ProviderResult<null>>
 }
 
 export interface DataProviders {

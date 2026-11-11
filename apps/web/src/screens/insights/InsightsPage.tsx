@@ -1,5 +1,6 @@
+import { SparkleIcon } from '@phosphor-icons/react'
 import { useMemo, useState } from 'react'
-import { ACTION_NEXT, type ActionTransition, type Brand, type EvidenceQuery, type Insight, type InsightAction, type InsightStatus, type InsightTransition, type MetricDefinition, type ProviderResult, type QueryContext, type Role } from '../../contracts'
+import { ACTION_NEXT, type ActionTransition, type AiDraftStatus, type Brand, type EvidenceQuery, type Insight, type InsightAction, type InsightStatus, type InsightTransition, type MetricDefinition, type ProviderResult, type QueryContext, type Role } from '../../contracts'
 import { EmptyState } from '../../components/EmptyState'
 import { INSIGHT_STATUS_LABELS, InsightCard } from '../../components/InsightCard'
 import { Avatar } from '../../components/ui/Avatar'
@@ -82,6 +83,17 @@ interface PendingNote {
  * statusurile și lucrează aici: ciornă, review, publicare, acțiuni și pașii lor. Clientul vede doar analizele
  * publicate, iar filtrarea reală e a providerului (RLS), nu a interfeței.
  */
+/** De ce nu s-a salvat nicio ciornă. În toate aceste cazuri, lista de analize rămâne neschimbată. */
+const GENERATION_PROBLEM: Record<Exclude<AiDraftStatus, 'ok'>, string> = {
+  insufficient_evidence: 'AdSy AI nu a avut dovezi suficiente pentru o ciornă pe această perioadă: fie indicatorii nu au date, fie textul propus conținea cifre care nu se regăsesc în ei. Nu s-a salvat nimic.',
+  rejected: 'Ciorna propusă de model nu a respectat forma cerută și nu a fost salvată. Încearcă din nou.',
+  ai_off: 'Generarea sau afișarea conținutului AdSy AI e oprită pentru acest brand ori din preferințele tale.',
+  not_configured: 'AdSy AI nu e configurat încă pe server. Până atunci nu pleacă nicio cerere.',
+  budget_exhausted: 'Brandul și-a consumat plafonul lunar de AdSy AI. Ciornele noi pornesc luna viitoare sau după ridicarea plafonului.',
+  rate_limited: 'Ai atins limita zilnică de cereri AdSy AI. Încearcă din nou mâine.',
+  model_error: 'Modelul nu a răspuns sau răspunsul a fost blocat. Nu s-a salvat nimic; încearcă din nou.',
+}
+
 export function InsightsPage() {
   const { brand, ctx, user } = useLayout()
   if (!brand || !ctx) return null
@@ -102,6 +114,11 @@ function InsightsContent({ brand, ctx, role }: { brand: Brand; ctx: QueryContext
   const [note, setNote] = useState<PendingNote | null>(null)
   const [recsFor, setRecsFor] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  // Ciornele generate: butonul apare doar echipei, și doar cu generarea și afișarea pornite pentru brand și utilizator.
+  const ai = useAsync(() => (agencyView ? providers.assistant.settings(brand.id) : Promise.resolve(null)), [providers, brand.id, agencyView])
+  const aiSettings = ai.state.status === 'done' && ai.state.value?.kind === 'ready' ? ai.state.value.data : null
+  const canGenerate = !!aiSettings && aiSettings.can_generate && aiSettings.effective.generation && aiSettings.effective.display
+  const [generation, setGeneration] = useState<{ tone: 'info' | 'problem'; text: string } | null>(null)
   // Responsabilul se poate alege doar unde numele membrilor sunt vizibile (agency_admin, E10); altfel rămâne utilizatorul curent.
   const people = useAsync(() => (role === 'agency_admin' ? providers.users.people() : Promise.resolve(null)), [providers, role])
   const owners = useMemo(() => {
@@ -130,6 +147,28 @@ function InsightsContent({ brand, ctx, role }: { brand: Brand; ctx: QueryContext
   async function step(key: string, call: () => Promise<ProviderResult<unknown>>, done: string) {
     const failed = await run(key, call, done)
     if (failed) toast(failed)
+  }
+
+  /** Cere serverului o ciornă pe perioada aleasă. Textul ei nu trece pe aici: la reușită, apare în listă, marcată ca generată. */
+  async function generate() {
+    setBusy('generate')
+    setGeneration(null)
+    const r = await providers.assistant.generateInsight(ctx).catch((): ProviderResult<never> => ({ kind: 'error', message: 'Ciorna nu a putut fi cerută. Reîncearcă.' }))
+    setBusy(null)
+    if (r.kind !== 'ready') return setGeneration({ tone: 'problem', text: r.kind === 'error' ? r.message : r.reason })
+    const d = r.data
+    if (d.status === 'ok') {
+      list.reload()
+      setTab('draft')
+      return setGeneration({
+        tone: 'info',
+        text: d.existing
+          ? 'Pe aceste date există deja o ciornă generată; e în lista de ciorne.'
+          : 'Ciorna e în listă, marcată „Generată de AdSy AI”. Verifică cifrele, interpretarea și recomandările înainte să o trimiți la review.',
+      })
+    }
+    if (d.status === 'ai_off') ai.reload()
+    setGeneration({ tone: 'problem', text: GENERATION_PROBLEM[d.status] })
   }
 
   const workflow: Workflow = {
@@ -162,6 +201,21 @@ function InsightsContent({ brand, ctx, role }: { brand: Brand; ctx: QueryContext
 
   return (
     <div className="flex flex-col gap-5">
+      {canGenerate && (
+        <section aria-label="Ciornă generată de AdSy AI" className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-1">
+          <SparkleIcon size={18} aria-hidden="true" className="flex-none text-accent-text" />
+          <p className="min-w-0 flex-1 text-[13px] leading-snug text-text-2">
+            <strong className="font-semibold text-text">AdSy AI poate scrie o ciornă </strong>
+            din indicatorii perioadei alese. Rămâne ciornă până o revizuiește și o publică echipa.
+          </p>
+          <Button variant="secondary" loading={busy === 'generate'} onClick={() => void generate()}>Generează ciornă</Button>
+        </section>
+      )}
+      {generation && (
+        <p role={generation.tone === 'problem' ? 'alert' : 'status'} className={`rounded-lg px-3 py-2 text-[12.5px] leading-snug ${generation.tone === 'problem' ? 'bg-warn-soft text-warn-text' : 'bg-accent-soft text-accent-text'}`}>
+          {generation.text}
+        </p>
+      )}
       <Resolved state={list.state} onRetry={list.reload} loadingLabel="Se încarcă analizele" skeletonClass="h-64">
         {(all) => <Body all={all} agencyView={agencyView} tab={tab} setTab={setTab} onOpenEvidence={open} workflow={workflow} onNew={() => setEditing({ insight: null })} />}
       </Resolved>

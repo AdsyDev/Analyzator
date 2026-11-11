@@ -155,7 +155,10 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
     list: async (ctx) => {
       const denied = guard<Insight[]>(ctx.brandId)
       if (denied) return denied
-      const all = allInsights(ctx.brandId)
+      // Ca `brand_insights`: analizele generate apar doar cu afișarea pornită (politica brandului și preferința personală).
+      const ai = await assistant.settings(ctx.brandId)
+      const display = ai.kind === 'ready' && ai.data.effective.display
+      const all = allInsights(ctx.brandId).filter((i) => i.origin !== 'adsy_ai' || display)
       // Ca RLS pe server: clientul primește doar analizele publicate și acțiunile agreate sau mai departe.
       if (isAgencyRole(getRole())) return ready(all)
       return ready(all.filter((i) => i.status === 'published').map((i) => ({ ...i, actions: i.actions.filter((a) => a.stage !== 'proposed' && a.stage !== 'cancelled') })))
@@ -175,6 +178,8 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
         author: current?.author ?? me(),
         period: draft.period,
         status: 'draft',
+        // Proveniența nu se pierde la editare, ca pe server.
+        ...(current?.origin ? { origin: current.origin } : {}),
         version: current?.version ?? 1,
         supersedes_id: current?.supersedes_id ?? null,
         recommendations: current?.recommendations ?? [],
@@ -645,7 +650,21 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
   const admin = createAdminFixtures({ now, getRole, getUserId: () => getUser().id, allowed })
   const clients = createClientsFixtures({ now, getRole, connections: (brandId) => (connectionsFile[brandId] ?? []).length })
 
-  const assistant = createAssistantFixtures({ allowed, getRole, metrics })
+  const assistant = createAssistantFixtures({
+    allowed,
+    getRole,
+    metrics,
+    createDraft: async (ctx, draft) => {
+      const found = brandsFile.brands.find((b) => b.id === ctx.brandId)
+      if (!found) return null
+      const brand: Brand = { ...found, tenant_id: brandsFile.tenant_id, tenant_name: 'STADA România' }
+      const saved = await insights.saveDraft(brand, null, draft)
+      if (saved.kind !== 'ready') return null
+      const created = edited.get(saved.data.id)
+      if (created) edited.set(created.id, { ...created, origin: 'adsy_ai' })
+      return saved.data.id
+    },
+  })
   return { kind: 'fixtures', metrics, insights, mentions, sources, brands, ai: aiFx.provider, search, traffic, paid, social, competition, assistant, users: admin.users, config: admin.config, clients }
 }
 
