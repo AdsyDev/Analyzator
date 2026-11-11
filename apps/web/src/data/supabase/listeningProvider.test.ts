@@ -142,6 +142,36 @@ describe('analize: scrieri (Supabase)', () => {
     expect(tables.recommendations).toEqual([{ id: 'r2' }])
   })
 
+  it('răspunsul clientului: pleacă doar recomandarea, răspunsul și motivul; brandul, autorul și data le pune serverul', async () => {
+    const { client, calls } = fakeDataClient()
+    const p = createSupabaseInsights(client)
+    expect(await p.respondToRecommendation('r1', 'accepted')).toEqual({ kind: 'ready', data: null })
+    expect(await p.respondToRecommendation('r1', 'adjustment_requested', '  Vrem alt termen.  ')).toEqual({ kind: 'ready', data: null })
+    expect(calls.map((c) => [c.table, c.op, c.payload])).toEqual([
+      ['recommendation_responses', 'insert', { recommendation_id: 'r1', response: 'accepted', comment: null }],
+      ['recommendation_responses', 'insert', { recommendation_id: 'r1', response: 'adjustment_requested', comment: 'Vrem alt termen.' }],
+    ])
+    for (const k of ['tenant_id', 'brand_id', 'user_id', 'insight_id', 'created_at']) expect(calls[0]!.payload).not.toHaveProperty(k)
+  })
+
+  it('răspunsul clientului: refuzurile serverului ajung cu mesajul lor; erorile de schemă rămân generice', async () => {
+    const ask = async (error: { code?: string; message: string }) => createSupabaseInsights(fakeDataClient({ errors: { 'recommendation_responses:insert': error } }).client).respondToRecommendation('r1', 'accepted')
+    expect(await ask({ code: '42501', message: 'Doar clientul răspunde la o recomandare' })).toEqual({ kind: 'error', message: 'Doar clientul răspunde la o recomandare.' })
+    expect(await ask({ code: '42501', message: 'Recomandare inexistentă sau fără acces' })).toEqual({ kind: 'error', message: 'Recomandare inexistentă sau fără acces.' })
+    expect(await ask({ code: '23514', message: 'Scrie ce ajustare ceri' })).toEqual({ kind: 'error', message: 'Scrie ce ajustare ceri.' })
+    expect(await ask({ code: '42501', message: 'new row violates row-level security policy for table "recommendation_responses"' })).toEqual({ kind: 'error', message: 'Nu ai dreptul să faci această modificare.' })
+    expect(await ask({ code: '42P01', message: 'relation "recommendation_responses" does not exist' })).toEqual({ kind: 'error', message: 'Răspunsul nu a putut fi salvat. Reîncearcă.' })
+  })
+
+  it('comentariul: pleacă doar analiza și textul; autorul și rolul lui le pune serverul', async () => {
+    const { client, calls } = fakeDataClient()
+    expect(await createSupabaseInsights(client).addComment('i1', '  Putem muta termenul?  ')).toEqual({ kind: 'ready', data: null })
+    expect(calls[0]).toMatchObject({ table: 'insight_comments', op: 'insert', payload: { insight_id: 'i1', body: 'Putem muta termenul?' } })
+    for (const k of ['author_id', 'author_role', 'tenant_id', 'brand_id']) expect(calls[0]!.payload).not.toHaveProperty(k)
+    const refused = fakeDataClient({ errors: { 'insight_comments:insert': { code: '42501', message: 'Analiză inexistentă sau fără acces' } } })
+    expect(await createSupabaseInsights(refused.client).addComment('i1', 'x')).toEqual({ kind: 'error', message: 'Analiză inexistentă sau fără acces.' })
+  })
+
   it('responsabilul ales pleacă spre server, care îl verifică; fără alegere rămâne utilizatorul curent', async () => {
     const { client, calls } = fakeDataClient({ userId: 'me' })
     await createSupabaseInsights(client).addAction(brand, 'i1', { title: 'x', owner_id: 'coleg', due: null, effort: null, tracked_metric_key: null })

@@ -35,6 +35,8 @@ import {
   type SyncRunStatus,
   type CredentialStatus,
   type Sentiment,
+  type ClientResponse,
+  type InsightComment,
 } from '../../contracts'
 import { runErrorCodes, runReason } from '../../lib/runReason'
 import { addDays, comparisonRange, todayBucharest } from '../../lib/period'
@@ -131,6 +133,10 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
   const removed = new Set<string>()
   const addedActions = new Map<string, InsightAction[]>()
   const actionState = new Map<string, Pick<InsightAction, 'status' | 'stage' | 'result_note'>>()
+  // Răspunsurile clientului și comentariile din previzualizare; regulile oglindesc triggerele din `client_feedback`.
+  const responses = new Map<string, ClientResponse & { userId: string }>()
+  const comments = new Map<string, Array<InsightComment & { userId: string }>>()
+  let feedbackSeq = 0
   let insightSeq = 0
   const me = (): Insight['author'] => {
     const role = getRole()
@@ -143,6 +149,13 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
       .filter((i) => !removed.has(i.id))
       .map((i) => ({
         ...i,
+        recommendations: (i.recommendations ?? []).map((r) => {
+          const x = responses.get(r.id)
+          if (!x) return { ...r, client_response: null }
+          const { userId, ...response } = x
+          return { ...r, client_response: { ...response, own: userId === getUser().id } }
+        }),
+        comments: (comments.get(i.id) ?? []).map(({ userId, ...c }) => ({ ...c, own: userId === getUser().id })),
         actions: [...i.actions, ...(addedActions.get(i.id) ?? [])].map((a) => ({ ...a, stage: a.stage ?? STATUS_STAGE[a.status], ...(actionState.get(a.id) ?? {}) })),
       }))
   }
@@ -288,6 +301,26 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
       if (t.to === 'cancelled' && !t.reason?.trim()) return failed('Anularea cere un motiv.')
       if (t.to === 'measured' && !t.result_note?.trim()) return failed('Starea measured cere rezultatul urmărit (result_note).')
       actionState.set(actionId, { stage: t.to, status: STAGE_STATUS[t.to], result_note: t.to === 'measured' ? (t.result_note?.trim() ?? null) : (a.result_note ?? null) })
+      return ready(null)
+    },
+    respondToRecommendation: async (recommendationId, response, comment) => {
+      const insight = brandsFile.brands.filter((b) => allowed.has(b.id)).flatMap((b) => allInsights(b.id)).find((i) => (i.recommendations ?? []).some((r) => r.id === recommendationId))
+      // Același mesaj pentru „nu există”, „nu e publicată” și „fără acces”, ca pe server.
+      if (!insight || insight.status !== 'published') return failed('Recomandare inexistentă sau fără acces.')
+      if (getRole() !== 'client_viewer') return failed('Doar clientul răspunde la o recomandare.')
+      const text = comment?.trim() || null
+      if (response === 'adjustment_requested' && !text) return failed('Scrie ce ajustare ceri.')
+      const me = getUser().id
+      responses.set(recommendationId, { response, comment: text, at: now().toISOString(), by: `Utilizator ${me.slice(0, 8)}`, own: true, userId: me })
+      return ready(null)
+    },
+    addComment: async (insightId, body) => {
+      const insight = brandsFile.brands.filter((b) => allowed.has(b.id)).flatMap((b) => allInsights(b.id)).find((i) => i.id === insightId)
+      if (!insight || insight.status !== 'published') return failed('Analiză inexistentă sau fără acces.')
+      const text = body.trim()
+      if (!text || text.length > 2000) return failed('Comentariul are între 1 și 2.000 de caractere.')
+      const me = getUser().id
+      comments.set(insightId, [...(comments.get(insightId) ?? []), { id: `comment-preview-${++feedbackSeq}`, body: text, created_at: now().toISOString(), author_role: isAgencyRole(getRole()) ? 'agency' : 'client', author: `Utilizator ${me.slice(0, 8)}`, own: true, userId: me }])
       return ready(null)
     },
   }

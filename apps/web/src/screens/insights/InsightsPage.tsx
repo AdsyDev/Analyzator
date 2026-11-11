@@ -1,6 +1,6 @@
 import { SparkleIcon } from '@phosphor-icons/react'
 import { useMemo, useState } from 'react'
-import { ACTION_NEXT, type ActionTransition, type AiDraftStatus, type Brand, type EvidenceQuery, type Insight, type InsightAction, type InsightStatus, type InsightTransition, type MetricDefinition, type ProviderResult, type QueryContext, type Role } from '../../contracts'
+import { ACTION_NEXT, type ActionTransition, type AiDraftStatus, type ClientResponseKind, type InsightRecommendation, type Brand, type EvidenceQuery, type Insight, type InsightAction, type InsightStatus, type InsightTransition, type MetricDefinition, type ProviderResult, type QueryContext, type Role } from '../../contracts'
 import { EmptyState } from '../../components/EmptyState'
 import { INSIGHT_STATUS_LABELS, InsightCard } from '../../components/InsightCard'
 import { Avatar } from '../../components/ui/Avatar'
@@ -18,6 +18,7 @@ import { EvidenceHost, type EvidenceTarget } from '../shared/EvidenceHost'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
 import { ACTION_LABEL } from '../overview/InsightSections'
+import { Discussion } from './Discussion'
 import { ACTION_STEP, ActionForm, EVIDENCE_KEYS, InsightEditor, NoteDialog, RecommendationsDialog } from './InsightEditor'
 import { useExportName } from '../shared/useExportName'
 
@@ -65,6 +66,10 @@ interface Workflow {
   onRecommendations: (i: Insight) => void
   onSupersede: (i: Insight) => void
   onActionStep: (a: ActionRow, to: ActionTransition['to']) => void
+  /** Răspunsul clientului la o recomandare; cererea de ajustare deschide întâi dialogul pentru motiv. */
+  onRespond: (r: InsightRecommendation, response: ClientResponseKind) => void
+  /** Comentariu pe o analiză publicată; întoarce mesajul de eroare sau `null`. */
+  onComment: (i: Insight, body: string) => Promise<string | null>
   busy: string | null
 }
 
@@ -197,6 +202,14 @@ function InsightsContent({ brand, ctx, role }: { brand: Brand; ctx: QueryContext
       }
       void step(`act:${a.id}`, () => providers.insights.transitionAction(a.id, { to }), ACTION_STEP[to].done)
     },
+    onRespond: (r, response) => {
+      if (response === 'adjustment_requested') {
+        setNote({ title: 'Solicită ajustare', label: 'Ce ai vrea schimbat', hint: 'Echipa AdSymphony vede cererea pe recomandare și îți răspunde în discuția analizei.', confirm: 'Trimite cererea', run: (text) => providers.insights.respondToRecommendation(r.id, response, text), done: 'Cererea de ajustare a fost trimisă echipei.' })
+        return
+      }
+      void step(`resp:${r.id}`, () => providers.insights.respondToRecommendation(r.id, response), 'Recomandarea a fost marcată ca acceptată.')
+    },
+    onComment: (i, body) => run(`comment:${i.id}`, () => providers.insights.addComment(i.id, body), 'Comentariul a fost trimis.'),
   }
 
   return (
@@ -392,8 +405,26 @@ function Body({ all, agencyView, tab, setTab, onOpenEvidence, workflow, onNew }:
           <ul className="flex flex-col gap-3">
             {shown.map((i) => (
               <li key={i.id} className={i.status === 'superseded' ? 'flex flex-col gap-2 opacity-80' : 'flex flex-col gap-2'}>
-                <InsightCard insight={i} agencyView={agencyView} onOpenEvidence={(q) => onOpenEvidence(q, i.evidence.find((e) => e.evidence_query === q)?.label ?? q.metric_key)} />
+                <InsightCard
+                  insight={i}
+                  agencyView={agencyView}
+                  onOpenEvidence={(q) => onOpenEvidence(q, i.evidence.find((e) => e.evidence_query === q)?.label ?? q.metric_key)}
+                  // Doar clientul răspunde la recomandări, și doar pe o analiză publicată; serverul verifică la fel.
+                  recommendationActions={
+                    !agencyView && i.status === 'published'
+                      ? (r) => (
+                          <>
+                            <Button variant="primary" disabled={workflow.busy !== null || r.client_response?.response === 'accepted'} onClick={() => workflow.onRespond(r, 'accepted')}>
+                              {r.client_response?.response === 'accepted' ? 'Acceptată' : 'Acceptă'}
+                            </Button>
+                            <Button variant="ghost" disabled={workflow.busy !== null} onClick={() => workflow.onRespond(r, 'adjustment_requested')}>Solicită ajustare</Button>
+                          </>
+                        )
+                      : undefined
+                  }
+                />
                 {agencyView && <InsightSteps insight={i} w={workflow} />}
+                {i.status === 'published' && <Discussion insight={i} onAdd={(body) => workflow.onComment(i, body)} />}
               </li>
             ))}
           </ul>

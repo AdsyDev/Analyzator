@@ -261,5 +261,16 @@ export function createSupabaseInsights(client: DataClient): InsightsProvider {
       const { error } = await client.from('action_transitions').insert({ action_id: actionId, to_status: t.to, reason: t.reason?.trim() || null, result_note: t.result_note?.trim() || null })
       return error ? failed(writeError(error, 'Statusul acțiunii nu a putut fi schimbat. Reîncearcă.')) : ready(null)
     },
+
+    // Clientul trimite doar recomandarea, răspunsul și motivul; brandul, autorul și data le pune serverul (trigger).
+    async respondToRecommendation(recommendationId, response, comment) {
+      const { error } = await client.from('recommendation_responses').insert({ recommendation_id: recommendationId, response, comment: comment?.trim() || null })
+      return error ? failed(writeError(error, 'Răspunsul nu a putut fi salvat. Reîncearcă.')) : ready(null)
+    },
+
+    async addComment(insightId, body) {
+      const { error } = await client.from('insight_comments').insert({ insight_id: insightId, body: body.trim() })
+      return error ? failed(writeError(error, 'Comentariul nu a putut fi salvat. Reîncearcă.')) : ready(null)
+    },
   }
 }

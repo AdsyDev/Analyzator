@@ -1,7 +1,7 @@
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import type { AiDraftStatus, AiSettings } from '../../contracts'
+import type { AiDraftStatus, AiSettings, ClientResponse, InsightComment } from '../../contracts'
 import { createFixtureProviders } from '../../data/fixtures/createFixtureProviders'
 import { createSupabaseProviders } from '../../data/supabase/providers'
 import { resolvePeriod } from '../../lib/period'
@@ -201,6 +201,170 @@ describe('Analize și acțiuni — ciorne generate de AdSy AI', () => {
     expect(r).toEqual({ kind: 'error', message: 'Doar echipa agenției poate cere o ciornă.' })
     const s2 = await p.assistant.settings('brand-urinal')
     expect(s2.kind === 'ready' && s2.data.can_generate).toBe(false)
+  })
+})
+
+describe('Analize și acțiuni — răspunsul clientului și discuția', () => {
+  type Wrap = NonNullable<Parameters<typeof renderApp>[0]['wrap']>
+  const REC = { id: 'rec-1', problem: 'Pagina de vârste e greu de găsit.', action: 'Reorganizăm meniul.', expected_benefit: 'Mai multe vizite pe pagină.', priority: 1 as const }
+  /** O recomandare pe analiza publicată din fixturi, cu răspunsul și comentariile ținute în test, ca pe server. */
+  function withFeedback(start: { response?: ClientResponse | null; comments?: InsightComment[]; fail?: string } = {}) {
+    const state = { response: start.response ?? null, comments: start.comments ?? [], calls: [] as unknown[][] }
+    const wrap: Wrap = (b) => ({
+      ...b,
+      insights: {
+        ...b.insights,
+        list: async (c) => {
+          const r = await b.insights.list(c)
+          return r.kind === 'ready' ? { kind: 'ready' as const, data: r.data.map((i) => (i.status === 'published' ? { ...i, recommendations: [{ ...REC, client_response: state.response }], comments: state.comments } : i)) } : r
+        },
+        respondToRecommendation: async (id, response, comment) => {
+          state.calls.push(['respond', id, response, comment])
+          if (start.fail) return { kind: 'error' as const, message: start.fail }
+          state.response = { response, comment: comment ?? null, at: '2026-11-11T10:00:00+02:00', by: 'Utilizator 30000000', own: true }
+          return { kind: 'ready' as const, data: null }
+        },
+        addComment: async (id, body) => {
+          state.calls.push(['comment', id, body])
+          if (start.fail) return { kind: 'error' as const, message: start.fail }
+          state.comments = [...state.comments, { id: `c-${state.comments.length + 1}`, body, created_at: '2026-11-11T10:05:00+02:00', author_role: 'client', author: 'Utilizator 30000000', own: true }]
+          return { kind: 'ready' as const, data: null }
+        },
+      },
+    })
+    return { wrap, state }
+  }
+  const published = async () => (await cards()).find((c) => c.getAttribute('data-status') === 'published')!
+  const discussion = () => screen.getByRole('region', { name: /^Discuție: / })
+
+  it('clientul acceptă o recomandare: pleacă doar recomandarea și răspunsul; cardul arată „Acceptată de client”', async () => {
+    const { wrap, state } = withFeedback()
+    renderApp({ route: URINAL, role: 'client_viewer', wrap })
+    await pageReady('Analize și acțiuni')
+    const card = await published()
+    expect(within(card).queryByText(/de client/)).toBeNull() // fără răspuns nu apare nimic: lipsa nu e acceptare
+    await userEvent.click(within(card).getByRole('button', { name: 'Acceptă' }))
+    expect(await within(await published()).findByText('Acceptată de client')).toBeInTheDocument()
+    expect(state.calls).toEqual([['respond', 'rec-1', 'accepted', undefined]])
+    expect(await published()).toHaveTextContent('de tine')
+    expect(within(await published()).getByRole('button', { name: 'Acceptată' })).toBeDisabled()
+    expect(within(await published()).getByRole('button', { name: 'Solicită ajustare' })).toBeEnabled()
+  })
+
+  it('„Solicită ajustare” cere un motiv; cu motiv, cererea apare pe recomandare, cu textul ei', async () => {
+    const { wrap, state } = withFeedback()
+    renderApp({ route: URINAL, role: 'client_viewer', wrap })
+    await pageReady('Analize și acțiuni')
+    await userEvent.click(within(await published()).getByRole('button', { name: 'Solicită ajustare' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Solicită ajustare' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Trimite cererea' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Completează: ce ai vrea schimbat.')
+    expect(state.calls).toEqual([])
+    await userEvent.type(within(dialog).getByLabelText('Ce ai vrea schimbat'), 'Vrem alt termen.')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Trimite cererea' }))
+    expect(await within(await published()).findByText('Ajustare cerută de client')).toBeInTheDocument()
+    expect(await published()).toHaveTextContent('„Vrem alt termen.”')
+    expect(state.calls).toEqual([['respond', 'rec-1', 'adjustment_requested', 'Vrem alt termen.']])
+    expect(screen.queryByRole('dialog', { name: 'Solicită ajustare' })).toBeNull()
+  })
+
+  it('refuzul serverului rămâne în dialog, cu mesajul lui, și nimic nu se schimbă pe card', async () => {
+    const { wrap } = withFeedback({ fail: 'Recomandare inexistentă sau fără acces.' })
+    renderApp({ route: URINAL, role: 'client_viewer', wrap })
+    await pageReady('Analize și acțiuni')
+    await userEvent.click(within(await published()).getByRole('button', { name: 'Solicită ajustare' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Solicită ajustare' })
+    await userEvent.type(within(dialog).getByLabelText('Ce ai vrea schimbat'), 'Altceva.')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Trimite cererea' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Recomandare inexistentă sau fără acces.')
+    expect(within(await published()).queryByText(/de client/)).toBeNull()
+  })
+
+  it('echipa vede răspunsul clientului, dar nu are butoanele lui', async () => {
+    const { wrap } = withFeedback({ response: { response: 'adjustment_requested', comment: 'Vrem alt termen.', at: '2026-11-10T09:00:00+02:00', by: 'Utilizator 30000000', own: false } })
+    renderApp({ route: URINAL, wrap })
+    await pageReady('Analize și acțiuni')
+    const card = await published()
+    expect(within(card).getByText('Ajustare cerută de client')).toBeInTheDocument()
+    expect(card).toHaveTextContent('Utilizator 30000000')
+    expect(card).toHaveTextContent('„Vrem alt termen.”')
+    expect(within(card).queryByRole('button', { name: 'Acceptă' })).toBeNull()
+    expect(within(card).queryByRole('button', { name: 'Solicită ajustare' })).toBeNull()
+  })
+
+  it('discuția: clientul scrie un comentariu și îl vede ca al lui; nu apare sub ciorne', async () => {
+    const { wrap, state } = withFeedback()
+    renderApp({ route: URINAL, role: 'client_viewer', wrap })
+    await pageReady('Analize și acțiuni')
+    await published()
+    expect(discussion()).toHaveTextContent('Niciun comentariu încă.')
+    expect(within(discussion()).getByRole('button', { name: 'Trimite comentariul' })).toBeDisabled()
+    await userEvent.type(within(discussion()).getByRole('textbox'), 'Putem muta termenul?')
+    await userEvent.click(within(discussion()).getByRole('button', { name: 'Trimite comentariul' }))
+    expect(await within(discussion()).findByText('Putem muta termenul?')).toBeInTheDocument()
+    expect(state.calls).toEqual([['comment', expect.any(String), 'Putem muta termenul?']])
+    expect(within(discussion()).getByText('Tu')).toBeInTheDocument()
+    expect(within(discussion()).getByRole('textbox')).toHaveValue('')
+    expect(discussion()).toHaveTextContent('Discuție (1)')
+  })
+
+  it('echipa vede comentariile clientului etichetate „Client”, fără nume, și poate răspunde; ciornele nu au discuție', async () => {
+    const { wrap, state } = withFeedback({ comments: [{ id: 'c-0', body: 'Putem muta termenul?', created_at: '2026-11-10T09:00:00+02:00', author_role: 'client', author: 'Utilizator 30000000', own: false }, { id: 'c-1', body: 'Da, discutăm joi.', created_at: '2026-11-10T11:00:00+02:00', author_role: 'agency', author: 'Utilizator 30000002', own: false }] })
+    renderApp({ route: URINAL, wrap })
+    await pageReady('Analize și acțiuni')
+    await cards()
+    expect(screen.getAllByRole('region', { name: /^Discuție: / })).toHaveLength(1) // doar analiza publicată; nu ciorna, nu cea în review, nu cea înlocuită
+    const items = within(discussion()).getAllByRole('listitem')
+    expect(items.map((i) => i.getAttribute('data-author'))).toEqual(['client', 'agency'])
+    expect(items[0]).toHaveTextContent('Client')
+    expect(items[1]).toHaveTextContent('Echipa AdSymphony')
+    expect(discussion()).not.toHaveTextContent('Utilizator 30000000')
+    await userEvent.type(within(discussion()).getByRole('textbox'), 'Am mutat termenul.')
+    await userEvent.click(within(discussion()).getByRole('button', { name: 'Trimite comentariul' }))
+    await waitFor(() => expect(state.calls).toEqual([['comment', expect.any(String), 'Am mutat termenul.']]))
+  })
+
+  it('un comentariu refuzat rămâne în câmp, cu mesajul serverului', async () => {
+    const { wrap } = withFeedback({ fail: 'Analiză inexistentă sau fără acces.' })
+    renderApp({ route: URINAL, role: 'client_viewer', wrap })
+    await pageReady('Analize și acțiuni')
+    await published()
+    await userEvent.type(within(discussion()).getByRole('textbox'), 'Un comentariu')
+    await userEvent.click(within(discussion()).getByRole('button', { name: 'Trimite comentariul' }))
+    expect(await within(discussion()).findByRole('alert')).toHaveTextContent('Analiză inexistentă sau fără acces.')
+    expect(within(discussion()).getByRole('textbox')).toHaveValue('Un comentariu')
+  })
+
+  it('previzualizarea respectă regulile serverului: doar clientul răspunde, doar pe o analiză publicată; ajustarea cere motiv', async () => {
+    let role: 'agency_admin' | 'client_viewer' = 'agency_admin'
+    const p = createFixtureProviders({ getRole: () => role })
+    const brands = await p.brands.list()
+    const brand = brands.kind === 'ready' ? brands.data.find((b) => b.id === 'brand-urinal')! : null
+    if (!brand) throw new Error('așteptam brandul din fixturi')
+    const ctx = { brandId: brand.id, period: resolvePeriod('28d'), comparison: 'previous' as const, filters: {} }
+    const all = async () => { const r = await p.insights.list(ctx); return r.kind === 'ready' ? r.data : [] }
+    // Echipa scrie o analiză cu o recomandare și o publică.
+    const made = await p.insights.saveDraft(brand, null, { title: 'Cu recomandare', period: { from: ctx.period.from, to: ctx.period.to }, summary: 's', interpretation: 'i', limits: 'l', evidence_keys: ['ga4_sessions'] })
+    const id = made.kind === 'ready' ? made.data.id : ''
+    await p.insights.addRecommendation(brand, id, REC)
+    const recId = (await all()).find((i) => i.id === id)!.recommendations![0]!.id
+    // Pe ciornă: nimeni nu răspunde și nimeni nu comentează.
+    role = 'client_viewer'
+    expect(await p.insights.respondToRecommendation(recId, 'accepted')).toEqual({ kind: 'error', message: 'Recomandare inexistentă sau fără acces.' })
+    expect(await p.insights.addComment(id, 'x')).toEqual({ kind: 'error', message: 'Analiză inexistentă sau fără acces.' })
+    role = 'agency_admin'
+    await p.insights.transition(id, 'in_review')
+    await p.insights.transition(id, 'published')
+    expect(await p.insights.respondToRecommendation(recId, 'accepted')).toEqual({ kind: 'error', message: 'Doar clientul răspunde la o recomandare.' })
+    expect((await p.insights.addComment(id, 'Comentariu al echipei')).kind).toBe('ready')
+    role = 'client_viewer'
+    expect(await p.insights.respondToRecommendation(recId, 'adjustment_requested', '  ')).toEqual({ kind: 'error', message: 'Scrie ce ajustare ceri.' })
+    expect((await p.insights.respondToRecommendation(recId, 'adjustment_requested', 'Alt termen')).kind).toBe('ready')
+    expect((await p.insights.respondToRecommendation(recId, 'accepted')).kind).toBe('ready')
+    expect((await p.insights.addComment(id, 'Comentariu al clientului')).kind).toBe('ready')
+    const seen = (await all()).find((i) => i.id === id)!
+    expect(seen.recommendations![0]!.client_response).toMatchObject({ response: 'accepted', comment: null, own: true })
+    expect(seen.comments!.map((c) => [c.author_role, c.body])).toEqual([['agency', 'Comentariu al echipei'], ['client', 'Comentariu al clientului']])
   })
 })
 

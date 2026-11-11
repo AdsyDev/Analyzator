@@ -112,3 +112,23 @@ review) ajung la utilizator; erorile de schemă rămân generice. Recomandările
 
 `brand_insights` întoarce `origin` și omite analizele `adsy_ai` când controlul „afișare” e oprit pentru brand sau pentru utilizator.
 
+## Răspunsul clientului și comentariile (11 nov. 2026, deciziile S)
+
+Migrația `20261113120000_client_feedback.sql`. Ambele tabele sunt doar de adăugare (`UPDATE` și `DELETE` refuzate și pentru service role) și acceptă scrieri doar pe analize `published`.
+
+| Tabel | Se trimite | Completează serverul | Cine scrie |
+|---|---|---|---|
+| `recommendation_responses` | `recommendation_id`, `response` (`accepted` sau `adjustment_requested`), `comment` (obligatoriu la ajustare, cel mult 2.000 de caractere) | `tenant_id`, `brand_id`, `insight_id`, `user_id`, `created_at` | Doar `client_viewer` cu acces la brand |
+| `insight_comments` | `insight_id`, `body` (1–2.000 de caractere) | `tenant_id`, `brand_id`, `author_id`, `author_role` (`client` sau `agency`), `created_at` | Oricine are acces la brand |
+
+Erori: `42501` „Recomandare inexistentă sau fără acces” ori „Analiză inexistentă sau fără acces” (același mesaj pentru inexistent, nepublicat și fără acces), `42501` „Doar clientul răspunde la o recomandare”, `23514` „Scrie ce ajustare ceri”. Câmpurile completate de server nu pot fi trimise (fără drept de inserare pe coloană).
+
+Citire: echipa agenției, mereu; clientul, cât analiza e `published`.
+
+`brand_insights` întoarce în plus:
+
+- pe recomandare: `client_response` = ultimul răspuns `{ response, comment, at, by, own }` sau `null` când clientul nu a răspuns (lipsa nu e acceptare);
+- pe analiză: `comments` = `[{ id, body, created_at, author_role, author, own }]`, în ordinea scrierii.
+
+`by` și `author` sunt „Utilizator” plus primele opt caractere din ID, nu nume (E10); `own` spune dacă rândul e al utilizatorului curent. Acceptarea nu schimbă statusul analizei și nu creează sau mută acțiuni.
+

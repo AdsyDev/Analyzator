@@ -26,6 +26,22 @@ export interface EvidenceLink {
   evidence_query: EvidenceQuery
 }
 
+export const CLIENT_RESPONSES = ['accepted', 'adjustment_requested'] as const
+export type ClientResponseKind = (typeof CLIENT_RESPONSES)[number]
+
+/**
+ * Ultimul răspuns al clientului la o recomandare dintr-o analiză publicată (deciziile S). Istoricul rămâne pe server;
+ * aici vine doar cel în vigoare. Numele nu se arată (E10): `by` e o etichetă neutră, `own` spune dacă e al utilizatorului curent.
+ */
+export interface ClientResponse {
+  response: ClientResponseKind
+  /** Motivul; obligatoriu la cererea de ajustare. */
+  comment: string | null
+  at: IsoDateTime
+  by: string
+  own: boolean
+}
+
 /** O recomandare: problema, ce propunem și ce ne așteptăm să se schimbe. Se editează doar cât analiza e ciornă. */
 export interface InsightRecommendation {
   id: string
@@ -34,8 +50,21 @@ export interface InsightRecommendation {
   expected_benefit: string
   /** 1–3, fără zecimale (spec 2.8); 1 = prioritatea cea mai mare. */
   priority: 1 | 2 | 3
+  /** `null` sau absent = clientul nu a răspuns încă. Nu înseamnă acceptare. */
+  client_response?: ClientResponse | null
 }
-export type NewRecommendation = Omit<InsightRecommendation, 'id'>
+export type NewRecommendation = Omit<InsightRecommendation, 'id' | 'client_response'>
+
+/** Un comentariu din discuția de pe o analiză publicată, între client și echipă. Nu se editează și nu se șterge. */
+export interface InsightComment {
+  id: string
+  body: string
+  created_at: IsoDateTime
+  author_role: 'client' | 'agency'
+  /** Etichetă neutră a autorului, fără nume. */
+  author: string
+  own: boolean
+}
 
 export interface InsightAction {
   id: string
@@ -75,6 +104,8 @@ export interface Insight {
   supersedes_id?: string | null
   /** Recomandările analizei, în ordinea priorității (1 = cea mai mare). */
   recommendations?: InsightRecommendation[]
+  /** Discuția de pe analiza publicată, în ordinea scrierii. */
+  comments?: InsightComment[]
   /** „Limite": ce nu arată analiza. */
   limits: string | null
   actions: InsightAction[]

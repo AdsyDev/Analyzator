@@ -3,7 +3,7 @@ import type { AiPolicyInput, AiPreferenceInput, AiDraftResult, AiReply, BrandDoc
 import type { Brand, CompetitorSet } from './brand'
 import type { CompetitionGap, CompetitionMatrix } from './competition'
 import type { BrandId, ProviderResult, TenantId } from './common'
-import type { ActionTransition, Insight, InsightDraft, InsightTransition, NewAction, NewRecommendation } from './insight'
+import type { ActionTransition, Insight, InsightDraft, InsightTransition, NewAction, NewRecommendation, ClientResponseKind } from './insight'
 import type { MentionPage, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnapshot, SentimentDistribution } from './mention'
 import type { Evidence, EvidenceQuery, MetricDefinition, MetricsBundle, TrendSeries } from './metric'
 import type { QueryContext } from './period'
@@ -49,6 +49,13 @@ export interface InsightsProvider {
   /** Acțiune nouă pe o analiză; fără `owner_id`, responsabilul e utilizatorul curent. */
   addAction(brand: Brand, insightId: string, action: NewAction): Promise<ProviderResult<null>>
   transitionAction(actionId: string, transition: ActionTransition): Promise<ProviderResult<null>>
+  /**
+   * Răspunsul clientului la o recomandare dintr-o analiză publicată: acceptare sau cerere de ajustare (cu motiv). Doar
+   * clientul îl poate da; serverul refuză echipa agenției. Fiecare răspuns se adaugă la istoric.
+   */
+  respondToRecommendation(recommendationId: string, response: ClientResponseKind, comment?: string): Promise<ProviderResult<null>>
+  /** Un comentariu pe o analiză publicată, de la client sau de la echipă. */
+  addComment(insightId: string, body: string): Promise<ProviderResult<null>>
 }
 
 export interface MentionsProvider {
