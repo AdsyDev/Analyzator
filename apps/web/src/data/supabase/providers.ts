@@ -153,6 +153,8 @@ const traffic: TrafficProvider = {
 const paid: PaidProvider = {
   summary: async () => notConnected(NO_PAID_IMPORT),
   budget: async () => notConnected(NO_PAID_IMPORT),
+  saveBudget: async () => notConnected(NO_PAID_IMPORT),
+  deleteBudget: async () => notConnected(NO_PAID_IMPORT),
   series: async () => notConnected(NO_PAID_IMPORT),
   rows: async () => notConnected(NO_PAID_IMPORT),
 }

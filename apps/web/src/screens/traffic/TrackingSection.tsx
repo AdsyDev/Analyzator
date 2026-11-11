@@ -16,7 +16,7 @@ const STATUS: Record<TrackingStatus, { label: string; tone: ChipTone; icon: type
 /** Tracking quality: listă de verificări. Sensul stă în text și icon, nu doar în culoare. */
 export function TrackingSection({ state, onRetry }: { state: AsyncState<ProviderResult<TrackingQuality>>; onRetry: () => void }) {
   return (
-    <Section id="tracking" title="Tracking quality" description="Verificări rulate zilnic. Cifrele de mai sus sunt la fel de bune ca măsurarea din spatele lor.">
+    <Section id="tracking" title="Tracking quality" description="Verificări calculate din datele GA4 colectate, pe perioada aleasă. Cifrele de mai sus sunt la fel de bune ca măsurarea din spatele lor.">
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă verificările" skeletonClass="h-40">
         {(q) => (
           <div className="flex flex-col gap-2">
@@ -36,7 +36,7 @@ export function TrackingSection({ state, onRetry }: { state: AsyncState<Provider
                 )
               })}
             </ul>
-            <p className="text-[12px] text-text-2">Verificat la <span className="font-mono text-[11.5px] text-text">{formatDateTime(q.checked_at)}</span>.</p>
+            <p className="text-[12px] text-text-2">Pe datele colectate la <span className="font-mono text-[11.5px] text-text">{formatDateTime(q.checked_at)}</span>.</p>
           </div>
         )}
       </Resolved>

@@ -27,15 +27,17 @@ export function paidFiltersFrom(ctx: QueryContext): PaidFilters {
 export function PaidPage() {
   const { brand, ctx, user } = useLayout()
   if (!brand || !ctx) return null
-  return <PaidContent brand={brand} ctx={ctx} canImport={user.role === 'agency_admin'} />
+  // Bugetul îl scrie echipa agenției (RLS verifică rolul și accesul la brand); clientul doar îl vede.
+  return <PaidContent brand={brand} ctx={ctx} canImport={user.role === 'agency_admin'} canEditBudget={user.role !== 'client_viewer'} />
 }
 
-function PaidContent({ brand, ctx, canImport }: { brand: Brand; ctx: QueryContext; canImport: boolean }) {
+function PaidContent({ brand, ctx, canImport, canEditBudget }: { brand: Brand; ctx: QueryContext; canImport: boolean; canEditBudget: boolean }) {
   const providers = useProviders()
   const f = paidFiltersFrom(ctx)
   const key = ctxKey(ctx)
   const summary = useAsync(() => providers.paid.summary(ctx, f), [providers, key])
-  const budget = useAsync(() => providers.paid.budget(ctx), [providers, brand.id])
+  // Planul în vigoare la sfârșitul perioadei alese: se schimbă odată cu perioada, nu cu filtrul de platformă.
+  const budget = useAsync(() => providers.paid.budget(ctx), [providers, brand.id, ctx.period.to])
   const series = useAsync(() => providers.paid.series(ctx, f), [providers, key])
   const rows = useAsync(() => providers.paid.rows(ctx, f), [providers, key])
 
@@ -55,7 +57,28 @@ function PaidContent({ brand, ctx, canImport }: { brand: Brand; ctx: QueryContex
         <span>Fus orar al exportului <strong className="font-semibold text-text">{s.source_timezone}</strong></span>
       </p>
       <PaidKpis kpis={s.kpis} ctx={ctx} />
-      <BudgetSection state={budget.state} onRetry={budget.reload} />
+      <BudgetSection
+        state={budget.state}
+        onRetry={budget.reload}
+        editing={
+          canEditBudget
+            ? {
+                defaultPeriod: { from: ctx.period.from, to: ctx.period.to },
+                defaultCurrency: /^[A-Z]{3}$/.test(s.currency) ? s.currency : 'RON',
+                onSave: async (b) => {
+                  const r = await providers.paid.saveBudget(brand, b)
+                  if (r.kind === 'ready') budget.reload()
+                  return r.kind === 'ready' ? null : r.kind === 'error' ? r.message : r.reason
+                },
+                onDelete: async (id) => {
+                  const r = await providers.paid.deleteBudget(id)
+                  if (r.kind === 'ready') budget.reload()
+                  return r.kind === 'ready' ? null : r.kind === 'error' ? r.message : r.reason
+                },
+              }
+            : undefined
+        }
+      />
       <Section id="evolution" title="Evoluție" description={`Spend (${s.currency}) și rezultate, în grafice separate. Zilele neimportate apar ca gol, nu ca zero.`}>
         <Resolved state={series.state} onRetry={series.reload} loadingLabel="Se încarcă evoluția" skeletonClass="h-60">
           {(d) => {

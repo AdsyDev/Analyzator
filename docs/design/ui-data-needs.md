@@ -54,9 +54,9 @@ KPI-urile GA4 vin din registru (`ga4_sessions`, `ga4_active_users`, `ga4_engaged
 | Cerere | Răspuns | Note |
 |---|---|---|
 | `channels(ctx, device)` | `TrafficChannels` | Pe grup de canale GA4: `sessions`, `share_pct` (cota în totalul filtrat), `change_pct` (relativă, în %), `engagement_rate`, `key_events`. Filtrul `device` (`desktop`, `mobile`, `tablet`) se aplică doar canalelor; KPI-urile rămân pe toate device-urile (UI-ul o spune explicit). |
-| `aiReferrals(ctx)` | `AiReferrals` | Surse cu `sessions`, `key_events`, `conversion_rate` (calculată de server); `rules_version` și `rules_effective_from` (regulile sunt versionate, spec cap. 16). |
+| `aiReferrals(ctx)` | `AiReferrals` | Surse cu `sessions`, `key_events`, `conversion_rate` (calculată de server; `null` cât timp rata nu are definiție, J-2); `rules_version` și `rules_effective_from` (regulile sunt versionate, spec cap. 16). Construit: `docs/contracts/traffic-quality-budget.md`. |
 | `clarityDevices(ctx)` | `ClarityDevices` | Defalcarea pe device pentru cele patru metrici `clarity_*`. Coloana „Toate" vine din registru; `clarity_daily` are dimensiunea `device`, dar view-ul de observații o exclude, deci defalcarea cere un view nou. |
-| `trackingQuality(ctx)` | `TrackingQuality` | Verificări cu `status` (`ok`, `warning`, `problem`, `unknown`), titlu și notă, plus `checked_at`. |
+| `trackingQuality(ctx)` | `TrackingQuality` | Verificări cu `status` (`ok`, `warning`, `problem`, `unknown`), titlu și notă, plus `checked_at`. Construit: cinci verificări din datele GA4 colectate (J-3). |
 
 Starea sincronizării Clarity (bannerul „Sincronizarea Clarity are probleme") se citește din `SourcesProvider.statuses`, nu dintr-o cerere nouă.
 

@@ -6,7 +6,7 @@ import type { ActionTransition, Insight, InsightDraft, InsightTransition, NewAct
 import type { Mention, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnapshot, SentimentDistribution } from './mention'
 import type { Evidence, EvidenceQuery, MetricDefinition, MetricsBundle, TrendSeries } from './metric'
 import type { QueryContext } from './period'
-import type { PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from './paid'
+import type { NewPaidBudget, PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from './paid'
 import type { ContentGap, LandingPage, SearchFilters, SearchKeyword } from './search'
 import type { SocialCalendarItem, SocialCompetitor, SocialFilters, SocialGroups, SocialPost, SocialSummary } from './social'
 import type { ClientsProvider, ConfigProvider, UsersProvider } from './admin'
@@ -136,7 +136,11 @@ export interface TrafficProvider {
  */
 export interface PaidProvider {
   summary(ctx: QueryContext, f: PaidFilters): Promise<ProviderResult<PaidSummary>>
+  /** Planul în vigoare la sfârșitul perioadei alese; fără plan, `approved_budget` e `null`. */
   budget(ctx: QueryContext): Promise<ProviderResult<PaidBudget>>
+  /** Scrierile sunt ale echipei agenției cu acces la brand (RLS verifică rolul, nu interfața). */
+  saveBudget(brand: Brand, budget: NewPaidBudget): Promise<ProviderResult<null>>
+  deleteBudget(id: string): Promise<ProviderResult<null>>
   series(ctx: QueryContext, f: PaidFilters): Promise<ProviderResult<PaidSeries>>
   rows(ctx: QueryContext, f: PaidFilters): Promise<ProviderResult<PaidRow[]>>
 }

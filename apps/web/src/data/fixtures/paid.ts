@@ -94,6 +94,9 @@ export function createPaidFixtures({ allowed, now }: { allowed: Set<string>; now
   }
 
   const need = (ctx: QueryContext) => (allowed.has(ctx.brandId) ? (data[ctx.brandId] ?? null) : undefined)
+  /** Planurile introduse sau șterse în sesiunea de previzualizare (doar în memorie). */
+  const plans = new Map<string, { id: string; plan_from: string; plan_to: string; amount: number; currency: string; note: string | null } | null>()
+  let seq = 0
 
   return {
     summary: async (ctx, f) => {
@@ -115,25 +118,47 @@ export function createPaidFixtures({ allowed, now }: { allowed: Set<string>; now
       if (b === undefined) return denied
       if (!b) return notConnected(NO_IMPORT)
       const asOf = dataAsOf(b)
-      const planFrom = `${asOf.slice(0, 8)}01`
+      // Planul introdus în sesiune (sau șters) are prioritate față de cel din fixture; `null` = șters.
+      const edited = plans.get(ctx.brandId)
+      if (edited === null) {
+        return ready<PaidBudget>({ id: null, currency: '', approved_budget: null, plan_from: ctx.period.from, plan_to: ctx.period.to, spent: null, elapsed_days: 0, planned_days: 0, spend_pct: null, time_pct: 0, plan_note: null, data_as_of: null, currency_mismatch: false })
+      }
       const next = new Date(Date.UTC(Number(asOf.slice(0, 4)), Number(asOf.slice(5, 7)), 1))
-      const planTo = addDays(next.toISOString().slice(0, 10), -1)
-      const planned = daysBetween(planFrom, planTo) + 1
-      const elapsed = daysBetween(planFrom, asOf) + 1
-      const spent = r2(sum(rowsIn(ctx.brandId, b, planFrom, asOf, null), 'spend'))
+      const plan = edited ?? { id: `budget-${ctx.brandId}`, plan_from: `${asOf.slice(0, 8)}01`, plan_to: addDays(next.toISOString().slice(0, 10), -1), amount: b.approved_budget, currency: b.currency, note: b.plan_note }
+      const planned = daysBetween(plan.plan_from, plan.plan_to) + 1
+      const last = asOf < plan.plan_to ? asOf : plan.plan_to
+      const elapsed = last < plan.plan_from ? 0 : daysBetween(plan.plan_from, last) + 1
+      const mismatch = plan.currency !== b.currency
+      const spent = mismatch || elapsed === 0 ? null : r2(sum(rowsIn(ctx.brandId, b, plan.plan_from, last, null), 'spend'))
       const budget: PaidBudget = {
-        currency: b.currency,
-        approved_budget: b.approved_budget,
-        plan_from: planFrom,
-        plan_to: planTo,
+        id: plan.id,
+        currency: plan.currency,
+        approved_budget: plan.amount,
+        plan_from: plan.plan_from,
+        plan_to: plan.plan_to,
         spent,
         elapsed_days: elapsed,
         planned_days: planned,
-        spend_pct: r2((100 * spent) / b.approved_budget),
+        spend_pct: spent === null ? null : r2((100 * spent) / plan.amount),
         time_pct: r2((100 * elapsed) / planned),
-        plan_note: b.plan_note,
+        plan_note: plan.note,
+        data_as_of: elapsed === 0 ? null : last,
+        currency_mismatch: mismatch,
       }
       return ready(budget)
+    },
+
+    saveBudget: async (brand, input) => {
+      if (!allowed.has(brand.id)) return denied
+      plans.set(brand.id, { id: `budget-${brand.id}-${++seq}`, plan_from: input.plan_from, plan_to: input.plan_to, amount: input.amount, currency: input.currency, note: input.note })
+      return ready(null)
+    },
+
+    deleteBudget: async (id) => {
+      // Planul din fixture are id-ul `budget-<brand>` și nu e în `plans` până nu e înlocuit sau șters.
+      const brandId = [...plans].find(([, plan]) => plan?.id === id)?.[0] ?? Object.keys(data).find((b) => id === `budget-${b}`)
+      if (brandId) plans.set(brandId, null)
+      return ready(null)
     },
 
     series: async (ctx, f) => {

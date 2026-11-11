@@ -86,6 +86,61 @@ describe('Paid Media cu import', () => {
     expect(s.textContent).not.toMatch(/depășit|în urmă|peste ritm|sub ritm/i)
   })
 
+  it('agenția introduce un buget nou: planul apare imediat, cu suma și nota lui', async () => {
+    renderApp({ route: MINI, role: 'account' })
+    await open()
+    const s = await waitForSection('Buget și pacing')
+    await userEvent.click(await within(s).findByRole('button', { name: 'Buget nou' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Buget aprobat' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvează bugetul' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Suma trebuie să fie un număr mai mare ca zero.')
+    await userEvent.type(within(dialog).getByLabelText('Buget aprobat'), '9000')
+    await userEvent.type(within(dialog).getByLabelText('Notă (opțional)'), 'plan revizuit')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvează bugetul' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Buget aprobat' })).toBeNull())
+    expect(await within(s).findByText(/din 9\.000\sRON/)).toBeInTheDocument()
+    expect(within(s).getByText(/plan revizuit/)).toBeInTheDocument()
+  })
+
+  it('planul șters lasă „Fără buget aprobat”, nu un buget zero', async () => {
+    renderApp({ route: MINI })
+    await open()
+    const s = await waitForSection('Buget și pacing')
+    await userEvent.click(await within(s).findByRole('button', { name: 'Șterge planul' }))
+    expect(await within(s).findByText('Fără buget aprobat')).toBeInTheDocument()
+    expect(within(s).queryByRole('progressbar')).toBeNull()
+    expect(within(s).getByRole('button', { name: 'Adaugă buget' })).toBeInTheDocument()
+    expect(within(s).queryByRole('button', { name: 'Șterge planul' })).toBeNull()
+  })
+
+  it('refuzul serverului la salvare rămâne în dialog, cu mesajul lui', async () => {
+    renderApp({ route: MINI, wrap: (b) => ({ ...b, paid: { ...b.paid, saveBudget: async () => failed('Nu ai dreptul să modifici bugetul acestui brand.') } }) })
+    await open()
+    const s = await waitForSection('Buget și pacing')
+    await userEvent.click(await within(s).findByRole('button', { name: 'Buget nou' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Buget aprobat' })
+    await userEvent.type(within(dialog).getByLabelText('Buget aprobat'), '100')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salvează bugetul' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Nu ai dreptul să modifici bugetul acestui brand.')
+  })
+
+  it('clientul vede bugetul aprobat, fără acțiuni de scriere', async () => {
+    renderApp({ route: MINI, role: 'client_viewer' })
+    await open()
+    const s = await waitForSection('Buget și pacing')
+    expect(await within(s).findAllByRole('progressbar')).toHaveLength(2)
+    expect(within(s).queryByRole('button', { name: /buget/i })).toBeNull()
+    expect(within(s).queryByRole('button', { name: 'Șterge planul' })).toBeNull()
+  })
+
+  it('cost în altă monedă decât bugetul: fără bară de spend și fără procent, cu explicația', async () => {
+    renderApp({ route: MINI, wrap: (b) => ({ ...b, paid: { ...b.paid, budget: async (c) => { const r = await b.paid.budget(c); return r.kind === 'ready' ? { ...r, data: { ...r.data, currency: 'EUR', spent: null, spend_pct: null, currency_mismatch: true } } : r } } }) })
+    await open()
+    const s = await waitForSection('Buget și pacing')
+    expect(await within(s).findByRole('note')).toHaveTextContent(/altă monedă decât bugetul \(EUR\)/)
+    expect((await within(s).findAllByRole('progressbar')).map((b) => b.getAttribute('aria-label'))).toEqual(['Zile trecute din plan'])
+  })
+
   it('evoluție: spend și conversii în grafice separate, cu gol pentru zilele neimportate', async () => {
     renderApp({ route: MINI })
     await open()
@@ -146,7 +201,7 @@ describe('Paid Media cu import', () => {
 
   it('o singură cerere pe secțiune; un brand nepermis nu face nicio cerere', async () => {
     const calls = { s: 0, b: 0, se: 0, r: 0 }
-    renderApp({ route: MINI, wrap: (b) => ({ ...b, paid: { summary: async (c, f) => (calls.s++, b.paid.summary(c, f)), budget: async (c) => (calls.b++, b.paid.budget(c)), series: async (c, f) => (calls.se++, b.paid.series(c, f)), rows: async (c, f) => (calls.r++, b.paid.rows(c, f)) } }) })
+    renderApp({ route: MINI, wrap: (b) => ({ ...b, paid: { ...b.paid, summary: async (c, f) => (calls.s++, b.paid.summary(c, f)), budget: async (c) => (calls.b++, b.paid.budget(c)), series: async (c, f) => (calls.se++, b.paid.series(c, f)), rows: async (c, f) => (calls.r++, b.paid.rows(c, f)) } }) })
     await open()
     await screen.findByTestId('paid-kpis')
     await new Promise((r) => setTimeout(r, 300))
