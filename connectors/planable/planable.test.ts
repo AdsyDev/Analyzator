@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { collectPlanable, MENTIONS_SKIPPED } from './collect-core.ts'
-import { MentionsSchema, mentionNativeId, mentionSkipReasons, pageMetrics, platformOf } from './normalize.ts'
+import { MentionsSchema, mentionFieldShape, mentionNativeId, mentionSkipReasons, pageMetrics, platformOf } from './normalize.ts'
 import { FakeDb, fakeFetch, noSleep, type FakeResponse } from '../shared/test-helpers.ts'
 
 // Răspunsurile sunt construite după schema OpenAPI publică (api.planable.io/api/v1/openapi.json, 2026-10-12):
@@ -111,6 +111,20 @@ describe('normalizare Planable', () => {
   })
 })
 
+describe('câmpurile unei mențiuni (diagnostic)', () => {
+  test('doar nume: cu valoare, goale și cele cu link http(s); obiectele se deschid un nivel', () => {
+    const shape = mentionFieldShape({
+      platform: 'web', url: '', publishedAt: '2026-10-05T12:00:00Z', text: 'Text SECRET', sentiment: null, tags: [], media: ['a'], engagement: 0,
+      permalink: ' https://exemplu.ro/stire-SECRET ', author: { name: 'Ana SECRET', username: '', site: 'http://exemplu.ro', deep: { x: 1 } }, extra: {},
+      'cheie ciudată/<x>': 1,
+    })
+    assert.deepEqual(shape.filled.sort(), ['author.deep', 'author.name', 'author.site', 'cheie_ciudat_x_', 'engagement', 'media', 'permalink', 'platform', 'publishedAt', 'text'])
+    assert.deepEqual(shape.empty.sort(), ['author.username', 'extra', 'sentiment', 'tags', 'url'])
+    assert.deepEqual(shape.links.sort(), ['author.site', 'permalink'])
+    assert.ok(!JSON.stringify(shape).includes('SECRET'), 'valorile nu apar')
+  })
+})
+
 describe('collectPlanable', () => {
   test('fără token al clientului: not_connected, fără sync_run și fără cereri', async () => {
     const { db } = setup({ credential: null })
@@ -192,7 +206,7 @@ describe('collectPlanable', () => {
     const bad = (o: Record<string, unknown>) => ({ ...mention('https://x.com/ok'), ...o })
     const data = [
       mention('https://x.com/ok'),
-      bad({ platform: 'Facebook', url: '' }), bad({ platform: 'facebook', url: '' }), bad({ platform: ' facebook ', url: '' }),
+      bad({ platform: 'Facebook', url: '', permalink: 'https://legatura-ascunsa.test/1' }), bad({ platform: 'facebook', url: '', permalink: 'https://legatura-ascunsa.test/2' }), bad({ platform: ' facebook ', url: '' }),
       bad({ platform: 'news', url: 'exemplu.ro/stire' }),
       bad({ platform: 'tiktok', url: '', publishedAt: 'necunoscut' }),
       bad({ platform: 'tiktok', publishedAt: '' }),
@@ -204,16 +218,22 @@ describe('collectPlanable', () => {
     assert.equal(l.rows_written, 1)
     assert.deepEqual(db.tables.mentions!.map((m) => m.url), ['https://x.com/ok'])
     const notes = l.errors.filter((e) => e.dimension === MENTIONS_SKIPPED)
-    assert.deepEqual(notes.map((e) => [e.code, e.message]), [
-      ['parser_note', '3 mențiuni sărite din facebook: fără URL'],
-      ['parser_note', '1 mențiune sărită din news: URL care nu începe cu http(s)'],
-      ['parser_note', '1 mențiune sărită din tiktok: fără dată de publicare validă'],
-      ['parser_note', '1 mențiune sărită din tiktok: fără URL și fără dată de publicare validă'],
+    assert.ok(notes.every((e) => e.code === 'parser_note'))
+    const common = 'author.name, author.username, engagement, platform'
+    assert.deepEqual(notes.map((e) => e.message), [
+      '3 mențiuni sărite din facebook: fără URL',
+      'câmpurile lor (facebook): cu valoare: author.name, author.username, engagement, permalink (2), platform, publishedAt, sentiment, text; goale: author.profileImageUrl, url; cu link http(s): permalink (2)',
+      '1 mențiune sărită din news: URL care nu începe cu http(s)',
+      `câmpurile lor (news): cu valoare: ${common}, publishedAt, sentiment, text, url; goale: author.profileImageUrl; cu link http(s): niciunul`,
+      '1 mențiune sărită din tiktok: fără dată de publicare validă',
+      `câmpurile lor (tiktok): cu valoare: ${common}, sentiment, text, url; goale: author.profileImageUrl, publishedAt; cu link http(s): url`,
+      '1 mențiune sărită din tiktok: fără URL și fără dată de publicare validă',
+      `câmpurile lor (tiktok): cu valoare: ${common}, publishedAt, sentiment, text; goale: author.profileImageUrl, url; cu link http(s): niciunul`,
     ])
-    assert.equal(l.errors.length, 4, 'o notă pe grup, nu una pe mențiune')
+    assert.equal(l.errors.length, 8, 'două note pe grup, nu câte una pe mențiune')
     const run = db.tables.sync_runs!.find((r) => r.source === 'planable_listening')!
-    assert.deepEqual((run.errors as Array<{ dimension?: string }>).filter((e) => e.dimension === MENTIONS_SKIPPED).length, 4, 'notele ajung în sync_runs.errors')
-    assert.ok(!JSON.stringify(run.errors).includes('exemplu.ro'), 'URL-ul mențiunii sărite nu se scrie în note')
+    assert.deepEqual((run.errors as Array<{ dimension?: string }>).filter((e) => e.dimension === MENTIONS_SKIPPED).length, 8, 'notele ajung în sync_runs.errors')
+    for (const secret of ['exemplu.ro', 'legatura-ascunsa', 'Mențiune', 'necunoscut']) assert.ok(!JSON.stringify(run.errors).includes(secret), `valoarea „${secret}” nu se scrie în note`)
   })
 
   test('fără mențiuni sărite nu apare nicio notă despre ele', async () => {

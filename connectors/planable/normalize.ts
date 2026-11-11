@@ -260,6 +260,35 @@ export function mentionSkipReasons(m: Mention): MentionSkipReason[] {
   return reasons
 }
 
+/** Numele câmpurilor unei mențiuni, pe trei categorii. Doar nume: valorile nu ies niciodată de aici. */
+export type MentionFieldShape = { filled: string[]; empty: string[]; links: string[] }
+
+const FIELD_NAME = /[^A-Za-z0-9_.]+/g
+const isEmptyValue = (v: unknown) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '') || (Array.isArray(v) && v.length === 0)
+
+/**
+ * Ce câmpuri are o mențiune în răspunsul Planable (inclusiv cele nedescrise în schemă): cu valoare, goale și cele al căror
+ * text începe cu http(s). Obiectele se deschid un singur nivel (`author.name`). Servește la diagnostic, când `url` vine gol:
+ * arată dacă linkul stă în alt câmp, fără să scrie vreo valoare în jurnal.
+ */
+export function mentionFieldShape(m: Record<string, unknown>): MentionFieldShape {
+  const shape: MentionFieldShape = { filled: [], empty: [], links: [] }
+  const visit = (name: string, v: unknown, nested: boolean) => {
+    const clean = name.replace(FIELD_NAME, '_').slice(0, 48)
+    if (isEmptyValue(v)) return void shape.empty.push(clean)
+    if (!nested && typeof v === 'object' && !Array.isArray(v)) {
+      const entries = Object.entries(v as Record<string, unknown>)
+      if (entries.length === 0) return void shape.empty.push(clean)
+      for (const [k, inner] of entries) visit(`${name}.${k}`, inner, true)
+      return
+    }
+    shape.filled.push(clean)
+    if (typeof v === 'string' && /^https?:\/\//.test(v.trim())) shape.links.push(clean)
+  }
+  for (const [k, v] of Object.entries(m)) visit(k, v, false)
+  return shape
+}
+
 export function mentionRow(m: Mention, p: Provenance, own: OwnAccounts | null = null) {
   const s = (m.sentiment ?? '').toLowerCase()
   return {

@@ -33,6 +33,7 @@ import {
   PostsSchema,
   WorkspacesSchema,
   MENTION_SKIP_LABELS,
+  mentionFieldShape,
   mentionRow,
   mentionSkipReasons,
   ownAccounts,
@@ -83,17 +84,33 @@ function statusOf(errors: SyncRunError[], rows: number, fatal: boolean): SyncRun
 /** Dimensiunea notelor despre mențiuni sărite; `collect.ts` le scrie în jurnalul rulării. */
 export const MENTIONS_SKIPPED = 'mentions_skipped'
 
+type SkippedGroup = { count: number; filled: Map<string, number>; empty: Map<string, number>; links: Map<string, number> }
+const FIELD_LIST_MAX = 40
+
+/** „a, b (3), c”: numele câmpurilor în ordine alfabetică; numărul apare doar când câmpul nu e în toate mențiunile grupului. */
+function fieldList(fields: Map<string, number>, total: number): string {
+  const names = [...fields.keys()].sort((a, b) => a.localeCompare(b))
+  const shown = names.slice(0, FIELD_LIST_MAX).map((n) => (fields.get(n) === total ? n : `${n} (${fields.get(n)})`))
+  if (names.length > FIELD_LIST_MAX) shown.push(`și încă ${names.length - FIELD_LIST_MAX}`)
+  return shown.length ? shown.join(', ') : 'niciunul'
+}
+
 /**
- * O notă pe (rețea, motiv), cele mai numeroase întâi. O mențiune găsită de două cuvinte urmărite se numără de două ori:
- * fără URL nu avem cu ce o deduplica.
+ * Două note pe (rețea, motiv), cele mai numeroase întâi: câte mențiuni au fost sărite și ce câmpuri aveau (doar numele lor,
+ * niciodată valorile). O mențiune găsită de două cuvinte urmărite se numără de două ori: fără URL nu avem cu ce o deduplica.
  */
-function skippedMentionNotes(skipped: Map<string, number>): SyncRunError[] {
+function skippedMentionNotes(skipped: Map<string, SkippedGroup>): SyncRunError[] {
   return [...skipped.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([key, count]) => {
+    .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+    .flatMap(([key, g]) => {
       const cut = key.lastIndexOf('|')
+      const platform = key.slice(0, cut)
       const why = (key.slice(cut + 1).split('+') as MentionSkipReason[]).map((r) => MENTION_SKIP_LABELS[r]).join(' și ')
-      return { code: 'parser_note', status: null, dimension: MENTIONS_SKIPPED, message: `${count} ${count === 1 ? 'mențiune sărită' : 'mențiuni sărite'} din ${key.slice(0, cut)}: ${why}` }
+      const note = (message: string): SyncRunError => ({ code: 'parser_note', status: null, dimension: MENTIONS_SKIPPED, message })
+      return [
+        note(`${g.count} ${g.count === 1 ? 'mențiune sărită' : 'mențiuni sărite'} din ${platform}: ${why}`),
+        note(`câmpurile lor (${platform}): cu valoare: ${fieldList(g.filled, g.count)}; goale: ${fieldList(g.empty, g.count)}; cu link http(s): ${fieldList(g.links, g.count)}`),
+      ]
     })
 }
 
@@ -325,7 +342,7 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
     const own = pages.error && pages.items.length === 0 ? null : ownAccounts(pages.items.map(({ item }) => item).filter((pg) => pg.workspaceId === conn.external_account_id))
     const mentions: Row[] = []
     // Mențiunile sărite, numărate pe rețea și motiv: o notă pe grup, nu una pe mențiune.
-    const skipped = new Map<string, number>()
+    const skipped = new Map<string, SkippedGroup>()
     for (const k of keywords.data.data) {
       let cursor: number | undefined
       for (let page = 0; page < PLANABLE_MAX_PAGES; page++) {
@@ -347,7 +364,11 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
             // Rețeaua vine din API ca text liber (același câmp ca `mentions.source_name`): curățată și limitată, ca notele să rămână puține.
             const platform = m.platform.trim().toLowerCase().replace(/[^\p{L}\p{N}_ .-]+/gu, '_').slice(0, 64)
             const key = `${platform || 'rețea necunoscută'}|${reasons.join('+')}`
-            skipped.set(key, (skipped.get(key) ?? 0) + 1)
+            const group = skipped.get(key) ?? { count: 0, filled: new Map(), empty: new Map(), links: new Map() }
+            group.count++
+            const shape = mentionFieldShape(m as Record<string, unknown>)
+            for (const kind of ['filled', 'empty', 'links'] as const) for (const name of new Set(shape[kind])) group[kind].set(name, (group[kind].get(name) ?? 0) + 1)
+            skipped.set(key, group)
             continue
           }
           mentions.push(mentionRow(m, { ...provenance, payload_hash: r.payloadHash }, own))
