@@ -239,6 +239,27 @@ export function authorIsOwned(m: Mention, own: OwnAccounts | null): boolean | nu
   return set ? keys.some((k) => set.has(k)) : false
 }
 
+/** De ce nu se poate scrie o mențiune: fără URL, URL care nu e http(s), dată invalidă. Lista goală = mențiune validă. */
+export type MentionSkipReason = 'url_missing' | 'url_not_http' | 'date_invalid'
+
+export const MENTION_SKIP_LABELS: Record<MentionSkipReason, string> = {
+  url_missing: 'fără URL',
+  url_not_http: 'URL care nu începe cu http(s)',
+  date_invalid: 'fără dată de publicare validă',
+}
+
+/**
+ * Motivele pentru care o mențiune e sărită. URL-ul e cheia naturală (`native_id` = hash-ul lui) și data e obligatorie în
+ * `mentions`: fără ele rândul nu se scrie și nu se deduce nimic în locul lor (regula 8).
+ */
+export function mentionSkipReasons(m: Mention): MentionSkipReason[] {
+  const reasons: MentionSkipReason[] = []
+  if (m.url.trim() === '') reasons.push('url_missing')
+  else if (!/^https?:\/\//.test(m.url)) reasons.push('url_not_http')
+  if (Number.isNaN(Date.parse(m.publishedAt))) reasons.push('date_invalid')
+  return reasons
+}
+
 export function mentionRow(m: Mention, p: Provenance, own: OwnAccounts | null = null) {
   const s = (m.sentiment ?? '').toLowerCase()
   return {

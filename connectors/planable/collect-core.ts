@@ -32,11 +32,14 @@ import {
   PostMetricsSchema,
   PostsSchema,
   WorkspacesSchema,
+  MENTION_SKIP_LABELS,
   mentionRow,
+  mentionSkipReasons,
   ownAccounts,
   socialDailyRows,
   socialPostRow,
   type Mention,
+  type MentionSkipReason,
   type Page,
   type PageMetricsItem,
   type Post,
@@ -75,6 +78,23 @@ function statusOf(errors: SyncRunError[], rows: number, fatal: boolean): SyncRun
   if (fatal && rows === 0) return 'failed'
   if (real.length > 0) return rows > 0 ? 'partial' : 'failed'
   return 'succeeded'
+}
+
+/** Dimensiunea notelor despre mențiuni sărite; `collect.ts` le scrie în jurnalul rulării. */
+export const MENTIONS_SKIPPED = 'mentions_skipped'
+
+/**
+ * O notă pe (rețea, motiv), cele mai numeroase întâi. O mențiune găsită de două cuvinte urmărite se numără de două ori:
+ * fără URL nu avem cu ce o deduplica.
+ */
+function skippedMentionNotes(skipped: Map<string, number>): SyncRunError[] {
+  return [...skipped.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([key, count]) => {
+      const cut = key.lastIndexOf('|')
+      const why = (key.slice(cut + 1).split('+') as MentionSkipReason[]).map((r) => MENTION_SKIP_LABELS[r]).join(' și ')
+      return { code: 'parser_note', status: null, dimension: MENTIONS_SKIPPED, message: `${count} ${count === 1 ? 'mențiune sărită' : 'mențiuni sărite'} din ${key.slice(0, cut)}: ${why}` }
+    })
 }
 
 function httpError(r: Extract<GetResult, { ok: false }>, dimension: string): SyncRunError {
@@ -304,6 +324,8 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
     if (pages.error) errors.push(pages.error)
     const own = pages.error && pages.items.length === 0 ? null : ownAccounts(pages.items.map(({ item }) => item).filter((pg) => pg.workspaceId === conn.external_account_id))
     const mentions: Row[] = []
+    // Mențiunile sărite, numărate pe rețea și motiv: o notă pe grup, nu una pe mențiune.
+    const skipped = new Map<string, number>()
     for (const k of keywords.data.data) {
       let cursor: number | undefined
       for (let page = 0; page < PLANABLE_MAX_PAGES; page++) {
@@ -320,8 +342,12 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
           break
         }
         for (const m of parsed.data.data as Mention[]) {
-          if (!/^https?:\/\//.test(m.url) || Number.isNaN(Date.parse(m.publishedAt))) {
-            errors.push({ code: 'parser_note', status: null, message: 'mențiune fără URL sau dată validă, sărită' })
+          const reasons = mentionSkipReasons(m)
+          if (reasons.length > 0) {
+            // Rețeaua vine din API ca text liber (același câmp ca `mentions.source_name`): curățată și limitată, ca notele să rămână puține.
+            const platform = m.platform.trim().toLowerCase().replace(/[^\p{L}\p{N}_ .-]+/gu, '_').slice(0, 64)
+            const key = `${platform || 'rețea necunoscută'}|${reasons.join('+')}`
+            skipped.set(key, (skipped.get(key) ?? 0) + 1)
             continue
           }
           mentions.push(mentionRow(m, { ...provenance, payload_hash: r.payloadHash }, own))
@@ -331,6 +357,8 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
         cursor = next
       }
     }
+
+    errors.push(...skippedMentionNotes(skipped))
 
     // Corecțiile umane au prioritate: mențiunile cu sentiment revizuit se actualizează fără câmpul sentiment (ca la CSV).
     const reviewed = new Set<string>()
