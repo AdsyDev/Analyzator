@@ -1,0 +1,98 @@
+# AdSy AI: controale și chat pe dovezi
+
+Etapa 4, prima felie (deciziile M din `docs/decisions.md`). Migrația `20261112090000_stage4_adsy_ai_controls_chat.sql`, funcția server `supabase/functions/adsy-ai`. Specificația: `docs/product/spec.md`, cap. 23.
+
+**Forma apelului către model e luată din SDK-ul oficial `@google/genai` (v3.1.0) și nu a fost confirmată pe un cont real.** Până când serverul nu are cheia și modelul, AdSy AI răspunde „neconfigurat” și nu pleacă nicio cerere.
+
+## Controale
+
+Trei controale pe brand: **chat** (întrebări către AdSy AI), **generare** (ciorne de analize scrise de AdSy AI) și **afișare** (conținutul generat e vizibil).
+
+| Tabel | Ce ține | Cine scrie | Cine citește |
+|---|---|---|---|
+| `ai_brand_policies` | Politica brandului: cele trei controale și `monthly_token_cap` (implicit 2.000.000) | Doar `agency_admin`; fără `DELETE`; inserarea și schimbarea se auditează | Oricine are acces la brand |
+| `ai_user_preferences` | Preferința personală pe brand: `chat_enabled`, `display_enabled` | Fiecare utilizator, doar rândul lui | Doar utilizatorul |
+| `ai_requests` | Jurnalul cererilor către model și răspunsul validat (cache) | Doar funcția server (service role) | Utilizatorul își vede cererile; `agency_admin` le vede pe toate ale brandului |
+
+Reguli:
+
+- **Fără politică salvată, toate trei sunt oprite.** AI-ul pornește doar printr-o decizie explicită a administratorului.
+- **Politica bate preferința.** Preferința poate doar să restrângă; generarea nu are preferință personală.
+- Cu totul oprit, dashboardurile și analizele scrise de echipă rămân neschimbate.
+
+### `brand_ai_settings(p_brand_id)`
+
+Regimul E8 (`SECURITY INVOKER`, `has_brand_access` în corp).
+
+```json
+{
+  "tenant_id": "…",
+  "policy": { "chat": true, "generation": false, "display": true, "monthly_token_cap": 2000000, "updated_at": "…" },
+  "preference": { "chat": true, "display": true },
+  "effective": { "chat": true, "generation": false, "display": true },
+  "can_edit_policy": false,
+  "month_tokens": null
+}
+```
+
+`effective` = politică ȘI preferință. `month_tokens` (tokenii brandului în luna curentă, Europe/Bucharest) e `null` pentru cine nu e `agency_admin`.
+
+## Funcția server `adsy-ai`
+
+`POST` cu sesiunea utilizatorului (`Authorization: Bearer …`).
+
+| Acțiune | Corp | Răspuns |
+|---|---|---|
+| `status` | `{ action, brand_id }` | `{ configured, model_id, prompt_version }`; doar pentru cine are acces la brand |
+| `chat` | `{ action, brand_id, question, period: { start, end }, comparison?: "previous" \| "year_ago" }` | `{ status, answer?, blocked_by?, cached?, model_id?, prompt_version?, request_id? }` |
+
+Întrebarea are 3–1.000 de caractere; perioada, cel mult 400 de zile. Erori: `401` fără sesiune, `403` fără acces la brand, `400` cerere invalidă.
+
+### Ordinea verificărilor (toate pe server)
+
+1. Sesiunea, la GoTrue.
+2. Accesul la brand și controalele, prin `brand_ai_settings` chemat **cu sesiunea utilizatorului**. Cu chatul oprit, funcția răspunde `ai_off` și se oprește: nu citește date și nu cheamă modelul.
+3. Configurarea: `GEMINI_API_KEY` și `ADSY_AI_MODEL` în mediul funcției. Lipsă: `not_configured`.
+4. Contextul, citit tot cu sesiunea utilizatorului (RLS): `brand_metrics` pentru 18 metrici din registru, numele lor din `metric_definitions_current` și cel mult cinci analize **publicate** din `brand_insights`. Modelul vede doar ce vede utilizatorul. Nu primește mențiuni brute, răspunsuri AI brute, nume de autori, e-mailuri sau chei.
+5. Cache: aceeași întrebare, pe aceleași date, cu același model și aceeași versiune de prompt întoarce răspunsul salvat, fără apel și fără tokeni.
+6. Plafoane: tokenii lunii pe brand (`monthly_token_cap`) și 60 de cereri pe utilizator în 24 de ore. Depășire: `budget_exhausted`, respectiv `rate_limited`.
+7. Un singur apel `generateContent`, fără unelte, cu răspuns JSON după schemă.
+8. Verificarea răspunsului, apoi scrierea în `ai_requests`.
+
+Cheia de service scrie și citește doar `ai_requests`, mereu cu `tenant_id` și `brand_id` în filtru sau în rând. Cheia modelului se trimite doar în antetul cererii către Google.
+
+### Contractul răspunsului
+
+Modelul întoarce `finding_type` (`answer`, `insufficient_evidence`, `out_of_scope`), `summary`, `evidence_ids`, `metric_keys`, `limitations`, `proposed_action`. Serverul adaugă `period` (cea cerută) și `requires_review: true` (mereu).
+
+Un răspuns e `ok` doar dacă:
+
+- JSON-ul respectă contractul;
+- fiecare `evidence_id` există în contextul trimis (`metric:<cheie>` sau `insight:<id>`), deci e al acestui brand și al acestei perioade;
+- fiecare cheie din `metric_keys` e printre dovezile citate;
+- **fiecare număr din text** se regăsește în dovezile citate (valoare, valoare de comparație, variație absolută sau relativă, rotunjite la zecimalele scrise), în întrebare, în anii ori lungimea perioadei sau în numele indicatorilor. Datele calendaristice sunt scoase din text înainte de verificare.
+
+Altfel:
+
+| `status` | Când | Ce primește utilizatorul |
+|---|---|---|
+| `insufficient_evidence` | Dovadă necunoscută, fără dovezi, număr nesusținut, sau modelul spune că nu are date | Fără concluzie; doar `limitations`, dacă nici ele nu aduc cifre nesusținute |
+| `out_of_scope` | Întrebarea nu e despre datele brandului | Fără concluzie |
+| `rejected` | JSON în afara contractului | Fără text de la model |
+| `model_error` | Apelul a eșuat sau a fost blocat; `code`: `auth`, `rate_limited`, `model_not_found`, `blocked`, `truncated`, `unavailable`, `invalid_response` | Fără detalii de la furnizor |
+
+Motivul intern al respingerii (`rejection_reason`) rămâne în `ai_requests`.
+
+### Cache și cost
+
+`data_snapshot_id` = SHA-256 al contextului trimis modelului. `cache_key` = SHA-256 din tenant, brand, sarcină, `data_snapshot_id`, `model_id`, `prompt_version` și întrebarea normalizată. Căutarea în cache e mereu pe `tenant_id` și `brand_id`. Fiecare cerere are `prompt_tokens`, `output_tokens` (inclusiv tokenii de „gândire”) și `total_tokens`; cele din cache au zero.
+
+`model_id` și `prompt_version` nu sunt fixate în cod pentru totdeauna: modelul vine din `ADSY_AI_MODEL`, iar versiunea promptului (`chat-v1`) se schimbă odată cu promptul și intră în cheia de cache.
+
+## Ce pleacă spre furnizorul modelului
+
+Numele brandului, perioada, valorile agregate ale celor 18 indicatori, textele analizelor publicate de echipă și întrebarea utilizatorului. Nu pleacă: date personale, mențiuni sau răspunsuri AI brute, chei, identificatori de utilizator. Termenii de procesare ai furnizorului trebuie validați înainte de pornirea politicii pe un brand.
+
+## Neconstruit în această felie
+
+Analizele generate (controlul „generare”), ascunderea conținutului generat (controlul „afișare” e salvat, dar încă nu are conținut de ascuns în afara răspunsurilor din chat), baza de documente aprobate, setul de evaluare pe 100 de exemple.

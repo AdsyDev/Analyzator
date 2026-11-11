@@ -54,6 +54,8 @@ Fără signup. Cinci stări în același cadru: **autentificare** (email de serv
 
 ## Overview (`/brands/:id/overview`)
 
+**După macheta din propunere (11 nov. 2026, N).** Titlu „Imaginea completă a brandului”, calea „Brand Intelligence / Overview”, „Exportă raportul”. Rând de șase indicatori compacți (AI Share of Voice, Mențiuni în AI, Vizibilitate SEO, Sentiment pozitiv, Trafic organic, Poziție competitivă), fiecare cu numele exact al indicatorului dedesubt, tooltip cu definiția și legătură spre detaliu; cei din registru deschid dovezile. Apoi „Evoluția vizibilității AI” (2/3) și „Vizibilitate pe platforme” (1/3); „SEO și trafic”, „Social listening” (inel cu sentimentul mențiunilor revizuite) și „Competitori”. Dedesubt: bara de context, „Ce s-a schimbat”, „Prioritățile următoare”, „Interpretarea AdSymphony”. Lângă titlu, comutatorul „AI insights” deschide sidebarul AdSy AI din dreapta (închis la început, reținut pe dispozitiv): „Pașii recomandați” din ultima analiză publicată și întrebarea rapidă, cu buton de închidere; pe ecrane înguste acoperă pagina. Graficul de evoluție are curbă netedă, arie în degrade, puncte la capete și comutator 28 / 90 zile pentru perioada paginii; „SEO și trafic” are o linie mică fără axe; inelul de sentiment arată mențiunile revizuite. Tema implicită e cea închisă, cu paleta din machetă (N-7). Descrierea de mai jos e a versiunii anterioare.
+
 Structura de mai jos e cea din propunerea din 10 nov. 2026 („Overview pentru decizii rapide"), construită în Etapa 2 (deciziile G). Designul inițial (spec cap. 12) e păstrat în tabelul de diferențe.
 
 1. „Starea datelor" (pe orice modul cu surse): date până la, pe sursă; ultima sincronizare unde utilizatorul o poate vedea; următoarea actualizare estimată.
@@ -118,6 +120,10 @@ Designul inițial: Taburi (agenție: „Flux editorial" și vederea publicată; 
 ## Portofoliu (`/portfolio`)
 
 **Etapa 3 (11 nov. 2026, K-3).** Toate brandurile permise utilizatorului, pe aceeași perioadă (filtrul de perioadă și comparație din URL), cu indicatorii de pe cardurile din Overview: valoare și variație, sau starea („Sursă neconectată”, „Fără date pentru interval”). Numele brandului duce la Overview-ul lui, cu aceeași perioadă. Un brand ai cărui indicatori nu pot fi citiți rămâne în listă, cu motivul. Linkul din meniu apare de la două branduri în sus.
+
+## AdSy AI (`/brands/:id/assistant`)
+
+**Etapa 4 (11 nov. 2026, M).** „Întreabă AdSy AI”: conversația sesiunii; fiecare răspuns are „Generat de AdSy AI”, „Nevalidat de echipă”, perioada, dovezile (o metrică deschide sertarul de dovezi, o analiză duce la Analize), limitele și, dacă există, propunerea pentru echipă. Stări fără răspuns: „Dovezi insuficiente”, „În afara datelor brandului”, „Răspuns respins”, „Plafonul lunar a fost atins”, „Prea multe întrebări azi”, „AdSy AI nu a putut răspunde”, „AdSy AI e oprit”, „AdSy AI nu e configurat încă”. „Controale AdSy AI”: preferința personală (Chat, Afișare) și, pentru `agency_admin`, politica brandului (Chat, Generare, Afișare, plafon lunar, consumul lunii); ceilalți văd politica, fără să o poată schimba.
 
 ## Administrare (doar agenție)
 

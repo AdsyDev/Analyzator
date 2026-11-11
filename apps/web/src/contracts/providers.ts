@@ -1,4 +1,5 @@
 import type { AiAnswerDetail, AiAnswerSummary, AiCitedSource, AiEngineStat, AiEngineTrend, AiFilters, AiTopicMatrix } from './ai'
+import type { AiPolicyInput, AiPreferenceInput, AiReply, AiServerStatus, AiSettings } from './assistant'
 import type { Brand, CompetitorSet } from './brand'
 import type { CompetitionGap, CompetitionMatrix } from './competition'
 import type { BrandId, ProviderResult, TenantId } from './common'
@@ -165,6 +166,18 @@ export interface CompetitionProvider {
   gaps(ctx: QueryContext): Promise<ProviderResult<CompetitionGap[]>>
 }
 
+/** AdSy AI (Etapa 4): controalele și chatul pe dovezi. Modelul e chemat doar de funcția server `adsy-ai`. */
+export interface AssistantProvider {
+  settings(brandId: BrandId): Promise<ProviderResult<AiSettings>>
+  serverStatus(brandId: BrandId): Promise<ProviderResult<AiServerStatus>>
+  /** Doar `agency_admin` (RLS); schimbarea se auditează. */
+  savePolicy(brand: Brand, policy: AiPolicyInput): Promise<ProviderResult<null>>
+  /** Preferința utilizatorului curent pe acest brand. */
+  savePreference(brand: Brand, preference: AiPreferenceInput): Promise<ProviderResult<null>>
+  /** O întrebare despre brand, pe perioada din context. Serverul verifică din nou controalele și dovezile. */
+  ask(ctx: QueryContext, question: string): Promise<ProviderResult<AiReply>>
+}
+
 export interface DataProviders {
   /** `supabase` pe implicit; `fixtures` doar cu VITE_DESIGN_PREVIEW la build. */
   readonly kind: 'supabase' | 'fixtures'
@@ -179,6 +192,7 @@ export interface DataProviders {
   paid: PaidProvider
   social: SocialProvider
   competition: CompetitionProvider
+  assistant: AssistantProvider
   users: UsersProvider
   config: ConfigProvider
   clients: ClientsProvider

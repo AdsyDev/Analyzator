@@ -12,9 +12,9 @@ const BRANDS = ['brand-urinal', 'brand-minimartieni', 'brand-proenzi']
 
 // Chei pe ecran. Cheile fără date fictive (restul ai_*, paid_*, listening_*, social_*) nu se inventează:
 // primesc `not_connected`, ca providerul real.
-const ABSENT = ['ai_sov', 'paid_spend', 'listening_mentions', 'social_reach']
+const ABSENT = ['ai_owned_citation_rate', 'paid_spend', 'listening_mentions', 'social_reach']
 const SCREENS: Record<string, string[]> = {
-  overview: ['ai_mention_rate', 'seomonitor_visibility_latest', 'mentions_count', 'ga4_sessions', 'ga4_key_events', 'gsc_clicks'],
+  overview: ['ai_sov', 'ai_mention_rate', 'seomonitor_visibility_latest', 'gsc_clicks', 'seomonitor_keywords_top10', 'gsc_ctr', 'ga4_sessions', 'mentions_count'],
   seo: ['gsc_clicks', 'gsc_impressions', 'gsc_ctr', 'gsc_average_position', 'seomonitor_keywords_top3', 'seomonitor_keywords_top10', 'seomonitor_visibility', 'seomonitor_visibility_latest'],
   traffic: ['ga4_sessions', 'ga4_engaged_sessions', 'ga4_key_events', 'ga4_active_users', 'clarity_rage_click_sessions', 'clarity_dead_click_sessions', 'clarity_quickback_sessions', 'clarity_scroll_depth'],
 }

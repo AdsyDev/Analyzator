@@ -43,6 +43,7 @@ import { createAdminFixtures } from './admin'
 import { createAiFixtures } from './ai'
 import { createCompetitionFixtures } from './competition'
 import { createPaidFixtures } from './paid'
+import { createAssistantFixtures } from './assistant'
 import { createSearchFixtures } from './search'
 import { createSocialFixtures } from './social'
 import { createTrafficFixtures } from './traffic'
@@ -644,7 +645,8 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
   const admin = createAdminFixtures({ now, getRole, getUserId: () => getUser().id, allowed })
   const clients = createClientsFixtures({ now, getRole, connections: (brandId) => (connectionsFile[brandId] ?? []).length })
 
-  return { kind: 'fixtures', metrics, insights, mentions, sources, brands, ai: aiFx.provider, search, traffic, paid, social, competition, users: admin.users, config: admin.config, clients }
+  const assistant = createAssistantFixtures({ allowed, getRole, metrics })
+  return { kind: 'fixtures', metrics, insights, mentions, sources, brands, ai: aiFx.provider, search, traffic, paid, social, competition, assistant, users: admin.users, config: admin.config, clients }
 }
 
 type ProviderGuard<T> = Extract<import('../../contracts').ProviderResult<T>, { kind: 'error' }>

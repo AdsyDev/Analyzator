@@ -1,6 +1,6 @@
 {
   "_marker": "analyzator-design-preview-fixture",
-  "_note": "Parametri pentru valori fictive, doar pentru cheile din registru (cele 16 de nivel A, plus ai_mention_rate și mentions_count pentru Overview). `aggregate`: sum, mean sau last. Override-uri pe brand: scale, trend_pct, status, coverage, stale_days, comparison_zero, value_null, warnings. insufficient_sample nu poate apărea încă la nivel A (min_sample e null în registru); apare aici ca să poată fi revăzută starea.",
+  "_note": "Parametri pentru valori fictive, doar pentru cheile din registru (cele 16 de nivel A, plus ai_mention_rate, ai_sov și mentions_count pentru Overview). `aggregate`: sum, mean sau last. Override-uri pe brand: scale, trend_pct, status, coverage, stale_days, comparison_zero, value_null, warnings. insufficient_sample nu poate apărea încă la nivel A (min_sample e null în registru); apare aici ca să poată fi revăzută starea.",
   "anchor_date": "2026-09-01",
   "profiles": {
     "ga4_sessions": {"unit": "count", "aggregate": "sum", "daily_base": 420, "noise": 0.12, "trend_pct": 8, "brands": {"brand-urinal": {}, "brand-minimartieni": {"scale": 1.4, "trend_pct": 14}, "brand-proenzi": {"scale": 0.55, "trend_pct": -4}}},
@@ -20,6 +20,7 @@
     "clarity_quickback_sessions": {"unit": "count", "aggregate": "sum", "daily_base": 31, "noise": 0.2, "trend_pct": 2, "brands": {"brand-urinal": {"status": "stale", "stale_days": 3}, "brand-minimartieni": {"scale": 0.9}, "brand-proenzi": {"status": "not_connected"}}},
     "clarity_scroll_depth": {"unit": "percent", "aggregate": "mean", "daily_base": 52, "noise": 0.05, "trend_pct": -2, "brands": {"brand-urinal": {"status": "stale", "stale_days": 3}, "brand-minimartieni": {"scale": 1.08}, "brand-proenzi": {"status": "not_connected"}}},
     "ai_mention_rate": {"unit": "percent", "aggregate": "mean", "daily_base": 38, "noise": 0.05, "trend_pct": 6, "brands": {"brand-urinal": {"status": "partial", "coverage": 0.92}, "brand-minimartieni": {"scale": 1.25}, "brand-proenzi": {"status": "insufficient_sample", "scale": 0.9}}},
+    "ai_sov": {"unit": "percent", "aggregate": "mean", "daily_base": 31, "noise": 0.04, "trend_pct": 8, "brands": {"brand-urinal": {"status": "stale", "stale_days": 3}, "brand-minimartieni": {"scale": 1.15}, "brand-proenzi": {"status": "insufficient_sample", "scale": 0.8}}},
     "mentions_count": {"unit": "count", "aggregate": "sum", "daily_base": 0.4, "noise": 0.9, "trend_pct": 9, "brands": {"brand-urinal": {}, "brand-minimartieni": {"scale": 0.5}, "brand-proenzi": {"status": "not_connected"}}}
   }
 }

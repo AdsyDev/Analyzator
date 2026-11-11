@@ -1,29 +1,35 @@
+import { ChartBarIcon, ChatCircleTextIcon, RobotIcon, SmileyIcon, StackIcon, TrophyIcon, type Icon } from '@phosphor-icons/react'
 import { Link } from 'react-router-dom'
-import type { Brand, MetricDefinition, MetricsBundle, ProviderResult, QueryContext, SentimentDistribution, SocialSummary, TrendSeries } from '../../contracts'
-import { KpiCard } from '../../components/KpiCard'
-import { StatCard } from '../../components/StatCard'
+import type { Brand, CompetitionMatrix, MetricDefinition, MetricsBundle, ProviderResult, SentimentDistribution } from '../../contracts'
+import { KpiTile } from '../../components/KpiTile'
 import type { AsyncState } from '../../data/useAsync'
-import { changeDirection, formatInteger, formatMetricValue, formatRange, formatRelativeChange } from '../../lib/format'
+import { formatInteger, formatMetricValue, formatRange } from '../../lib/format'
+import { isGoodChange, metricView } from '../../lib/metricView'
 import { brandPath } from '../../lib/navigation'
-import { comparisonRange } from '../../lib/period'
-import { sourceName } from '../../lib/sources'
 import type { EvidenceTarget } from '../shared/EvidenceHost'
 import { MISSING_DEFINITION, unregisteredReason } from '../shared/slots'
-import { sparkPoints } from '../shared/sparks'
-import { OVERVIEW_CARDS, type OverviewSocialCard } from './slots'
+import { positionRows } from './position'
+import { OVERVIEW_CARDS } from './slots'
 
 interface Props {
   brand: Brand
-  ctx: QueryContext
   /** Perioada și comparația din URL, păstrate la deschiderea detaliului. */
   search: string
   metrics: AsyncState<MetricsBundle>
   definitions: Map<string, MetricDefinition>
-  trends: AsyncState<TrendSeries[]>
   sentiment: AsyncState<ProviderResult<SentimentDistribution>>
-  social: AsyncState<ProviderResult<SocialSummary>>
+  matrix: AsyncState<ProviderResult<CompetitionMatrix>>
   onRetry: () => void
   onOpen: (target: EvidenceTarget) => void
+}
+
+const ICONS: Record<string, Icon> = {
+  ai_sov: RobotIcon,
+  ai_mention_rate: ChatCircleTextIcon,
+  seomonitor_visibility_latest: StackIcon,
+  sentiment_positive: SmileyIcon,
+  gsc_clicks: ChartBarIcon,
+  competitive_position: TrophyIcon,
 }
 
 /**
@@ -37,68 +43,91 @@ export function sentimentLine(s: SentimentDistribution): string {
   return `Negativ, după revizuire: ${formatInteger(s.negative)} din ${formatInteger(s.total)}${share}${pending}.`
 }
 
-function SocialCard({ card, social, ctx, detail }: { card: OverviewSocialCard; social: Props['social']; ctx: QueryContext; detail: React.ReactNode }) {
-  const base = { label: 'Interacțiuni (social propriu)', definition: 'Interacțiunile raportate de Planable pentru conturile brandului, în perioada selectată.', category: card.category, detail, sourceLabel: sourceName('planable') }
-  if (social.status === 'loading') return <StatCard {...base} valueText={null} status="unavailable" loading />
-  if (social.status === 'failed') return <StatCard {...base} valueText={null} status="unavailable" emptyTitle="Nu am putut încărca datele" note={social.message} />
-  const r = social.value
-  if (r.kind === 'not_connected') return <StatCard {...base} valueText={null} status="not_connected" emptyTitle="Sursă neconectată" note={r.reason} />
-  if (r.kind === 'error') return <StatCard {...base} valueText={null} status="unavailable" emptyTitle="Nu am putut încărca datele" note={r.message} />
-  const k = r.data.kpis.find((x) => x.key === 'interactions')
-  if (!k) return <StatCard {...base} valueText={null} status="unavailable" note="Planable nu a trimis interacțiuni pentru acest interval." dataAsOf={r.data.data_as_of} />
-  const cmp = comparisonRange(ctx.period, ctx.comparison)
-  return (
-    <StatCard
-      {...base}
-      label={`${k.label} (social propriu)`}
-      definition={k.definition}
-      valueText={k.value === null ? null : formatInteger(k.value)}
-      deltaText={k.change === null ? null : formatRelativeChange(k.change)}
-      deltaDirection={k.change === null ? null : changeDirection(k.change)}
-      goodWhen="up"
-      status={k.status}
-      note={[k.note, card.gap].filter(Boolean).join(' ')}
-      compareLabel={`față de ${formatRange(cmp.from, cmp.to)}`}
-      dataAsOf={r.data.data_as_of}
-    />
-  )
+const SENTIMENT_LABEL = 'Sentiment pozitiv (mențiuni revizuite)'
+const SENTIMENT_DEFINITION = 'Ponderea mențiunilor cu sentiment pozitiv din mențiunile revizuite de echipă, în perioada selectată. Mențiunile nerevizuite și postările din conturile proprii nu intră.'
+const POSITION_LABEL = 'Locul în setul de competitori (AI)'
+const POSITION_DEFINITION = 'Locul brandului printre competitorii din setul în vigoare, pe primul indicator AI din matricea de Concurență. Entitățile fără valoare nu intră în clasament. Nu e un scor compus.'
+
+/** Starea unui card care citește un provider: încărcare, eroare sau „Sursă neconectată”, înainte de date. */
+function gate<T>(state: AsyncState<ProviderResult<T>>): { data: T } | { tile: { state: 'loading' | 'error' | 'ready'; valueText: null; error?: string; emptyTitle?: string; emptyReason?: string; status?: 'not_connected' | 'unavailable' } } {
+  if (state.status === 'loading') return { tile: { state: 'loading', valueText: null } }
+  if (state.status === 'failed') return { tile: { state: 'error', valueText: null, error: state.message } }
+  if (state.value.kind === 'error') return { tile: { state: 'error', valueText: null, error: state.value.message } }
+  if (state.value.kind === 'not_connected') return { tile: { state: 'ready', valueText: null, emptyTitle: 'Sursă neconectată', emptyReason: state.value.reason, status: 'not_connected' } }
+  return { data: state.value.data }
 }
 
-/** Cele șase carduri din Overview. Fiecare își păstrează starea: lipsa unei surse nu blochează celelalte carduri. */
-export function OverviewKpis({ brand, ctx, search, metrics, definitions, trends, sentiment, social, onRetry, onOpen }: Props) {
+/**
+ * Cei șase indicatori din Overview, în ordinea din machetă. Patru sunt metrici din registru (cu numele lor exact și cu
+ * dovezi la click); sentimentul și poziția competitivă vin din `brand_mention_sentiment` și din matricea de Concurență.
+ * Fiecare card își păstrează starea: lipsa unei surse nu le blochează pe celelalte.
+ */
+export function OverviewKpis({ brand, search, metrics, definitions, sentiment, matrix, onRetry, onOpen }: Props) {
   const items = metrics.status === 'done' ? metrics.value.items : []
-  const sentimentReady = sentiment.status === 'done' && sentiment.value.kind === 'ready' ? sentiment.value.data : null
   return (
-    <div className="grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="kpi-grid">
+    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 @3xl:grid-cols-3 @7xl:grid-cols-6" data-testid="kpi-grid">
       {OVERVIEW_CARDS.map((card) => {
         const detail = (
           <Link to={`${brandPath(brand.id, card.module)}${search}`} className="text-[11.5px] font-medium text-accent-text hover:underline" aria-label={`${card.category}: ${card.detailLabel}`}>
             {card.detailLabel}
           </Link>
         )
-        if (card.kind === 'social') return <SocialCard key={card.key} card={card} social={social} ctx={ctx} detail={detail} />
+        const icon = ICONS[card.key] ?? ChartBarIcon
+
+        if (card.kind === 'sentiment') {
+          const g = gate(sentiment)
+          if ('tile' in g) return <KpiTile key={card.key} icon={icon} title={card.category} label={SENTIMENT_LABEL} definition={SENTIMENT_DEFINITION} detail={detail} onRetry={onRetry} {...g.tile} />
+          const s = g.data
+          const has = s.total > 0 && s.shares.positive !== null
+          return (
+            <KpiTile
+              key={card.key} icon={icon} title={card.category} label={SENTIMENT_LABEL} definition={SENTIMENT_DEFINITION} detail={detail} state="ready" status={has ? 'ok' : 'unavailable'}
+              valueText={has ? formatMetricValue(s.shares.positive, 'percent') : null}
+              sub={has ? `${formatInteger(s.positive)} din ${formatInteger(s.total)} revizuite${s.unreviewed > 0 ? ` · ${formatInteger(s.unreviewed)} nerevizuite` : ''}` : null}
+              emptyTitle="Fără mențiuni revizuite" emptyReason={sentimentLine(s)}
+            />
+          )
+        }
+
+        if (card.kind === 'position') {
+          const g = gate(matrix)
+          if ('tile' in g) return <KpiTile key={card.key} icon={icon} title={card.category} label={POSITION_LABEL} definition={POSITION_DEFINITION} detail={detail} onRetry={onRetry} {...g.tile} />
+          const row = positionRows(g.data).find((p) => p.dimension === 'ai')
+          return (
+            <KpiTile
+              key={card.key} icon={icon} title={card.category} label={POSITION_LABEL} definition={POSITION_DEFINITION} detail={detail} state="ready" status={row?.rank ? 'ok' : 'unavailable'}
+              valueText={row?.rank ? `#${row.rank.place} din ${row.rank.of}` : null}
+              sub={row?.rank ? `După ${row.row.label}.` : null}
+              emptyTitle="Fără clasament" emptyReason={row?.rankReason ?? 'Matricea de Concurență nu are un indicator AI.'}
+            />
+          )
+        }
+
         const item = items.find((i) => i.metric_key === card.key) ?? null
         const def = definitions.get(card.key) ?? null
         const label = def?.label ?? card.label
+        const view = item ? metricView(item) : null
         const cmp = item?.evidence_query.comparison_period
-        const extra = [card.key === 'mentions_count' && sentimentReady ? sentimentLine(sentimentReady) : null, card.gap ?? null].filter(Boolean).join(' ')
         return (
-          <KpiCard
+          <KpiTile
             key={card.key}
-            category={card.category}
+            icon={icon}
+            title={card.category}
             label={label}
             definition={def?.formula ?? MISSING_DEFINITION}
-            metric={item}
-            loading={metrics.status === 'loading'}
+            state={metrics.status === 'loading' ? 'loading' : metrics.status === 'failed' ? 'error' : 'ready'}
+            status={item?.status}
             error={metrics.status === 'failed' ? metrics.message : null}
-            spark={sparkPoints(trends, card.key)}
-            direction={def?.direction ?? 'neutral'}
-            qualifier={def?.aggregation_label ?? null}
-            compareLabel={cmp ? `față de ${formatRange(cmp.start, cmp.end)}` : undefined}
-            emptyReason={def === null && item?.status === 'not_connected' ? unregisteredReason(card) : null}
-            extra={extra || null}
+            valueText={view?.hasValue ? view.valueText : null}
+            deltaText={view?.deltaText}
+            deltaDirection={view?.deltaDirection}
+            deltaGood={view?.deltaDirection ? isGoodChange(def?.direction ?? 'neutral', view.deltaDirection) : null}
+            sub={view?.deltaText && cmp ? `față de ${formatRange(cmp.start, cmp.end)}` : null}
+            caveat={view?.caveat}
+            emptyTitle={view?.emptyTitle ?? 'Fără date pentru interval'}
+            emptyReason={def === null && item?.status === 'not_connected' ? unregisteredReason(card) : (view?.emptyReason ?? null)}
             detail={detail}
-            onOpen={() => item && onOpen({ page: 'Overview', label, query: item.evidence_query, item, definition: def })}
+            onOpen={item ? () => onOpen({ page: 'Overview', label, query: item.evidence_query, item, definition: def }) : undefined}
             onRetry={onRetry}
           />
         )

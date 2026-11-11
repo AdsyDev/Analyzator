@@ -60,11 +60,11 @@ describe('AppShell', () => {
     expect(screen.getByText('Nicio sursă nu a importat date încă')).toBeInTheDocument()
   })
 
-  it('navigarea are cele 13 module pentru agency_admin și păstrează perioada, nu filtrele modulului', () => {
+  it('navigarea are cele 14 module pentru agency_admin și păstrează perioada, nu filtrele modulului', () => {
     setup()
     const nav = screen.getByRole('navigation', { name: 'Module' })
     expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual([
-      'Overview', 'AI Visibility', 'SEO și Search', 'Indexare', 'Trafic și conversii', 'User experience', 'Paid Media', 'Social', 'Listening', 'Farmacovigilență', 'Concurență', 'Analize și acțiuni', 'Rapoarte',
+      'Overview', 'AI Visibility', 'SEO și Search', 'Indexare', 'Trafic și conversii', 'User experience', 'Paid Media', 'Social', 'Listening', 'Farmacovigilență', 'Concurență', 'Analize și acțiuni', 'Rapoarte', 'AdSy AI',
     ])
     expect(within(nav).getByRole('link', { name: 'Farmacovigilență' })).toHaveAttribute('href', '/brands/b1/pharmacovigilance?period=7d')
     const ai = within(nav).getByRole('link', { name: 'AI Visibility' })
@@ -102,14 +102,14 @@ describe('AppShell', () => {
     setup({ brandId: null })
     const nav = screen.getByRole('navigation', { name: 'Module' })
     expect(within(nav).queryAllByRole('link')).toHaveLength(0)
-    expect(nav.querySelectorAll('[aria-disabled="true"]')).toHaveLength(13)
+    expect(nav.querySelectorAll('[aria-disabled="true"]')).toHaveLength(14)
   })
 
   it('Farmacovigilență (submeniul Listening) e doar pentru agency_admin (B7-14)', () => {
     for (const user of [strategist, { ...strategist, role: 'account' as const }, client]) {
       setup({ user })
       const nav = screen.getByRole('navigation', { name: 'Module' })
-      expect(within(nav).getAllByRole('link')).toHaveLength(12)
+      expect(within(nav).getAllByRole('link')).toHaveLength(13)
       expect(within(nav).queryByRole('link', { name: 'Farmacovigilență' }), user.role).toBeNull()
       cleanup()
     }
@@ -186,9 +186,10 @@ describe('AppShell', () => {
 
   it('comută tema', async () => {
     setup()
-    await userEvent.click(screen.getByRole('button', { name: 'Comută la tema închisă' }))
-    expect(document.documentElement.getAttribute('data-az-theme')).toBe('dark')
-    expect(screen.getByRole('button', { name: 'Comută la tema deschisă' })).toBeInTheDocument()
+    // Fără o alegere salvată, aplicația pornește pe tema închisă.
+    await userEvent.click(screen.getByRole('button', { name: 'Comută la tema deschisă' }))
+    expect(document.documentElement.getAttribute('data-az-theme')).toBe('light')
+    expect(screen.getByRole('button', { name: 'Comută la tema închisă' })).toBeInTheDocument()
   })
 
   it('meniul contului: date, ieșire din cont, fără comutator de rol în afara previzualizării', async () => {

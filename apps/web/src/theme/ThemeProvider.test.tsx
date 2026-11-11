@@ -31,45 +31,47 @@ function Probe() {
 const attr = () => document.documentElement.getAttribute('data-az-theme')
 
 describe('ThemeProvider', () => {
-  beforeEach(() => document.documentElement.removeAttribute('data-az-theme'))
-  
+  beforeEach(() => {
+    document.documentElement.removeAttribute('data-az-theme')
+    window.localStorage.removeItem('az-theme')
+  })
 
-  it('pornește din prefers-color-scheme când nu există alegere salvată', () => {
-    mockSystem(true)
+
+  it('pornește pe tema închisă când nu există alegere salvată, indiferent de tema sistemului', () => {
+    mockSystem(false)
     render(<ThemeProvider><Probe /></ThemeProvider>)
     expect(screen.getByRole('button').textContent).toBe('dark:sistem')
     expect(attr()).toBe('dark')
   })
 
-  it('urmărește sistemul cât timp utilizatorul nu a ales', () => {
+  it('nu urmărește tema sistemului', () => {
     const sys = mockSystem(false)
     render(<ThemeProvider><Probe /></ThemeProvider>)
-    expect(attr()).toBe('light')
     act(() => sys.set(true))
-    expect(attr()).toBe('dark')
-  })
-
-  it('persistă alegerea explicită și o preferă sistemului', async () => {
-    const sys = mockSystem(false)
-    render(<ThemeProvider><Probe /></ThemeProvider>)
-    await userEvent.click(screen.getByRole('button'))
-    expect(screen.getByRole('button').textContent).toBe('dark:explicit')
-    expect(window.localStorage.getItem('az-theme')).toBe('dark')
     act(() => sys.set(false))
     expect(attr()).toBe('dark')
   })
 
-  it('citește tema salvată la pornire', () => {
-    mockSystem(false)
-    window.localStorage.setItem('az-theme', 'dark')
+  it('persistă alegerea explicită', async () => {
+    mockSystem(true)
     render(<ThemeProvider><Probe /></ThemeProvider>)
-    expect(attr()).toBe('dark')
+    await userEvent.click(screen.getByRole('button'))
+    expect(screen.getByRole('button').textContent).toBe('light:explicit')
+    expect(window.localStorage.getItem('az-theme')).toBe('light')
+    expect(attr()).toBe('light')
+  })
+
+  it('citește tema salvată la pornire', () => {
+    mockSystem(true)
+    window.localStorage.setItem('az-theme', 'light')
+    render(<ThemeProvider><Probe /></ThemeProvider>)
+    expect(attr()).toBe('light')
   })
 
   it('ignoră o valoare salvată invalidă', () => {
     mockSystem(false)
     window.localStorage.setItem('az-theme', 'neon')
     render(<ThemeProvider><Probe /></ThemeProvider>)
-    expect(screen.getByRole('button').textContent).toBe('light:sistem')
+    expect(screen.getByRole('button').textContent).toBe('dark:sistem')
   })
 })

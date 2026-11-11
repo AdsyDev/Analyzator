@@ -12,7 +12,7 @@ describe('Portofoliu', () => {
     await open()
     await screen.findByRole('table', { name: 'Portofoliu: indicatorii brandurilor' })
     expect(rows().map((r) => within(r).getByRole('link').textContent)).toEqual(['Urinal', 'Minimartieni', 'Proenzi'])
-    for (const h of ['Brand', 'Sesiuni', 'Key events', 'Mențiuni']) expect(screen.getByRole('columnheader', { name: new RegExp(`^${h}`) })).toBeInTheDocument()
+    for (const h of ['Brand', 'AI SoV în setul urmărit', 'AI Mention Rate', 'Clicks (Search Console)']) expect(screen.getByRole('columnheader', { name: new RegExp(`^${h.replace(/[()]/g, '\\$&')}`) })).toBeInTheDocument()
   })
 
   it('cifra din portofoliu e cea de pe cardul din Overview al brandului', async () => {
@@ -20,13 +20,13 @@ describe('Portofoliu', () => {
     await open()
     await screen.findByRole('table', { name: 'Portofoliu: indicatorii brandurilor' })
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent ?? '')
-    const col = headers.findIndex((h) => h.startsWith('Sesiuni'))
+    const col = headers.findIndex((h) => h.startsWith('Clicks (Search Console)'))
     const cell = within(rows()[0]!).getAllByRole('cell')[col]!
     const value = cell.querySelector('span span')!.textContent!
     await userEvent.click(within(rows()[0]!).getByRole('link', { name: 'Urinal' }))
-    await pageReady('Overview')
+    await pageReady('Imaginea completă a brandului')
     expect(where()).toBe('/brands/brand-urinal/overview')
-    expect((await screen.findByRole('article', { name: 'Sesiuni' })).textContent).toContain(value)
+    expect((await screen.findByRole('article', { name: 'Clicks (Search Console)' })).textContent).toContain(value)
   })
 
   it('un brand ai cărui indicatori nu pot fi citiți rămâne în listă, cu motivul; celelalte își arată cifrele', async () => {
@@ -54,13 +54,13 @@ describe('Portofoliu', () => {
 
   it('linkul „Portofoliu” apare în meniu doar cu cel puțin două branduri', async () => {
     renderApp({ route: '/brands/brand-urinal/overview' })
-    await pageReady('Overview')
+    await pageReady('Imaginea completă a brandului')
     expect(within(screen.getByRole('navigation', { name: 'Portofoliu' })).getByRole('link', { name: 'Portofoliu' })).toHaveAttribute('href', '/portfolio')
   })
 
   it('cu un singur brand, meniul nu are „Portofoliu”', async () => {
     renderApp({ route: '/brands/brand-urinal/overview', wrap: (b) => ({ ...b, brands: { ...b.brands, list: async () => { const r = await b.brands.list(); return r.kind === 'ready' ? { ...r, data: r.data.slice(0, 1) } : r } } }) })
-    await pageReady('Overview')
+    await pageReady('Imaginea completă a brandului')
     expect(screen.queryByRole('navigation', { name: 'Portofoliu' })).toBeNull()
   })
 })

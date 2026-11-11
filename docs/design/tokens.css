@@ -1,5 +1,7 @@
 /* Analyzator design tokens. Sursa: docs/design/reference/Analyzator.dc.html (blocurile :root).
-   Light este implicit; dark se activează cu data-az-theme="dark" pe <html>.
+   Light este implicit în acest fișier; dark se activează cu data-az-theme="dark" pe <html> (aplicația pornește pe dark, N-4).
+   Paleta dark urmează macheta din propunere („Imaginea completă a brandului”): fundal aproape negru, accent turcoaz,
+   violet și albastru pentru competitori, verde pentru variațiile favorabile.
    Regula de aur: sticla (--glass*, backdrop-filter) doar pe sidebar, topbar, drawere, modale, popovere.
    Suprafețele cu date folosesc --surface (solid). */
 
@@ -63,33 +65,33 @@
 }
 
 :root[data-az-theme="dark"] {
-  --bg:#0C1118;
-  --au1:rgba(15,163,163,0.10);
-  --au2:rgba(124,111,222,0.08);
-  --au3:rgba(15,163,163,0.04);
-  --glass:rgba(18,24,33,0.6);
-  --glass-strong:rgba(20,27,37,0.88);
-  --glass-thick:rgba(16,22,30,0.76);
-  --glass-bar:rgba(16,22,30,0.94);
+  --bg:#070C11;
+  --au1:rgba(25,211,206,0.09);
+  --au2:rgba(139,92,246,0.07);
+  --au3:rgba(25,211,206,0.04);
+  --glass:rgba(10,16,22,0.62);
+  --glass-strong:rgba(12,19,26,0.9);
+  --glass-thick:rgba(9,15,21,0.8);
+  --glass-bar:rgba(8,13,18,0.94);
   --glass-border:rgba(255,255,255,0.08);
-  --surface:#141B24;
-  --surface-2:#18212C;
-  --border:#233040;
-  --border-strong:#2F3E51;
-  --text:#E9EEF4;
-  --text-2:#93A1B3;
-  --text-3:#728196;
-  --accent:#22B8B6;
-  --accent-text:#4FD3D0;
-  --accent-soft:rgba(34,184,182,0.14);
-  --accent-btn:#22B8B6;
-  --on-accent:#061A1A;
-  --lav:#958AF0;
-  --lav-text:#B0A7F6;
-  --lav-soft:rgba(149,138,240,0.16);
-  --pos:#35BC86;
-  --pos-text:#55D3A0;
-  --pos-soft:rgba(53,188,134,0.14);
+  --surface:#0D151C;
+  --surface-2:#121D26;
+  --border:#1A2733;
+  --border-strong:#283A4B;
+  --text:#F1F5F9;
+  --text-2:#9BADC0;
+  --text-3:#6E8296;
+  --accent:#19D3CE;
+  --accent-text:#3FE0DA;
+  --accent-soft:rgba(25,211,206,0.14);
+  --accent-btn:#19D3CE;
+  --on-accent:#04201F;
+  --lav:#A78BFA;
+  --lav-text:#C4B5FD;
+  --lav-soft:rgba(167,139,250,0.16);
+  --pos:#22C55E;
+  --pos-text:#4ADE80;
+  --pos-soft:rgba(34,197,94,0.14);
   --neg:#EC6B71;
   --neg-text:#F48D92;
   --neg-soft:rgba(236,107,113,0.14);
@@ -100,19 +102,19 @@
   --pv:#EB9499;
   --pv-soft:rgba(235,148,153,0.10);
   --pv-btn:#C9545A;
-  --c1:#7A8899;
-  --c2:#5F6D7F;
-  --c3:#4B5869;
+  --c1:#A78BFA;
+  --c2:#3B82F6;
+  --c3:#64748B;
   --s3:#7FA6CC;
   --s4:#C9A772;
-  --grid:#1C2532;
+  --grid:#15202A;
   --gap-a:rgba(147,161,179,0.07);
-  --skeleton:#1C2633;
-  --ring:rgba(34,184,182,0.45);
+  --skeleton:#15202A;
+  --ring:rgba(25,211,206,0.45);
   --scrim:rgba(5,8,12,0.40);
   --nav-active:rgba(255,255,255,0.075);
   --nav-hover:rgba(255,255,255,0.04);
-  --heat:34,184,182;
+  --heat:25,211,206;
   --sh-1:0 1px 2px rgba(0,0,0,0.30);
   --sh-2:0 2px 4px rgba(0,0,0,0.3),0 14px 32px rgba(0,0,0,0.38);
   --sh-glass:inset 0 1px 0 rgba(255,255,255,0.05),0 8px 32px rgba(0,0,0,0.35);

@@ -1,74 +1,56 @@
 /**
- * Cardurile din Overview (propunerea din 10 nov. 2026, „Overview pentru decizii rapide"): maximum șase, fiecare
- * răspunde la o întrebare (`category`) și duce la detaliul ei (`module`). Eticheta rămâne numele exact al metricii
- * din registru; `label` e doar rezerva pentru o cheie fără definiție.
+ * Overview, după macheta din propunere („Imaginea completă a brandului”): șase indicatori pe primul rând, fiecare cu
+ * detaliul lui. Eticheta rămâne numele exact al metricii din registru; `label` e doar rezerva pentru o cheie fără definiție.
  *
- * Două carduri nu au încă metrica din propunere și o spun explicit, fără valori estimate:
- * - „Performanță socială" arată interacțiunile din `brand_social` (calculate în SQL); engagement rate nu are încă
- *   definiție în registru (numitorul diferă pe platforme).
- * - „Acțiuni importante" arată numărul de key events; rata sesiunilor cu key event nu se colectează încă.
+ * Patru carduri sunt metrici din registru. Două nu sunt și o spun:
+ * - „Sentiment” arată ponderea pozitivă din mențiunile revizuite de om (`brand_mention_sentiment`), cu numărul lor;
+ * - „Poziție competitivă” arată locul brandului în setul de competitori pe AI, din matricea de Concurență.
+ * Macheta mai arată „Scor SEO” și „Mențiuni AI”; aplicația nu are un scor SEO compus și nici un număr de mențiuni AI în
+ * registru, deci în locul lor stau Visibility SEOmonitor și AI Mention Rate, cu numele lor adevărat.
  */
 import type { KpiSlot } from '../shared/slots'
 
-export interface OverviewMetricCard extends KpiSlot {
-  kind: 'metric'
+interface CardBase {
   category: string
   /** Segmentul modulului de detaliu (`/brands/:id/<module>`). */
   module: string
   detailLabel: string
-  /** Ce lipsește față de indicatorul din propunere, afișat sub valoare. */
-  gap?: string
 }
-export interface OverviewSocialCard {
-  kind: 'social'
-  key: 'social_interactions'
-  category: string
-  module: string
-  detailLabel: string
-  gap: string
+export interface OverviewMetricCard extends KpiSlot, CardBase {
+  kind: 'metric'
 }
-export type OverviewCard = OverviewMetricCard | OverviewSocialCard
+export interface OverviewSentimentCard extends CardBase {
+  kind: 'sentiment'
+  key: 'sentiment_positive'
+}
+export interface OverviewPositionCard extends CardBase {
+  kind: 'position'
+  key: 'competitive_position'
+}
+export type OverviewCard = OverviewMetricCard | OverviewSentimentCard | OverviewPositionCard
 
 export const OVERVIEW_CARDS: readonly OverviewCard[] = [
-  { kind: 'metric', key: 'ai_mention_rate', label: 'AI Mention Rate', category: 'Vizibilitate AI', module: 'ai', detailLabel: 'Engine-uri și topicuri' },
-  { kind: 'metric', key: 'seomonitor_visibility_latest', label: 'Visibility SEOmonitor', category: 'Vizibilitate organică', module: 'seo', detailLabel: 'Keywords și pagini' },
-  { kind: 'metric', key: 'mentions_count', label: 'Mențiuni', category: 'Conversații relevante', module: 'listening', detailLabel: 'Mention feed' },
-  {
-    kind: 'social',
-    key: 'social_interactions',
-    category: 'Performanță socială',
-    module: 'social',
-    detailLabel: 'Postări',
-    gap: 'Engagement rate nu are încă definiție în registru; până atunci arătăm interacțiunile.',
-  },
-  { kind: 'metric', key: 'ga4_sessions', label: 'Sesiuni', category: 'Trafic pe site', module: 'traffic', detailLabel: 'Canale și landing pages' },
-  {
-    kind: 'metric',
-    key: 'ga4_key_events',
-    label: 'Key events',
-    category: 'Acțiuni importante',
-    module: 'traffic',
-    detailLabel: 'Trafic și conversii',
-    gap: 'Număr de evenimente, nu de sesiuni: rata sesiunilor cu key event nu se colectează încă.',
-  },
+  { kind: 'metric', key: 'ai_sov', label: 'AI Share of Voice', category: 'AI Share of Voice', module: 'ai', detailLabel: 'Engine-uri și topicuri' },
+  { kind: 'metric', key: 'ai_mention_rate', label: 'AI Mention Rate', category: 'Mențiuni în AI', module: 'ai', detailLabel: 'Răspunsuri AI' },
+  { kind: 'metric', key: 'seomonitor_visibility_latest', label: 'Visibility SEOmonitor', category: 'Vizibilitate SEO', module: 'seo', detailLabel: 'Keywords și pagini' },
+  { kind: 'sentiment', key: 'sentiment_positive', category: 'Sentiment pozitiv', module: 'listening', detailLabel: 'Mention feed' },
+  { kind: 'metric', key: 'gsc_clicks', label: 'Clicks (Search Console)', category: 'Trafic organic', module: 'seo', detailLabel: 'Landing pages' },
+  { kind: 'position', key: 'competitive_position', category: 'Poziție competitivă', module: 'competition', detailLabel: 'Toată comparația' },
 ]
 
 /** Cardurile care sunt metrici din registru, în ordinea afișării. */
 export const KPI_SLOTS: readonly OverviewMetricCard[] = OVERVIEW_CARDS.filter((c): c is OverviewMetricCard => c.kind === 'metric')
-export const KPI_KEYS: readonly string[] = KPI_SLOTS.map((s) => s.key)
 
-/** Cele patru grafice din „Evoluția brandului": AI, search, trafic, mențiuni; fiecare cu scara ei. */
-export interface TrendSlot {
-  key: string
-  tab: string
-}
+/** Metricile din cardurile de sub primul rând: „SEO și trafic” și „Social listening”. */
+export const BOARD_KEYS = ['seomonitor_keywords_top10', 'gsc_ctr', 'ga4_sessions', 'mentions_count'] as const
 
-export const TREND_SLOTS: readonly TrendSlot[] = [
-  { key: 'ai_mention_rate', tab: 'AI' },
-  { key: 'gsc_clicks', tab: 'Search' },
-  { key: 'ga4_sessions', tab: 'Trafic' },
-  { key: 'mentions_count', tab: 'Mențiuni' },
-]
+/** Toate metricile din registru de pe Overview: după ele se numără acoperirea și se caută „Ce s-a schimbat”. */
+export const KPI_KEYS: readonly string[] = [...KPI_SLOTS.map((s) => s.key), ...BOARD_KEYS]
 
-/** „Poziția față de competitori": primul rând al fiecărei dimensiuni din matricea de Concurență, în această ordine. */
+/** Seria din „Evoluția vizibilității AI” și seria zilnică din „SEO și trafic”. */
+export const AI_TREND_KEY = 'ai_sov'
+export const ORGANIC_TREND_KEY = 'gsc_clicks'
+export const TREND_KEYS: readonly string[] = [...new Set([...KPI_KEYS, AI_TREND_KEY, ORGANIC_TREND_KEY])]
+
+/** Rândul din matricea de Concurență folosit pentru „Poziție competitivă” și pentru cardul „Competitori”. */
 export const POSITION_DIMENSIONS = ['ai', 'seo', 'listening'] as const

@@ -5,11 +5,12 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select * from no_plan();
 
--- R1. Toate cele 24 de politici de date folosesc noua funcție (21 din D-20, paid_budgets din J-4, index_urls și index_inspections din L); nicio politică de date
+-- R1. Toate cele 27 de politici de date folosesc noua funcție (21 din D-20, paid_budgets din J-4, index_urls și index_inspections din L,
+-- cele trei tabele AdSy AI din M); nicio politică de date
 -- nu mai apelează has_brand_access pe rând.
 select is(
   (select count(*)::integer from pg_policies where schemaname = 'public' and cmd = 'SELECT' and qual like '%accessible_brand_ids()%'),
-  24, 'R1: 24 de politici SELECT folosesc accessible_brand_ids()');
+  27, 'R1: 27 de politici SELECT folosesc accessible_brand_ids()');
 select is_empty(
   $$ select tablename from pg_policies where schemaname = 'public' and cmd = 'SELECT' and qual = 'private.has_brand_access(brand_id)' $$,
   'R1: nicio politică de date nu mai evaluează has_brand_access pe fiecare rând');

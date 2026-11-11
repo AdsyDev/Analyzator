@@ -12,6 +12,7 @@ import { UsersPage } from '../screens/admin/UsersPage'
 import { IndexingPage } from '../screens/indexing/IndexingPage'
 import { InsightsPage } from '../screens/insights/InsightsPage'
 import { AiPage } from '../screens/ai/AiPage'
+import { AssistantPage } from '../screens/assistant/AssistantPage'
 import { CompetitionPage } from '../screens/competition/CompetitionPage'
 import { ListeningPage } from '../screens/listening/ListeningPage'
 import { PharmacovigilancePage } from '../screens/listening/PharmacovigilancePage'
@@ -59,6 +60,7 @@ function BrandModulePage() {
   if (module.segment === 'competition') return <CompetitionPage />
   if (module.segment === 'insights') return <InsightsPage />
   if (module.segment === 'reports') return <ReportsPage />
+  if (module.segment === 'assistant') return <AssistantPage />
   return <NotFoundPage />
 }
 

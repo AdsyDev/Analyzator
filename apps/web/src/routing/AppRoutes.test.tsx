@@ -94,7 +94,7 @@ describe('rute de brand', () => {
   it('/ duce la Overview-ul primului brand permis', async () => {
     setup('/')
     await waitFor(() => expect(where()).toBe('/brands/brand-urinal/overview'))
-    expect(await screen.findByRole('heading', { level: 1, name: 'Overview' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Imaginea completă a brandului' })).toBeInTheDocument()
   })
 
   it('/brands/:id duce la Overview', async () => {
@@ -103,7 +103,7 @@ describe('rute de brand', () => {
   })
 
   it.each([
-    ['overview', 'Overview', /Starea brandului pe toate sursele/],
+    ['overview', 'Imaginea completă a brandului', /Vizibilitate, reputație și oportunități într-un singur loc/],
     ['ai', 'AI Visibility', /răspunsurile asistenților AI/],
     ['seo', 'SEO și Search', /Prezența în Google/],
     ['traffic', 'Trafic și conversii', /Ce se întâmplă după click/],
@@ -394,7 +394,7 @@ describe('previzualizare: rol comutabil', () => {
 
   it('comutarea la agenție readuce Administrarea', async () => {
     setup('/brands/brand-urinal/overview', { role: 'client_viewer' })
-    await screen.findByRole('heading', { level: 1, name: 'Overview' })
+    await screen.findByRole('heading', { level: 1, name: 'Imaginea completă a brandului' })
     expect(screen.queryByRole('navigation', { name: 'Administrare' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: /^Contul / }))
     await userEvent.click(screen.getByRole('radio', { name: 'Agenție, administrator' }))

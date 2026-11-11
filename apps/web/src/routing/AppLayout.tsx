@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Outlet, useLocation, useMatch, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, Outlet, useLocation, useMatch, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import { useAuth, useUser } from '../auth/AuthContext'
 import { AppShell } from '../components/AppShell'
 import { ModuleFreshness } from '../components/ModuleFreshness'
@@ -32,6 +32,8 @@ export interface LayoutContext {
   reloadBrands: () => void
   /** Alege spațiul din topbar (de ex. site-ul deschis în pagina lui de surse). */
   selectBrand: (id: string) => void
+  /** Sidebarul AdSy AI („AI insights”): deschis sau nu, și elementul în care pagina își montează conținutul. */
+  aiPanel: { open: boolean; setOpen: (open: boolean) => void; container: HTMLElement | null }
 }
 
 export const useLayout = () => useOutletContext<LayoutContext>()
@@ -46,6 +48,16 @@ function readBrand(): string | null {
     return window.localStorage.getItem(BRAND_KEY) ?? window.sessionStorage.getItem(BRAND_KEY)
   } catch {
     return null
+  }
+}
+const AI_PANEL_KEY = 'az-ai-panel'
+const AI_SWITCH_ID = 'ai-insights-switch'
+/** Sidebarul AdSy AI e închis până îl deschide utilizatorul; alegerea se reține pe dispozitiv. */
+function readAiPanel(): boolean {
+  try {
+    return window.localStorage.getItem(AI_PANEL_KEY) === 'open'
+  } catch {
+    return false
   }
 }
 function writeBrand(id: string) {
@@ -80,6 +92,25 @@ export function AppLayout() {
     brandsState.status === 'done' ? brandsState.value : brandsState.status === 'failed' ? { kind: 'error', message: brandsState.message } : null
   const brands = brandsResult?.kind === 'ready' ? brandsResult.data : []
 
+  const [aiOpen, setAiOpenState] = useState<boolean>(readAiPanel)
+  const [aiContainer, setAiContainerState] = useState<HTMLElement | null>(null)
+  // Deschis de utilizator (nu restaurat la încărcare): focusul trece în sidebar; la închidere se întoarce la comutator.
+  const focusAiPanel = useRef(false)
+  const setAiContainer = useCallback((el: HTMLElement | null) => {
+    setAiContainerState(el)
+    if (el && focusAiPanel.current) el.focus()
+    focusAiPanel.current = false
+  }, [])
+  const setAiOpen = (open: boolean) => {
+    focusAiPanel.current = open
+    if (!open) document.getElementById(AI_SWITCH_ID)?.focus()
+    setAiOpenState(open)
+    try {
+      window.localStorage.setItem(AI_PANEL_KEY, open ? 'open' : 'closed')
+    } catch {
+      // Stocarea poate fi blocată; alegerea rămâne valabilă cât ține pagina.
+    }
+  }
   const [remembered, setRemembered] = useState<string | null>(readBrand)
   const urlBrand = urlBrandId ? (brands.find((b) => b.id === urlBrandId) ?? null) : null
   useEffect(() => {
@@ -159,7 +190,7 @@ export function AppLayout() {
   } else if (urlBrandId && !urlBrand) {
     content = <NoAccessPage homeBrandId={homeBrandId} />
   } else {
-    const context: LayoutContext = { user, brands, brand: urlBrand, activeBrand: shellBrand, ctx, homeBrandId, changeFilters: change, reloadBrands, selectBrand: onBrandChange }
+    const context: LayoutContext = { user, brands, brand: urlBrand, activeBrand: shellBrand, ctx, homeBrandId, changeFilters: change, reloadBrands, selectBrand: onBrandChange, aiPanel: { open: aiOpen, setOpen: setAiOpen, container: aiContainer } }
     // Starea datelor apare pe fiecare modul de brand care depinde de surse; cât nu se poate citi, nu ocupă loc.
     // Structura rămâne aceeași cu sau fără fâșie, ca pagina să nu se remonteze (și să nu-și reia cererile) când apare.
     const showFreshness = module && urlBrand && module.sources.length > 0 && freshnessState.status !== 'failed' && (freshnessState.status === 'loading' || freshness !== null)
@@ -178,7 +209,27 @@ export function AppLayout() {
       brands={brandsResult}
       brandId={shellBrand?.id ?? null}
       onBrandChange={onBrandChange}
-      title={title}
+      title={module?.headline ?? title}
+      eyebrow={module?.headline ? `Brand Intelligence / ${module.title}` : undefined}
+      actions={
+        urlBrand && (module?.exportReport || module?.assistantPanel) ? (
+          <div className="flex flex-wrap items-center gap-3 print:hidden">
+            {module.exportReport && (
+              <Link to={{ pathname: brandPath(urlBrand.id, 'reports'), search: sharedSearch(params) }} className="inline-flex h-9 items-center rounded-[10px] border border-border-strong bg-surface px-3 text-[13px] font-semibold hover:bg-surface-2">
+                Exportă raportul
+              </Link>
+            )}
+            {module.assistantPanel && (
+              <label htmlFor={AI_SWITCH_ID} className="flex h-9 cursor-pointer items-center gap-2 rounded-[10px] border border-border-strong bg-surface px-3 text-[13px] font-semibold hover:bg-surface-2">
+                <input id={AI_SWITCH_ID} type="checkbox" role="switch" aria-checked={aiOpen} checked={aiOpen} onChange={(e) => setAiOpen(e.target.checked)} className="peer sr-only" />
+                <span aria-hidden="true" className="relative h-5 w-9 rounded-full bg-neutral-soft transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-4 after:rounded-full after:bg-[var(--text-2)] after:transition-transform peer-checked:bg-accent peer-checked:after:translate-x-4 peer-checked:after:bg-white peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2" />
+                AI insights
+              </label>
+            )}
+          </div>
+        ) : undefined
+      }
+      rightPanel={module?.assistantPanel && urlBrand && aiOpen ? { ref: setAiContainer, onClose: () => setAiOpen(false) } : undefined}
       subtitle={subtitle || undefined}
       dataAsOf={dataAsOf}
       lastRefreshAt={lastRefreshAt}

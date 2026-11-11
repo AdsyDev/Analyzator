@@ -1,6 +1,7 @@
 import { ChartLineIcon, TableIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { useId, useMemo, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type { ChartFormat, ChartSeries } from '../lib/chartData'
+import { continuousRuns, linePath } from '../lib/chartPath'
 import { cn } from '../lib/cn'
 import { formatCompact } from '../lib/format'
 import { Button } from './ui/Button'
@@ -34,9 +35,15 @@ export interface TrendChartProps {
   onRetry?: () => void
   /** Motivul când sursa lipsește (status not_connected/unavailable al seriilor). */
   unavailableReason?: string | null
+  /** Curbe netede între puncte (macheta din propunere); valorile și golurile rămân aceleași. */
+  smooth?: boolean
+  /** Puncte la primul și la ultimul punct al fiecărei serii pline și eticheta ultimei valori a seriei principale. */
+  endMarkers?: boolean
+  /** Umple, în degrade, aria de sub seria principală. Golurile rămân goluri. */
+  area?: boolean
 }
 
-export function TrendChart({ title, series, labels, height = 240, format = 'int', note, loading = false, error = null, onRetry, unavailableReason = null }: TrendChartProps) {
+export function TrendChart({ title, series, labels, height = 240, format = 'int', note, loading = false, error = null, onRetry, unavailableReason = null, smooth = false, endMarkers = false, area = false }: TrendChartProps) {
   const [hidden, setHidden] = useState<Record<string, boolean>>({})
   const [hover, setHover] = useState<number | null>(null)
   const [asTable, setAsTable] = useState(false)
@@ -81,18 +88,18 @@ export function TrendChart({ title, series, labels, height = 240, format = 'int'
   const xp = (i: number) => (n > 1 ? (i / (n - 1)) * 100 : 50)
   const Y = (v: number) => height - ((v - min) / span) * height
 
-  const pathFor = (values: Array<number | null>) => {
-    let d = ''
-    let pen = false
-    values.forEach((v, i) => {
-      if (v === null) {
-        pen = false
-        return
-      }
-      d += `${pen ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)} `
-      pen = true
-    })
-    return d.trim()
+  const pointsOf = (values: Array<number | null>, idx: number[]) => idx.map((i) => ({ x: X(i), y: Y(values[i] as number) }))
+  const pathFor = (values: Array<number | null>) => continuousRuns(values).map((idx) => linePath(pointsOf(values, idx), smooth)).join(' ')
+  /** Aria de sub linie, pe fiecare porțiune continuă: linia, apoi închiderea pe baza graficului. */
+  const areaFor = (values: Array<number | null>) =>
+    continuousRuns(values)
+      .filter((idx) => idx.length > 1)
+      .map((idx) => `${linePath(pointsOf(values, idx), smooth)} L${X(idx[idx.length - 1]!).toFixed(1)} ${height} L${X(idx[0]!).toFixed(1)} ${height} Z`)
+      .join(' ')
+  /** Primul și ultimul punct cu valoare al unei serii. */
+  const endsOf = (values: Array<number | null>) => {
+    const idx = values.map((v, i) => (v === null || v === undefined ? -1 : i)).filter((i) => i >= 0)
+    return idx.length === 0 ? [] : [...new Set([idx[0]!, idx[idx.length - 1]!])]
   }
 
   // Goluri: zilele fără date ale seriei principale (prima vizibilă), hașurate. Seria de comparație e secundară
@@ -231,6 +238,17 @@ export function TrendChart({ title, series, labels, height = 240, format = 'int'
               </div>
             ))}
             <svg viewBox={`0 0 1000 ${height}`} preserveAspectRatio="none" aria-hidden="true" className="absolute inset-0 size-full overflow-visible">
+              {area && primary && !primary.dashed && (
+                <>
+                  <defs>
+                    <linearGradient id={`${uid}-area`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" style={{ stopColor: primary.color, stopOpacity: 0.28 }} />
+                      <stop offset="100%" style={{ stopColor: primary.color, stopOpacity: 0 }} />
+                    </linearGradient>
+                  </defs>
+                  <path data-testid="chart-area" d={areaFor(primary.values)} stroke="none" fill={`url(#${uid}-area)`} />
+                </>
+              )}
               {[...visible].reverse().map((s, j, arr) => (
                 <path
                   key={s.key}
@@ -245,6 +263,23 @@ export function TrendChart({ title, series, labels, height = 240, format = 'int'
                 />
               ))}
             </svg>
+            {endMarkers &&
+              visible
+                .filter((s) => !s.dashed)
+                .flatMap((s) =>
+                  endsOf(s.values).map((i) => (
+                    <span key={`${s.key}-${i}`} aria-hidden="true" data-testid="chart-end-marker" className="pointer-events-none absolute -ml-[5px] -mt-[5px] size-2.5 rounded-full ring-2 ring-surface" style={{ left: `${xp(i)}%`, top: Y(s.values[i] as number), background: s.color }} />
+                  )),
+                )}
+            {endMarkers && hi === null && primary && !primary.dashed && (() => {
+              const last = endsOf(primary.values).at(-1)
+              if (last === undefined) return null
+              return (
+                <span aria-hidden="true" className="pointer-events-none absolute -translate-x-full -translate-y-[calc(100%+10px)] whitespace-nowrap rounded-md border border-border-strong bg-surface-2 px-2 py-1 font-mono text-[11px] text-text" style={{ left: `${xp(last)}%`, top: Y(primary.values[last] as number) }}>
+                  {labels[last]} · {fmtValue(primary.values[last] ?? null, format)}
+                </span>
+              )
+            })()}
             {hi !== null && (
               <>
                 <div className="pointer-events-none absolute inset-y-0 border-l border-dashed border-border-strong" style={{ left: `${xp(hi)}%` }} />

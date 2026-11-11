@@ -26,6 +26,12 @@ export interface BrandModule {
   connectLabel?: string
   /** Modulul arată ultima stare cunoscută, nu o perioadă: bara de perioadă și comparație nu apare. */
   noPeriod?: boolean
+  /** Titlul mare al paginii, când diferă de numele din meniu (Overview: „Imaginea completă a brandului”). */
+  headline?: string
+  /** Pagina are, lângă titlu, legătura spre raportul perioadei („Exportă raportul”). */
+  exportReport?: boolean
+  /** Pagina are sidebarul AdSy AI, deschis din comutatorul „AI insights” de lângă titlu. */
+  assistantPanel?: boolean
 }
 
 export const DEVICE_FILTER: FilterDef = {
@@ -158,7 +164,16 @@ const AI_GROUPS: DynamicFilter = {
 
 /** Titlurile și subtitlurile din design (`PAGES`). Filtrele sunt allowlist-ul cheilor din URL pentru fiecare modul. */
 export const BRAND_MODULES: Record<string, BrandModule> = {
-  overview: { segment: 'overview', title: 'Overview', subtitle: () => 'Starea brandului pe toate sursele. Apasă pe orice indicator ca să vezi înregistrările din spatele lui.', sources: ['seomonitor', 'gsc', 'ga4', 'planable'], filters: [] },
+  overview: {
+    segment: 'overview',
+    title: 'Overview',
+    headline: 'Imaginea completă a brandului',
+    subtitle: () => 'Vizibilitate, reputație și oportunități într-un singur loc. Apasă pe orice indicator ca să vezi înregistrările din spatele lui.',
+    sources: ['seomonitor', 'gsc', 'ga4', 'planable'],
+    filters: [],
+    exportReport: true,
+    assistantPanel: true,
+  },
   ai: { segment: 'ai', title: 'AI Visibility', subtitle: () => 'Cum apare brandul în răspunsurile asistenților AI, pe aceleași întrebări rulate zilnic.', sources: ['seomonitor'], filters: [ENGINE_FILTER], dynamicFilter: AI_GROUPS },
   seo: { segment: 'seo', title: 'SEO și Search', subtitle: () => 'Prezența în Google: clicks, poziții și subiectele pe care competitorii le acoperă înaintea ta.', sources: ['seomonitor', 'gsc'], filters: [KEYWORD_TYPE_FILTER] },
   // Fără `sources`: fâșia „Starea datelor” ar arăta actualitatea Search Analytics, nu ziua inspecției (pe care pagina o spune singură).
@@ -192,6 +207,7 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
   },
   competition: { segment: 'competition', title: 'Concurență', subtitle: () => 'Brandul față de setul de competitori, pe aceleași surse și aceeași perioadă.', sources: [], filters: [] },
   insights: { segment: 'insights', title: 'Analize și acțiuni', subtitle: () => 'Interpretările echipei AdSymphony și acțiunile care decurg din ele.', sources: [], filters: [] },
+  assistant: { segment: 'assistant', title: 'AdSy AI', subtitle: () => 'Întrebări despre datele brandului, cu răspunsuri verificate față de dovezi. Un răspuns e o ipoteză pentru echipă, nu o analiză validată.', sources: [], filters: [] },
   reports: { segment: 'reports', title: 'Rapoarte', subtitle: () => 'Raportul perioadei alese: indicatorii și analizele publicate, gata de tipărit, de salvat ca PDF sau de exportat în CSV.', sources: ['seomonitor', 'gsc', 'ga4', 'planable'], filters: [] },
 }
 

@@ -11,7 +11,7 @@
       // Aplică tema înainte de prima randare (fără flash). Logica de rezervă e în ThemeProvider.
       try {
         var t = localStorage.getItem('az-theme');
-        if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        if (t !== 'light' && t !== 'dark') t = 'dark';
         document.documentElement.setAttribute('data-az-theme', t);
       } catch (e) {}
     </script>

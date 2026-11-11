@@ -1,6 +1,7 @@
 import {
   notConnected,
   type AiVisibilityProvider,
+  type AssistantProvider,
   type BrandsProvider,
   type ClientsProvider,
   type CompetitionProvider,
@@ -24,6 +25,7 @@ import { createSupabaseBrands } from './brandsProvider'
 import { createSupabaseSources } from './sourcesProvider'
 import { createSupabaseClients } from './clientsProvider'
 import { createSupabaseMetrics } from './metricsProvider'
+import { createSupabaseAssistant } from './assistantProvider'
 import { createSupabasePaid } from './paidProvider'
 import { createSupabaseSocial } from './socialProvider'
 import { createSupabaseInsights, createSupabaseMentions } from './listeningProvider'
@@ -200,6 +202,15 @@ const competition: CompetitionProvider = {
   gaps: async () => notConnected('Datele despre competitori nu sunt încă disponibile pentru acest brand.'),
 }
 
+const AI_OFF = 'AdSy AI nu este disponibil pentru acest brand.'
+const assistant: AssistantProvider = {
+  settings: async () => notConnected(AI_OFF),
+  serverStatus: async () => notConnected(AI_OFF),
+  savePolicy: async () => notConnected(AI_OFF),
+  savePreference: async () => notConnected(AI_OFF),
+  ask: async () => notConnected(AI_OFF),
+}
+
 export interface SupabaseProvidersDeps {
   client: DataClient
   now?: () => Date
@@ -225,6 +236,7 @@ export function createSupabaseProviders(deps?: SupabaseProvidersDeps): DataProvi
     paid: deps ? createSupabasePaid(deps.client) : paid,
     social: deps ? createSupabaseSocial(deps.client) : social,
     competition: deps ? createSupabaseCompetition(deps.client) : competition,
+    assistant: deps ? createSupabaseAssistant(deps.client) : assistant,
     users: deps ? createSupabaseUsers(deps.client) : users,
     config: deps ? createSupabaseConfig(deps.client, now) : config,
     clients: deps ? createSupabaseClients(deps.client) : clients,
