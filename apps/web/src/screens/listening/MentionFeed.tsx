@@ -8,6 +8,7 @@ import { StatusChip } from '../../components/ui/Chip'
 import { useProviders } from '../../data/DataProvidersContext'
 import { ctxKey } from '../../data/hooks'
 import { useAsync } from '../../data/useAsync'
+import { formatInteger } from '../../lib/format'
 import { platformOf } from '../../lib/platform'
 import { safeUrl } from '../../lib/safeUrl'
 import { Resolved } from '../shared/Resolved'
@@ -35,6 +36,14 @@ function SentimentBadge({ m }: { m: Mention }) {
 }
 
 /**
+ * Mențiunile pe care sursa le trimite fără text și fără link (mențiunile web din Planable): sunt numărate, dar feed-ul nu
+ * are ce arăta din ele și nu inventează nimic în loc.
+ */
+export function withoutContentNote(n: number): string {
+  return `${formatInteger(n)} ${n === 1 ? 'mențiune din perioadă a venit' : 'mențiuni din perioadă au venit'} de la sursă fără text și fără link (de regulă, cele de pe web). ${n === 1 ? 'E numărată' : 'Sunt numărate'} la „Mențiuni”, dar nu ${n === 1 ? 'poate fi afișată sau revizuită' : 'pot fi afișate sau revizuite'}.`
+}
+
+/**
  * Feed-ul de mențiuni, cu fiecare mențiune ca o postare (E-3): platforma, autorul (cont propriu sau extern, fără nume
  * inventate), data, textul complet, sentimentul cu starea validării și butonul de marcare pentru farmacovigilență.
  * Starea „marcat" vine de la provider, deci rămâne după reîncărcare.
@@ -49,9 +58,14 @@ export function MentionFeed({ brand, ctx, filters, onChanged }: { brand: Brand; 
       <Resolved state={state.state} onRetry={state.reload} loadingLabel="Se încarcă mențiunile" skeletonClass="h-64">
         {(p) =>
           p.items.length === 0 ? (
-            <EmptyState compact title="Nicio mențiune pentru filtrele alese" text="Schimbă sentimentul, sursa sau perioada." />
+            p.without_content > 0 ? (
+              <EmptyState compact title="Nicio mențiune de afișat" text={withoutContentNote(p.without_content)} />
+            ) : (
+              <EmptyState compact title="Nicio mențiune pentru filtrele alese" text="Schimbă sentimentul, sursa sau perioada." />
+            )
           ) : (
             <div className="flex flex-col gap-3">
+              {p.without_content > 0 && <p role="note" className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-[12.5px] leading-snug text-text-2">{withoutContentNote(p.without_content)}</p>}
               <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {p.items.map((m) => {
                   const own = m.owned_account === true

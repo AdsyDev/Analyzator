@@ -157,3 +157,6 @@ Cost / conversii pe totalurile perioadei (TikTok Ads), pentru aceeași acțiune 
 _Observații: view-urile `paid_metric_observations` / `mentions_metric_observations`; vezi `docs/contracts/csv-*.md`._
 
 Numărul de mențiuni distincte publicate în interval; importul nu schimbă data publicării.
+
+**Acoperire (11 nov. 2026, deciziile R).** De la prima colectare după această dată, numără și mențiunile pe care Planable le trimite fără link (cele de pe web), scrise cu o cheie construită. Formula nu s-a schimbat; valoarea crește mult la brandurile cu mențiuni web, iar comparația cu o perioadă dinainte reflectă și schimbarea de acoperire.
+

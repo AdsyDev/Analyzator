@@ -97,6 +97,8 @@ Mutat din Trafic (E-1, varianta a): „Comportament" (Microsoft Clarity, pe devi
 
 ## Listening (`/brands/:id/listening`)
 
+**Mențiuni fără conținut (11 nov. 2026, R).** Mențiunile venite de la sursă fără text și fără link (cele de pe web, din Planable) nu apar ca carduri. Feed-ul are o notă cu numărul lor („sunt numărate la «Mențiuni», dar nu pot fi afișate sau revizuite”); dacă nu există nicio mențiune cu conținut, starea goală spune asta în loc de „schimbă filtrele”. Distribuția sentimentului le numără separat și nu le pune la „așteaptă revizuirea”.
+
 „Distribuția sentimentului" (bară segmentată pozitiv/neutru/negativ, cu număr și procent; „Fiecare sentiment e verificat de un om din echipa AdSymphony"); filtre sentiment și sursă; feed de mențiuni (sursă, autor, dată, text, sentiment, „Revizuit de <nume>", „Deschide sursa", PharmacovigilanceButton cu stare „Marcat pentru farmacovigilență <data>"); stare goală „Nicio mențiune pentru filtrele alese"; Mențiunile apar ca postări (E-3): carduri cu platforma, autorul (cont propriu sau extern), data, textul complet, sentimentul și linkul spre original. Jurnalul PV are submeniul lui:
 
 ## Listening → Farmacovigilență (`/brands/:id/pharmacovigilance`)

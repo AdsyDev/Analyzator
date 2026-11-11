@@ -14,6 +14,20 @@ describe('createSupabaseMentions', () => {
     expect(rpcs[0]).toMatchObject({ fn: 'brand_mentions', args: { p_sentiment: 'unreviewed', p_source: 'instagram', p_page: 1 } })
   })
 
+  it('mențiunile fără conținut vin numărate separat; un server mai vechi, care nu trimite câmpul, înseamnă zero', async () => {
+    const withCount = fakeDataClient({ rpc: () => ({ data: { items: [mention], total: 1, page: 1, page_size: 20, without_content: 1068 } }) })
+    const r = await createSupabaseMentions(withCount.client).list(ctx, { sentiment: null, source: null, author: null, page: 1, page_size: 20 })
+    expect(r.kind === 'ready' && [r.data.total, r.data.without_content, r.data.items.length]).toEqual([1, 1068, 1])
+    const older = fakeDataClient({ rpc: () => ({ data: { items: [mention], total: 1, page: 1, page_size: 20 } }) })
+    const o = await createSupabaseMentions(older.client).list(ctx, { sentiment: null, source: null, author: null, page: 1, page_size: 20 })
+    expect(o.kind === 'ready' && o.data.without_content).toBe(0)
+    const dist = { connected: true, total: 2, positive: 1, neutral: 1, negative: 0, unreviewed: 3, owned_excluded: 0, shares: { positive: 50, neutral: 50, negative: 0 } }
+    const s1 = await createSupabaseMentions(fakeDataClient({ rpc: () => ({ data: { ...dist, without_content: 7 } }) }).client).sentiment(ctx)
+    expect(s1.kind === 'ready' && [s1.data.unreviewed, s1.data.without_content]).toEqual([3, 7])
+    const s2 = await createSupabaseMentions(fakeDataClient({ rpc: () => ({ data: dist }) }).client).sentiment(ctx)
+    expect(s2.kind === 'ready' && s2.data.without_content).toBe(0)
+  })
+
   it('fără Listening conectat: sentimentul e „Sursă neconectată”, nu zero', async () => {
     const { client } = fakeDataClient({ rpc: () => ({ data: { connected: false, total: 0, positive: 0, neutral: 0, negative: 0, unreviewed: 0, owned_excluded: 0, shares: { positive: null, neutral: null, negative: null } } }) })
     expect((await createSupabaseMentions(client).sentiment(ctx)).kind).toBe('not_connected')

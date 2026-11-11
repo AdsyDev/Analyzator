@@ -6,6 +6,7 @@ import {
   type Insight,
   type InsightsProvider,
   type Mention,
+  type MentionPage,
   type MentionsProvider,
   type Page,
   type PvFlag,
@@ -37,13 +38,15 @@ export function createSupabaseMentions(client: DataClient): MentionsProvider {
         p_sentiment: q.sentiment, p_source: q.source, p_page: q.page, p_page_size: q.page_size, p_author: q.author ?? 'all',
       })
       if (error) return failed(rpcError(error))
-      const d = data as Page<Mention> | null
+      const d = data as (Page<Mention> & { without_content?: unknown }) | null
       if (!d || !Array.isArray(d.items) || typeof d.total !== 'number') return failed(CONTRACT)
+      // Un server mai vechi nu trimite câmpul: atunci nu există mențiuni fără conținut de raportat.
+      const page: MentionPage = { items: d.items, total: d.total, page: d.page, page_size: d.page_size, without_content: typeof d.without_content === 'number' ? d.without_content : 0 }
       if (d.total === 0 && q.page === 1 && !q.sentiment && !q.source && !q.author) {
         const s = await this.sentiment(ctx)
         if (s.kind === 'not_connected') return s
       }
-      return ready(d)
+      return ready(page)
     },
 
     async sentiment(ctx) {
@@ -53,7 +56,7 @@ export function createSupabaseMentions(client: DataClient): MentionsProvider {
       if (!d || typeof d.total !== 'number' || typeof d.owned_excluded !== 'number') return failed(CONTRACT)
       if (d.connected === false) return notConnected(NO_LISTENING)
       const { connected: _c, ...dist } = d
-      return ready(dist as SentimentDistribution)
+      return ready({ ...dist, without_content: typeof dist.without_content === 'number' ? dist.without_content : 0 } as SentimentDistribution)
     },
 
     async sources(brandId) {

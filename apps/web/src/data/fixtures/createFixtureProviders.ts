@@ -351,7 +351,8 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
         .filter((m) => (q.author === 'owned' ? m.owned_account === true : q.author === 'external' ? m.owned_account !== true : true))
         .sort((a, b) => b.published_at.localeCompare(a.published_at))
       const start = (q.page - 1) * q.page_size
-      return ready({ items: filtered.slice(start, start + q.page_size), total: filtered.length, page: q.page, page_size: q.page_size })
+      // Mențiunile fictive au toate text și link: niciuna „fără conținut”.
+      return ready({ items: filtered.slice(start, start + q.page_size), total: filtered.length, page: q.page, page_size: q.page_size, without_content: 0 })
     },
     sources: async (brandId) => {
       const denied = guard<never>(brandId)
@@ -373,6 +374,7 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
         neutral: count('neutral'),
         negative: count('negative'),
         unreviewed: all.length - reviewed.length,
+        without_content: 0,
         owned_excluded: inRange.length - all.length,
         shares: { positive: share(count('positive')), neutral: share(count('neutral')), negative: share(count('negative')) },
       })

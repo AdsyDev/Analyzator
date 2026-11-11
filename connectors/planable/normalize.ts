@@ -239,7 +239,10 @@ export function authorIsOwned(m: Mention, own: OwnAccounts | null): boolean | nu
   return set ? keys.some((k) => set.has(k)) : false
 }
 
-/** De ce nu se poate scrie o mențiune: fără URL, URL care nu e http(s), dată invalidă. Lista goală = mențiune validă. */
+/**
+ * De ce nu se poate scrie o mențiune: URL care nu e http(s) sau dată invalidă. Lista goală = mențiune validă. `url_missing`
+ * apare doar alături de `date_invalid`: o mențiune fără link, dar cu dată, se scrie cu o cheie construită (deciziile R).
+ */
 export type MentionSkipReason = 'url_missing' | 'url_not_http' | 'date_invalid'
 
 export const MENTION_SKIP_LABELS: Record<MentionSkipReason, string> = {
@@ -248,16 +251,39 @@ export const MENTION_SKIP_LABELS: Record<MentionSkipReason, string> = {
   date_invalid: 'fără dată de publicare validă',
 }
 
+/** Sursa nu a trimis linkul mențiunii (mențiunile web din Planable). Lipsa nu se înlocuiește cu nimic: `url` rămâne NULL. */
+export const hasNoLink = (m: Mention): boolean => m.url.trim() === ''
+
 /**
- * Motivele pentru care o mențiune e sărită. URL-ul e cheia naturală (`native_id` = hash-ul lui) și data e obligatorie în
- * `mentions`: fără ele rândul nu se scrie și nu se deduce nimic în locul lor (regula 8).
+ * Motivele pentru care o mențiune e sărită. Data e obligatorie în `mentions` și nu se deduce (regula 8); un URL care nu e
+ * http(s) nu e un link și nici o lipsă curată, deci rândul nu se scrie.
  */
 export function mentionSkipReasons(m: Mention): MentionSkipReason[] {
   const reasons: MentionSkipReason[] = []
-  if (m.url.trim() === '') reasons.push('url_missing')
-  else if (!/^https?:\/\//.test(m.url)) reasons.push('url_not_http')
-  if (Number.isNaN(Date.parse(m.publishedAt))) reasons.push('date_invalid')
+  const dateInvalid = Number.isNaN(Date.parse(m.publishedAt))
+  if (hasNoLink(m)) {
+    if (dateInvalid) reasons.push('url_missing')
+  } else if (!/^https?:\/\//.test(m.url)) reasons.push('url_not_http')
+  if (dateInvalid) reasons.push('date_invalid')
   return reasons
+}
+
+/**
+ * Identitatea unei mențiuni fără link: rețeaua, autorul, momentul publicării și textul, dacă există. E tot ce trimite sursa
+ * despre ea. Autorul și textul intră doar în hash: numele autorului nu se salvează nicăieri (D-22).
+ */
+export function builtMentionIdentity(m: Mention): string {
+  const author = [m.author?.name, m.author?.username].map((v) => (typeof v === 'string' ? v.trim().toLowerCase() : '')).join('\u0001')
+  const text = typeof m.text === 'string' && m.text.trim() !== '' ? createHash('sha256').update(m.text.trim()).digest('hex') : ''
+  return [m.platform.trim().toLowerCase(), author, new Date(m.publishedAt).toISOString(), text].join('\u0000')
+}
+
+/**
+ * Cheia construită pentru o mențiune fără link. `n` deosebește mențiunile cu aceeași identitate (același site, în aceeași
+ * secundă): a doua primește 2, ca numărul lor să nu scadă. Prefixul `s:` o separă de cheile din URL (`h:`).
+ */
+export function builtMentionNativeId(identity: string, n: number): string {
+  return `s:${createHash('sha256').update(`${identity}\u0000${n}`).digest('hex').slice(0, 32)}`
 }
 
 /** Numele câmpurilor unei mențiuni, pe trei categorii. Doar nume: valorile nu ies niciodată de aici. */
@@ -289,12 +315,13 @@ export function mentionFieldShape(m: Record<string, unknown>): MentionFieldShape
   return shape
 }
 
-export function mentionRow(m: Mention, p: Provenance, own: OwnAccounts | null = null) {
+/** `builtKey` = cheia construită, pentru o mențiune fără link; altfel cheia e hash-ul URL-ului. */
+export function mentionRow(m: Mention, p: Provenance, own: OwnAccounts | null = null, builtKey: string | null = null) {
   const s = (m.sentiment ?? '').toLowerCase()
   return {
     ...common(p),
-    native_id: mentionNativeId(m.url),
-    url: m.url.slice(0, 2048),
+    native_id: builtKey ?? mentionNativeId(m.url),
+    url: builtKey ? null : m.url.slice(0, 2048),
     source_name: m.platform.slice(0, 256),
     published_at: m.publishedAt,
     text: m.text ? m.text.slice(0, 20_000) : null,

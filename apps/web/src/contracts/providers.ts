@@ -4,7 +4,7 @@ import type { Brand, CompetitorSet } from './brand'
 import type { CompetitionGap, CompetitionMatrix } from './competition'
 import type { BrandId, ProviderResult, TenantId } from './common'
 import type { ActionTransition, Insight, InsightDraft, InsightTransition, NewAction, NewRecommendation } from './insight'
-import type { Mention, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnapshot, SentimentDistribution } from './mention'
+import type { MentionPage, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnapshot, SentimentDistribution } from './mention'
 import type { Evidence, EvidenceQuery, MetricDefinition, MetricsBundle, TrendSeries } from './metric'
 import type { QueryContext } from './period'
 import type { NewPaidBudget, PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from './paid'
@@ -52,7 +52,7 @@ export interface InsightsProvider {
 }
 
 export interface MentionsProvider {
-  list(ctx: QueryContext, query: MentionQuery): Promise<ProviderResult<Page<Mention>>>
+  list(ctx: QueryContext, query: MentionQuery): Promise<ProviderResult<MentionPage>>
   sentiment(ctx: QueryContext): Promise<ProviderResult<SentimentDistribution>>
   /** Sursele distincte ale mențiunilor, pentru filtrul de sursă. */
   sources(brandId: BrandId): Promise<ProviderResult<string[]>>
