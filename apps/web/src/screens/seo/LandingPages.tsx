@@ -5,6 +5,7 @@ import type { AsyncState } from '../../data/useAsync'
 import { formatInteger, formatMetricValue } from '../../lib/format'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
+import { useExportName } from '../shared/useExportName'
 
 const num = (v: number | null) => (v === null ? <span className="text-text-3">Fără date</span> : formatInteger(v))
 
@@ -34,10 +35,11 @@ const columns: Column<LandingPage>[] = [
 ]
 
 export function LandingPages({ state, onRetry }: { state: AsyncState<ProviderResult<LandingPage[]>>; onRetry: () => void }) {
+  const exportName = useExportName('landing pages')
   return (
     <Section id="landing" title="Landing pages din search" description="Rezultatele din Search Console pe pagină. Key events GA4 apar doar când maparea paginii e validată; altfel „Nemapat”, nu zero.">
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă paginile" skeletonClass="h-48">
-        {(rows) => <SortableTable caption="Landing pages din search" columns={columns} rows={rows} rowKey={(p) => p.url} pageSize={8} emptyText="Nicio pagină cu date în perioada aleasă." />}
+        {(rows) => <SortableTable caption="Landing pages din search" exportFileName={exportName} columns={columns} rows={rows} rowKey={(p) => p.url} pageSize={8} emptyText="Nicio pagină cu date în perioada aleasă." />}
       </Resolved>
     </Section>
   )

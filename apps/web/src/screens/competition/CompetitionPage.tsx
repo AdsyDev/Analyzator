@@ -9,6 +9,7 @@ import { useAsync, type AsyncState } from '../../data/useAsync'
 import { useLayout } from '../../routing/AppLayout'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
+import { useExportName } from '../shared/useExportName'
 
 const DIMENSION_LABELS = { ai: 'AI', seo: 'SEO' } as const
 
@@ -57,6 +58,7 @@ function Matrix({ state, onRetry }: { state: AsyncState<ProviderResult<Competiti
 }
 
 function Gaps({ state, onRetry }: { state: AsyncState<ProviderResult<CompetitionGap[]>>; onRetry: () => void }) {
+  const exportName = useExportName('diferente concurenta')
   return (
     <Section id="gaps" title="Unde apare concurența și noi lipsim" description="Căutări și subiecte în care un competitor e prezent, iar brandul lipsește sau e mai slab. Sunt puncte de plecare pentru discuție, nu concluzii.">
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă diferențele" skeletonClass="h-48">
@@ -64,7 +66,7 @@ function Gaps({ state, onRetry }: { state: AsyncState<ProviderResult<Competition
           gaps.length === 0 ? (
             <EmptyState compact title="Nicio diferență găsită" text="Nu am găsit subiecte în care un competitor apare și brandul lipsește." />
           ) : (
-            <SortableTable caption="Unde apare concurența și noi lipsim" columns={gapColumns} rows={gaps} rowKey={(g) => g.id} pageSize={8} emptyText="Nicio diferență." />
+            <SortableTable caption="Unde apare concurența și noi lipsim" exportFileName={exportName} columns={gapColumns} rows={gaps} rowKey={(g) => g.id} pageSize={8} emptyText="Nicio diferență." />
           )
         }
       </Resolved>

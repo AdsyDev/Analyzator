@@ -9,6 +9,7 @@ import { ClientsPage } from '../screens/admin/ClientsPage'
 import { ConfigPage } from '../screens/admin/ConfigPage'
 import { SitePage, SourcesRedirect } from '../screens/admin/SitePage'
 import { UsersPage } from '../screens/admin/UsersPage'
+import { IndexingPage } from '../screens/indexing/IndexingPage'
 import { InsightsPage } from '../screens/insights/InsightsPage'
 import { AiPage } from '../screens/ai/AiPage'
 import { CompetitionPage } from '../screens/competition/CompetitionPage'
@@ -16,6 +17,8 @@ import { ListeningPage } from '../screens/listening/ListeningPage'
 import { PharmacovigilancePage } from '../screens/listening/PharmacovigilancePage'
 import { OverviewPage } from '../screens/overview/OverviewPage'
 import { PaidPage } from '../screens/paid/PaidPage'
+import { PortfolioPage } from '../screens/portfolio/PortfolioPage'
+import { ReportsPage } from '../screens/reports/ReportsPage'
 import { SeoPage } from '../screens/seo/SeoPage'
 import { SocialPage } from '../screens/social/SocialPage'
 import { TrafficPage } from '../screens/traffic/TrafficPage'
@@ -46,6 +49,7 @@ function BrandModulePage() {
   if (module.segment === 'overview') return <OverviewPage />
   if (module.segment === 'ai') return <AiPage />
   if (module.segment === 'seo') return <SeoPage />
+  if (module.segment === 'indexing') return <IndexingPage />
   if (module.segment === 'traffic') return <TrafficPage />
   if (module.segment === 'ux') return <UxPage />
   if (module.segment === 'paid') return <PaidPage />
@@ -54,6 +58,7 @@ function BrandModulePage() {
   if (module.segment === 'pharmacovigilance') return <PharmacovigilancePage />
   if (module.segment === 'competition') return <CompetitionPage />
   if (module.segment === 'insights') return <InsightsPage />
+  if (module.segment === 'reports') return <ReportsPage />
   return <NotFoundPage />
 }
 
@@ -95,6 +100,7 @@ export function AppRoutes() {
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route index element={<HomeRedirect />} />
+          <Route path="portfolio" element={<PortfolioPage />} />
           <Route path="brands/:brandId" element={<BrandIndexRedirect />} />
           <Route path="brands/:brandId/:segment" element={<BrandModulePage />} />
           <Route path="admin" element={<AdminIndexRedirect />} />

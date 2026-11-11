@@ -228,3 +228,22 @@ După evaluare, Etapa 2 a fost cerută direct în aplicație (deciziile G din `d
 Rămas din Etapa 2 după a doua rundă (deciziile H): reimportul SEOmonitor, ieșirea metricilor din `draft`, filtrele AI și cele trei definiții care așteaptă strategia. Estimare: 3–5 zile de lucru, toate condiționate de decizii sau de date reale.
 
 Înainte de a arăta clientului: `npm run test:security` complet (rulează în `supabase-deploy` la merge) și o trecere pe date reale a noului Overview pentru fiecare brand, cu atenție la cardul de mențiuni și la poziția față de competitori.
+
+## 9. Starea după primele trei felii din Etapa 3 (11 nov. 2026)
+
+Etapa 3 a fost cerută direct în aplicație (deciziile J, K, L din `docs/decisions.md`). Tabelul compară cu lucrările din secțiunea 3.
+
+| Lucrare din Etapa 3 | Stare | Ce s-a construit | Ce a rămas și de ce depinde |
+|---|---|---|---|
+| Indexare: inventar, URL Inspection, ecran | Construit, neverificat pe date reale | Lista de URL-uri prioritare introdusă de agenție, conectorul URL Inspection (și pentru paginile cu cele mai multe clickuri), ecranul Indexare, rulare săptămânală | Prima rulare reală confirmă clasificarea verdictului. Inventarul complet (sitemap) și evoluția în timp în ecran |
+| Planable: competitori, listening pe competitori și topicuri | Neînceput | — | Mențiunile web vin din API fără link (I-4): întâi răspunsul Planable sau exportul CSV |
+| Paid: rută unică, buget și pacing, conversii Meta, reconciliere | Parțial | Buget aprobat pe interval, introdus de agenție, și pacing | Ruta unică (Airbyte sau conectori direcți), acțiunea de conversie Meta, reconcilierea: decizii de la client |
+| Funnel, rata sesiunilor cu key event, AI referrals, calitatea trackingului | Parțial | AI referrals cu reguli versionate; cinci verificări de calitate a trackingului | Funnelul și rata: key events confirmate pe brand și definiția din strategie (G-1). Pragurile de 10 % sunt provizorii |
+| Social: taxonomie editorială, două moduri de raportare | Neînceput | — | Taxonomia de la echipă |
+| Matrice de competitori completă și content gaps | Neînceput | — | Pozițiile competitorilor în SEOmonitor |
+| Client manager, comentarii, acceptarea recomandării, „Solicită ajustare” | Neînceput | — | Decizia de roluri: un rol nou de client care poate scrie atinge toate politicile de acces |
+| Export PDF și CSV, Rapoarte | Construit | Export CSV din tabelele de brand; pagina Rapoarte, tipărită sau salvată ca PDF din browser | Rapoarte programate pe e-mail, arhivă, șablon cu identitatea clientului (cer PDF pe server) |
+| Vedere de portofoliu | Construit | Toate brandurile permise, pe aceeași perioadă, cu indicatorii din Overview | Totaluri pe portofoliu (nu există o definiție); RPC dedicat la zeci de branduri |
+
+Înainte de a arăta clientului: `npm run test:security` complet (rulează în `supabase-deploy` la merge), o rulare reală a `gsc-index-weekly` pe un brand și o trecere pe date reale prin AI referrals, calitatea trackingului și Rapoarte.
+

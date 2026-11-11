@@ -6,8 +6,8 @@ import type { ActionTransition, Insight, InsightDraft, InsightTransition, NewAct
 import type { Mention, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnapshot, SentimentDistribution } from './mention'
 import type { Evidence, EvidenceQuery, MetricDefinition, MetricsBundle, TrendSeries } from './metric'
 import type { QueryContext } from './period'
-import type { PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from './paid'
-import type { ContentGap, LandingPage, SearchFilters, SearchKeyword } from './search'
+import type { NewPaidBudget, PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from './paid'
+import type { ContentGap, IndexStatus, LandingPage, SearchFilters, SearchKeyword } from './search'
 import type { SocialCalendarItem, SocialCompetitor, SocialFilters, SocialGroups, SocialPost, SocialSummary } from './social'
 import type { ClientsProvider, ConfigProvider, UsersProvider } from './admin'
 import type { NewConnection, NewTenantConnection, OAuthProvider, SourceConnection, SourceFreshness, SourceStatusInfo, SyncRun, TenantConnection, TokenSaved, ValidationOutcome, AccountList, AirbyteInspection, DiscoverKind } from './source'
@@ -119,6 +119,11 @@ export interface SearchProvider {
   keywords(ctx: QueryContext, f: SearchFilters): Promise<ProviderResult<SearchKeyword[]>>
   landingPages(ctx: QueryContext): Promise<ProviderResult<LandingPage[]>>
   contentGaps(ctx: QueryContext): Promise<ProviderResult<ContentGap[]>>
+  /** Ultima inspecție a fiecărui URL și lista prioritară; nu depinde de perioada aleasă. */
+  indexStatus(brandId: BrandId): Promise<ProviderResult<IndexStatus>>
+  /** Lista prioritară o scrie echipa agenției cu acces la brand (RLS verifică rolul, nu interfața). */
+  addIndexUrl(brand: Brand, url: string): Promise<ProviderResult<null>>
+  removeIndexUrl(id: string): Promise<ProviderResult<null>>
 }
 
 /** Trafic și conversii (spec cap. 16). KPI-urile GA4 și Clarity ale brandului vin din registru prin `MetricsProvider`. */
@@ -136,7 +141,11 @@ export interface TrafficProvider {
  */
 export interface PaidProvider {
   summary(ctx: QueryContext, f: PaidFilters): Promise<ProviderResult<PaidSummary>>
+  /** Planul în vigoare la sfârșitul perioadei alese; fără plan, `approved_budget` e `null`. */
   budget(ctx: QueryContext): Promise<ProviderResult<PaidBudget>>
+  /** Scrierile sunt ale echipei agenției cu acces la brand (RLS verifică rolul, nu interfața). */
+  saveBudget(brand: Brand, budget: NewPaidBudget): Promise<ProviderResult<null>>
+  deleteBudget(id: string): Promise<ProviderResult<null>>
   series(ctx: QueryContext, f: PaidFilters): Promise<ProviderResult<PaidSeries>>
   rows(ctx: QueryContext, f: PaidFilters): Promise<ProviderResult<PaidRow[]>>
 }

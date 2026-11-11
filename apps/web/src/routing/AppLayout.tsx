@@ -9,7 +9,7 @@ import type { FilterBarChange } from '../components/FilterBar'
 import type { FilterDef } from '../lib/period'
 import { useProviders } from '../data/DataProvidersContext'
 import { useAsync } from '../data/useAsync'
-import { brandPath } from '../lib/navigation'
+import { PORTFOLIO_PATH, brandPath } from '../lib/navigation'
 import { sharedSearch } from '../lib/period'
 import { ADMIN_MODULES, BRAND_MODULES } from './modules'
 import { NoAccessPage, NoBrandsPage, ProviderProblem } from './pages'
@@ -73,6 +73,7 @@ export function AppLayout() {
   const module = segment ? BRAND_MODULES[segment] : undefined
   const adminModule = adminMatch?.params.segment ? ADMIN_MODULES[adminMatch.params.segment] : undefined
   const isHome = location.pathname === '/'
+  const isPortfolio = location.pathname === PORTFOLIO_PATH
 
   const { state: brandsState, reload: reloadBrands } = useAsync(() => providers.brands.list(), [providers, user.id, user.role])
   const brandsResult: ProviderResult<Brand[]> | null =
@@ -134,8 +135,8 @@ export function AppLayout() {
     return { dataAsOf: dates[0] ?? fresh[0] ?? null, lastRefreshAt: imports[imports.length - 1] ?? null }
   }, [sourcesState, freshness])
 
-  const title = module?.title ?? adminModule?.title ?? (siteMatch ? 'Site și surse' : 'Analyzator')
-  const subtitle = module?.subtitle(shellBrand?.name ?? '') ?? adminModule?.subtitle(shellBrand?.name ?? null) ?? (siteMatch ? 'Detaliile site-ului, sursele lui de date și istoricul sincronizărilor.' : undefined)
+  const title = module?.title ?? adminModule?.title ?? (siteMatch ? 'Site și surse' : isPortfolio ? 'Portofoliu' : 'Analyzator')
+  const subtitle = module?.subtitle(shellBrand?.name ?? '') ?? adminModule?.subtitle(shellBrand?.name ?? null) ?? (siteMatch ? 'Detaliile site-ului, sursele lui de date și istoricul sincronizărilor.' : isPortfolio ? 'Toate brandurile la care ai acces, pe aceeași perioadă, cu indicatorii din Overview.' : undefined)
   useEffect(() => {
     document.title = [title, shellBrand?.name, 'Analyzator'].filter(Boolean).join(' · ')
   }, [title, shellBrand?.name])
@@ -147,7 +148,7 @@ export function AppLayout() {
   }
 
   // `/admin/sources` trimite la site-ul ales în topbar, deci așteaptă lista de branduri.
-  const needsBrand = urlBrandId !== null || isHome || location.pathname === '/admin/sources'
+  const needsBrand = urlBrandId !== null || isHome || isPortfolio || location.pathname === '/admin/sources'
   let content
   if (needsBrand && brandsResult === null) {
     content = <div role="status" aria-label="Se încarcă spațiile de brand" className="h-64 rounded-xl bg-skeleton" />
@@ -183,7 +184,7 @@ export function AppLayout() {
       lastRefreshAt={lastRefreshAt}
       onSignOut={() => void signOut()}
       roleSwitcher={preview ? { role: user.role, onChange: preview.setRole } : undefined}
-      filterBar={module && ctx && urlBrand ? <FilterBar value={ctx} onChange={change} onReset={reset} filterDefs={visibleFilterDefs} /> : undefined}
+      filterBar={module && !module.noPeriod && ctx && urlBrand ? <FilterBar value={ctx} onChange={change} onReset={reset} filterDefs={visibleFilterDefs} /> : undefined}
     >
       {content}
     </AppShell>

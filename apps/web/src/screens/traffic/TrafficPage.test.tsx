@@ -101,7 +101,7 @@ describe('Trafic: tracking quality', () => {
     expect(items.map((i) => i.getAttribute('data-status'))).toEqual(['problem', 'ok', 'warning', 'ok'])
     expect(within(items[0]!).getByText('Problemă')).toBeInTheDocument()
     expect(within(items[2]!).getByText('Avertisment')).toBeInTheDocument()
-    expect(within(s).getByText(/Verificat la/)).toBeInTheDocument()
+    expect(within(s).getByText(/Pe datele colectate la/)).toBeInTheDocument()
     expect(within(s).getByText(/Cifrele de mai sus sunt la fel de bune ca măsurarea/)).toBeInTheDocument()
   })
 

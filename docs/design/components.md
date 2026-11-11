@@ -113,3 +113,8 @@ Design-ul acoperă `normal`, `loading`, `partial`, `stale` și `unavailable` pe 
 10. **„Evoluții prioritare"** (cap. 12, max 3 schimbări semnificative): nu apare în Overview-ul din design; de confirmat cu designul înainte de UI-2.
 11. **Evidențiere în dark/light a „celei mai bune valori"** fără culoare: verificat doar pe culoare.
 12. **Stări de focus pentru heatmap și rânduri de tabel** interactive: lipsesc.
+
+## Export CSV din tabele (Etapa 3, K-1)
+
+`SortableTable` primește `exportFileName`; când e dat și tabelul are rânduri, sub tabel apare „Exportă CSV”. Fișierul conține toate rândurile (nu doar pagina curentă), în ordinea afișată, cu valorile brute ale coloanelor (`exportValue`, implicit `sortValue`); o coloană fără niciuna nu intră în export. Formatul e în `lib/csv.ts`: separator „;”, zecimale cu virgulă, UTF-8 cu BOM, date ISO; lipsa e celulă goală, nu 0; un text care ar fi citit ca formulă de Excel primește un apostrof. Numele fișierului vine din `useExportName(ce conține)`: conținut, brand, perioadă. Activ pe: Paid Media, Keywords, Landing pages, Canale, AI referrals, Postări, diferențele din Concurență, Acțiuni, Portofoliu.
+

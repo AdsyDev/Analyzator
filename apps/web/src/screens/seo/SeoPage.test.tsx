@@ -217,7 +217,7 @@ describe('SEO și Search: izolarea secțiunilor și providerul real', () => {
 
   it('o singură cerere pe secțiune (filtrul „keywords" nu reia restul)', async () => {
     const calls = { kw: 0, pages: 0, gaps: 0 }
-    renderApp({ route: ROUTE, wrap: (b) => ({ ...b, search: { keywords: async (c, f) => (calls.kw++, b.search.keywords(c, f)), landingPages: async (c) => (calls.pages++, b.search.landingPages(c)), contentGaps: async (c) => (calls.gaps++, b.search.contentGaps(c)) } }) })
+    renderApp({ route: ROUTE, wrap: (b) => ({ ...b, search: { ...b.search, keywords: async (c, f) => (calls.kw++, b.search.keywords(c, f)), landingPages: async (c) => (calls.pages++, b.search.landingPages(c)), contentGaps: async (c) => (calls.gaps++, b.search.contentGaps(c)) } }) })
     await open()
     await new Promise((r) => setTimeout(r, 300))
     expect(calls).toEqual({ kw: 1, pages: 1, gaps: 1 })

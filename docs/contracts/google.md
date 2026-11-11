@@ -104,3 +104,35 @@ Citire pentru oricine are acces la brand (inclusiv client), cu excepția `source
 ## Rulare
 
 `.github/workflows/google-weekly.yml`: marți 04:00 UTC, **dezactivat** până la `CONNECTOR_GOOGLE_ENABLED = true`; `workflow_dispatch` activ oricând (`only`: `ga4` sau `gsc`). Local: `npm run collect:google [-- --only ga4|gsc]`.
+
+## Indexare (URL Inspection)
+
+Etapa 3 (deciziile L din `docs/decisions.md`). Conector: `connectors/google/index-core.ts`; rulare: `.github/workflows/gsc-index-weekly.yml` (marți 05:30 UTC, după `google-weekly`; activ cu `CONNECTOR_GOOGLE_ENABLED = true`; `workflow_dispatch` oricând, opțional pe un brand) sau local `npm run collect:index [-- --brand <uuid>]`. **Forma răspunsului e derivată din documentația API-ului, neconfirmată pe un cont real.**
+
+- **Apel:** `urlInspection.index.inspect` cu `siteUrl` = proprietatea Search Console a brandului (conexiunea `gsc`), `inspectionUrl` și `languageCode = ro`. Același scope de citire (`webmasters.readonly`) și același service account ca Search Analytics.
+- **Ce se inspectează,** cel mult 200 de URL-uri pe brand și rulare: întâi lista agenției (`index_urls`, cel mult 150), apoi cele mai bune 50 de pagini după clickuri din ultimele 28 de zile (`search_queries`), fără dubluri. Cota Google e de 2.000 de inspecții pe zi și 600 pe minut, pe proprietate; între apeluri e o pauză de 150 ms.
+- **`index_urls`:** `url` (http/https, cel mult 2.048 de caractere), `url_md5` calculat de bază, `created_by`. Citire: oricine are acces la brand. Scriere: `agency_admin`, `strategist`, `account` cu acces la brand; fără `UPDATE`; inserarea și ștergerea se auditează.
+- **`index_inspections`,** cheie `(tenant_id, brand_id, url_md5, inspected_on)`; `inspected_on` e ziua din Europe/Bucharest. Câmpurile din `indexStatusResult` se păstrează neschimbate: `verdict`, `coverage_state`, `indexing_state`, `robots_txt_state`, `page_fetch_state`, `crawled_as`, `last_crawl_time`, `google_canonical`, `user_canonical`. Un câmp absent e `NULL`. `origin` = `priority` sau `top_page`. Scrie doar workerul.
+- **Rularea** se scrie în `sync_runs` cu `source = gsc_index`. Un URL din afara proprietății nu se cere (`url_outside_property`); un URL respins de Google (`inspection_rejected`) nu oprește restul. Accesul refuzat, cota epuizată sau o cădere opresc rularea, cu ce s-a adunat. Fără nimic de inspectat nu se deschide nicio rulare.
+
+### `brand_index_status(p_brand_id)`
+
+Regimul E8 (`SECURITY INVOKER`, `has_brand_access` în corp). Nu depinde de perioadă: întoarce ultima inspecție a fiecărui URL.
+
+```json
+{
+  "connected": true,
+  "inspected_on": "2026-11-10",
+  "summary": { "total": 5, "indexed": 2, "not_indexed": 2, "unknown": 1, "canonical_mismatch": 1 },
+  "urls": [{ "url": "…", "priority": true, "state": "indexed", "verdict": "PASS", "coverage_state": "…", "last_crawl_time": "…", "google_canonical": "…", "user_canonical": "…", "canonical_matches": true, "inspected_on": "2026-11-10" }],
+  "priority_urls": [{ "id": "…", "url": "…", "inspected": false }]
+}
+```
+
+- `state` vine din `metrics.index_state(verdict)`: `PASS` = `indexed`; `FAIL` și `NEUTRAL` = `not_indexed`; orice altceva, inclusiv lipsa verdictului = `unknown`.
+- `canonical_matches` e `null` când Google sau pagina nu declară un canonical.
+- `summary` numără URL-urile din lista inspectată, nu din tot site-ul. Nu există o metrică de registru „rată de indexare”.
+- `connected: false` când brandul nu are Search Console conectat.
+
+De confirmat la prima rulare reală: valorile `verdict` și clasificarea lor, limba în care vine `coverageState` cu `languageCode = ro`, comportamentul la proprietăți `sc-domain:` și timpul unei rulări de 200 de URL-uri.
+

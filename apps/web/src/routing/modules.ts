@@ -24,6 +24,8 @@ export interface BrandModule {
   disconnected?: (brandName: string) => string
   /** Sursa pe care o conectează acțiunea „Conectează …" (doar agency_admin). */
   connectLabel?: string
+  /** Modulul arată ultima stare cunoscută, nu o perioadă: bara de perioadă și comparație nu apare. */
+  noPeriod?: boolean
 }
 
 export const DEVICE_FILTER: FilterDef = {
@@ -159,6 +161,8 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
   overview: { segment: 'overview', title: 'Overview', subtitle: () => 'Starea brandului pe toate sursele. Apasă pe orice indicator ca să vezi înregistrările din spatele lui.', sources: ['seomonitor', 'gsc', 'ga4', 'planable'], filters: [] },
   ai: { segment: 'ai', title: 'AI Visibility', subtitle: () => 'Cum apare brandul în răspunsurile asistenților AI, pe aceleași întrebări rulate zilnic.', sources: ['seomonitor'], filters: [ENGINE_FILTER], dynamicFilter: AI_GROUPS },
   seo: { segment: 'seo', title: 'SEO și Search', subtitle: () => 'Prezența în Google: clicks, poziții și subiectele pe care competitorii le acoperă înaintea ta.', sources: ['seomonitor', 'gsc'], filters: [KEYWORD_TYPE_FILTER] },
+  // Fără `sources`: fâșia „Starea datelor” ar arăta actualitatea Search Analytics, nu ziua inspecției (pe care pagina o spune singură).
+  indexing: { segment: 'indexing', title: 'Indexare', subtitle: () => 'Care pagini sunt în indexul Google și care nu, după ultima inspecție Search Console.', sources: [], filters: [], noPeriod: true },
   traffic: { segment: 'traffic', title: 'Trafic și conversii', subtitle: () => 'Ce se întâmplă după click: vizite, acțiuni importante și calitatea măsurării.', sources: ['ga4'], filters: [DEVICE_FILTER] },
   ux: { segment: 'ux', title: 'User experience', subtitle: () => 'Cum folosesc vizitatorii site-ul, din Microsoft Clarity: rage clicks, dead clicks, quick backs și scroll, pe device.', sources: ['clarity'], filters: [] },
   paid: {
@@ -188,6 +192,7 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
   },
   competition: { segment: 'competition', title: 'Concurență', subtitle: () => 'Brandul față de setul de competitori, pe aceleași surse și aceeași perioadă.', sources: [], filters: [] },
   insights: { segment: 'insights', title: 'Analize și acțiuni', subtitle: () => 'Interpretările echipei AdSymphony și acțiunile care decurg din ele.', sources: [], filters: [] },
+  reports: { segment: 'reports', title: 'Rapoarte', subtitle: () => 'Raportul perioadei alese: indicatorii și analizele publicate, gata de tipărit, de salvat ca PDF sau de exportat în CSV.', sources: ['seomonitor', 'gsc', 'ga4', 'planable'], filters: [] },
 }
 
 export interface AdminModule {

@@ -41,6 +41,8 @@ export interface PaidSummary {
 }
 
 export interface PaidBudget {
+  /** `null` când nu există un plan în vigoare. */
+  id: string | null
   currency: string
   approved_budget: number | null
   plan_from: IsoDate
@@ -53,6 +55,20 @@ export interface PaidBudget {
   time_pct: number
   /** Nota planului, de ex. „plan cu distribuție săptămânală". */
   plan_note: string | null
+  /** Ultima zi cu date de cost din plan; zilele trecute se numără până la ea. `null` fără cost colectat. */
+  data_as_of: IsoDate | null
+  /** Costul e în altă monedă decât planul (sau în mai multe): nu se adună, deci `spent` e `null`. */
+  currency_mismatch: boolean
+}
+
+/** Un plan de buget introdus de agenție. Planurile nu se modifică: unul greșit se șterge și se introduce din nou. */
+export interface NewPaidBudget {
+  plan_from: IsoDate
+  plan_to: IsoDate
+  amount: number
+  /** Cod ISO 4217, de ex. „RON". */
+  currency: string
+  note: string | null
 }
 
 export interface PaidSeries {

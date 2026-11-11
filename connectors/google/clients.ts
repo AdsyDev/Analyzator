@@ -41,6 +41,14 @@ export interface GscClient {
   query(req: GscQueryRequest): Promise<unknown>
 }
 
+export type UrlInspectionRequest = { siteUrl: string; inspectionUrl: string; languageCode: string }
+
+export interface UrlInspectionClient {
+  /** Răspunsul brut urlInspection.index.inspect (validat de apelant cu UrlInspectionSchema). */
+  inspect(req: UrlInspectionRequest): Promise<unknown>
+}
+export type InspectionClientFactory = (credentials: ServiceAccount) => UrlInspectionClient
+
 export type GoogleClients = { ga4: Ga4Client; gsc: GscClient }
 export type ClientFactory = (credentials: ServiceAccount) => GoogleClients
 
@@ -111,3 +119,16 @@ export const createGoogleClients: ClientFactory = (credentials) => {
 
   return { ga4, gsc }
 }
+
+/** URL Inspection folosește același scope de citire ca Search Analytics (`webmasters.readonly`). */
+export const createInspectionClient: InspectionClientFactory = (credentials) => {
+  const auth = new GoogleAuth({ credentials: { client_email: credentials.client_email, private_key: credentials.private_key }, scopes: [GSC_SCOPE] })
+  const sc = searchconsole({ version: 'v1', auth })
+  return {
+    async inspect(req) {
+      const res = await sc.urlInspection.index.inspect({ requestBody: { siteUrl: req.siteUrl, inspectionUrl: req.inspectionUrl, languageCode: req.languageCode } })
+      return res.data
+    },
+  }
+}
+

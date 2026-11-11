@@ -195,6 +195,30 @@ describe('SortableTable', () => {
     expect(screen.getByText('Nu există keywords pentru filtrele alese.')).toBeInTheDocument()
   })
 
+  it('export CSV: toate rândurile (nu doar pagina), în ordinea afișată, cu valorile brute; lipsa e celulă goală', async () => {
+    const blobs: Blob[] = []
+    const create = vi.fn((b: Blob) => (blobs.push(b), 'blob:test'))
+    Object.assign(URL, { createObjectURL: create, revokeObjectURL: vi.fn() })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const withExtra: Column<Row>[] = [...columns, { key: 'link', header: 'Link', render: () => 'deschide' }, { key: 'id', header: 'ID', render: (r) => r.id, exportValue: (r) => `kw-${r.id}` }]
+    render(<SortableTable caption="Keywords" columns={withExtra} rows={rows} rowKey={(r) => r.id} pageSize={2} emptyText="x" exportFileName="keywords.csv" />)
+    await userEvent.click(within(screen.getByRole('columnheader', { name: /Clicks/ })).getByRole('button'))
+    await userEvent.click(screen.getByRole('button', { name: 'Exportă CSV: Keywords' }))
+    expect(click).toHaveBeenCalledTimes(1)
+    // `text()` decodează UTF-8 și elimină BOM-ul: îl verificăm pe octeți (Excel are nevoie de el pentru diacritice).
+    expect([...new Uint8Array(await blobs[0]!.arrayBuffer()).slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
+    expect(await blobs[0]!.text()).toBe('Keyword;Clicks;ID\r\nmerișor;0;kw-3\r\nd-manoză;12;kw-4\r\nurinal;30;kw-1\r\ncistită;;kw-2\r\n')
+    click.mockRestore()
+  })
+
+  it('fără nume de fișier sau fără rânduri nu există export', () => {
+    const { unmount } = render(<SortableTable caption="Keywords" columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="x" />)
+    expect(screen.queryByRole('button', { name: /Exportă CSV/ })).toBeNull()
+    unmount()
+    render(<SortableTable caption="Keywords" columns={columns} rows={[]} rowKey={(r) => r.id} emptyText="x" exportFileName="keywords.csv" />)
+    expect(screen.queryByRole('button', { name: /Exportă CSV/ })).toBeNull()
+  })
+
   it('click pe rând', async () => {
     const onRowClick = vi.fn()
     render(<SortableTable caption="K" columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="x" onRowClick={onRowClick} />)

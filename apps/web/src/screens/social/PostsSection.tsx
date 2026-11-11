@@ -12,6 +12,7 @@ import { safeUrl } from '../../lib/safeUrl'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
 import { FORMAT_LABELS, PLATFORM_LABELS } from './labels'
+import { useExportName } from '../shared/useExportName'
 
 const NO_PERF = <span className="text-text-3" title="Date de performanță indisponibile pentru această postare">Indisponibil</span>
 
@@ -122,6 +123,7 @@ function PostCards({ rows, brandName }: { rows: SocialPost[]; brandName: string 
  * performanță e „Indisponibil", nu zero.
  */
 export function PostsSection({ state, onRetry, brandName }: { state: AsyncState<ProviderResult<SocialPost[]>>; onRetry: () => void; brandName: string }) {
+  const exportName = useExportName('postari')
   const [view, setView] = useState<View>('cards')
   return (
     <Section
@@ -135,7 +137,7 @@ export function PostsSection({ state, onRetry, brandName }: { state: AsyncState<
           view === 'cards' ? (
             <PostCards rows={rows} brandName={brandName} />
           ) : (
-            <SortableTable caption="Performanța conținutului" columns={columns} rows={rows} rowKey={(p) => p.id} pageSize={8} emptyText="Nicio postare pentru filtrele și perioada alese." phoneCards={false} />
+            <SortableTable caption="Performanța conținutului" exportFileName={exportName} columns={columns} rows={rows} rowKey={(p) => p.id} pageSize={8} emptyText="Nicio postare pentru filtrele și perioada alese." phoneCards={false} />
           )
         }
       </Resolved>

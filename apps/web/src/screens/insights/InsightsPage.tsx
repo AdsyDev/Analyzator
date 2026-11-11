@@ -18,6 +18,7 @@ import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
 import { ACTION_LABEL } from '../overview/InsightSections'
 import { ACTION_STEP, ActionForm, EVIDENCE_KEYS, InsightEditor, NoteDialog, RecommendationsDialog } from './InsightEditor'
+import { useExportName } from '../shared/useExportName'
 
 type StatusTab = 'all' | InsightStatus
 
@@ -251,6 +252,7 @@ function InsightSteps({ insight, w }: { insight: Insight; w: Workflow }) {
 }
 
 function Body({ all, agencyView, tab, setTab, onOpenEvidence, workflow, onNew }: { all: Insight[]; agencyView: boolean; tab: StatusTab; setTab: (t: StatusTab) => void; onOpenEvidence: (q: EvidenceQuery, label: string) => void; workflow: Workflow; onNew: () => void }) {
+  const exportName = useExportName('actiuni')
   // A doua barieră: chiar dacă providerul ar greși, clientul nu primește o analiză nepublicată.
   const visible = useMemo(() => (agencyView ? all : all.filter((i) => i.status === 'published')), [all, agencyView])
   const counts = useMemo(() => {
@@ -344,7 +346,7 @@ function Body({ all, agencyView, tab, setTab, onOpenEvidence, workflow, onNew }:
         )}
       </Section>
       <Section id="actions" title="Acțiuni" description={agencyView ? 'Registrul acțiunilor: responsabil, termen, plan și pasul următor. Clientul vede acțiunile agreate ale analizelor publicate.' : 'Ce urmează din analize, cu responsabil, termen și status.'}>
-        <SortableTable caption="Acțiuni" columns={columns} rows={actionRows(shown)} rowKey={(a) => `${a.insight.id}:${a.id}`} pageSize={8} emptyText="Analizele afișate nu au acțiuni." />
+        <SortableTable caption="Acțiuni" exportFileName={exportName} columns={columns} rows={actionRows(shown)} rowKey={(a) => `${a.insight.id}:${a.id}`} pageSize={8} emptyText="Analizele afișate nu au acțiuni." />
       </Section>
     </>
   )

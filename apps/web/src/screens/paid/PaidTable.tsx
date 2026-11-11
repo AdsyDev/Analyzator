@@ -4,6 +4,7 @@ import type { AsyncState } from '../../data/useAsync'
 import { formatCurrency, formatDate, formatInteger, formatMetricValue } from '../../lib/format'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
+import { useExportName } from '../shared/useExportName'
 
 const PLATFORM: Record<PaidPlatform, string> = { google_ads: 'Google Ads', meta_ads: 'Meta Ads', tiktok_ads: 'TikTok Ads' }
 const dash = <span className="text-text-3">Fără date</span>
@@ -29,10 +30,11 @@ function columns(currency: string): Column<PaidRow>[] {
 
 /** Performance table: câte un rând pe zi, platformă, cont și campanie. Fără galerie de creatives. */
 export function PaidTable({ state, currency, onRetry }: { state: AsyncState<ProviderResult<PaidRow[]>>; currency: string; onRetry: () => void }) {
+  const exportName = useExportName('paid media')
   return (
     <Section id="performance" title="Performanță pe zi" description="Câte un rând pe zi, platformă, cont și campanie, în moneda și fusul orar ale exportului. N/A înseamnă că metrica nu se aplică campaniei, nu zero.">
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă tabelul" skeletonClass="h-72">
-        {(rows) => <SortableTable caption="Performanță Paid Media pe zi, platformă, cont și campanie" columns={columns(currency)} rows={rows} rowKey={(r) => `${r.date}|${r.platform}|${r.account}|${r.campaign}`} pageSize={12} emptyText="Niciun rând importat pentru filtrele și perioada alese." />}
+        {(rows) => <SortableTable caption="Performanță Paid Media pe zi, platformă, cont și campanie" exportFileName={exportName} columns={columns(currency)} rows={rows} rowKey={(r) => `${r.date}|${r.platform}|${r.account}|${r.campaign}`} pageSize={12} emptyText="Niciun rând importat pentru filtrele și perioada alese." />}
       </Resolved>
     </Section>
   )

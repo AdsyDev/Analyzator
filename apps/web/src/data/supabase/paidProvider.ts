@@ -1,4 +1,4 @@
-import { failed, notConnected, PAID_PLATFORMS, ready, type PaidFilters, type PaidKpi, type PaidProvider, type PaidRow, type PaidSeries, type PaidSummary, type ProviderResult, type QueryContext } from '../../contracts'
+import { failed, notConnected, PAID_PLATFORMS, ready, type PaidBudget, type PaidFilters, type PaidKpi, type PaidProvider, type PaidRow, type PaidSeries, type PaidSummary, type ProviderResult, type QueryContext } from '../../contracts'
 import { METRIC_STATUSES } from '../../contracts'
 import { serverPeriodKind } from '../../lib/period'
 import type { DataClient } from './dataClient'
@@ -36,6 +36,13 @@ function kpi(v: unknown): PaidKpi {
     definition: String(o.definition ?? ''),
     note: typeof o.note === 'string' ? o.note : null,
   }
+}
+
+/** Refuzul RLS și regulile tabelului, în română; restul erorilor nu își arată detaliile. */
+function budgetWriteError(e: { code?: string }, fallback: string): string {
+  if (e.code === '42501') return 'Nu ai dreptul să modifici bugetul acestui brand.'
+  if (e.code === '23514') return 'Bugetul nu respectă regulile: sumă mai mare ca zero, monedă din trei litere, interval de cel mult 400 de zile.'
+  return fallback
 }
 
 /**
@@ -85,8 +92,43 @@ export function createSupabasePaid(client: DataClient): PaidProvider {
       }
     },
 
-    // Bugetul aprobat nu are încă tabel în Analyzator: nu inventăm un plan.
-    budget: async () => notConnected('Bugetul aprobat nu e încă încărcat în Analyzator; pacing-ul apare după încărcarea planului de buget.'),
+    // Planul în vigoare la sfârșitul perioadei (`brand_paid_budget`, J-4); costul și procentele vin calculate de server.
+    async budget(ctx) {
+      const { data, error } = await client.rpc('brand_paid_budget', { p_brand_id: ctx.brandId, p_day: ctx.period.to })
+      if (error) return failed(error.code === '42501' ? 'Nu ai acces la acest spațiu de brand.' : 'Bugetul nu a putut fi citit. Reîncearcă.')
+      const d = data as { plan?: Record<string, unknown> | null } | null
+      if (!d || !('plan' in d)) return failed(CONTRACT)
+      const plan = d.plan
+      // Fără plan: stare validă („Fără buget aprobat”), nu eroare și nu buget zero.
+      if (plan === null || plan === undefined) {
+        return ready<PaidBudget>({ id: null, currency: '', approved_budget: null, plan_from: ctx.period.from, plan_to: ctx.period.to, spent: null, elapsed_days: 0, planned_days: 0, spend_pct: null, time_pct: 0, plan_note: null, data_as_of: null, currency_mismatch: false })
+      }
+      const approved = num(plan.approved_budget)
+      const time = num(plan.time_pct)
+      if (typeof plan.id !== 'string' || typeof plan.plan_from !== 'string' || typeof plan.plan_to !== 'string' || typeof plan.currency !== 'string' || approved === null || time === null) return failed(CONTRACT)
+      return ready<PaidBudget>({
+        id: plan.id, currency: plan.currency, approved_budget: approved, plan_from: plan.plan_from, plan_to: plan.plan_to,
+        spent: num(plan.spent), elapsed_days: num(plan.elapsed_days) ?? 0, planned_days: num(plan.planned_days) ?? 0,
+        spend_pct: num(plan.spend_pct), time_pct: time, plan_note: typeof plan.plan_note === 'string' ? plan.plan_note : null,
+        data_as_of: typeof plan.data_as_of === 'string' ? plan.data_as_of : null, currency_mismatch: plan.currency_mismatch === true,
+      })
+    },
+
+    async saveBudget(brand, b) {
+      const { data: auth } = await client.auth.getSession()
+      const me = auth.session?.user.id
+      if (!me) return failed('Sesiunea a expirat. Autentifică-te din nou.')
+      const { error } = await client.from('paid_budgets').insert({
+        tenant_id: brand.tenant_id, brand_id: brand.id, plan_from: b.plan_from, plan_to: b.plan_to, amount: b.amount,
+        currency: b.currency.trim().toUpperCase(), note: b.note?.trim() || null, created_by: me,
+      })
+      return error ? failed(budgetWriteError(error, 'Bugetul nu a putut fi salvat. Reîncearcă.')) : ready(null)
+    },
+
+    async deleteBudget(id) {
+      const { error } = await client.from('paid_budgets').delete().eq('id', id)
+      return error ? failed(budgetWriteError(error, 'Bugetul nu a putut fi șters. Reîncearcă.')) : ready(null)
+    },
 
     async series(ctx, f) {
       const r = await report(ctx, f)

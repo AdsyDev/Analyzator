@@ -1,5 +1,6 @@
 import { useId, useMemo, useState, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
+import { downloadCsv, toCsv, type CsvCell } from '../../lib/csv'
 import { DataCard, DataCardList } from './DataCard'
 import { paginate, Pager } from './Pager'
 import { Tabs } from './Tabs'
@@ -14,6 +15,8 @@ export interface Column<Row> {
   render: (row: Row) => ReactNode
   /** Pe telefon, coloana care dă titlul cardului (implicit prima). */
   cardTitle?: boolean
+  /** Valoarea din exportul CSV; implicit `sortValue`. O coloană fără niciuna nu intră în export. */
+  exportValue?: (row: Row) => CsvCell
 }
 
 interface SortableTableProps<Row> {
@@ -27,6 +30,8 @@ interface SortableTableProps<Row> {
   onRowClick?: (row: Row) => void
   /** Pe telefon, rândurile devin carduri (cu „Tabel" ca a doua vedere). `false` când ecranul are deja propriile carduri. */
   phoneCards?: boolean
+  /** Numele fișierului CSV (cu `.csv`). Când e dat și tabelul are rânduri, apare „Exportă CSV”, cu toate rândurile, în ordinea afișată. */
+  exportFileName?: string
 }
 
 type Sort = { key: string; dir: 'asc' | 'desc' } | null
@@ -35,7 +40,7 @@ function compare(a: string | number, b: string | number): number {
   return typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), 'ro')
 }
 
-export function SortableTable<Row>({ caption, columns, rows, rowKey, pageSize = 10, emptyText, onRowClick, phoneCards = true }: SortableTableProps<Row>) {
+export function SortableTable<Row>({ caption, columns, rows, rowKey, pageSize = 10, emptyText, onRowClick, phoneCards = true, exportFileName }: SortableTableProps<Row>) {
   const [sort, setSort] = useState<Sort>(null)
   const [page, setPage] = useState(1)
   const [view, setView] = useState<'cards' | 'table'>('cards')
@@ -64,10 +69,24 @@ export function SortableTable<Row>({ caption, columns, rows, rowKey, pageSize = 
     setSort((s) => (s?.key !== key ? { key, dir: 'asc' } : s.dir === 'asc' ? { key, dir: 'desc' } : null))
   }
 
+  // Exportul scrie valorile brute (nu textul formatat), din toate rândurile, nu doar din pagina curentă.
+  function exportCsv() {
+    if (!exportFileName) return
+    const cols = columns.filter((c) => c.exportValue ?? c.sortValue)
+    downloadCsv(exportFileName, toCsv(cols.map((c) => c.header), sorted.map((row) => cols.map((c) => (c.exportValue ?? c.sortValue)?.(row)))))
+  }
+  const exportButton =
+    exportFileName && rows.length > 0 ? (
+      <button type="button" onClick={exportCsv} aria-label={`Exportă CSV: ${caption}`} className="self-end rounded-lg px-2 py-1 text-[12.5px] font-medium text-accent-text hover:bg-surface-2 print:hidden">
+        Exportă CSV
+      </button>
+    ) : null
+
   const empty = <p className="px-4 py-8 text-center text-[13px] text-text-2">{emptyText}</p>
   const pager = <Pager current={current} pages={pages} pageSize={pageSize} total={sorted.length} onPage={setPage} className="border-t border-border px-4 py-2" />
 
   const tableView = (
+    <div className="flex flex-col gap-1.5">
     <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-1">
       <div className="scroll-x relative">
         <table className="w-full border-collapse text-[13px]">
@@ -116,6 +135,8 @@ export function SortableTable<Row>({ caption, columns, rows, rowKey, pageSize = 
         </table>
       </div>
       {rows.length === 0 ? empty : pager}
+    </div>
+    {exportButton}
     </div>
   )
 
@@ -181,6 +202,7 @@ export function SortableTable<Row>({ caption, columns, rows, rowKey, pageSize = 
                 ))}
               </DataCardList>
               <Pager current={current} pages={pages} pageSize={pageSize} total={sorted.length} onPage={setPage} className="px-1" />
+              {exportButton}
             </>
           )
         ) : (

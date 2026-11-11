@@ -60,11 +60,11 @@ describe('AppShell', () => {
     expect(screen.getByText('Nicio sursă nu a importat date încă')).toBeInTheDocument()
   })
 
-  it('navigarea are cele 11 module pentru agency_admin și păstrează perioada, nu filtrele modulului', () => {
+  it('navigarea are cele 13 module pentru agency_admin și păstrează perioada, nu filtrele modulului', () => {
     setup()
     const nav = screen.getByRole('navigation', { name: 'Module' })
     expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual([
-      'Overview', 'AI Visibility', 'SEO și Search', 'Trafic și conversii', 'User experience', 'Paid Media', 'Social', 'Listening', 'Farmacovigilență', 'Concurență', 'Analize și acțiuni',
+      'Overview', 'AI Visibility', 'SEO și Search', 'Indexare', 'Trafic și conversii', 'User experience', 'Paid Media', 'Social', 'Listening', 'Farmacovigilență', 'Concurență', 'Analize și acțiuni', 'Rapoarte',
     ])
     expect(within(nav).getByRole('link', { name: 'Farmacovigilență' })).toHaveAttribute('href', '/brands/b1/pharmacovigilance?period=7d')
     const ai = within(nav).getByRole('link', { name: 'AI Visibility' })
@@ -102,14 +102,14 @@ describe('AppShell', () => {
     setup({ brandId: null })
     const nav = screen.getByRole('navigation', { name: 'Module' })
     expect(within(nav).queryAllByRole('link')).toHaveLength(0)
-    expect(nav.querySelectorAll('[aria-disabled="true"]')).toHaveLength(11)
+    expect(nav.querySelectorAll('[aria-disabled="true"]')).toHaveLength(13)
   })
 
   it('Farmacovigilență (submeniul Listening) e doar pentru agency_admin (B7-14)', () => {
     for (const user of [strategist, { ...strategist, role: 'account' as const }, client]) {
       setup({ user })
       const nav = screen.getByRole('navigation', { name: 'Module' })
-      expect(within(nav).getAllByRole('link')).toHaveLength(10)
+      expect(within(nav).getAllByRole('link')).toHaveLength(12)
       expect(within(nav).queryByRole('link', { name: 'Farmacovigilență' }), user.role).toBeNull()
       cleanup()
     }

@@ -6,8 +6,10 @@ import {
   ChatCircleTextIcon,
   CursorClickIcon,
   EarIcon,
+  FileTextIcon,
   FirstAidKitIcon,
   ListIcon,
+  ListMagnifyingGlassIcon,
   MagnifyingGlassIcon,
   MegaphoneSimpleIcon,
   MoonIcon,
@@ -16,6 +18,7 @@ import {
   ScalesIcon,
   SlidersHorizontalIcon,
   SquaresFourIcon,
+  StackIcon,
   SunIcon,
   UserListIcon,
   UsersThreeIcon,
@@ -28,7 +31,7 @@ import type { Brand, IsoDate, IsoDateTime, ProviderResult, Role, SessionUser } f
 import { ROLES } from '../contracts'
 import { cn } from '../lib/cn'
 import { formatDate, formatRelative } from '../lib/format'
-import { ROLE_LABELS, adminItemsFor, adminPath, brandNavFor, brandPath, type NavItem } from '../lib/navigation'
+import { PORTFOLIO_PATH, ROLE_LABELS, adminItemsFor, adminPath, brandNavFor, brandPath, type NavItem } from '../lib/navigation'
 import { sharedSearch } from '../lib/period'
 import { useTheme } from '../theme/ThemeProvider'
 import { Avatar } from './ui/Avatar'
@@ -39,6 +42,7 @@ const ICONS: Record<string, Icon> = {
   ChatCircleText: ChatCircleTextIcon,
   CursorClick: CursorClickIcon,
   MagnifyingGlass: MagnifyingGlassIcon,
+  ListMagnifyingGlass: ListMagnifyingGlassIcon,
   ChartLineUp: ChartLineUpIcon,
   MegaphoneSimple: MegaphoneSimpleIcon,
   UsersThree: UsersThreeIcon,
@@ -46,6 +50,8 @@ const ICONS: Record<string, Icon> = {
   FirstAidKit: FirstAidKitIcon,
   Scales: ScalesIcon,
   Notebook: NotebookIcon,
+  FileText: FileTextIcon,
+  Stack: StackIcon,
   Buildings: BuildingsIcon,
   PlugsConnected: PlugsConnectedIcon,
   UserList: UserListIcon,
@@ -237,7 +243,7 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
         id={navId}
         aria-label="Navigare principală"
         className={cn(
-          'glass fixed bottom-0 left-0 top-[var(--banner-h,0px)] z-30 flex w-[min(280px,85vw)] flex-col gap-1 overflow-y-auto overscroll-contain border-y-0 border-l-0 px-3 py-4 duration-200',
+          'glass fixed bottom-0 left-0 top-[var(--banner-h,0px)] z-30 flex w-[min(280px,85vw)] flex-col gap-1 overflow-y-auto overscroll-contain border-y-0 border-l-0 px-3 py-4 duration-200 print:hidden',
           // Deschis: vizibil imediat (focusul intră în sertar). Închis: rămâne vizibil cât alunecă, apoi iese din ordinea de tab.
           navOpen ? 'transition-[width,translate] max-lg:shadow-drawer' : 'transition-[width,translate,visibility] max-lg:invisible max-lg:-translate-x-full',
           collapsed ? 'lg:w-[72px]' : 'lg:w-[240px]',
@@ -250,6 +256,12 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
             <XIcon size={18} aria-hidden="true" />
           </button>
         </div>
+        {/* Portofoliul are sens de la două branduri în sus; cu unul singur, Overview spune același lucru. */}
+        {brandList.length > 1 && (
+          <nav aria-label="Portofoliu" className="mb-2 flex flex-col gap-0.5 border-b border-border pb-2">
+            <SidebarLink item={{ segment: 'portfolio', label: 'Portofoliu', icon: 'Stack' }} collapsed={collapsed} to={{ pathname: PORTFOLIO_PATH, search }} />
+          </nav>
+        )}
         <nav aria-label="Module" className="flex flex-col gap-0.5">
           {brandNavFor(user.role).map((item) => (
             <SidebarLink key={item.segment} item={item} collapsed={collapsed} to={brandId ? { pathname: brandPath(brandId, item.segment), search } : null} />
@@ -276,9 +288,10 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
         </button>
       </aside>
 
-      <div className={cn('transition-[margin] duration-200', collapsed ? 'lg:ml-[72px]' : 'lg:ml-[240px]')}>
+      {/* La tipărire rămâne doar conținutul paginii: fără meniu, fără bara de sus și fără filtre. */}
+      <div className={cn('transition-[margin] duration-200 print:!ml-0', collapsed ? 'lg:ml-[72px]' : 'lg:ml-[240px]')}>
         {/* Pe ecrane mici, linia „Date până la" coboară pe al doilea rând al barei de sus, ca să rămână vizibilă. */}
-        <header className="glass-bar sticky top-[var(--banner-h,0px)] z-20 flex min-h-14 flex-wrap items-center gap-x-2 border-x-0 border-t-0 px-3 pt-2 sm:gap-x-3 sm:px-6 md:h-14 md:flex-nowrap md:pt-0">
+        <header className="glass-bar sticky top-[var(--banner-h,0px)] z-20 flex min-h-14 flex-wrap items-center gap-x-2 border-x-0 border-t-0 px-3 pt-2 sm:gap-x-3 sm:px-6 md:h-14 md:flex-nowrap md:pt-0 print:hidden">
           <button
             ref={navButton}
             type="button"
@@ -352,7 +365,7 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
             <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em] sm:text-[26px]">{title}</h1>
             {subtitle && <p className="mt-1 max-w-[72ch] text-[14px] leading-normal text-text-2">{subtitle}</p>}
           </div>
-          {filterBar}
+          {filterBar && <div className="print:hidden">{filterBar}</div>}
           {children}
         </main>
       </div>

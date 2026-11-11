@@ -20,6 +20,7 @@ export const BRAND_NAV: readonly NavItem[] = [
   { segment: 'overview', label: 'Overview', icon: 'SquaresFour' },
   { segment: 'ai', label: 'AI Visibility', icon: 'ChatCircleText' },
   { segment: 'seo', label: 'SEO și Search', icon: 'MagnifyingGlass' },
+  { segment: 'indexing', label: 'Indexare', icon: 'ListMagnifyingGlass', parent: 'seo' },
   { segment: 'traffic', label: 'Trafic și conversii', icon: 'ChartLineUp' },
   { segment: 'ux', label: 'User experience', icon: 'CursorClick' },
   { segment: 'paid', label: 'Paid Media', icon: 'MegaphoneSimple' },
@@ -29,6 +30,7 @@ export const BRAND_NAV: readonly NavItem[] = [
   { segment: 'pharmacovigilance', label: 'Farmacovigilență', icon: 'FirstAidKit', parent: 'listening', roles: ['agency_admin'] },
   { segment: 'competition', label: 'Concurență', icon: 'Scales' },
   { segment: 'insights', label: 'Analize și acțiuni', icon: 'Notebook' },
+  { segment: 'reports', label: 'Rapoarte', icon: 'FileText' },
 ]
 
 /** Modulele de brand vizibile pentru un rol, în ordinea meniului (submeniurile imediat după părinte). */
@@ -61,6 +63,8 @@ export const ROLE_LABELS: Record<Role, string> = {
   client_viewer: 'Client, cititor',
 }
 
+/** Portofoliul: toate brandurile permise utilizatorului, pe aceeași perioadă. */
+export const PORTFOLIO_PATH = '/portfolio'
 export const brandPath = (brandId: string, segment: string) => `/brands/${brandId}/${segment}`
 export const adminPath = (segment: string) => `/admin/${segment}`
 /** Pagina unui site în Administrare: detaliile și sursele lui. */
