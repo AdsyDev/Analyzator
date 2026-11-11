@@ -19,7 +19,7 @@ import { sha256 } from './normalize.ts'
 
 export const INDEX_SOURCE = 'gsc_index'
 export const INDEX_SCHEMA_VERSION = 'docs-2026-11-11'
-/** Paginile cu cele mai multe clickuri din ultimele 28 de zile, pe lângă lista agenției. */
+/** Paginile cu cele mai multe clickuri (apoi afișări) din ultimele 28 de zile, pe lângă lista agenției. */
 export const INDEX_TOP_PAGES = 50
 export const INDEX_TOP_PAGES_DAYS = 28
 /** Plafon pe brand și rulare. Cota Google: 2.000 de inspecții pe zi și 600 pe minut, pe proprietate. */
@@ -100,9 +100,9 @@ export function inspectionRow(payload: z.infer<typeof UrlInspectionSchema>, c: C
 export async function candidateUrls(db: Db, conn: { tenant_id: string; brand_id: string }, today: string): Promise<Candidate[]> {
   const scope = `tenant_id=eq.${conn.tenant_id}&brand_id=eq.${conn.brand_id}`
   const priority = await db.select<{ tenant_id: string; brand_id: string; url: string }>('index_urls', `select=tenant_id,brand_id,url&${scope}&order=url.asc&limit=${INDEX_MAX_URLS}`)
-  const pages = await db.select<{ tenant_id: string; brand_id: string; page: string; clicks: number | string | null }>(
+  const pages = await db.select<{ tenant_id: string; brand_id: string; page: string; clicks: number | string | null; impressions: number | string | null }>(
     'search_queries',
-    `select=tenant_id,brand_id,page,clicks&${scope}&date=gte.${addDaysIso(today, -INDEX_TOP_PAGES_DAYS)}&order=clicks.desc.nullslast&limit=5000`,
+    `select=tenant_id,brand_id,page,clicks,impressions&${scope}&date=gte.${addDaysIso(today, -INDEX_TOP_PAGES_DAYS)}&order=clicks.desc.nullslast,impressions.desc.nullslast&limit=5000`,
   )
   // Serviciul ocolește RLS: fiecare rând citit e verificat din nou pe client și brand.
   for (const r of [...priority, ...pages]) if (r.tenant_id !== conn.tenant_id || r.brand_id !== conn.brand_id) throw new Error('Rând citit pentru alt client sau alt brand; opresc rularea.')
@@ -115,9 +115,17 @@ export async function candidateUrls(db: Db, conn: { tenant_id: string; brand_id:
     out.push({ url, origin })
   }
   for (const p of [...priority].sort((a, b) => a.url.localeCompare(b.url))) add(p.url, 'priority')
-  const clicks = new Map<string, number>()
-  for (const p of pages) clicks.set(p.page, (clicks.get(p.page) ?? 0) + (Number(p.clicks) || 0))
-  const top = [...clicks.entries()].filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, INDEX_TOP_PAGES)
+  // Paginile după clickuri; la egalitate (sau pe un site mic, fără clickuri pe rândurile query × pagină), după afișări.
+  // O pagină fără clickuri și fără afișări nu intră.
+  const seenInSearch = new Map<string, { clicks: number; impressions: number }>()
+  for (const p of pages) {
+    const t = seenInSearch.get(p.page) ?? { clicks: 0, impressions: 0 }
+    seenInSearch.set(p.page, { clicks: t.clicks + (Number(p.clicks) || 0), impressions: t.impressions + (Number(p.impressions) || 0) })
+  }
+  const top = [...seenInSearch.entries()]
+    .filter(([, t]) => t.clicks > 0 || t.impressions > 0)
+    .sort((a, b) => b[1].clicks - a[1].clicks || b[1].impressions - a[1].impressions || a[0].localeCompare(b[0]))
+    .slice(0, INDEX_TOP_PAGES)
   for (const [page] of top) add(page, 'top_page')
   return out
 }
@@ -161,7 +169,7 @@ async function runIndex(deps: IndexDeps, conn: BrandConnection & { brand_id: str
   const candidates = await candidateUrls(db, scope, today)
   // Fără nimic de inspectat nu se deschide o rulare: nu e un eșec și nu e o inspecție.
   if (candidates.length === 0) {
-    return { connection_id: conn.id, brand_id: conn.brand_id, status: 'not_connected', reason: 'niciun URL de inspectat: lista prioritară e goală și nu există pagini cu clickuri în ultimele 28 de zile', urls: 0, rows_written: 0, errors: [] }
+    return { connection_id: conn.id, brand_id: conn.brand_id, status: 'not_connected', reason: 'niciun URL de inspectat: lista prioritară e goală și nicio pagină nu a apărut în Search Console în ultimele 28 de zile', urls: 0, rows_written: 0, errors: [] }
   }
 
   const handle = await startSyncRun(db, { ...scope, source: INDEX_SOURCE, source_connection_id: conn.id, period_start: today, period_end: today }, now)
