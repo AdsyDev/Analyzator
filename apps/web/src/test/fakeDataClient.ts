@@ -35,6 +35,8 @@ export function fakeDataClient(opts: Opts = {}) {
     let limit: number | null = null
     let order: { col: string; asc: boolean } | null = null
     let single: 'one' | 'maybe' | null = null
+    // `.select()` după o scriere cere rândurile atinse (ca `RETURNING`): zero rânduri = RLS nu a oferit nimic la scriere.
+    let returning = false
     let rows = () => {
       let out = (tables[table] ?? []).filter((r) =>
         call.filters.every(([col, op, val]) => {
@@ -53,7 +55,10 @@ export function fakeDataClient(opts: Opts = {}) {
       return limit === null ? out : out.slice(0, limit)
     }
     const b: Record<string, unknown> = {
-      select: () => b,
+      select: () => {
+        if (call.op !== 'select') returning = true
+        return b
+      },
       insert: (payload: unknown) => {
         call.op = 'insert'
         call.payload = payload
@@ -81,12 +86,13 @@ export function fakeDataClient(opts: Opts = {}) {
         let result: { data: unknown; error: unknown }
         if (err) result = { data: null, error: err }
         else if (call.op === 'update') {
-          for (const r of rows()) Object.assign(r, call.payload as Row)
-          result = { data: null, error: null }
+          const hit = rows()
+          for (const r of hit) Object.assign(r, call.payload as Row)
+          result = { data: returning ? (single ? (hit[0] ?? null) : hit) : null, error: null }
         } else if (call.op === 'delete') {
           const gone = new Set(rows())
           tables[table] = (tables[table] ?? []).filter((r) => !gone.has(r))
-          result = { data: null, error: null }
+          result = { data: returning ? [...gone] : null, error: null }
         } else if (call.op === 'insert') result = { data: single ? { ...(call.payload as Row), id: 'new-id', credential_status: 'missing' } : call.payload, error: null }
         else {
           const r = rows()

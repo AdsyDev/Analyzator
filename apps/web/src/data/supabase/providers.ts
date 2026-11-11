@@ -210,6 +210,10 @@ const assistant: AssistantProvider = {
   savePreference: async () => notConnected(AI_OFF),
   ask: async () => notConnected(AI_OFF),
   generateInsight: async () => notConnected(AI_OFF),
+  documents: async () => notConnected(AI_OFF),
+  addDocument: async () => notConnected(AI_OFF),
+  setDocumentStatus: async () => notConnected(AI_OFF),
+  deleteDocument: async () => notConnected(AI_OFF),
 }
 
 export interface SupabaseProvidersDeps {

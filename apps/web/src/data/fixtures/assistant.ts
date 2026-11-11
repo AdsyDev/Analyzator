@@ -1,4 +1,5 @@
-import { failed, isAgencyRole, ready, type AiControls, type AiReply, type AssistantProvider, type InsightDraft, type MetricsProvider, type QueryContext, type Role } from '../../contracts'
+import { failed, isAgencyRole, ready, type AiControls, type AiReply, type AssistantProvider, type BrandDocument, type InsightDraft, type MetricsProvider, type QueryContext, type Role } from '../../contracts'
+import { splitIntoFragments } from '../../lib/fragments'
 import { formatMetricValue } from '../../lib/format'
 
 interface Options {
@@ -17,6 +18,10 @@ export function createAssistantFixtures({ allowed, getRole, metrics, createDraft
   const denied = failed<never>('Acces refuzat la acest spațiu de brand.')
   const policies = new Map<string, AiControls & { monthly_token_cap: number; updated_at: string }>()
   const preferences = new Map<string, { chat: boolean; display: boolean }>()
+  // Documentele din previzualizare trăiesc în memorie; regulile oglindesc triggerele din `brand_documents`.
+  const documents = new Map<string, BrandDocument[]>()
+  let documentSeq = 0
+  const canApprove = () => getRole() === 'agency_admin' || getRole() === 'strategist'
   const policyOf = (brandId: string) => policies.get(brandId) ?? { chat: true, generation: true, display: true, monthly_token_cap: 2_000_000, updated_at: '2026-11-03T09:00:00+02:00' }
   const preferenceOf = (brandId: string) => preferences.get(brandId) ?? { chat: true, display: true }
   const effectiveOf = (brandId: string): AiControls => {
@@ -96,6 +101,46 @@ export function createAssistantFixtures({ allowed, getRole, metrics, createDraft
         evidence_keys: withValue.map((m) => m.metric_key),
       })
       return id ? ready({ ...none, status: 'ok', insight_id: id }) : failed('Ciorna nu a putut fi salvată.')
+    },
+
+    documents: async (brandId) => {
+      if (!allowed.has(brandId)) return denied
+      const all = documents.get(brandId) ?? []
+      return ready(isAgencyRole(getRole()) ? all : all.filter((d) => d.status === 'approved'))
+    },
+
+    addDocument: async (brand, doc) => {
+      if (!allowed.has(brand.id)) return denied
+      if (!isAgencyRole(getRole())) return failed('Nu ai dreptul să schimbi acest document.')
+      const fragments = splitIntoFragments(doc.text)
+      if (fragments.length === 0) return failed('Documentul nu are text.')
+      const id = `doc-preview-${++documentSeq}`
+      const { text: _text, ...fields } = doc
+      documents.set(brand.id, [{ ...fields, id, title: doc.title.trim(), status: 'draft', approved_at: null, fragments: fragments.length, created_at: new Date().toISOString() }, ...(documents.get(brand.id) ?? [])])
+      return ready({ id })
+    },
+
+    setDocumentStatus: async (brand, id, status) => {
+      if (!allowed.has(brand.id)) return denied
+      if (!canApprove()) return failed(status === 'approved' ? 'Doar strategistul sau administratorul agenției aprobă un document' : 'Doar strategistul sau administratorul agenției retrage un document')
+      const all = documents.get(brand.id) ?? []
+      const doc = all.find((d) => d.id === id)
+      if (!doc) return failed('Nu ai dreptul să schimbi acest document.')
+      if (status === 'approved') {
+        if (doc.status !== 'draft') return failed(`Tranziție nepermisă: ${doc.status} → approved`)
+        if (!doc.owner || !doc.valid_from) return failed('Aprobarea cere responsabilul documentului la brand și data de început a valabilității')
+      } else if (doc.status !== 'approved') return failed(`Tranziție nepermisă: ${doc.status} → retired`)
+      documents.set(brand.id, all.map((d) => (d.id === id ? { ...d, status, approved_at: d.approved_at ?? new Date().toISOString() } : d)))
+      return ready(null)
+    },
+
+    deleteDocument: async (brand, id) => {
+      if (!allowed.has(brand.id)) return denied
+      const all = documents.get(brand.id) ?? []
+      const doc = all.find((d) => d.id === id)
+      if (!doc || doc.status !== 'draft' || !isAgencyRole(getRole())) return failed('Doar o ciornă se poate șterge.')
+      documents.set(brand.id, all.filter((d) => d.id !== id))
+      return ready(null)
     },
   }
 }

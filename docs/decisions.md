@@ -282,3 +282,20 @@ Cererea proprietarului produsului, 11 nov. 2026: „continuă cu restul etapei 4
 
 **Răspunsurile proprietarului produsului din 11 nov., notate aici ca să nu se piardă:** mențiunile web intră din Planable (prin conexiunea existentă); comentariile și acceptarea recomandărilor folosesc rolul de client existent, fără un rol nou „client manager”. Ambele sunt lucrări separate, neîncepute în această felie.
 
+## P — Etapa 4, a treia felie: baza de documente aprobate (2026-11-11)
+
+Specificația, cap. 23 („Baza de cunoștințe”). Contract: `docs/contracts/adsy-ai.md` („Documente aprobate”). Migrația `20261112150000_stage4_brand_documents.sql`.
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| P-1 | Cum intră un document | (a) fișier încărcat; (b) text lipit | **(b).** Interfața nu poate citi PDF sau Word fără o bibliotecă nouă, iar un text extras automat ar fi „aprobat” fără să-l fi văzut cineva. Textul se lipește, iar un rând care începe cu „#” e titlu de secțiune. Încărcarea de fișiere rămâne de făcut dacă volumul o cere. |
+| P-2 | Aprobarea | — | Introducerea nu aprobă: documentul intră ca ciornă. Îl aprobă `strategist` sau `agency_admin`, cu responsabilul de la brand și data de început a valabilității completate. `account` poate introduce și șterge ciorne. Aprobarea consemnează în aplicație acordul brandului; nu îl înlocuiește. |
+| P-3 | Editarea după aprobare | (a) se editează, cu istoric; (b) nu se editează | **(b).** Un document aprobat nu se schimbă, nici textul lui, nici cu cheia de service. Se retrage și se adaugă versiunea nouă. Așa, un răspuns vechi rămâne explicabil prin textul de atunci. |
+| P-4 | Ce intră în context | — | Doar documentele `approved`, valabile la data întrebării (`valid_from` ≤ azi ≤ `valid_to`, în Europe/Bucharest). Ciornele, documentele retrase și cele expirate nu intră. |
+| P-5 | Căutarea | (a) semantică, cu embeddings; (b) lexicală, în Postgres | **(b).** Cuvintele întrebării (cel puțin patru litere, fără diacritice), oricare dintre ele, ordonate după potrivire; cel mult cinci fragmente. Fără un al doilea apel la furnizor și fără un index de vectori de întreținut. Limită: găsește „doza” pentru „doză”, dar nu „dozele”; nu găsește sinonime. Căutarea semantică rămâne de evaluat pe documente reale. |
+| P-6 | Documente față de indicatori | — | În răspuns, un fragment e o dovadă de alt tip („Document aprobat”), separată de metrici. Promptul cere atribuire și interzice amestecul: o afirmație din document nu e un rezultat măsurat. O cifră din fragment trece verificarea doar dacă fragmentul e citat. |
+| P-7 | Cine vede documentele | — | Echipa agenției, toate statusurile; clientul, doar pe cele aprobate ale brandului lui (sunt ale lui). Căutarea rulează cu sesiunea utilizatorului, deci modelul nu primește un fragment pe care utilizatorul nu l-ar putea citi. |
+| P-8 | Produsul | — | Câmp text opțional. Nu există un nomenclator de produse; `product_id` din specificație rămâne pentru când va exista. |
+| P-9 | Ciornele generate | — | Nu folosesc documentele (O-4): o analiză de perioadă descrie date observate. |
+| P-10 | Verificarea datelor calendaristice (corecție) | — | Proba pe modelul real a arătat că „10 noi. 2026” nu era recunoscut ca dată și răspunsuri corecte erau respinse. Lunile se recunosc acum după numele întreg sau abrevierea lor, iar „mai” și „noi”, care sunt și cuvinte obișnuite, doar cu punct, an sau punctuație de interval. „cu 12 mai multe” și „3 decizii” rămân numere de verificat. |
+

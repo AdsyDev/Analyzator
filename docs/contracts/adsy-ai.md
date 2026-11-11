@@ -91,7 +91,7 @@ Motivul intern al respingerii (`rejection_reason`) rămâne în `ai_requests`.
 
 ## Ce pleacă spre furnizorul modelului
 
-Numele brandului, perioada, valorile agregate ale celor 18 indicatori, textele analizelor publicate de echipă și întrebarea utilizatorului. Nu pleacă: date personale, mențiuni sau răspunsuri AI brute, chei, identificatori de utilizator. Termenii de procesare ai furnizorului trebuie validați înainte de pornirea politicii pe un brand.
+Numele brandului, perioada, valorile agregate ale celor 18 indicatori, textele analizelor publicate de echipă, fragmentele documentelor aprobate care potrivesc întrebarea și întrebarea utilizatorului. Nu pleacă: date personale, mențiuni sau răspunsuri AI brute, chei, identificatori de utilizator. Termenii de procesare ai furnizorului trebuie validați înainte de pornirea politicii pe un brand.
 
 ## Ciorne generate (a doua felie, deciziile O)
 
@@ -132,6 +132,35 @@ Versiunea nouă a unei analize generate (`supersedes_id`) moștenește ambele c�
 
 Modelul implicit e `gemini-3.5-flash-lite` (`DEFAULT_MODEL_ID` în `gemini.ts`, decizia O-9); `ADSY_AI_MODEL` îl înlocuiește. Fără `GEMINI_API_KEY`, funcția rămâne „neconfigurat”. O eroare temporară a furnizorului (500, 503, rețea, timeout de 25 s) se reîncearcă o singură dată; 429 și erorile de cheie nu.
 
+## Documente aprobate (a treia felie, deciziile P)
+
+Migrația `20261112150000_stage4_brand_documents.sql`.
+
+| Tabel | Ce ține | Cine scrie | Cine citește |
+|---|---|---|---|
+| `brand_documents` | Titlu, `doc_type` (`product_info`, `claims`, `brand_guidelines`, `faq`, `other`), `product` (opțional), `country`, `language`, `version`, `owner` (cine răspunde la brand), `status`, `approved_at`, `approved_by`, `valid_from`, `valid_to` | `agency_admin`, `strategist`, `account`; se auditează | Echipa: toate. Clientul: doar `approved` |
+| `brand_document_fragments` | `position`, `section_ref`, `content` (cel mult 4.000 de caractere; cel mult 400 pe document) și indexul de căutare | Aceiași, doar cât documentul e ciornă | Ca documentul |
+
+Statusul are un singur drum, verificat de trigger:
+
+| De la → la | Cine | Condiții |
+|---|---|---|
+| (inserare) → `draft` | `agency_admin`, `strategist`, `account` | Statusul și aprobarea trimise de client se ignoră |
+| `draft → approved` | `strategist`, `agency_admin` | `owner`, `valid_from` și cel puțin un fragment; completează `approved_at` și `approved_by` |
+| `approved → retired` | `strategist`, `agency_admin` | Doar statusul se schimbă |
+
+Un document `approved` sau `retired` nu se editează și nu se șterge (nici cu cheia de service), iar fragmentele lui nu se adaugă, nu se schimbă și nu se șterg. O ciornă se poate șterge, cu fragmentele ei.
+
+### `brand_document_search(p_brand_id, p_query, p_on, p_limit)`
+
+Regimul E8. Întoarce cel mult `p_limit` (implicit 5, maximum 10) fragmente ale documentelor `approved` și valabile la `p_on` (implicit azi, Europe/Bucharest): `fragment_id`, `document_id`, `title`, `doc_type`, `version`, `section_ref`, `content`, `valid_from`, `valid_to`. Căutare lexicală: cuvintele întrebării de 4–40 de caractere, fără diacritice, oricare dintre ele; ordinea e a potrivirii. Fără cuvinte utilizabile, listă goală.
+
+### În chat
+
+Funcția `adsy-ai` cheamă `brand_document_search` cu sesiunea utilizatorului și întrebarea lui. Fragmentele intră în `DATE.documents` (cel mult cinci, 1.500 de caractere fiecare), cu `evidence_id = doc:<fragment_id>`. În răspuns, dovada are `kind: "document"`, eticheta „titlu · secțiune” și `document_id`. Documentele intră în amprenta datelor, deci un document nou aprobat sau retras invalidează răspunsurile din cache. Promptul e `chat-v3`.
+
+Spre furnizorul modelului pleacă, pe lângă cele de mai sus, textul fragmentelor potrivite întrebării. **Documentele nu trebuie să conțină date personale.**
+
 ## Neconstruit încă
 
-Baza de documente aprobate și setul de evaluare pe 100 de exemple etichetate.
+Încărcarea de fișiere, căutarea semantică și setul de evaluare pe 100 de exemple etichetate.

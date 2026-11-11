@@ -13,7 +13,8 @@
 // 1. Sesiunea utilizatorului (GoTrue).
 // 2. Accesul la brand și controalele AdSy AI, prin `brand_ai_settings` chemat cu sesiunea utilizatorului (RLS). Cu chatul
 //    oprit de politică sau de preferință, funcția se oprește aici: nu citește date și nu cheamă modelul.
-// 3. Contextul (indicatori, analize publicate) se citește tot cu sesiunea utilizatorului: modelul vede doar ce vede el.
+// 3. Contextul (indicatori, analize publicate, fragmente din documentele aprobate și valabile) se citește tot cu sesiunea
+//    utilizatorului: modelul vede doar ce vede el.
 // 4. Plafonul lunar al brandului și limita zilnică a utilizatorului, apoi cache-ul.
 // 5. Un singur apel către model, fără unelte. Răspunsul e verificat (contract.ts) înainte să ajungă la utilizator.
 // Cheia de service scrie doar jurnalul `ai_requests`, cu tenant și brand verificate explicit. Cheia modelului nu apare în
@@ -22,7 +23,7 @@
 import { ALLOWED_HEADERS } from '../_shared/cors.ts'
 import {
   buildContext, CHAT_METRIC_KEYS, DRAFT_SCHEMA, draftPrompt, GENERATE_PROMPT_VERSION, GENERATE_SYSTEM_PROMPT, hasMetricValues, MAX_QUESTION, PROMPT_VERSION, RESPONSE_SCHEMA, sha256Hex,
-  SYSTEM_PROMPT, userPrompt, verifyAnswer, verifyDraft, type Answer, type ChatContext, type Draft, type InsightRow, type MetricRow, type Period,
+  SYSTEM_PROMPT, userPrompt, verifyAnswer, verifyDraft, MAX_DOCUMENT_FRAGMENTS, type Answer, type ChatContext, type DocumentRow, type Draft, type InsightRow, type MetricRow, type Period,
 } from './contract.ts'
 import { generateJson, isValidModelId } from './gemini.ts'
 
@@ -183,12 +184,14 @@ type LogRow = { status: Answer['status'] | 'error'; response: Answer | Draft | n
 type Prepared = { tenantId: string; scope: string; ctx: ChatContext; snapshot: string }
 
 /** Contextul trimis modelului, citit cu sesiunea utilizatorului: modelul vede doar ce vede el. */
-async function prepare(deps: HandlerDeps, actor: Actor, settings: Settings, input: PeriodInput, withInsights: boolean): Promise<Prepared> {
+async function prepare(deps: HandlerDeps, actor: Actor, settings: Settings, input: PeriodInput, question: string | null): Promise<Prepared> {
+  // Chatul (are întrebare) primește și analizele publicate și fragmentele de documente; ciorna, doar indicatorii.
+  const withInsights = question !== null
   const tenantId = settings.tenant_id
   const brands = await asUser<Array<{ id: string; tenant_id: string; name: string }>>(deps, actor, `brands?select=id,tenant_id,name&id=eq.${input.brandId}`)
   const brand = brands[0]
   if (brands.length !== 1 || !brand || brand.id !== input.brandId || brand.tenant_id !== tenantId) throw new HttpError(403, 'Nu ai acces la acest spațiu de brand.')
-  const [envelope, definitions, insights] = await Promise.all([
+  const [envelope, definitions, insights, documents] = await Promise.all([
     asUser<{ data?: MetricRow[] }>(deps, actor, 'rpc/brand_metrics', {
       method: 'POST',
       body: JSON.stringify({ p_brand_id: input.brandId, p_metric_keys: CHAT_METRIC_KEYS, p_start: input.period.start, p_end: input.period.end, p_kind: input.comparison === 'year_ago' ? 'yoy' : 'custom' }),
@@ -196,6 +199,10 @@ async function prepare(deps: HandlerDeps, actor: Actor, settings: Settings, inpu
     asUser<Array<{ metric_key: string; name_ro: string }>>(deps, actor, `metric_definitions_current?select=metric_key,name_ro&metric_key=in.(${CHAT_METRIC_KEYS.join(',')})`),
     // O ciornă se scrie din indicatori, nu din concluziile analizelor anterioare.
     withInsights ? asUser<InsightRow[]>(deps, actor, 'rpc/brand_insights', { method: 'POST', body: JSON.stringify({ p_brand_id: input.brandId, p_start: input.period.start, p_end: input.period.end }) }) : Promise.resolve([]),
+    // Doar documente aprobate și valabile azi (filtrul e în funcția SQL, cu RLS-ul utilizatorului).
+    question !== null
+      ? asUser<DocumentRow[]>(deps, actor, 'rpc/brand_document_search', { method: 'POST', body: JSON.stringify({ p_brand_id: input.brandId, p_query: question, p_on: null, p_limit: MAX_DOCUMENT_FRAGMENTS }) })
+      : Promise.resolve([]),
   ])
   const ctx = buildContext({
     brandName: brand.name,
@@ -204,6 +211,7 @@ async function prepare(deps: HandlerDeps, actor: Actor, settings: Settings, inpu
     metrics: Array.isArray(envelope?.data) ? envelope.data : [],
     definitions: Array.isArray(definitions) ? definitions : [],
     insights: Array.isArray(insights) ? insights : [],
+    documents: Array.isArray(documents) ? documents : [],
   })
   return { tenantId, scope: `tenant_id=eq.${tenantId}&brand_id=eq.${input.brandId}`, ctx, snapshot: await sha256Hex(JSON.stringify(ctx.data)) }
 }
@@ -247,7 +255,7 @@ async function chat(deps: HandlerDeps, actor: Actor, input: ChatInput): Promise<
   if (!configured(env)) return { status: 'not_configured' }
   const modelId = env.modelId as string
 
-  const p = await prepare(deps, actor, settings, input, true)
+  const p = await prepare(deps, actor, settings, input, input.question)
   const { tenantId, ctx } = p
   const cacheKey = await sha256Hex([tenantId, input.brandId, 'chat', p.snapshot, modelId, PROMPT_VERSION, input.question.toLowerCase().replace(/\s+/g, ' ')].join('\n'))
   const log = logger(deps, actor, p, input, { task: 'chat', modelId, promptVersion: PROMPT_VERSION, question: input.question, cacheKey })
@@ -326,7 +334,7 @@ async function generateInsight(deps: HandlerDeps, actor: Actor, input: PeriodInp
   if (!configured(env)) return { status: 'not_configured' }
   const modelId = env.modelId as string
 
-  const p = await prepare(deps, actor, settings, input, false)
+  const p = await prepare(deps, actor, settings, input, null)
   const { tenantId, ctx } = p
   // Fără niciun indicator cu valoare nu există din ce scrie: modelul nu e chemat.
   if (!hasMetricValues(ctx)) return { status: 'insufficient_evidence' }

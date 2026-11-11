@@ -102,4 +102,79 @@ describe('createSupabaseAssistant', () => {
     expect(await createSupabaseAssistant(st.client).serverStatus('b1')).toEqual({ kind: 'ready', data: { configured: false, model_id: null, prompt_version: 'chat-v1' } })
     expect(st.invocations[0]).toEqual({ name: 'adsy-ai', body: { action: 'status', brand_id: 'b1' } })
   })
+
+  describe('documente', () => {
+    const row = { id: 'd1', brand_id: 'b1', tenant_id: 't1', title: 'Prospect', doc_type: 'product_info', product: null, country: 'RO', language: 'ro', version: '1.0', owner: 'Medical', status: 'approved', approved_at: '2026-11-01T10:00:00+00:00', valid_from: '2026-01-01', valid_to: null, created_at: '2026-10-30T10:00:00+00:00', brand_document_fragments: [{ count: 3 }] }
+    const doc = { title: ' Prospect ', doc_type: 'product_info' as const, product: ' ', country: 'ro', language: 'RO', version: ' 2.0 ', owner: ' Medical ', valid_from: '2026-01-01', valid_to: null, text: '# Administrare\nUn comprimat pe zi.\n\n# Păstrare\nLa temperatura camerei.' }
+
+    it('lista se citește doar pentru brandul cerut și numără fragmentele; alt brand nu apare', async () => {
+      const { client, calls } = fakeDataClient({ tables: { brand_documents: [row, { ...row, id: 'd2', brand_id: 'b2', title: 'Alt brand' }] } })
+      const r = await createSupabaseAssistant(client).documents('b1')
+      expect(calls[0]).toMatchObject({ table: 'brand_documents', filters: [['brand_id', 'eq', 'b1']] })
+      expect(r.kind === 'ready' && r.data.map((d) => [d.id, d.title, d.status, d.fragments, d.owner, d.valid_to])).toEqual([['d1', 'Prospect', 'approved', 3, 'Medical', null]])
+    })
+
+    it('un status sau un tip necunoscut încalcă contractul; eroarea bazei rămâne generică', async () => {
+      const bad = fakeDataClient({ tables: { brand_documents: [{ ...row, status: 'publicat' }] } })
+      expect((await createSupabaseAssistant(bad.client).documents('b1')).kind).toBe('error')
+      const err = fakeDataClient({ errors: { brand_documents: { code: '42P01', message: 'relation "brand_documents" does not exist' } } })
+      const r = await createSupabaseAssistant(err.client).documents('b1')
+      expect(r.kind === 'error' && r.message).not.toContain('brand_documents')
+    })
+
+    it('adăugarea scrie ciorna cu autorul din sesiune, apoi fragmentele cu secțiunile lor; statusul nu se trimite', async () => {
+      const { client, calls } = fakeDataClient({ userId: 'u1' })
+      const r = await createSupabaseAssistant(client).addDocument(brand, doc)
+      expect(r).toEqual({ kind: 'ready', data: { id: 'new-id' } })
+      expect(calls[0]).toMatchObject({ table: 'brand_documents', op: 'insert', payload: { tenant_id: 't1', brand_id: 'b1', title: 'Prospect', doc_type: 'product_info', product: null, country: 'RO', language: 'ro', version: '2.0', owner: 'Medical', valid_from: '2026-01-01', valid_to: null, created_by: 'u1' } })
+      expect(calls[0]!.payload).not.toHaveProperty('status')
+      expect(calls[0]!.payload).not.toHaveProperty('approved_at')
+      expect(calls[1]).toMatchObject({ table: 'brand_document_fragments', op: 'insert', payload: [
+        { tenant_id: 't1', brand_id: 'b1', document_id: 'new-id', position: 1, section_ref: 'Administrare', content: 'Un comprimat pe zi.' },
+        { tenant_id: 't1', brand_id: 'b1', document_id: 'new-id', position: 2, section_ref: 'Păstrare', content: 'La temperatura camerei.' },
+      ] })
+    })
+
+    it('fără text nu se scrie nimic; dacă fragmentele nu se pot scrie, ciorna se șterge', async () => {
+      const empty = fakeDataClient({ userId: 'u1' })
+      expect(await createSupabaseAssistant(empty.client).addDocument(brand, { ...doc, text: '# Doar titlu' })).toEqual({ kind: 'error', message: 'Documentul nu are text.' })
+      expect(empty.calls).toHaveLength(0)
+      const broken = fakeDataClient({ userId: 'u1', errors: { 'brand_document_fragments:insert': { code: '23514', message: 'check' } } })
+      expect((await createSupabaseAssistant(broken.client).addDocument(brand, doc)).kind).toBe('error')
+      expect(broken.calls.map((c) => [c.table, c.op])).toEqual([['brand_documents', 'insert'], ['brand_document_fragments', 'insert'], ['brand_documents', 'delete']])
+      expect(broken.calls[2]!.filters).toEqual([['id', 'eq', 'new-id'], ['brand_id', 'eq', 'b1']])
+    })
+
+    it('aprobarea și retragerea schimbă doar statusul, pe rândul brandului; zero rânduri atinse înseamnă refuz', async () => {
+      const tables = { brand_documents: [{ ...row, status: 'draft' }] }
+      const { client, calls } = fakeDataClient({ tables })
+      expect(await createSupabaseAssistant(client).setDocumentStatus(brand, 'd1', 'approved')).toEqual({ kind: 'ready', data: null })
+      expect(calls[0]).toMatchObject({ table: 'brand_documents', op: 'update', payload: { status: 'approved' }, filters: [['id', 'eq', 'd1'], ['brand_id', 'eq', 'b1']] })
+      // Un document care nu e al acestui brand (sau pe care RLS nu îl oferă): nu se schimbă nimic.
+      expect(await createSupabaseAssistant(client).setDocumentStatus(brand, 'altul', 'retired')).toEqual({ kind: 'error', message: 'Nu ai dreptul să schimbi acest document.' })
+    })
+
+    it('mesajul regulii de aprobare ajunge la utilizator; o eroare de schemă nu', async () => {
+      const rule = fakeDataClient({ errors: { 'brand_documents:update': { code: '23514', message: 'Aprobarea cere responsabilul documentului la brand și data de început a valabilității' } } })
+      expect(await createSupabaseAssistant(rule.client).setDocumentStatus(brand, 'd1', 'approved')).toEqual({ kind: 'error', message: 'Aprobarea cere responsabilul documentului la brand și data de început a valabilității' })
+      const role = fakeDataClient({ errors: { 'brand_documents:update': { code: '42501', message: 'Doar strategistul sau administratorul agenției aprobă un document' } } })
+      expect(await createSupabaseAssistant(role.client).setDocumentStatus(brand, 'd1', 'approved')).toEqual({ kind: 'error', message: 'Doar strategistul sau administratorul agenției aprobă un document' })
+      const schema = fakeDataClient({ errors: { 'brand_documents:update': { code: '42703', message: 'column "x" of relation "brand_documents" does not exist' } } })
+      const r = await createSupabaseAssistant(schema.client).setDocumentStatus(brand, 'd1', 'approved')
+      expect(r.kind === 'error' && r.message).toBe('Statusul documentului nu a putut fi schimbat. Reîncearcă.')
+    })
+
+    it('ștergerea: doar ce a șters efectiv baza contează', async () => {
+      const { client } = fakeDataClient({ tables: { brand_documents: [{ ...row, status: 'draft' }] } })
+      expect(await createSupabaseAssistant(client).deleteDocument(brand, 'd1')).toEqual({ kind: 'ready', data: null })
+      expect(await createSupabaseAssistant(client).deleteDocument(brand, 'd1')).toEqual({ kind: 'error', message: 'Doar o ciornă se poate șterge.' })
+    })
+
+    it('un răspuns care citează un document păstrează tipul dovezii', async () => {
+      const cited = { ...answer, evidence: [{ id: 'doc:f1', kind: 'document', label: 'Prospect · Administrare', document_id: 'd1' }] }
+      const { client } = fakeDataClient({ invoke: () => ({ data: { status: 'ok', answer: cited } }) })
+      const r = await createSupabaseAssistant(client).ask(ctx, 'Ce spune prospectul?')
+      expect(r.kind === 'ready' && r.data.answer?.evidence).toEqual([{ id: 'doc:f1', kind: 'document', label: 'Prospect · Administrare', document_id: 'd1' }])
+    })
+  })
 })
