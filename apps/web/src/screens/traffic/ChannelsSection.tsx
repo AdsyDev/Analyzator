@@ -6,6 +6,7 @@ import { cn } from '../../lib/cn'
 import { changeDirection, formatInteger, formatMetricValue, formatRelativeChange } from '../../lib/format'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
+import { useExportName } from '../shared/useExportName'
 
 const num = (v: number | null) => (v === null ? <span className="text-text-3">Fără date</span> : formatInteger(v))
 
@@ -38,6 +39,7 @@ interface Props {
 }
 
 export function ChannelsSection({ state, onRetry, deviceLabel }: Props) {
+  const exportName = useExportName('canale')
   return (
     <Section
       id="channels"
@@ -45,7 +47,7 @@ export function ChannelsSection({ state, onRetry, deviceLabel }: Props) {
       description={deviceLabel ? `Filtrat pe device: ${deviceLabel}. Indicatorii de sus rămân pe toate device-urile.` : 'Sesiunile pe grupurile de canale GA4, cu pondere și variație față de comparație.'}
     >
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă canalele" skeletonClass="h-64">
-        {(d) => <SortableTable caption="Canale" columns={columns} rows={d.channels} rowKey={(c) => c.channel} pageSize={10} emptyText="Niciun canal cu date în perioada aleasă." />}
+        {(d) => <SortableTable caption="Canale" exportFileName={exportName} columns={columns} rows={d.channels} rowKey={(c) => c.channel} pageSize={10} emptyText="Niciun canal cu date în perioada aleasă." />}
       </Resolved>
     </Section>
   )

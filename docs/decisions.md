@@ -211,3 +211,14 @@ Cererea proprietarului produsului, 11 nov. 2026: „Construiește etapa 3”. Et
 | J-4 | Bugetul de paid | (a) pe platformă; (b) un total pe interval | **(b).** Tabelul `paid_budgets`: un buget aprobat pe interval, pentru toate platformele. Îl scriu `agency_admin`, `strategist` și `account` cu acces la brand; clientul îl vede. Rândurile nu se modifică; la suprapunere e în vigoare planul introdus cel mai recent. Zilele trecute se numără până la ultima zi cu cost, ca procentele să fie comparabile. Monedele diferite nu se adună și nu se convertesc. Bugetul pe platformă rămâne o cerere separată. |
 | J-5 | Ce depinde de alții în Etapa 3 | — | Lista de URL-uri prioritare (Indexare), acțiunea de conversie Meta, key events confirmate pe brand (funnel), taxonomia editorială (Social), decizia de roluri pentru comentariile clientului, pozițiile competitorilor în SEOmonitor (matricea completă, content gaps). Aceste lucrări nu sunt în prima felie. |
 
+## K — Etapa 3, a doua felie: export CSV, Rapoarte, Portofoliu (2026-11-11)
+
+Aceeași cerere ca la J. Trei lucrări fără dependențe externe și fără schimbări în baza de date: toate citesc prin RPC-urile existente, cu drepturile utilizatorului.
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| K-1 | Formatul exportului CSV | (a) virgulă și punct zecimal; (b) „;” și virgulă zecimală | **(b).** Fișierul se deschide direct în Excel în română, fără import manual: separator „;”, zecimale cu virgulă, UTF-8 cu BOM, date ISO. Lipsa e celulă goală, nu 0 (regula 8). Textele care încep cu `=`, `+`, `-`, `@` primesc un apostrof, ca numele de campanii sau textele mențiunilor să nu ruleze ca formule. Exportul scrie valorile deja afișate: nu face cereri noi și nu ocolește RLS. |
+| K-2 | Raportul PDF | (a) PDF generat pe server; (b) pagină de raport tipărită din browser | **(b).** Pagina „Rapoarte” arată indicatorii și analizele publicate ale perioadei și se salvează ca PDF cu tipărirea browserului. Fără serviciu nou, fără stocare de fișiere, fără cost de rulare; cifrele sunt aceleași ca în aplicație, pentru că vin din aceleași RPC-uri. **Nu există:** rapoarte programate pe e-mail, arhivă de rapoarte generate, șablon cu identitatea clientului. Acestea cer un PDF pe server și sunt o cerere separată. |
+| K-3 | Portofoliul | (a) RPC nou care agregă brandurile; (b) câte o cerere `brand_metrics` pe brand | **(b).** Fiecare brand e citit separat, prin poarta existentă, deci nu apare o cale nouă peste mai multe branduri. Indicatorii sunt cei de pe cardurile din Overview. Nu există totaluri pe portofoliu: metricile nu se adună între branduri (rate, vizibilitate) și nu avem o definiție pentru asta. La multe branduri (zeci), pagina va avea nevoie de un RPC dedicat. |
+| K-4 | Impact | — | Doar `apps/web` și documentația. Un modul nou în meniu („Rapoarte”) și un link nou („Portofoliu”, de la două branduri în sus). |
+

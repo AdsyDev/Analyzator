@@ -7,6 +7,7 @@ import { cn } from '../../lib/cn'
 import { formatDate, formatInteger } from '../../lib/format'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
+import { useExportName } from '../shared/useExportName'
 
 /** Rank absent = „Fără rank", niciodată 100 (spec 2.2). Un rank din Top 3 e accentuat și prin text, nu doar prin culoare. */
 function Rank({ value }: { value: number | null }) {
@@ -69,10 +70,11 @@ const columns: Column<SearchKeyword>[] = [
 ]
 
 export function KeywordTable({ state, onRetry }: { state: AsyncState<ProviderResult<SearchKeyword[]>>; onRetry: () => void }) {
+  const exportName = useExportName('keywords')
   return (
     <Section id="keywords" title="Keywords urmărite" description="Rank din SEOmonitor, la ultima observație din perioadă. Trend: poziții câștigate sau pierdute pe mobil. Keywords fără rank apar ultimele la sortare.">
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă keywords" skeletonClass="h-72">
-        {(rows) => <SortableTable caption="Keywords urmărite" columns={columns} rows={rows} rowKey={(k) => k.id} pageSize={8} emptyText="Niciun keyword pentru filtrele alese." />}
+        {(rows) => <SortableTable caption="Keywords urmărite" exportFileName={exportName} columns={columns} rows={rows} rowKey={(k) => k.id} pageSize={8} emptyText="Niciun keyword pentru filtrele alese." />}
       </Resolved>
     </Section>
   )

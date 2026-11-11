@@ -16,6 +16,8 @@ import { ListeningPage } from '../screens/listening/ListeningPage'
 import { PharmacovigilancePage } from '../screens/listening/PharmacovigilancePage'
 import { OverviewPage } from '../screens/overview/OverviewPage'
 import { PaidPage } from '../screens/paid/PaidPage'
+import { PortfolioPage } from '../screens/portfolio/PortfolioPage'
+import { ReportsPage } from '../screens/reports/ReportsPage'
 import { SeoPage } from '../screens/seo/SeoPage'
 import { SocialPage } from '../screens/social/SocialPage'
 import { TrafficPage } from '../screens/traffic/TrafficPage'
@@ -54,6 +56,7 @@ function BrandModulePage() {
   if (module.segment === 'pharmacovigilance') return <PharmacovigilancePage />
   if (module.segment === 'competition') return <CompetitionPage />
   if (module.segment === 'insights') return <InsightsPage />
+  if (module.segment === 'reports') return <ReportsPage />
   return <NotFoundPage />
 }
 
@@ -95,6 +98,7 @@ export function AppRoutes() {
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route index element={<HomeRedirect />} />
+          <Route path="portfolio" element={<PortfolioPage />} />
           <Route path="brands/:brandId" element={<BrandIndexRedirect />} />
           <Route path="brands/:brandId/:segment" element={<BrandModulePage />} />
           <Route path="admin" element={<AdminIndexRedirect />} />

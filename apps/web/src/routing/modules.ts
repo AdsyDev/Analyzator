@@ -188,6 +188,7 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
   },
   competition: { segment: 'competition', title: 'Concurență', subtitle: () => 'Brandul față de setul de competitori, pe aceleași surse și aceeași perioadă.', sources: [], filters: [] },
   insights: { segment: 'insights', title: 'Analize și acțiuni', subtitle: () => 'Interpretările echipei AdSymphony și acțiunile care decurg din ele.', sources: [], filters: [] },
+  reports: { segment: 'reports', title: 'Rapoarte', subtitle: () => 'Raportul perioadei alese: indicatorii și analizele publicate, gata de tipărit, de salvat ca PDF sau de exportat în CSV.', sources: ['seomonitor', 'gsc', 'ga4', 'planable'], filters: [] },
 }
 
 export interface AdminModule {

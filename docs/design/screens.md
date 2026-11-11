@@ -81,7 +81,11 @@ Filtre Device și Canal; „Canale" (sessions, pondere, variație); „AI referr
 
 Mutat din Trafic (E-1, varianta a): „Comportament" (Microsoft Clarity, pe device: rage clicks, dead clicks, quick backs, scroll depth, cu definiția fiecărei metrici) cu banner de sursă întârziată („Sincronizarea Clarity eșuează din <data>: ... Afișăm ultimele date importate.", „Reconectează în Surse"). Trafic trimite aici printr-un link.
 
+**Etapa 3 (11 nov. 2026):** „AI referrals” și „Tracking quality” au date reale (J-1…J-3). Rata din „AI referrals” e ascunsă cât timp serverul nu o trimite. „Tracking quality” arată cinci verificări calculate din datele GA4 colectate, cu „Pe datele colectate la”, nu verificări zilnice.
+
 ## Paid Media (`/brands/:id/paid`) și Social (`/brands/:id/social`)
+
+**Etapa 3 (11 nov. 2026):** „Buget și pacing” citește planul din `paid_budgets` (J-4). Echipa agenției are „Adaugă buget” / „Buget nou” (dialog: interval, sumă, monedă, notă) și „Șterge planul”; clientul vede bugetul, fără acțiuni. Fără plan: „Fără buget aprobat”. Cost în altă monedă decât planul: explicația, fără bara de spend.
 
 În design există doar starea implicită, un EmptyState: titlu „Sursă neconectată", motiv („Google Ads și Meta Ads nu sunt conectate pentru <brand>. Până la conectare nu afișăm cifre, nici estimate." respectiv Planable pentru Social), acțiune „Conectează <sursă>" pentru agenție și „Cere conectarea" pentru client (toast: „Am trimis cererea de conectare către echipa AdSymphony."). Conținutul cu date (cap. 15 și 17) nu e proiectat și vine în UI-4.
 
@@ -102,6 +106,14 @@ Antet cu „Set de competitori v<n>", „Efectiv din <data>", „Date până la 
 **Etapa 2 (10 nov. 2026):** agenția lucrează în pagină: „Analiză nouă" și „Editează" (titlu, perioadă, constatare, interpretare, limite, metrici citate), „Trimite la review", „Publică" și „Returnează la draft" (doar strategist și agency_admin, cu motiv), „Șterge ciorna", „Adaugă acțiune" (termen, efort, KPI urmărit) și pașii acțiunii în tabel (agreată, în lucru, finalizată, rezultat, anulare cu motiv). Clientul nu vede niciunul dintre controale. Din a doua rundă (H-4): „Recomandări” pe ciornă, „Versiune nouă” pe analiza publicată și selectorul de responsabil pentru `agency_admin`; recomandările apar în analiza publicată.
 
 Designul inițial: Taburi (agenție: „Flux editorial" și vederea publicată; client: doar publicate); tabel cu titlu, autor, perioadă, status (Draft, În review, Publicat, Înlocuit), actualizat; detaliu cu rezumat, dovezi atașate, „Limite", tabel „Acțiuni" (acțiune, responsabil, termen, status); „Analiză nouă" pentru agenție.
+
+## Rapoarte (`/brands/:id/reports`)
+
+**Etapa 3 (11 nov. 2026, K-2).** Raportul perioadei alese, pentru oricine are acces la brand: antet (brand, client, perioadă, comparație, generat la), „Indicatori” (un tabel pe grup: Vizibilitate AI, SEO și Search, Trafic și conversii, Listening, Paid Media; valoare, variație, stare) și „Analize publicate” (constatare, interpretare, limite, recomandări, acțiuni). „Tipărește sau salvează ca PDF” deschide tipărirea browserului; la tipărire dispar meniul, bara de sus, filtrele și butoanele. „Exportă indicatorii (CSV)” scrie aceleași rânduri într-un fișier. Pagina nu are valori proprii: sunt cele din `brand_metrics` și `brand_insights`.
+
+## Portofoliu (`/portfolio`)
+
+**Etapa 3 (11 nov. 2026, K-3).** Toate brandurile permise utilizatorului, pe aceeași perioadă (filtrul de perioadă și comparație din URL), cu indicatorii de pe cardurile din Overview: valoare și variație, sau starea („Sursă neconectată”, „Fără date pentru interval”). Numele brandului duce la Overview-ul lui, cu aceeași perioadă. Un brand ai cărui indicatori nu pot fi citiți rămâne în listă, cu motivul. Linkul din meniu apare de la două branduri în sus.
 
 ## Administrare (doar agenție)
 
