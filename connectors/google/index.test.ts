@@ -25,7 +25,7 @@ const result = (o: Record<string, unknown> = {}) => ({
     indexStatusResult: { verdict: 'PASS', coverageState: 'Submitted and indexed', robotsTxtState: 'ALLOWED', indexingState: 'INDEXING_ALLOWED', pageFetchState: 'SUCCESSFUL', crawledAs: 'MOBILE', lastCrawlTime: '2026-11-09T04:12:33Z', googleCanonical: 'https://site.test/a', userCanonical: 'https://site.test/a', ...o },
   },
 })
-const page = (p: string, clicks: number | null, date = '2026-11-05', brand = B1, tenant = T1) => ({ tenant_id: tenant, brand_id: brand, date, device: 'MOBILE', query: 'q', page: p, clicks })
+const page = (p: string, clicks: number | null, date = '2026-11-05', brand = B1, tenant = T1, impressions: number | null = null) => ({ tenant_id: tenant, brand_id: brand, date, device: 'MOBILE', query: 'q', page: p, clicks, impressions })
 
 function setup(o: { priority?: string[]; pages?: Array<Record<string, unknown>>; respond?: (req: UrlInspectionRequest, n: number) => unknown; credential?: boolean; site?: string; tables?: Record<string, Array<Record<string, unknown>>> } = {}) {
   const db = new FakeDb({
@@ -74,7 +74,7 @@ describe('urlInProperty', () => {
 })
 
 describe('candidateUrls', () => {
-  test('întâi lista agenției, apoi paginile cu cele mai multe clickuri din 28 de zile; fără dubluri și fără pagini cu zero clickuri', async () => {
+  test('întâi lista agenției, apoi paginile cu cele mai multe clickuri din 28 de zile; fără dubluri și fără pagini nevăzute în search', async () => {
     const { db } = setup({
       priority: ['https://site.test/z', 'https://site.test/a'],
       pages: [page('https://site.test/a', 500), page('https://site.test/b', 3), page('https://site.test/b', 4, '2026-11-06'), page('https://site.test/c', 9), page('https://site.test/zero', 0), page('https://site.test/nul', null), page('https://site.test/vechi', 900, '2026-10-01')],
@@ -85,6 +85,11 @@ describe('candidateUrls', () => {
       { url: 'https://site.test/c', origin: 'top_page' },
       { url: 'https://site.test/b', origin: 'top_page' },
     ])
+  })
+
+  test('site mic, fără clickuri pe rândurile query × pagină: paginile se aleg după afișări', async () => {
+    const { db } = setup({ pages: [page('https://site.test/rar', 0, '2026-11-05', B1, T1, 4), page('https://site.test/des', null, '2026-11-05', B1, T1, 90), page('https://site.test/click', 1, '2026-11-05', B1, T1, 2), page('https://site.test/nimic', 0, '2026-11-05', B1, T1, 0)] })
+    assert.deepEqual((await candidateUrls(db, { tenant_id: T1, brand_id: B1 }, '2026-11-11')).map((c) => c.url), ['https://site.test/click', 'https://site.test/des', 'https://site.test/rar'])
   })
 
   test(`cel mult ${INDEX_TOP_PAGES} de pagini după clickuri și ${INDEX_MAX_URLS} de URL-uri în total`, async () => {

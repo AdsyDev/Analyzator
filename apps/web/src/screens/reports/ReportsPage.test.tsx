@@ -37,12 +37,12 @@ describe('Rapoarte', () => {
   it('aceeași valoare ca pe cardul din Overview', async () => {
     renderApp({ route: ROUTE })
     await open()
-    const row = (await within(section('Indicatori')).findAllByRole('row')).find((r) => within(r).queryByRole('rowheader', { name: 'Sesiuni' }))!
+    const row = (await within(section('Indicatori')).findAllByRole('row')).find((r) => within(r).queryByRole('rowheader', { name: 'Clicks (Search Console)' }))!
     const value = within(row).getAllByRole('cell')[0]!.textContent!
     expect(value).toMatch(/\d/)
     await userEvent.click(screen.getByRole('link', { name: 'Overview' }))
-    await pageReady('Overview')
-    const card = await screen.findByRole('article', { name: 'Sesiuni' })
+    await pageReady('Imaginea completă a brandului')
+    const card = await screen.findByRole('article', { name: 'Clicks (Search Console)' })
     expect(card.textContent).toContain(value)
   })
 

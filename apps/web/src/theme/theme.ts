@@ -24,11 +24,11 @@ export function storeTheme(theme: Theme): void {
   }
 }
 
-export function systemTheme(): Theme {
-  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light'
-}
+/**
+ * Tema cu care pornește aplicația când utilizatorul nu a ales una: închisă, ca în macheta din propunere
+ * („Imaginea completă a brandului”). Nu mai urmează tema sistemului; butonul din bara de sus o schimbă și o reține.
+ */
+export const DEFAULT_THEME: Theme = 'dark'
 
 export function applyTheme(theme: Theme): void {
   document.documentElement.setAttribute(THEME_ATTRIBUTE, theme)

@@ -25,7 +25,7 @@ const ROW =
   /\('([a-z0-9_]+)', (\d+), '((?:[^']|'')*)', '((?:[^']|'')*)', '(\w+)', '(\w+)', '\w+', [\d.]+, (?:null|'\w+'),\s*(null|'(?:[^']|'')*'), '(\w+)', (?:null|[\d.]+), \d+, '(\w+)', (null|'(?:[^']|'')*'), '[\d-]+', '([^']*)'\)/g
 
 /** Cheile intrate în registru după nivelul A pe care fixtures le acoperă (Overview): rândul lor curent vine din migrația care le-a adăugat. */
-const EXTRA_KEYS = ['ai_mention_rate', 'mentions_count']
+const EXTRA_KEYS = ['ai_mention_rate', 'ai_sov', 'mentions_count']
 
 function rowsFrom(text: string) {
   return [...text.matchAll(ROW)].map(toRow)

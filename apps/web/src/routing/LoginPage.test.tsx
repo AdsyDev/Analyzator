@@ -151,8 +151,8 @@ describe('autentificare', () => {
   it('comutatorul de temă funcționează și pe login', async () => {
     const { auth } = real()
     renderLogin(auth)
-    await userEvent.click(await screen.findByRole('button', { name: 'Comută la tema închisă' }))
-    expect(document.documentElement.getAttribute('data-az-theme')).toBe('dark')
+    await userEvent.click(await screen.findByRole('button', { name: 'Comută la tema deschisă' }))
+    expect(document.documentElement.getAttribute('data-az-theme')).toBe('light')
   })
 
   it('cu sesiune activă, trimite la adresa cerută inițial (doar internă)', async () => {

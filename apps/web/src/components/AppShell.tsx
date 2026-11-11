@@ -17,6 +17,7 @@ import {
   PlugsConnectedIcon,
   ScalesIcon,
   SlidersHorizontalIcon,
+  SparkleIcon,
   SquaresFourIcon,
   StackIcon,
   SunIcon,
@@ -51,6 +52,7 @@ const ICONS: Record<string, Icon> = {
   Scales: ScalesIcon,
   Notebook: NotebookIcon,
   FileText: FileTextIcon,
+  Sparkle: SparkleIcon,
   Stack: StackIcon,
   Buildings: BuildingsIcon,
   PlugsConnected: PlugsConnectedIcon,
@@ -74,6 +76,12 @@ export interface AppShellProps {
   brandId: string | null
   onBrandChange: (brandId: string) => void
   title: string
+  /** Rândul mic de deasupra titlului (de ex. „Brand Intelligence / Overview”). */
+  eyebrow?: string
+  /** Acțiunile paginii, în dreapta titlului. */
+  actions?: ReactNode
+  /** Sidebarul din dreapta (AdSy AI): pagina își montează conținutul în elementul primit prin `ref`. */
+  rightPanel?: { ref: (el: HTMLElement | null) => void; onClose: () => void }
   subtitle?: string
   /** „Date până la" și „Ultimul refresh" ale brandului curent. */
   dataAsOf: IsoDate | null
@@ -186,7 +194,7 @@ function UserMenu({ user, roleSwitcher, onSignOut }: Pick<AppShellProps, 'user' 
   )
 }
 
-export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle, dataAsOf, lastRefreshAt, onSignOut, roleSwitcher, filterBar, now, children }: AppShellProps) {
+export function AppShell({ user, brands, brandId, onBrandChange, title, eyebrow, actions, rightPanel, subtitle, dataAsOf, lastRefreshAt, onSignOut, roleSwitcher, filterBar, now, children }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(readCollapsed)
   // Sertarul de navigare de pe ecranele sub `lg` (telefon, tabletă). Pe desktop bara laterală e mereu vizibilă.
   const [navOpen, setNavOpen] = useState(false)
@@ -289,7 +297,7 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
       </aside>
 
       {/* La tipărire rămâne doar conținutul paginii: fără meniu, fără bara de sus și fără filtre. */}
-      <div className={cn('transition-[margin] duration-200 print:!ml-0', collapsed ? 'lg:ml-[72px]' : 'lg:ml-[240px]')}>
+      <div className={cn('transition-[margin] duration-200 print:!ml-0 print:!mr-0', collapsed ? 'lg:ml-[72px]' : 'lg:ml-[240px]', rightPanel && 'xl:mr-[380px]')}>
         {/* Pe ecrane mici, linia „Date până la" coboară pe al doilea rând al barei de sus, ca să rămână vizibilă. */}
         <header className="glass-bar sticky top-[var(--banner-h,0px)] z-20 flex min-h-14 flex-wrap items-center gap-x-2 border-x-0 border-t-0 px-3 pt-2 sm:gap-x-3 sm:px-6 md:h-14 md:flex-nowrap md:pt-0 print:hidden">
           <button
@@ -361,14 +369,25 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, subtitle
         </header>
 
         <main id="main" tabIndex={-1} className="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 pb-12 pt-4 outline-none sm:gap-5 sm:px-6 sm:pt-5">
-          <div>
-            <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em] sm:text-[26px]">{title}</h1>
-            {subtitle && <p className="mt-1 max-w-[72ch] text-[14px] leading-normal text-text-2">{subtitle}</p>}
+          <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+            <div className="min-w-0 flex-1 basis-80">
+              {eyebrow && <p className="mb-1 text-[12px] font-medium text-text-2">{eyebrow}</p>}
+              <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em] sm:text-[26px]">{title}</h1>
+              {subtitle && <p className="mt-1 max-w-[72ch] text-[14px] leading-normal text-text-2">{subtitle}</p>}
+            </div>
+            {actions}
           </div>
           {filterBar && <div className="print:hidden">{filterBar}</div>}
           {children}
         </main>
       </div>
+      {rightPanel && (
+        <>
+          {/* Pe ecrane late sidebarul stă lângă conținut; pe cele înguste îl acoperă, cu fundal pe care apeși ca să-l închizi. */}
+          <div data-testid="panel-scrim" aria-hidden="true" className="fixed inset-x-0 bottom-0 top-[var(--banner-h,0px)] z-[35] xl:hidden print:hidden" style={{ background: 'var(--scrim)' }} onClick={rightPanel.onClose} />
+          <div ref={rightPanel.ref} tabIndex={-1} className="glass-strong fixed bottom-0 right-0 top-[var(--banner-h,0px)] z-40 flex w-[min(380px,100vw)] flex-col border-y-0 border-r-0 outline-none xl:z-30 print:hidden" />
+        </>
+      )}
     </div>
   )
 }

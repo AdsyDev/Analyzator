@@ -29,7 +29,7 @@ describe('AI Visibility: structura din spec cap. 13', () => {
     expect(within(c).getByRole('tooltip')).toHaveTextContent('Google AI Overviews se raportează separat')
   })
 
-  it.each(['Recommendation Rate', 'Owned Citation Rate', 'SoV în setul urmărit', 'Răspunsuri valide', 'AI Overviews: Mention Rate'])('KPI „%s": not_connected, fără cifră și fără definiție inventată', async (name) => {
+  it.each(['Recommendation Rate', 'Owned Citation Rate', 'Răspunsuri valide', 'AI Overviews: Mention Rate'])('KPI „%s": not_connected, fără cifră și fără definiție inventată', async (name) => {
     renderApp({ route: ROUTE })
     await open()
     const c = screen.getByRole('article', { name })

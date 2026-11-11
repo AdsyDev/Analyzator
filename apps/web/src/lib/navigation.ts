@@ -31,6 +31,7 @@ export const BRAND_NAV: readonly NavItem[] = [
   { segment: 'competition', label: 'Concurență', icon: 'Scales' },
   { segment: 'insights', label: 'Analize și acțiuni', icon: 'Notebook' },
   { segment: 'reports', label: 'Rapoarte', icon: 'FileText' },
+  { segment: 'assistant', label: 'AdSy AI', icon: 'Sparkle' },
 ]
 
 /** Modulele de brand vizibile pentru un rol, în ordinea meniului (submeniurile imediat după părinte). */
