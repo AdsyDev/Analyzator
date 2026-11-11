@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { collectPlanable, MENTIONS_SKIPPED } from './collect-core.ts'
-import { MentionsSchema, mentionFieldShape, mentionNativeId, mentionSkipReasons, pageMetrics, platformOf } from './normalize.ts'
+import { collectPlanable, MENTIONS_SKIPPED, MENTIONS_WITHOUT_LINK } from './collect-core.ts'
+import { builtMentionIdentity, builtMentionNativeId, hasNoLink, MentionsSchema, mentionFieldShape, mentionNativeId, mentionRow, mentionSkipReasons, pageMetrics, platformOf } from './normalize.ts'
 import { FakeDb, fakeFetch, noSleep, type FakeResponse } from '../shared/test-helpers.ts'
 
 // Răspunsurile sunt construite după schema OpenAPI publică (api.planable.io/api/v1/openapi.json, 2026-10-12):
@@ -100,14 +100,41 @@ describe('normalizare Planable', () => {
     assert.match(mentionNativeId('https://x.com/a/1'), /^h:[0-9a-f]{32}$/)
   })
 
-  test('motivele pentru care o mențiune e sărită: fără URL, URL fără http(s), dată invalidă; validă = niciun motiv', () => {
-    const m = (o: Record<string, unknown>) => MentionsSchema.parse({ data: [{ ...mention('https://x.com/a/1'), ...o }], pagination: { nextCursor: null } }).data[0]!
+  const parsed = (o: Record<string, unknown>) => MentionsSchema.parse({ data: [{ ...mention('https://x.com/a/1'), ...o }], pagination: { nextCursor: null } }).data[0]!
+
+  test('motivele pentru care o mențiune e sărită: URL fără http(s) sau dată invalidă; fără link, dar cu dată, nu se sare', () => {
+    const m = parsed
     assert.deepEqual(mentionSkipReasons(m({})), [])
-    assert.deepEqual(mentionSkipReasons(m({ url: '' })), ['url_missing'])
-    assert.deepEqual(mentionSkipReasons(m({ url: '   ' })), ['url_missing'])
+    assert.deepEqual(mentionSkipReasons(m({ url: '' })), [], 'fără link, cu dată: se scrie cu cheie construită')
+    assert.deepEqual(mentionSkipReasons(m({ url: '   ' })), [])
+    assert.deepEqual([hasNoLink(m({ url: '' })), hasNoLink(m({ url: '  ' })), hasNoLink(m({}))], [true, true, false])
     assert.deepEqual(mentionSkipReasons(m({ url: 'www.exemplu.ro/articol' })), ['url_not_http'])
     assert.deepEqual(mentionSkipReasons(m({ publishedAt: 'ieri' })), ['date_invalid'])
     assert.deepEqual(mentionSkipReasons(m({ url: '', publishedAt: '' })), ['url_missing', 'date_invalid'])
+  })
+
+  test('cheia construită: aceeași mențiune dă aceeași cheie; rețeaua, autorul, momentul, textul sau numărul de ordine o schimbă', () => {
+    const web = (o: Record<string, unknown> = {}) => parsed({ platform: 'web', url: '', text: null, author: { name: 'Site de știri', username: null, profileImageUrl: null }, ...o })
+    const id = (o: Record<string, unknown> = {}, n = 1) => builtMentionNativeId(builtMentionIdentity(web(o)), n)
+    assert.match(id(), /^s:[0-9a-f]{32}$/)
+    assert.equal(id(), id(), 'stabilă între rulări')
+    assert.equal(id({ platform: ' WEB ' }), id(), 'spațiile și majusculele rețelei nu contează')
+    assert.equal(id({ author: { name: ' site de ȘTIRI ', username: null } }), id(), 'nici ale autorului')
+    assert.equal(id({ publishedAt: '2026-10-05T15:00:00+03:00' }), id(), 'același moment, scris cu alt fus')
+    assert.equal(id({ sentiment: 'negative', engagement: 999 }), id(), 'sentimentul și engagementul se pot schimba fără o mențiune nouă')
+    const others = [id({ platform: 'news' }), id({ author: { name: 'Alt site', username: null } }), id({ publishedAt: '2026-10-05T12:00:01Z' }), id({ text: 'Un text' }), id({}, 2)]
+    assert.equal(new Set([id(), ...others]).size, others.length + 1)
+    assert.ok(!id().startsWith('h:'), 'nu se poate confunda cu o cheie din URL')
+  })
+
+  test('rândul unei mențiuni fără link: url și text NULL, niciun câmp inventat, numele autorului nesalvat', () => {
+    const m = parsed({ platform: 'web', url: '', text: null, author: { name: 'Site de știri', username: null, profileImageUrl: null } })
+    const key = builtMentionNativeId(builtMentionIdentity(m), 1)
+    const row = mentionRow(m, { tenant_id: T1, brand_id: B1, source_id: 'c', sync_run_id: 'r', collected_at: '2026-10-08T05:00:00.000Z', payload_hash: 'a'.repeat(64), timezone: 'Europe/Bucharest' } as never, null, key)
+    assert.deepEqual([row.native_id, row.url, row.text, row.source_name, row.sentiment], [key, null, null, 'web', 'positive'])
+    assert.ok(!JSON.stringify(row).includes('Site de știri'))
+    // Cu link, rândul rămâne cel dinainte.
+    assert.equal(mentionRow(parsed({}), {} as never).url, 'https://x.com/a/1')
   })
 })
 
@@ -206,8 +233,7 @@ describe('collectPlanable', () => {
     const bad = (o: Record<string, unknown>) => ({ ...mention('https://x.com/ok'), ...o })
     const data = [
       mention('https://x.com/ok'),
-      bad({ platform: 'Facebook', url: '', permalink: 'https://legatura-ascunsa.test/1' }), bad({ platform: 'facebook', url: '', permalink: 'https://legatura-ascunsa.test/2' }), bad({ platform: ' facebook ', url: '' }),
-      bad({ platform: 'news', url: 'exemplu.ro/stire' }),
+      bad({ platform: 'news', url: 'exemplu.ro/stire' }), bad({ platform: 'news', url: 'alt.ro/stire', permalink: 'https://legatura-ascunsa.test/1' }),
       bad({ platform: 'tiktok', url: '', publishedAt: 'necunoscut' }),
       bad({ platform: 'tiktok', publishedAt: '' }),
     ]
@@ -221,19 +247,100 @@ describe('collectPlanable', () => {
     assert.ok(notes.every((e) => e.code === 'parser_note'))
     const common = 'author.name, author.username, engagement, platform'
     assert.deepEqual(notes.map((e) => e.message), [
-      '3 mențiuni sărite din facebook: fără URL',
-      'câmpurile lor (facebook): cu valoare: author.name, author.username, engagement, permalink (2), platform, publishedAt, sentiment, text; goale: author.profileImageUrl, url; cu link http(s): permalink (2)',
-      '1 mențiune sărită din news: URL care nu începe cu http(s)',
-      `câmpurile lor (news): cu valoare: ${common}, publishedAt, sentiment, text, url; goale: author.profileImageUrl; cu link http(s): niciunul`,
+      '2 mențiuni sărite din news: URL care nu începe cu http(s)',
+      'câmpurile lor (news): cu valoare: author.name, author.username, engagement, permalink (1), platform, publishedAt, sentiment, text, url; goale: author.profileImageUrl; cu link http(s): permalink (1)',
       '1 mențiune sărită din tiktok: fără dată de publicare validă',
       `câmpurile lor (tiktok): cu valoare: ${common}, sentiment, text, url; goale: author.profileImageUrl, publishedAt; cu link http(s): url`,
       '1 mențiune sărită din tiktok: fără URL și fără dată de publicare validă',
       `câmpurile lor (tiktok): cu valoare: ${common}, publishedAt, sentiment, text; goale: author.profileImageUrl, url; cu link http(s): niciunul`,
     ])
-    assert.equal(l.errors.length, 8, 'două note pe grup, nu câte una pe mențiune')
+    assert.equal(l.errors.length, 6, 'două note pe grup, nu câte una pe mențiune')
     const run = db.tables.sync_runs!.find((r) => r.source === 'planable_listening')!
-    assert.deepEqual((run.errors as Array<{ dimension?: string }>).filter((e) => e.dimension === MENTIONS_SKIPPED).length, 8, 'notele ajung în sync_runs.errors')
+    assert.deepEqual((run.errors as Array<{ dimension?: string }>).filter((e) => e.dimension === MENTIONS_SKIPPED).length, 6, 'notele ajung în sync_runs.errors')
     for (const secret of ['exemplu.ro', 'legatura-ascunsa', 'Mențiune', 'necunoscut']) assert.ok(!JSON.stringify(run.errors).includes(secret), `valoarea „${secret}” nu se scrie în note`)
+  })
+
+  describe('mențiuni fără link (web)', () => {
+    // Forma văzută la rularea reală din 11 nov. 2026: fără url și fără text; doar autor, dată, sentiment, engagement.
+    const web = (name: string, publishedAt: string, o: Record<string, unknown> = {}) => ({ platform: 'web', publishedAt, engagement: 0, sentiment: 'neutral', url: '', text: '', author: { name, username: '', profileImageUrl: '' }, ...o })
+    const listening = async (db: FakeDb, byKeyword: Record<string, unknown[]>, keywords = Object.keys(byKeyword)) => {
+      const over: Record<string, FakeResponse> = { '/api/v1/keywords': json({ data: keywords.map((k) => ({ keywordId: k, text: k, type: 'brand', workspaceId: WS })) }) }
+      for (const [k, data] of Object.entries(byKeyword)) over[`/api/v1/keywords/${k}/mentions`] = json({ data, pagination: { nextCursor: null, total: data.length } })
+      const out = await collectPlanable({ db, fetch: routes(over).fetch, sleep: noSleep().sleep, now: () => NOW })
+      return out.find((o) => o.source === 'planable_listening')!
+    }
+    const builtRows = (db: FakeDb) => db.tables.mentions!.filter((m) => String(m.native_id).startsWith('s:'))
+
+    test('se scriu, cu url și text NULL și cheie construită; o notă spune câte sunt, fără să schimbe statusul', async () => {
+      const { db } = setup()
+      const l = await listening(db, { k1: [mention('https://x.com/ok'), web('ziar.test', '2026-10-05T08:00:00Z'), web('ziar.test', '2026-10-05T09:00:00Z', { sentiment: 'negative' }), web('blog.test', '2026-10-05T08:00:00Z')] })
+      assert.equal(l.status, 'succeeded')
+      assert.equal(l.rows_written, 4)
+      const rows = builtRows(db)
+      assert.equal(rows.length, 3)
+      for (const r of rows) {
+        assert.deepEqual([r.url, r.text, r.source_name, r.tenant_id, r.brand_id, r.collection_method], [null, null, 'web', T1, B1, 'api'])
+        assert.match(String(r.native_id), /^s:[0-9a-f]{32}$/)
+      }
+      assert.equal(new Set(rows.map((r) => r.native_id)).size, 3)
+      assert.deepEqual(rows.map((r) => r.sentiment).sort(), ['negative', 'neutral', 'neutral'])
+      assert.ok(!JSON.stringify(db.tables.mentions).includes('ziar.test'), 'numele autorului nu se salvează')
+      assert.deepEqual(l.errors.map((e) => [e.code, e.dimension, e.message]), [['parser_note', MENTIONS_WITHOUT_LINK, '3 mențiuni scrise din web fără link de la sursă (3 și fără text); cheia e construită din rețea, autor și dată']])
+      assert.ok(!JSON.stringify(l.errors).includes('ziar.test'))
+    })
+
+    test('aceeași rulare repetată nu dublează nimic', async () => {
+      const { db } = setup()
+      const data = { k1: [web('ziar.test', '2026-10-05T08:00:00Z'), web('blog.test', '2026-10-05T08:00:00Z')] }
+      await listening(db, data)
+      const first = builtRows(db).map((r) => r.native_id).sort()
+      await listening(db, data)
+      assert.deepEqual(builtRows(db).map((r) => r.native_id).sort(), first)
+      assert.equal(builtRows(db).length, 2)
+    })
+
+    test('mențiuni identice (același site, același moment) rămân separate: numărul lor nu scade', async () => {
+      const { db } = setup()
+      const same = () => web('ziar.test', '2026-10-05T00:00:00Z')
+      await listening(db, { k1: [same(), same(), same()] })
+      assert.equal(builtRows(db).length, 3)
+      // La rularea următoare vin doar două: cele două chei existente se regăsesc, nu apar altele.
+      const before = new Set(builtRows(db).map((r) => r.native_id))
+      await listening(db, { k1: [same(), same()] })
+      assert.ok(builtRows(db).every((r) => before.has(r.native_id)))
+    })
+
+    test('aceeași mențiune găsită de două cuvinte urmărite se scrie o dată; pe fiecare identitate rămâne cea mai lungă listă', async () => {
+      const { db } = setup()
+      const a = () => web('ziar.test', '2026-10-05T08:00:00Z')
+      const b = () => web('blog.test', '2026-10-05T10:00:00Z')
+      const l = await listening(db, { k1: [a(), a(), b()], k2: [a(), b()] })
+      assert.equal(builtRows(db).length, 3, 'două de la ziar (maximul dintre cuvinte), una de la blog')
+      assert.match(l.errors.find((e) => e.dimension === MENTIONS_WITHOUT_LINK)!.message, /^3 mențiuni scrise din web/)
+    })
+
+    test('fără link, dar cu text: textul se păstrează și intră în identitate', async () => {
+      const { db } = setup()
+      const l = await listening(db, { k1: [web('ziar.test', '2026-10-05T08:00:00Z', { text: 'Primul text' }), web('ziar.test', '2026-10-05T08:00:00Z', { text: 'Al doilea text' }), web('ziar.test', '2026-10-05T08:00:00Z')] })
+      assert.deepEqual(builtRows(db).map((r) => r.text).sort(), [null, 'Al doilea text', 'Primul text'].sort())
+      assert.match(l.errors[0]!.message, /^3 mențiuni scrise din web fără link de la sursă \(1 și fără text\)/)
+    })
+
+    test('sentimentul revizuit de om pe o mențiune fără link nu se suprascrie la rularea următoare', async () => {
+      const { db } = setup()
+      await listening(db, { k1: [web('ziar.test', '2026-10-05T08:00:00Z')] })
+      const row = builtRows(db)[0]!
+      Object.assign(row, { sentiment: 'positive', sentiment_reviewed_by: 'u-om', sentiment_reviewed_at: '2026-10-06T10:00:00Z' })
+      await listening(db, { k1: [web('ziar.test', '2026-10-05T08:00:00Z', { sentiment: 'negative' })] })
+      assert.deepEqual([builtRows(db).length, builtRows(db)[0]!.sentiment, builtRows(db)[0]!.sentiment_reviewed_by], [1, 'positive', 'u-om'])
+    })
+
+    test('fără link și fără dată validă: rămâne sărită, nu primește o cheie', async () => {
+      const { db } = setup()
+      const l = await listening(db, { k1: [web('ziar.test', 'necunoscut')] })
+      assert.equal(builtRows(db).length, 0)
+      assert.match(l.errors.find((e) => e.dimension === MENTIONS_SKIPPED)!.message, /^1 mențiune sărită din web: fără URL și fără dată de publicare validă$/)
+    })
   })
 
   test('fără mențiuni sărite nu apare nicio notă despre ele', async () => {

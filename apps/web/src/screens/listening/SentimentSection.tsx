@@ -15,6 +15,9 @@ const ORDER: Sentiment[] = ['positive', 'neutral', 'negative']
 /** Câte postări proprii nu intră în distribuție (D-22). */
 const ownedNote = (n: number) => (n > 0 ? ` ${n === 1 ? 'O postare' : `${n} postări`} din conturile proprii ale brandului nu ${n === 1 ? 'e inclusă' : 'sunt incluse'}.` : '')
 
+/** Câte mențiuni au venit fără text și fără link: nu au ce revizui, deci nu intră nici în procente, nici la „așteaptă revizuirea”. */
+const noContentNote = (n: number) => (n > 0 ? ` ${n === 1 ? 'O mențiune a venit' : `${formatInteger(n)} mențiuni au venit`} de la sursă fără text și fără link și nu ${n === 1 ? 'poate fi revizuită' : 'pot fi revizuite'}.` : '')
+
 export function SentimentSection({ state, onRetry }: { state: AsyncState<ProviderResult<SentimentDistribution>>; onRetry: () => void }) {
   return (
     <Section id="sentiment" title="Distribuția sentimentului" description="Fiecare sentiment e verificat de un om din echipa AdSymphony; mențiunile încă nerevizuite și postările din conturile proprii ale brandului nu sunt incluse în procente.">
@@ -24,7 +27,7 @@ export function SentimentSection({ state, onRetry }: { state: AsyncState<Provide
             <EmptyState
               compact
               title="Nicio mențiune revizuită"
-              text={`${d.unreviewed > 0 ? `${d.unreviewed} ${d.unreviewed === 1 ? 'mențiune externă așteaptă' : 'mențiuni externe așteaptă'} revizuirea umană; până atunci nu afișăm o distribuție.` : 'Nu există mențiuni externe eligibile în perioada aleasă.'}${ownedNote(d.owned_excluded)}`}
+              text={`${d.unreviewed > 0 ? `${d.unreviewed} ${d.unreviewed === 1 ? 'mențiune externă așteaptă' : 'mențiuni externe așteaptă'} revizuirea umană; până atunci nu afișăm o distribuție.` : d.without_content > 0 ? 'Nu există mențiuni externe care să poată fi revizuite în perioada aleasă.' : 'Nu există mențiuni externe eligibile în perioada aleasă.'}${ownedNote(d.owned_excluded)}${noContentNote(d.without_content)}`}
             />
           ) : (
             <div className="flex flex-col gap-3">
@@ -46,6 +49,7 @@ export function SentimentSection({ state, onRetry }: { state: AsyncState<Provide
                 ))}
               </ul>
               {d.owned_excluded > 0 && <p className="text-[12.5px] text-text-2">{ownedNote(d.owned_excluded).trim()}</p>}
+              {d.without_content > 0 && <p className="text-[12.5px] text-text-2">{noContentNote(d.without_content).trim()}</p>}
               {d.unreviewed > 0 && (
                 <p className="rounded-lg bg-warn-soft px-3 py-2 text-[12.5px] leading-snug text-warn-text">
                   {formatInteger(d.unreviewed)} {d.unreviewed === 1 ? 'mențiune așteaptă' : 'mențiuni așteaptă'} revizuirea umană și nu {d.unreviewed === 1 ? 'e inclusă' : 'sunt incluse'} în procente.

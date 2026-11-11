@@ -63,7 +63,7 @@ const withChanges = (changes: Record<string, Partial<MetricItem>>) => (b: DataPr
 const H1 = 'Imaginea completă a brandului'
 const NAMES = { sov: 'AI SoV în setul urmărit', ai: 'AI Mention Rate', seo: 'Visibility SEOmonitor (ultima observație)', sentiment: 'Sentiment pozitiv (mențiuni revizuite)', clicks: 'Clicks (Search Console)', position: 'Locul în setul de competitori (AI)' }
 const ORDER = [NAMES.sov, NAMES.ai, NAMES.seo, NAMES.sentiment, NAMES.clicks, NAMES.position]
-const sentimentOf = (o: Partial<SentimentDistribution>): SentimentDistribution => ({ total: 4, positive: 3, neutral: 1, negative: 0, unreviewed: 2, owned_excluded: 0, shares: { positive: 75, neutral: 25, negative: 0 }, ...o })
+const sentimentOf = (o: Partial<SentimentDistribution>): SentimentDistribution => ({ total: 4, positive: 3, neutral: 1, negative: 0, unreviewed: 2, without_content: 0, owned_excluded: 0, shares: { positive: 75, neutral: 25, negative: 0 }, ...o })
 
 describe('Overview: compoziția din macheta propunerii', () => {
   it('titlul din machetă, calea, „Exportă raportul”, șase indicatori, cardurile, apoi semnalele, prioritățile și interpretarea; AdSy AI nu e pe pagină până nu e deschis', async () => {

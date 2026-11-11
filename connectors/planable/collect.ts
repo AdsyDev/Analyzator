@@ -3,7 +3,7 @@
 // Contract: docs/contracts/planable.md.
 
 import { SupabaseRest, supabaseConfigFromEnv } from '../shared/supabase-rest.ts'
-import { collectPlanable, MENTIONS_SKIPPED } from './collect-core.ts'
+import { collectPlanable, MENTIONS_SKIPPED, MENTIONS_WITHOUT_LINK } from './collect-core.ts'
 
 async function main(): Promise<void> {
   const db = new SupabaseRest(supabaseConfigFromEnv(process.env))
@@ -14,7 +14,7 @@ async function main(): Promise<void> {
     console.log(`brand ${o.brand_id ?? '—'} · ${o.source}: ${detail}`)
     for (const e of o.errors.filter((x) => !x.code.startsWith('parser_'))) console.log(`  ${e.code}${e.dimension ? ` [${e.dimension}]` : ''}: ${e.message}`)
     // Mențiunile sărite sunt note, dar schimbă câte mențiuni apar în aplicație: se scriu mereu, pe rețea și motiv.
-    for (const e of o.errors.filter((x) => x.dimension === MENTIONS_SKIPPED)) console.log(`  ${e.message}`)
+    for (const e of o.errors.filter((x) => x.dimension === MENTIONS_SKIPPED || x.dimension === MENTIONS_WITHOUT_LINK)) console.log(`  ${e.message}`)
     if (o.status === 'failed') failed++
   }
   if (outcomes.length === 0) console.log('Nicio conexiune Planable activă.')

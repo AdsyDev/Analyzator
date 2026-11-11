@@ -34,6 +34,9 @@ import {
   WorkspacesSchema,
   MENTION_SKIP_LABELS,
   mentionFieldShape,
+  builtMentionIdentity,
+  builtMentionNativeId,
+  hasNoLink,
   mentionRow,
   mentionSkipReasons,
   ownAccounts,
@@ -83,6 +86,7 @@ function statusOf(errors: SyncRunError[], rows: number, fatal: boolean): SyncRun
 
 /** Dimensiunea notelor despre mențiuni sărite; `collect.ts` le scrie în jurnalul rulării. */
 export const MENTIONS_SKIPPED = 'mentions_skipped'
+export const MENTIONS_WITHOUT_LINK = 'mentions_without_link'
 
 type SkippedGroup = { count: number; filled: Map<string, number>; empty: Map<string, number>; links: Map<string, number> }
 const FIELD_LIST_MAX = 40
@@ -112,6 +116,21 @@ function skippedMentionNotes(skipped: Map<string, SkippedGroup>): SyncRunError[]
         note(`câmpurile lor (${platform}): cu valoare: ${fieldList(g.filled, g.count)}; goale: ${fieldList(g.empty, g.count)}; cu link http(s): ${fieldList(g.links, g.count)}`),
       ]
     })
+}
+
+/**
+ * O notă pe rețea pentru mențiunile scrise fără link: câte sunt și câte nu au nici text. Sunt în `mentions`, cu `url` NULL și
+ * cheia construită; nota spune de ce feed-ul nu le poate arăta. Nu schimbă statusul rulării.
+ */
+function withoutLinkNotes(unlinked: Map<string, { count: number; withoutText: number }>): SyncRunError[] {
+  return [...unlinked.entries()]
+    .sort((a, b) => b[1].count - a[1].count || a[0].localeCompare(b[0]))
+    .map(([platform, g]) => ({
+      code: 'parser_note',
+      status: null,
+      dimension: MENTIONS_WITHOUT_LINK,
+      message: `${g.count} ${g.count === 1 ? 'mențiune scrisă' : 'mențiuni scrise'} din ${platform} fără link de la sursă (${g.withoutText} și fără text); cheia e construită din rețea, autor și dată`,
+    }))
 }
 
 function httpError(r: Extract<GetResult, { ok: false }>, dimension: string): SyncRunError {
@@ -341,9 +360,14 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
     if (pages.error) errors.push(pages.error)
     const own = pages.error && pages.items.length === 0 ? null : ownAccounts(pages.items.map(({ item }) => item).filter((pg) => pg.workspaceId === conn.external_account_id))
     const mentions: Row[] = []
+    // Mențiunile fără link, grupate pe identitate (rețea, autor, moment, text). Aceeași mențiune găsită de două cuvinte
+    // urmărite se scrie o dată: pe fiecare identitate rămâne cea mai lungă listă dintre cuvinte, nu suma lor.
+    type Unlinked = { m: Mention; payloadHash: string }
+    const withoutLink = new Map<string, Unlinked[]>()
     // Mențiunile sărite, numărate pe rețea și motiv: o notă pe grup, nu una pe mențiune.
     const skipped = new Map<string, SkippedGroup>()
     for (const k of keywords.data.data) {
+      const ofKeyword = new Map<string, Unlinked[]>()
       let cursor: number | undefined
       for (let page = 0; page < PLANABLE_MAX_PAGES; page++) {
         const r = await client.get(`/keywords/${encodeURIComponent(k.keywordId)}/mentions`, {
@@ -371,14 +395,37 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
             skipped.set(key, group)
             continue
           }
+          if (hasNoLink(m)) {
+            const identity = builtMentionIdentity(m)
+            const same = ofKeyword.get(identity) ?? []
+            same.push({ m, payloadHash: r.payloadHash })
+            ofKeyword.set(identity, same)
+            continue
+          }
           mentions.push(mentionRow(m, { ...provenance, payload_hash: r.payloadHash }, own))
         }
         const next = parsed.data.pagination.nextCursor
         if (next === null || next === cursor || parsed.data.data.length === 0) break
         cursor = next
       }
+      for (const [identity, same] of ofKeyword) if (same.length > (withoutLink.get(identity)?.length ?? 0)) withoutLink.set(identity, same)
     }
 
+    // Cheia construită: identitatea plus numărul de ordine printre mențiunile identice. Ordinea lor e fixată după sentiment,
+    // ca aceeași rulare repetată să dea aceleași rânduri.
+    const unlinked = new Map<string, { count: number; withoutText: number }>()
+    for (const [identity, same] of withoutLink) {
+      const ordered = [...same].sort((a, b) => (a.m.sentiment ?? '').localeCompare(b.m.sentiment ?? ''))
+      ordered.forEach(({ m, payloadHash }, i) => {
+        mentions.push(mentionRow(m, { ...provenance, payload_hash: payloadHash }, own, builtMentionNativeId(identity, i + 1)))
+        const platform = m.platform.trim().toLowerCase().replace(/[^\p{L}\p{N}_ .-]+/gu, '_').slice(0, 64) || 'rețea necunoscută'
+        const g = unlinked.get(platform) ?? { count: 0, withoutText: 0 }
+        g.count++
+        if (typeof m.text !== 'string' || m.text.trim() === '') g.withoutText++
+        unlinked.set(platform, g)
+      })
+    }
+    errors.push(...withoutLinkNotes(unlinked))
     errors.push(...skippedMentionNotes(skipped))
 
     // Corecțiile umane au prioritate: mențiunile cu sentiment revizuit se actualizează fără câmpul sentiment (ca la CSV).

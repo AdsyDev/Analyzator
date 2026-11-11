@@ -68,6 +68,15 @@ export interface Page<T> {
 }
 
 /**
+ * O pagină din feed-ul de mențiuni. `items` și `total` cuprind doar mențiunile cu conținut (link sau text);
+ * `without_content` numără, pe aceeași perioadă, sursă și autor, mențiunile pe care sursa le-a trimis fără niciunul
+ * (mențiunile web din Planable). Acestea nu au ce afișa și nu pot fi revizuite, dar sunt numărate la „Mențiuni”.
+ */
+export interface MentionPage extends Page<Mention> {
+  without_content: number
+}
+
+/**
  * Distribuția sentimentului. Doar mențiunile REVIZUITE de un om intră în `total` și în procente; cele
  * nerevizuite se numără separat (`unreviewed`), nu se presupun neutre. Procentele vin calculate de provider.
  */
@@ -77,8 +86,10 @@ export interface SentimentDistribution {
   positive: number
   neutral: number
   negative: number
-  /** Mențiuni eligibile încă fără etichetă umană. */
+  /** Mențiuni eligibile încă fără etichetă umană, dintre cele care pot fi revizuite (au link sau text). */
   unreviewed: number
+  /** Mențiuni externe venite de la sursă fără link și fără text: nu pot fi revizuite și nu intră în procente. */
+  without_content: number
   /** Postări din conturile proprii, excluse din distribuție (D-22). */
   owned_excluded: number
   /** Procente din `total`; `null` când `total` e 0. */

@@ -92,4 +92,51 @@ describe('Listening', () => {
     expect(await within(dist).findByText(/2 postări din conturile proprii ale brandului nu sunt incluse/)).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /Autor:\s*Cont propriu/ }).length).toBeGreaterThan(0)
   })
+
+  describe('mențiuni fără conținut (web, din Planable)', () => {
+    type Wrap = NonNullable<Parameters<typeof renderApp>[0]['wrap']>
+    const withCount = (n: number, empty = false): Wrap => (b) => ({
+      ...b,
+      mentions: {
+        ...b.mentions,
+        list: async (c, q) => { const r = await b.mentions.list(c, q); return r.kind === 'ready' ? { kind: 'ready' as const, data: { ...r.data, ...(empty ? { items: [], total: 0 } : {}), without_content: n } } : r },
+        sentiment: async (c) => { const r = await b.mentions.sentiment(c); return r.kind === 'ready' ? { kind: 'ready' as const, data: { ...r.data, without_content: n } } : r },
+      },
+    })
+    const feed = () => screen.getByRole('heading', { level: 2, name: 'Mențiuni' }).closest('section')!
+
+    it('feed-ul spune câte au venit fără text și link și nu arată carduri goale pentru ele', async () => {
+      renderApp({ route: '/brands/brand-urinal/listening', wrap: withCount(1068) })
+      await pageReady('Listening')
+      const note = await within(feed()).findByRole('note')
+      expect(note.textContent?.replace(/\s/g, ' ')).toContain('1.068 mențiuni din perioadă au venit de la sursă fără text și fără link')
+      expect(note).toHaveTextContent('Sunt numărate la „Mențiuni”, dar nu pot fi afișate sau revizuite.')
+      const cards = within(feed()).getAllByTestId('mention')
+      expect(cards.length).toBeGreaterThan(0)
+      expect(cards.every((c) => (c.textContent ?? '').trim().length > 0)).toBe(true)
+    })
+
+    it('fără nicio mențiune cu conținut: starea goală explică de ce, în loc de „schimbă filtrele”', async () => {
+      renderApp({ route: '/brands/brand-urinal/listening', wrap: withCount(1, true) })
+      await pageReady('Listening')
+      expect(await within(feed()).findByText('Nicio mențiune de afișat')).toBeInTheDocument()
+      expect(feed()).toHaveTextContent('1 mențiune din perioadă a venit de la sursă fără text și fără link')
+      expect(within(feed()).queryByText('Schimbă sentimentul, sursa sau perioada.')).toBeNull()
+    })
+
+    it('distribuția le menționează separat și nu le pune la „așteaptă revizuirea”', async () => {
+      renderApp({ route: '/brands/brand-urinal/listening', wrap: withCount(12) })
+      await pageReady('Listening')
+      const dist = screen.getByRole('heading', { level: 2, name: 'Distribuția sentimentului' }).closest('section')!
+      expect(await within(dist).findByText(/12 mențiuni au venit de la sursă fără text și fără link și nu pot fi revizuite\./)).toBeInTheDocument()
+      expect(dist).toHaveTextContent(/2 mențiuni așteaptă revizuirea umană/)
+    })
+
+    it('fără astfel de mențiuni, nu apare nicio notă', async () => {
+      renderApp({ route: '/brands/brand-urinal/listening' })
+      await pageReady('Listening')
+      await within(feed()).findAllByTestId('mention')
+      expect(within(feed()).queryByRole('note')).toBeNull()
+    })
+  })
 })
