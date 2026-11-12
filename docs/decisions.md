@@ -372,3 +372,16 @@ A doua verificare pe live a trecut 29 din 29, dar două întrebări cu date au p
 | U-6 | Ciorna: ce devine dovadă | (a) tot ce citează modelul; (b) doar indicatorii folosiți | **(b).** Dovezile ciornei sunt indicatorii cu valoare ale căror cifre apar în text. Unul citat ca „lipsă” sau nefolosit ar îngheța la publicare o valoare despre care analiza nu spune nimic. Fără niciun indicator cu valoare, ciorna nu se salvează. Serverul nu taie textul și nu respinge o ciornă pentru că e lungă: asta rămâne treaba promptului și a omului care o revizuiește. |
 | U-7 | Ce nu se știe încă | — | Efectul promptului nou se vede doar după publicare, la următoarea verificare pe live. Nu există un set de evaluare pentru ciorne; calitatea lor e judecată de mână, pe o singură ciornă la fiecare rulare. |
 
+## V — AdSy AI: variația unui procent se scrie în puncte procentuale (2026-11-12)
+
+A treia verificare pe live a trecut 30 din 30, dar ciorna generată scria „Mention Rate a crescut cu 5,24 %, ajungând la 38,05 %”. Rata urcase de la 32,81 % la 38,05 %, adică 5,24 puncte procentuale (15,97 % relativ). Cifra era din date, deci verificarea o accepta; afirmația era totuși greșită. Cererea proprietarului produsului: „corectează și rulează din nou verificarea”.
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| V-1 | Unde se corectează | (a) doar în prompt; (b) prompt și verificare pe server | **(b).** Promptul reduce greșeala, dar nu o exclude. Regula „nimic neverificat nu ajunge la om” cere ca serverul să oprească textul greșit, nu să spere că modelul ascultă. |
+| V-2 | Ce primește modelul | — | Indicatorii în procente care au variație vin cu `absolute_change_unit: "puncte procentuale"`. Nu e o formulă nouă: contractul metricilor spune deja că variația absolută a unui procent e în puncte procentuale; aici doar se scrie explicit, lângă cifră. Prompturile devin `chat-v5` și `insight-v3`, deci răspunsurile vechi din cache nu se mai refolosesc. |
+| V-3 | Ce oprește serverul | — | Un număr urmat de „%”, „la sută” sau „procente” care e variația în puncte procentuale a unui indicator citat și nu e, în aceleași dovezi, un procent adevărat (valoarea unei rate, o variație relativă). Motivul intern: `points_as_percent`. Răspunsul devine „dovezi insuficiente”, ca la o cifră nesusținută; ciorna nu se salvează. |
+| V-4 | Corectarea automată a textului | (a) serverul înlocuiește „%” cu „p.p.”; (b) respinge | **(b).** Serverul nu rescrie textul modelului: o înlocuire mecanică poate strica o propoziție corectă, iar un text respins se vede în jurnal și se poate număra. |
+| V-5 | Ce nu acoperă | — | Unitățile celorlalți indicatori (secunde, poziții, lei) nu se verifică; o cifră rotunjită la întreg care coincide cu altă variație poate fi oprită pe nedrept (rar; se vede în jurnal ca `points_as_percent`). Analizele scrise de om nu trec prin această verificare. |
+| V-6 | Impact | — | Timp: sub o oră, fără schimbare de schemă și fără interfață. Cost: o rulare de verificare pe live (circa 20.000 de tokeni). |
+

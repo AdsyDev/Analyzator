@@ -2,7 +2,7 @@
 // Modelul vede doar ce poate vedea utilizatorul: datele sunt citite cu sesiunea lui, prin RLS. Răspunsul e acceptat doar dacă
 // fiecare dovadă citată există în context și fiecare număr din text se regăsește în dovezile citate.
 
-export const PROMPT_VERSION = 'chat-v4'
+export const PROMPT_VERSION = 'chat-v5'
 export const MAX_QUESTION = 1000
 const MAX_INSIGHTS = 5
 export const MAX_DOCUMENT_FRAGMENTS = 5
@@ -37,7 +37,11 @@ export type InsightRow = { id: string; title: string; summary: string; interpret
 export type DocumentRow = { fragment_id: string; document_id: string; title: string; doc_type?: string | null; version?: string | null; section_ref?: string | null; content: string }
 
 export type Evidence =
-  | { id: string; kind: 'metric'; label: string; metric_key: string; numbers: number[] }
+  /**
+   * `pointChanges` = variația absolută a unui indicator în procente: e în puncte procentuale, nu în procente.
+   * `percents` = numerele indicatorului care chiar sunt procente (valoarea lui, dacă e în procente, și variația relativă).
+   */
+  | { id: string; kind: 'metric'; label: string; metric_key: string; numbers: number[]; pointChanges: number[]; percents: number[] }
   | { id: string; kind: 'insight'; label: string; insight_id: string; numbers: number[] }
   | { id: string; kind: 'document'; label: string; document_id: string; numbers: number[] }
 
@@ -55,8 +59,8 @@ const clean = (v: unknown, max = MAX_TEXT): string => (typeof v === 'string' ? v
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000)
 
 /** Numerele dintr-un text, în orice scriere uzuală (1.234,5 · 1,234.5 · 1 234,5). Cifrele lipite de litere (GA4) nu sunt numere. */
-export function numbersIn(text: string): Array<{ token: string; values: number[]; decimals: number }> {
-  const out: Array<{ token: string; values: number[]; decimals: number }> = []
+export function numbersIn(text: string): Array<{ token: string; values: number[]; decimals: number; end: number }> {
+  const out: Array<{ token: string; values: number[]; decimals: number; end: number }> = []
   const re = /(?<![\p{L}\p{N}_.,])\d+(?:[.,   ]\d{3})*(?:[.,]\d+)?(?![\p{L}\p{N}_])/gu
   for (const m of text.matchAll(re)) {
     const token = m[0]
@@ -78,7 +82,7 @@ export function numbersIn(text: string): Array<{ token: string; values: number[]
       // …sau ca separator de mii, când e urmat de exact trei cifre (1.234 poate fi o mie două sute treizeci și patru).
       if (after === 3) add(digits)
     }
-    out.push({ token, values: [...values], decimals })
+    out.push({ token, values: [...values], decimals, end: m.index + token.length })
   }
   return out
 }
@@ -120,6 +124,23 @@ function supported(n: { values: number[]; decimals: number }, allowed: number[])
   )
 }
 
+// „5,24 %”, „5,24 la sută”, „5,24 procente”, „20 de procente”; „5,24 puncte procentuale” nu.
+const PERCENT_MARK = /^[\s\u00a0\u202f]*(?:%|la\s+sută|(?:de\s+)?procente?(?![\p{L}]))/iu
+
+/**
+ * O variație în puncte procentuale scrisă ca procent („a crescut cu 5,24 %”, când rata a urcat cu 5,24 p.p.). Întoarce
+ * numărul scris greșit sau `null`. Un număr care e și procent adevărat în dovezile citate (valoarea unui indicator în
+ * procente, o variație relativă) nu e socotit greșit: textul poate vorbi despre acela.
+ */
+export function pointsWrittenAsPercent(text: string, cited: readonly Evidence[]): string | null {
+  const points = cited.flatMap((e) => (e.kind === 'metric' ? e.pointChanges : []))
+  if (points.length === 0) return null
+  // Analizele și documentele citate își aduc cifrele fără unitate: orice număr din ele poate fi un procent.
+  const percents = cited.flatMap((e) => (e.kind === 'metric' ? e.percents : e.numbers))
+  const wrong = numbersIn(text).find((n) => PERCENT_MARK.test(text.slice(n.end)) && supported(n, points) && !supported(n, percents))
+  return wrong?.token ?? null
+}
+
 /** Cifrele ajung la model cu cel mult două zecimale: valoarea din bază poate avea 15, iar modelul le-ar copia întocmai. */
 const shown = (v: number | null): number | null => (v === null ? null : Math.round(v * 100) / 100)
 
@@ -141,9 +162,21 @@ export function buildContext(input: {
       const id = `metric:${m.metric_key}`
       const exact = { value: num(m.value), comparison_value: num(m.comparison_value), absolute_change: num(m.absolute_change), relative_change: num(m.relative_change) }
       const row = { value: shown(exact.value), comparison_value: shown(exact.comparison_value), absolute_change: shown(exact.absolute_change), relative_change: shown(exact.relative_change) }
+      const some = (...v: Array<number | null>) => v.filter((x): x is number => x !== null)
+      const isPercent = m.unit === 'percent'
       // Dovada ține și valorile exacte, și pe cele trimise: un număr din text e verificat față de amândouă.
-      evidence.set(id, { id, kind: 'metric', label: names.get(m.metric_key)!, metric_key: m.metric_key, numbers: [...Object.values(exact), ...Object.values(row)].filter((v): v is number => v !== null) })
-      return { evidence_id: id, name: names.get(m.metric_key), unit: clean(m.unit, 32), currency: m.currency ?? null, ...row, status: clean(m.status, 32), data_as_of: m.data_as_of ?? null }
+      evidence.set(id, {
+        id, kind: 'metric', label: names.get(m.metric_key)!, metric_key: m.metric_key,
+        numbers: some(...Object.values(exact), ...Object.values(row)),
+        pointChanges: isPercent ? some(exact.absolute_change, row.absolute_change) : [],
+        percents: some(exact.relative_change, row.relative_change, ...(isPercent ? [exact.value, row.value, exact.comparison_value, row.comparison_value] : [])),
+      })
+      return {
+        evidence_id: id, name: names.get(m.metric_key), unit: clean(m.unit, 32), currency: m.currency ?? null, ...row,
+        // Variația absolută a unui procent e în puncte procentuale; cea relativă e mereu în procente.
+        ...(isPercent && row.absolute_change !== null ? { absolute_change_unit: 'puncte procentuale' } : {}),
+        status: clean(m.status, 32), data_as_of: m.data_as_of ?? null,
+      }
     })
   // Doar analizele publicate, cele mai recente; textele sunt ale echipei, dar rămân date, nu instrucțiuni.
   const insights = input.insights
@@ -195,6 +228,7 @@ export const SYSTEM_PROMPT = [
   '9. proposed_action e cel mult o propunere de pas următor pentru echipă, formulată ca ipoteză, sau null. limitations spune ce nu arată datele.',
   '10. Scrie numerele cu virgulă zecimală (53,3) și datele ca „14 oct. 2026”. Nu folosi numele tehnice din DATE (value, status, not_connected): spune pe românește ce înseamnă.',
   '11. documents, când există, conține fragmente din documentele aprobate de brand: ele arată ce afirmă brandul despre produs, nu ce s-a măsurat în piață. Când folosești un fragment, spune că vine din documentul aprobat și pune-i evidence_id în evidence_ids. Nu prezenta o afirmație din documents ca rezultat măsurat și nicio cifră din metrics ca afirmație a brandului.',
+  '12. Când un indicator are absolute_change_unit = „puncte procentuale”, variația lui absolută se scrie „cu 5,24 puncte procentuale” sau „cu 5,24 p.p.”, niciodată „cu 5,24 %”. relative_change e mereu în procente.',
 ].join('\n')
 
 export const RESPONSE_SCHEMA = {
@@ -283,6 +317,9 @@ export function verifyAnswer(raw: string, ctx: ChatContext, question: string): A
   for (const text of [summary, action ?? '', limitations]) {
     const bad = numbersIn(withoutDates(text)).find((n) => !supported(n, allowed))
     if (bad) return refused('insufficient_evidence', ctx.period, `unverified_number:${bad.token.slice(0, 40)}`)
+    // Cifra e corectă, dar unitatea nu: o variație în puncte procentuale prezentată ca procent e altă afirmație.
+    const unit = pointsWrittenAsPercent(text, cited)
+    if (unit) return refused('insufficient_evidence', ctx.period, `points_as_percent:${unit.slice(0, 40)}`)
   }
 
   return {
@@ -302,7 +339,7 @@ export function verifyAnswer(raw: string, ctx: ChatContext, question: string): A
 
 // Ciorne de analiză generate (Etapa 4, deciziile O) ------------------------------------------------------------------------
 
-export const GENERATE_PROMPT_VERSION = 'insight-v2'
+export const GENERATE_PROMPT_VERSION = 'insight-v3'
 /** Câți indicatori i se cer modelului cel mult: o analiză alege ce contează, nu înșiră tot registrul. */
 export const MAX_DRAFT_EVIDENCE = 6
 export const MAX_DRAFT_RECOMMENDATIONS = 3
@@ -324,6 +361,7 @@ export const GENERATE_SYSTEM_PROMPT = [
   '9. Nu da sfaturi medicale și nu face afirmații despre eficacitatea sau siguranța produselor.',
   '10. Scrie în română, cu diacritice, fără formatare. summary și interpretation au cel mult 90 de cuvinte fiecare.',
   '11. Scrie numerele cu virgulă zecimală (53,3) și procentele cu semnul % (53,3 %), iar datele ca „14 oct. 2026”. Folosește numele indicatorilor așa cum apar în DATE (name). Nu folosi numele tehnice (value, status, not_connected): spune pe românește ce înseamnă.',
+  '12. Când un indicator are absolute_change_unit = „puncte procentuale”, variația lui absolută se scrie „cu 5,24 puncte procentuale” sau „cu 5,24 p.p.”, niciodată „cu 5,24 %”. relative_change e mereu în procente.',
 ].join('\n')
 
 export const DRAFT_SCHEMA = {
@@ -422,6 +460,8 @@ export function verifyDraft(raw: string, ctx: ChatContext): Draft {
   for (const text of all) {
     const bad = numbersIn(withoutDates(text)).find((n) => !supported(n, allowed))
     if (bad) return noDraft('insufficient_evidence', ctx.period, `unverified_number:${bad.token.slice(0, 40)}`)
+    const unit = pointsWrittenAsPercent(text, withValues)
+    if (unit) return noDraft('insufficient_evidence', ctx.period, `points_as_percent:${unit.slice(0, 40)}`)
   }
 
   // Dovezile ciornei sunt indicatorii ale căror cifre apar efectiv în text. Unul citat, dar nefolosit, ar îngheța la
