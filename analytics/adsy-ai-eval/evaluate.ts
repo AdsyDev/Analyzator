@@ -9,7 +9,7 @@ export type EvalContext = {
   period: Period
   comparison_period: Period | null
   metrics: MetricRow[]
-  definitions: Array<{ metric_key: string; name_ro: string }>
+  definitions: Array<{ metric_key: string; name_ro: string; direction?: string | null }>
   insights: InsightRow[]
   documents: DocumentRow[]
 }

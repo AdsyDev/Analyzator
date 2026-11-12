@@ -204,6 +204,8 @@ describe('adsy-ai: chat', () => {
     assert.deepEqual(a.period, { start: '2026-10-14', end: '2026-11-10' })
     assert.ok(!('reason' in a), 'motivul intern nu ajunge la utilizator')
     assert.deepEqual([r.body.cached, r.body.model_id, r.body.prompt_version], [false, 'model-test-1', PROMPT_VERSION])
+    // Sensul indicatorilor (mai mare sau mai mic e mai bine) se citește din registru, odată cu numele.
+    assert.ok(state.calls.some((c) => c.url.includes('metric_definitions_current?select=metric_key,name_ro,direction&')))
     assert.equal(state.requests.length, 1)
     const log = state.requests[0]!
     assert.deepEqual([log.tenant_id, log.brand_id, log.user_id, log.task, log.status], [T1, B1, USER, 'chat', 'ok'])

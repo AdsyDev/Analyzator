@@ -196,7 +196,7 @@ async function prepare(deps: HandlerDeps, actor: Actor, settings: Settings, inpu
       method: 'POST',
       body: JSON.stringify({ p_brand_id: input.brandId, p_metric_keys: CHAT_METRIC_KEYS, p_start: input.period.start, p_end: input.period.end, p_kind: input.comparison === 'year_ago' ? 'yoy' : 'custom' }),
     }),
-    asUser<Array<{ metric_key: string; name_ro: string }>>(deps, actor, `metric_definitions_current?select=metric_key,name_ro&metric_key=in.(${CHAT_METRIC_KEYS.join(',')})`),
+    asUser<Array<{ metric_key: string; name_ro: string; direction: string | null }>>(deps, actor, `metric_definitions_current?select=metric_key,name_ro,direction&metric_key=in.(${CHAT_METRIC_KEYS.join(',')})`),
     // O ciornă se scrie din indicatori, nu din concluziile analizelor anterioare.
     withInsights ? asUser<InsightRow[]>(deps, actor, 'rpc/brand_insights', { method: 'POST', body: JSON.stringify({ p_brand_id: input.brandId, p_start: input.period.start, p_end: input.period.end }) }) : Promise.resolve([]),
     // Doar documente aprobate și valabile azi (filtrul e în funcția SQL, cu RLS-ul utilizatorului).

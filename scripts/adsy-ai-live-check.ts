@@ -212,7 +212,8 @@ async function main() {
   if (a1.json?.status === 'ok') {
     check('răspunsul ok citează dovezi și cere revizuire', Array.isArray(a1.json.answer?.evidence) && a1.json.answer.evidence.length > 0 && a1.json.answer.requires_review === true, a1.json.answer?.evidence)
   }
-  for (const q of ['Ce s-a întâmplat cu traficul organic din Google?', 'Cum stăm cu vizibilitatea în răspunsurile AI?', 'Câte mențiuni am avut și cât am cheltuit pe reclame?']) {
+  // Întrebarea despre poziție arată cum e formulată o schimbare la un indicator unde mai mic e mai bine.
+  for (const q of ['Ce s-a întâmplat cu traficul organic din Google?', 'Cum a evoluat poziția medie în Google față de perioada anterioară?', 'Cum stăm cu vizibilitatea în răspunsurile AI?', 'Câte mențiuni am avut și cât am cheltuit pe reclame?']) {
     const a = await chat(q)
     check(`„${q}”`, a.status === 200 && answered.includes(a.json?.status), show(a))
   }
