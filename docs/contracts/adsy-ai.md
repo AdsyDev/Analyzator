@@ -53,7 +53,7 @@ Regimul E8 (`SECURITY INVOKER`, `has_brand_access` în corp).
 1. Sesiunea, la GoTrue.
 2. Accesul la brand și controalele, prin `brand_ai_settings` chemat **cu sesiunea utilizatorului**. Cu chatul oprit, funcția răspunde `ai_off` și se oprește: nu citește date și nu cheamă modelul.
 3. Configurarea: `GEMINI_API_KEY` în mediul funcției; modelul are o valoare implicită, pe care `ADSY_AI_MODEL` o înlocuiește. Fără cheie: `not_configured`.
-4. Contextul, citit tot cu sesiunea utilizatorului (RLS): `brand_metrics` pentru 18 metrici din registru (cifrele ajung la model cu cel mult două zecimale; verificarea le acceptă și pe cele exacte; un indicator în procente care are variație vine cu `absolute_change_unit: "puncte procentuale"`, după `docs/contracts/metric-response.md`; poziția medie vine cu `absolute_change_unit: "poziții"`; un indicator cu `direction = lower_is_better` în registru vine cu `better_when: "mai mic"` și, când are o variație diferită de zero, cu `change_meaning` „înrăutățire” sau „îmbunătățire”), numele și sensul lor (`direction`) din `metric_definitions_current` și cel mult cinci analize **publicate** din `brand_insights`. Modelul vede doar ce vede utilizatorul. Nu primește mențiuni brute, răspunsuri AI brute, nume de autori, e-mailuri sau chei.
+4. Contextul, citit tot cu sesiunea utilizatorului (RLS): `brand_metrics` pentru 18 metrici din registru (cifrele ajung la model cu cel mult două zecimale; verificarea le acceptă și pe cele exacte; un indicator în procente care are variație vine cu `absolute_change_unit: "puncte procentuale"`, după `docs/contracts/metric-response.md`; poziția medie vine cu `absolute_change_unit: "poziții"`; un indicator cu `direction = lower_is_better` în registru vine cu `better_when: "mai mic"` și, când are o variație diferită de zero, cu `change_meaning` „înrăutățire” sau „îmbunătățire”; `status` ajunge la model cu textul din contractul metricilor, de exemplu „sursă neconectată”, nu cu numele tehnic), numele și sensul lor (`direction`) din `metric_definitions_current` și cel mult cinci analize **publicate** din `brand_insights`. Modelul vede doar ce vede utilizatorul. Nu primește mențiuni brute, răspunsuri AI brute, nume de autori, e-mailuri sau chei.
 5. Cache: aceeași întrebare, pe aceleași date, cu același model și aceeași versiune de prompt întoarce răspunsul salvat, fără apel și fără tokeni.
 6. Plafoane: tokenii lunii pe brand (`monthly_token_cap`) și 60 de cereri pe utilizator în 24 de ore. Depășire: `budget_exhausted`, respectiv `rate_limited`.
 7. Un singur apel `generateContent`, fără unelte, cu răspuns JSON după schemă.
@@ -88,7 +88,7 @@ Motivul intern al respingerii (`rejection_reason`) rămâne în `ai_requests`.
 
 `data_snapshot_id` = SHA-256 al contextului trimis modelului. `cache_key` = SHA-256 din tenant, brand, sarcină, `data_snapshot_id`, `model_id`, `prompt_version` și întrebarea normalizată. Căutarea în cache e mereu pe `tenant_id` și `brand_id`. Fiecare cerere are `prompt_tokens`, `output_tokens` (inclusiv tokenii de „gândire”) și `total_tokens`; cele din cache au zero.
 
-`model_id` și `prompt_version` nu sunt fixate în cod pentru totdeauna: modelul vine din `ADSY_AI_MODEL` sau din valoarea implicită, iar versiunea promptului (`chat-v6` la chat, `insight-v4` la ciorne) se schimbă odată cu promptul și intră în cheia de cache.
+`model_id` și `prompt_version` nu sunt fixate în cod pentru totdeauna: modelul vine din `ADSY_AI_MODEL` sau din valoarea implicită, iar versiunea promptului (`chat-v7` la chat, `insight-v5` la ciorne) se schimbă odată cu promptul și intră în cheia de cache.
 
 ## Ce pleacă spre furnizorul modelului
 
@@ -108,7 +108,7 @@ Ordinea verificărilor:
 
 1. Sesiunea, apoi `brand_ai_settings` cu sesiunea utilizatorului. `can_generate` fals (client): `403`. Politica fără generare sau fără afișare, ori preferința fără afișare: `ai_off`, fără nicio altă citire.
 2. Configurarea, apoi contextul: aceiași 18 indicatori ca la chat, **fără** analizele anterioare. Fără niciun indicator cu valoare: `insufficient_evidence`, fără apel.
-3. Cache pe `tenant_id`, `brand_id`, date, model și `insight-v4`: ciorna existentă se întoarce (`existing: true`); una ștearsă se reface din răspunsul salvat, cu o cerere nouă în jurnal, fără tokeni.
+3. Cache pe `tenant_id`, `brand_id`, date, model și `insight-v5`: ciorna existentă se întoarce (`existing: true`); una ștearsă se reface din răspunsul salvat, cu o cerere nouă în jurnal, fără tokeni.
 4. Plafoanele, apelul către model, verificarea (`verifyDraft`): contractul JSON, cele patru texte completate, dovezi care sunt indicatori din context, cel mult trei recomandări cu prioritate 1–3 și **fiecare cifră din orice text** regăsită în indicatorii citați, cu aceeași regulă de unitate ca la chat (o variație în puncte procentuale scrisă ca procent oprește ciorna, `points_as_percent`). Dovezile ciornei sunt indicatorii cu valoare ale căror cifre apar în text; fără niciunul, ciorna nu se salvează.
 5. Jurnalul (`ai_requests`, `task = generate_insight`), apoi scrierea, **cu sesiunea utilizatorului**: `insights` (ciornă, `origin = adsy_ai`, `ai_request_id`), `evidence_links` (SEOmonitor cu `device = desktop`), `recommendations`. Dacă dovezile sau recomandările nu se pot scrie, ciorna se șterge.
 

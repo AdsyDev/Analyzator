@@ -400,3 +400,17 @@ La verificarea de după V, chatul a scris „Poziția medie în Search Console a
 | W-7 | Ce nu acoperă | — | Dintre cei 18 indicatori ai chatului, doar poziția medie e `lower_is_better`. Costurile de reclame și numărul de mențiuni sunt `neutral` în registru și rămân formulate neutru; ceilalți 13 sunt `higher_is_better`. |
 | W-8 | Impact | — | Timp: sub o oră, fără schimbare de schemă și fără interfață. Cost: o rulare de verificare pe live (circa 23.000 de tokeni). |
 
+## X — AdSy AI: starea datelor pe românește, diacritice în titlu, erori de furnizor vizibile în verificare (2026-11-12)
+
+Verificarea de după W a trecut 31 din 31 la a doua rulare. Au rămas două formulări greșite („Mențiunile au statusul not_connected”; titlul ciornei „Crestere in vizibilitatea AI si scadere in trafic organic”), iar prima rulare picase la ciornă cu o eroare a furnizorului al cărei cod nu se vedea. Cererea proprietarului produsului: „corectează-le, fă merge și rulează verificarea”.
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| X-1 | Numele tehnice de stare | (a) doar o regulă în prompt; (b) modelul nu le mai primește | **(b).** Regula exista deja în prompt și nu a fost de ajuns. `status` ajunge la model cu textul din contractul metricilor („sursă neconectată”, „indisponibil”, „date parțiale”…), deci nu mai are ce copia. Un status necunoscut devine „stare necunoscută”, nu trece ca atare. Valoarea rămâne `null`: lipsa nu devine altceva. |
+| X-2 | Promptul | — | Exemplele de nume tehnice au ieșit din prompt (modelul le lua de acolo). Regula numește câmpurile care nu se scriu în text și cere diacritice în toate câmpurile, inclusiv în titlu. `chat-v7`, `insight-v5`. |
+| X-3 | Respingere pe server pentru stil | (a) da; (b) nu | **(b).** Un nume tehnic sau o diacritică lipsă nu fac răspunsul fals. O respingere ar arunca un răspuns corect și tokenii lui. Serverul verifică fapte (dovezi, cifre, unități); stilul rămâne în seama promptului și a revizuirii. |
+| X-4 | Cum se vede stilul la verificare | — | Verificarea pe live scrie „ATENȚIE” când un răspuns sau ciorna are un nume tehnic ori un cuvânt uzual fără diacritice și numără observațiile. Nu pică: modelul nu formulează la fel la fiecare rulare, iar o verificare care pică la întâmplare nu mai e crezută. |
+| X-5 | Eroarea furnizorului la ciornă | — | Verificarea afișează codul erorii, reia cererea o dată (ca la chat) și, la un refuz, arată motivul din jurnal. Funcția `adsy-ai` reia deja o dată erorile temporare; nu s-a schimbat. Codul erorii din prima rulare nu a fost aflat. |
+| X-6 | Ce nu acoperă | — | Lista de cuvinte fără diacritice e scurtă și orientativă. Alte abateri de stil (de exemplu „o scădere relativă de -8,3 %”) nu sunt semnalate. |
+| X-7 | Impact | — | Timp: sub o oră, fără schimbare de schemă și fără interfață. Cost: o rulare de verificare pe live (circa 25.000 de tokeni). |
+

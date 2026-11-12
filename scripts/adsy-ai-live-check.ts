@@ -183,14 +183,30 @@ async function main() {
   if (login.status !== 200 || !token) throw new Error(`Autentificarea contului temporar a eșuat (${login.status}).`)
   const fn = (body: Json, t: string = token) => call('/functions/v1/adsy-ai', { method: 'POST', token: t, body })
   /** O întrebare; la o eroare temporară a furnizorului (`model_error`) se mai încearcă o dată, ca un utilizator. */
+  // Formulări de urmărit, fără să pice verificarea: țin de stil, nu de fapte, iar modelul nu le respectă la fiecare rulare.
+  const TECHNICAL = /(?<![\p{L}\p{N}_:])(?:unavailable|stale|[a-z]+(?:_[a-z]+)+)(?![\p{L}\p{N}_])/u
+  const NO_DIACRITICS = /(?<![\p{L}])(?:si|in|fata|crestere|cresterea|scadere|scaderea|mentiuni|mentiunile|pozitie|pozitia|vizibilitatii|imbunatat\p{L}*|inrautat\p{L}*)(?![\p{L}])/iu
+  let styleNotes = 0
+  const style = (what: string, ...texts: unknown[]) => {
+    const text = texts.filter((t) => typeof t === 'string').join(' ')
+    const technical = text.match(TECHNICAL)?.[0]
+    const bare = text.match(NO_DIACRITICS)?.[0]
+    if (technical) console.log(`ATENȚIE ${what}: nume tehnic în text („${technical}”)`)
+    if (bare) console.log(`ATENȚIE ${what}: cuvânt fără diacritice („${bare}”)`)
+    styleNotes += (technical ? 1 : 0) + (bare ? 1 : 0)
+  }
+
   let retried = 0
   const chat = async (question: string, extra: Json = {}) => {
-    const first = await fn({ action: 'chat', brand_id: brand!.id, question, period, ...extra })
-    if (first.json?.status !== 'model_error') return first
-    retried++
-    console.log(`         (furnizorul a răspuns cu eroare temporară „${first.json?.code}”; reîncerc)`)
-    await new Promise((r) => setTimeout(r, 4000))
-    return fn({ action: 'chat', brand_id: brand!.id, question, period, ...extra })
+    let r = await fn({ action: 'chat', brand_id: brand!.id, question, period, ...extra })
+    if (r.json?.status === 'model_error') {
+      retried++
+      console.log(`         (furnizorul a răspuns cu eroare temporară „${r.json?.code}”; reîncerc)`)
+      await new Promise((done) => setTimeout(done, 4000))
+      r = await fn({ action: 'chat', brand_id: brand!.id, question, period, ...extra })
+    }
+    if (r.json?.cached !== true) style(`„${question}”`, r.json?.answer?.summary, r.json?.answer?.limitations, r.json?.answer?.proposed_action)
+    return r
   }
 
   // 3. Starea serverului și controalele ------------------------------------------------------------------------------------
@@ -292,6 +308,7 @@ async function main() {
     const i = (row.json ?? [])[0] as Json | undefined
     check('ciorna e în analize ca ciornă, marcată adsy_ai, legată de cerere', i?.status === 'draft' && i?.origin === 'adsy_ai' && i?.author_id === userId && typeof i?.ai_request_id === 'string', { status: i?.status, origin: i?.origin })
     console.log(`         titlu: ${mask(i?.title)}\n         constatare: ${mask(i?.summary).replace(/\s+/g, ' ').slice(0, 500)}\n         interpretare: ${mask(i?.interpretation).replace(/\s+/g, ' ').slice(0, 400)}\n         limite: ${mask(i?.limits).replace(/\s+/g, ' ').slice(0, 300)}`)
+    style('ciorna generată', i?.title, i?.summary, i?.interpretation, i?.limits)
     const ev = await service(`evidence_links?select=metric_key&insight_id=eq.${id}`)
     const recs = await service(`recommendations?select=priority,action&insight_id=eq.${id}`)
     check('ciorna are dovezi (metrici citate)', (ev.json?.length ?? 0) > 0, { dovezi: (ev.json ?? []).map((e: Json) => e.metric_key), recomandări: recs.json?.length })
@@ -328,6 +345,7 @@ async function main() {
   const final = await service(`ai_requests?select=total_tokens&user_id=eq.${userId}`)
   const total = ((final.json ?? []) as Json[]).reduce((s, r) => s + Number(r.total_tokens ?? 0), 0)
   console.log(`\nTokeni consumați de verificare: ${total} (din plafonul lunar al brandului).`)
+  console.log(`Observații de stil (nu pică verificarea): ${styleNotes}.`)
 }
 
 let failed = false

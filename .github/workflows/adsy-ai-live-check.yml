@@ -72,6 +72,6 @@ jobs:
             echo "### Verificare AdSy AI: $(date -u +%Y-%m-%dT%H:%MZ)"
             echo
             echo '```'
-            [ -f check.log ] && grep -E '^(ok|PICAT|ATENȚIE|Rezultat|Rămas|Tokeni|Brand verificat|Doar curățare|Doar chat|— )' check.log || echo "fără output"
+            [ -f check.log ] && grep -E '^(ok|PICAT|ATENȚIE|Rezultat|Rămas|Tokeni|Observații|Brand verificat|Doar curățare|Doar chat|— )' check.log || echo "fără output"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

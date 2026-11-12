@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildContext, GENERATE_SYSTEM_PROMPT, MAX_DRAFT_EVIDENCE, numbersIn, pointsWrittenAsPercent, sha256Hex, SYSTEM_PROMPT, userPrompt, verifyAnswer, verifyDraft, withoutDates, type MetricRow } from './contract.ts'
+import { buildContext, GENERATE_SYSTEM_PROMPT, MAX_DRAFT_EVIDENCE, numbersIn, pointsWrittenAsPercent, sha256Hex, statusLabel, SYSTEM_PROMPT, userPrompt, verifyAnswer, verifyDraft, withoutDates, type MetricRow } from './contract.ts'
 
 const metric = (key: string, o: Partial<MetricRow> = {}): MetricRow => ({ metric_key: key, value: 21611, unit: 'count', comparison_value: 18663, absolute_change: 2948, relative_change: 15.8, status: 'ok', data_as_of: '2026-11-09', ...o })
 const ctx = (extra: { insights?: Parameters<typeof buildContext>[0]['insights'] } = {}) =>
@@ -301,6 +301,46 @@ describe('sensul indicatorului: la poziția medie, mai mic e mai bine (verificar
     })
     const a = verifyAnswer(answer({ summary: 'Poziția medie s-a înrăutățit de la 6,88 la 7,47, cu 0,59 poziții.', evidence_ids: ['metric:gsc_average_position'], metric_keys: ['gsc_average_position'] }), c, 'Cum a evoluat poziția medie?')
     assert.equal(a.status, 'ok')
+  })
+})
+
+describe('starea datelor ajunge la model pe românește (verificarea pe live din 12 nov. 2026)', () => {
+  // Cazul găsit pe live: „Mențiunile au statusul not_connected”. Modelul copia numele tehnic din date.
+  test('fiecare status din contractul metricilor are textul lui; unul necunoscut nu trece ca nume tehnic', () => {
+    assert.deepEqual(
+      ['ok', 'not_connected', 'unavailable', 'cannot_compute', 'insufficient_sample', 'stale', 'partial', 'base_zero'].map(statusLabel),
+      ['fără probleme semnalate', 'sursă neconectată', 'indisponibil', 'nu se poate calcula', 'eșantion insuficient', 'date neactualizate', 'date parțiale', 'bază zero la comparație'],
+    )
+    for (const odd of ['status_nou', '', null, undefined, 42]) assert.equal(statusLabel(odd), 'stare necunoscută')
+  })
+
+  test('datele trimise modelului nu conțin niciun nume tehnic de stare', () => {
+    const c = buildContext({
+      brandName: 'B', period: { start: '2026-10-15', end: '2026-11-11' }, comparisonPeriod: null,
+      metrics: [
+        metric('mentions_count', { value: null, comparison_value: null, absolute_change: null, relative_change: null, status: 'not_connected' }),
+        metric('ga4_key_events', { value: null, comparison_value: null, absolute_change: null, relative_change: null, status: 'unavailable' }),
+        metric('ga4_sessions', { status: 'partial' }), metric('gsc_clicks', { status: 'stale' }), metric('gsc_ctr', { status: 'status_nou' }),
+      ],
+      definitions: ['mentions_count', 'ga4_key_events', 'ga4_sessions', 'gsc_clicks', 'gsc_ctr'].map((k) => ({ metric_key: k, name_ro: k })),
+      insights: [],
+    })
+    const sent = c.data.metrics as Array<{ evidence_id: string; status: string; value: number | null }>
+    assert.deepEqual(Object.fromEntries(sent.map((m) => [m.evidence_id, m.status])), {
+      'metric:ga4_key_events': 'indisponibil', 'metric:ga4_sessions': 'date parțiale', 'metric:gsc_clicks': 'date neactualizate', 'metric:gsc_ctr': 'stare necunoscută', 'metric:mentions_count': 'sursă neconectată',
+    })
+    assert.ok(!/"status":"[a-z_]+"/.test(JSON.stringify(c.data).replace(/"status":"(?:indisponibil)"/g, '')), 'nicio stare în engleză sau cu liniuță de subliniere')
+    assert.equal(sent.find((m) => m.evidence_id === 'metric:mentions_count')!.value, null, 'lipsa rămâne null, cu motivul ei')
+  })
+
+  test('prompturile nu mai dau exemple de nume tehnice de stare și cer diacritice, inclusiv în titlu', () => {
+    for (const p of [SYSTEM_PROMPT, GENERATE_SYSTEM_PROMPT]) {
+      assert.ok(!/not_connected|unavailable/.test(p))
+      assert.ok(p.includes('niciun cuvânt englezesc pentru starea datelor'))
+      assert.ok(p.includes('cu diacritice'))
+    }
+    assert.ok(GENERATE_SYSTEM_PROMPT.includes('inclusiv în title'))
+    assert.ok(GENERATE_SYSTEM_PROMPT.includes('„Creștere”, nu „Crestere”'))
   })
 })
 
