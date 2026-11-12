@@ -2,7 +2,7 @@
 // Modelul vede doar ce poate vedea utilizatorul: datele sunt citite cu sesiunea lui, prin RLS. Răspunsul e acceptat doar dacă
 // fiecare dovadă citată există în context și fiecare număr din text se regăsește în dovezile citate.
 
-export const PROMPT_VERSION = 'chat-v3'
+export const PROMPT_VERSION = 'chat-v4'
 export const MAX_QUESTION = 1000
 const MAX_INSIGHTS = 5
 export const MAX_DOCUMENT_FRAGMENTS = 5
@@ -105,16 +105,23 @@ export function withoutDates(text: string): string {
   return DATE_PATTERNS.reduce((t, re) => t.replace(re, ' '), text)
 }
 
-/** Un număr din text e susținut dacă e egal cu un număr permis, rotunjit la zecimalele cu care a fost scris. */
+/**
+ * Un număr din text e susținut dacă e egal cu un număr permis, rotunjit la zecimalele cu care a fost scris (cel mult
+ * patru). Și numărul scris se rotunjește la fel: unul copiat cu 15 zecimale e același cu valoarea lui din date.
+ */
 function supported(n: { values: number[]; decimals: number }, allowed: number[]): boolean {
   return n.values.some((v) =>
     allowed.some((a) => {
       const whole = Number.isInteger(v)
       const scale = 10 ** (whole ? 0 : Math.min(n.decimals, 4))
-      return Math.round(Math.abs(a) * scale) / scale === Math.abs(v) || (whole && Math.abs(a) === Math.abs(v))
+      const at = (x: number) => Math.round(Math.abs(x) * scale) / scale
+      return at(a) === at(v) || (whole && Math.abs(a) === Math.abs(v))
     }),
   )
 }
+
+/** Cifrele ajung la model cu cel mult două zecimale: valoarea din bază poate avea 15, iar modelul le-ar copia întocmai. */
+const shown = (v: number | null): number | null => (v === null ? null : Math.round(v * 100) / 100)
 
 export function buildContext(input: {
   brandName: string
@@ -132,8 +139,10 @@ export function buildContext(input: {
     .sort((a, b) => a.metric_key.localeCompare(b.metric_key))
     .map((m) => {
       const id = `metric:${m.metric_key}`
-      const row = { value: num(m.value), comparison_value: num(m.comparison_value), absolute_change: num(m.absolute_change), relative_change: num(m.relative_change) }
-      evidence.set(id, { id, kind: 'metric', label: names.get(m.metric_key)!, metric_key: m.metric_key, numbers: Object.values(row).filter((v): v is number => v !== null) })
+      const exact = { value: num(m.value), comparison_value: num(m.comparison_value), absolute_change: num(m.absolute_change), relative_change: num(m.relative_change) }
+      const row = { value: shown(exact.value), comparison_value: shown(exact.comparison_value), absolute_change: shown(exact.absolute_change), relative_change: shown(exact.relative_change) }
+      // Dovada ține și valorile exacte, și pe cele trimise: un număr din text e verificat față de amândouă.
+      evidence.set(id, { id, kind: 'metric', label: names.get(m.metric_key)!, metric_key: m.metric_key, numbers: [...Object.values(exact), ...Object.values(row)].filter((v): v is number => v !== null) })
       return { evidence_id: id, name: names.get(m.metric_key), unit: clean(m.unit, 32), currency: m.currency ?? null, ...row, status: clean(m.status, 32), data_as_of: m.data_as_of ?? null }
     })
   // Doar analizele publicate, cele mai recente; textele sunt ale echipei, dar rămân date, nu instrucțiuni.
@@ -264,7 +273,10 @@ export function verifyAnswer(raw: string, ctx: ChatContext, question: string): A
   }
   const citedKeys = cited.flatMap((e) => (e.kind === 'metric' ? [e.metric_key] : []))
   // Cheile declarate trebuie să fie printre dovezile citate: o cheie în plus e o dovadă pe care serverul nu a văzut-o.
-  for (const k of o.metric_keys) if (!citedKeys.includes(k)) return refused('insufficient_evidence', ctx.period, `uncited_metric:${k.slice(0, 80)}`)
+  // Modelul scrie uneori cheia cu prefixul din evidence_id („metric:…”): e aceeași cheie, nu una în plus.
+  for (const k of o.metric_keys) {
+    if (!citedKeys.includes(k.replace(/^metric:/, ''))) return refused('insufficient_evidence', ctx.period, `uncited_metric:${k.slice(0, 80)}`)
+  }
   if (summary === '') return refused('rejected', ctx.period, 'empty_summary')
 
   const allowed = [...ctx.baseNumbers, ...questionNumbers, ...cited.flatMap((e) => e.numbers)]

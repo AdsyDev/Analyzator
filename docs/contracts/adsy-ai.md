@@ -53,7 +53,7 @@ Regimul E8 (`SECURITY INVOKER`, `has_brand_access` în corp).
 1. Sesiunea, la GoTrue.
 2. Accesul la brand și controalele, prin `brand_ai_settings` chemat **cu sesiunea utilizatorului**. Cu chatul oprit, funcția răspunde `ai_off` și se oprește: nu citește date și nu cheamă modelul.
 3. Configurarea: `GEMINI_API_KEY` în mediul funcției; modelul are o valoare implicită, pe care `ADSY_AI_MODEL` o înlocuiește. Fără cheie: `not_configured`.
-4. Contextul, citit tot cu sesiunea utilizatorului (RLS): `brand_metrics` pentru 18 metrici din registru, numele lor din `metric_definitions_current` și cel mult cinci analize **publicate** din `brand_insights`. Modelul vede doar ce vede utilizatorul. Nu primește mențiuni brute, răspunsuri AI brute, nume de autori, e-mailuri sau chei.
+4. Contextul, citit tot cu sesiunea utilizatorului (RLS): `brand_metrics` pentru 18 metrici din registru (cifrele ajung la model cu cel mult două zecimale; verificarea le acceptă și pe cele exacte), numele lor din `metric_definitions_current` și cel mult cinci analize **publicate** din `brand_insights`. Modelul vede doar ce vede utilizatorul. Nu primește mențiuni brute, răspunsuri AI brute, nume de autori, e-mailuri sau chei.
 5. Cache: aceeași întrebare, pe aceleași date, cu același model și aceeași versiune de prompt întoarce răspunsul salvat, fără apel și fără tokeni.
 6. Plafoane: tokenii lunii pe brand (`monthly_token_cap`) și 60 de cereri pe utilizator în 24 de ore. Depășire: `budget_exhausted`, respectiv `rate_limited`.
 7. Un singur apel `generateContent`, fără unelte, cu răspuns JSON după schemă.
@@ -69,8 +69,8 @@ Un răspuns e `ok` doar dacă:
 
 - JSON-ul respectă contractul;
 - fiecare `evidence_id` există în contextul trimis (`metric:<cheie>` sau `insight:<id>`), deci e al acestui brand și al acestei perioade;
-- fiecare cheie din `metric_keys` e printre dovezile citate;
-- **fiecare număr din text** se regăsește în dovezile citate (valoare, valoare de comparație, variație absolută sau relativă, rotunjite la zecimalele scrise), în întrebare, în anii ori lungimea perioadei sau în numele indicatorilor. Datele calendaristice sunt scoase din text înainte de verificare.
+- fiecare cheie din `metric_keys` e printre dovezile citate (cu sau fără prefixul `metric:`);
+- **fiecare număr din text** se regăsește în dovezile citate (valoare, valoare de comparație, variație absolută sau relativă, comparate la zecimalele scrise, cel mult patru), în întrebare, în anii ori lungimea perioadei sau în numele indicatorilor. Datele calendaristice sunt scoase din text înainte de verificare.
 
 Altfel:
 
@@ -87,7 +87,7 @@ Motivul intern al respingerii (`rejection_reason`) rămâne în `ai_requests`.
 
 `data_snapshot_id` = SHA-256 al contextului trimis modelului. `cache_key` = SHA-256 din tenant, brand, sarcină, `data_snapshot_id`, `model_id`, `prompt_version` și întrebarea normalizată. Căutarea în cache e mereu pe `tenant_id` și `brand_id`. Fiecare cerere are `prompt_tokens`, `output_tokens` (inclusiv tokenii de „gândire”) și `total_tokens`; cele din cache au zero.
 
-`model_id` și `prompt_version` nu sunt fixate în cod pentru totdeauna: modelul vine din `ADSY_AI_MODEL` sau din valoarea implicită, iar versiunea promptului (`chat-v2` la chat, `insight-v1` la ciorne) se schimbă odată cu promptul și intră în cheia de cache.
+`model_id` și `prompt_version` nu sunt fixate în cod pentru totdeauna: modelul vine din `ADSY_AI_MODEL` sau din valoarea implicită, iar versiunea promptului (`chat-v4` la chat, `insight-v2` la ciorne) se schimbă odată cu promptul și intră în cheia de cache.
 
 ## Ce pleacă spre furnizorul modelului
 
@@ -107,8 +107,8 @@ Ordinea verificărilor:
 
 1. Sesiunea, apoi `brand_ai_settings` cu sesiunea utilizatorului. `can_generate` fals (client): `403`. Politica fără generare sau fără afișare, ori preferința fără afișare: `ai_off`, fără nicio altă citire.
 2. Configurarea, apoi contextul: aceiași 18 indicatori ca la chat, **fără** analizele anterioare. Fără niciun indicator cu valoare: `insufficient_evidence`, fără apel.
-3. Cache pe `tenant_id`, `brand_id`, date, model și `insight-v1`: ciorna existentă se întoarce (`existing: true`); una ștearsă se reface din răspunsul salvat, cu o cerere nouă în jurnal, fără tokeni.
-4. Plafoanele, apelul către model, verificarea (`verifyDraft`): contractul JSON, cele patru texte completate, dovezi care sunt indicatori din context, cel mult trei recomandări cu prioritate 1–3 și **fiecare cifră din orice text** regăsită în indicatorii citați.
+3. Cache pe `tenant_id`, `brand_id`, date, model și `insight-v2`: ciorna existentă se întoarce (`existing: true`); una ștearsă se reface din răspunsul salvat, cu o cerere nouă în jurnal, fără tokeni.
+4. Plafoanele, apelul către model, verificarea (`verifyDraft`): contractul JSON, cele patru texte completate, dovezi care sunt indicatori din context, cel mult trei recomandări cu prioritate 1–3 și **fiecare cifră din orice text** regăsită în indicatorii citați. Dovezile ciornei sunt indicatorii cu valoare ale căror cifre apar în text; fără niciunul, ciorna nu se salvează.
 5. Jurnalul (`ai_requests`, `task = generate_insight`), apoi scrierea, **cu sesiunea utilizatorului**: `insights` (ciornă, `origin = adsy_ai`, `ai_request_id`), `evidence_links` (SEOmonitor cu `device = desktop`), `recommendations`. Dacă dovezile sau recomandările nu se pot scrie, ciorna se șterge.
 
 Funcția nu trimite nimic la review și nu publică nimic. Fluxul de după e cel din `docs/contracts/insights.md`.
@@ -157,7 +157,7 @@ Regimul E8. Întoarce cel mult `p_limit` (implicit 5, maximum 10) fragmente ale 
 
 ### În chat
 
-Funcția `adsy-ai` cheamă `brand_document_search` cu sesiunea utilizatorului și întrebarea lui. Fragmentele intră în `DATE.documents` (cel mult cinci, 1.500 de caractere fiecare), cu `evidence_id = doc:<fragment_id>`. În răspuns, dovada are `kind: "document"`, eticheta „titlu · secțiune” și `document_id`. Documentele intră în amprenta datelor, deci un document nou aprobat sau retras invalidează răspunsurile din cache. Promptul e `chat-v3`.
+Funcția `adsy-ai` cheamă `brand_document_search` cu sesiunea utilizatorului și întrebarea lui. Fragmentele intră în `DATE.documents` (cel mult cinci, 1.500 de caractere fiecare), cu `evidence_id = doc:<fragment_id>`. În răspuns, dovada are `kind: "document"`, eticheta „titlu · secțiune” și `document_id`. Documentele intră în amprenta datelor, deci un document nou aprobat sau retras invalidează răspunsurile din cache. Promptul e `chat-v4`.
 
 Spre furnizorul modelului pleacă, pe lângă cele de mai sus, textul fragmentelor potrivite întrebării. **Documentele nu trebuie să conțină date personale.**
 

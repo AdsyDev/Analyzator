@@ -117,6 +117,53 @@ describe('verifyAnswer', () => {
   })
 })
 
+describe('respingeri greșite găsite la verificarea pe live (12 nov. 2026)', () => {
+  const precise = () =>
+    buildContext({
+      brandName: 'Brand de test', period: { start: '2026-10-15', end: '2026-11-11' }, comparisonPeriod: { start: '2025-10-15', end: '2025-11-11' },
+      metrics: [
+        metric('gsc_clicks', { value: 1624, comparison_value: 1771, absolute_change: -147, relative_change: -8.300395256916996 }),
+        metric('ai_owned_citation_rate', { value: 26.373626373626376, unit: 'percent', comparison_value: 27.472527472527474, absolute_change: -1.098901098901098, relative_change: null }),
+        metric('gsc_ctr', { value: 2.345, unit: 'percent', comparison_value: 2.6, absolute_change: -0.255, relative_change: null }),
+      ],
+      definitions: [{ metric_key: 'gsc_clicks', name_ro: 'Clicks (Search Console)' }, { metric_key: 'ai_owned_citation_rate', name_ro: 'AI Owned Citation Rate' }, { metric_key: 'gsc_ctr', name_ro: 'CTR (Search Console)' }],
+      insights: [],
+    })
+  const answer = (o: Record<string, unknown>) => JSON.stringify({ finding_type: 'answer', summary: '', evidence_ids: [], metric_keys: [], limitations: '', proposed_action: null, ...o })
+
+  test('modelul primește cifrele cu cel mult două zecimale, nu cu 15', () => {
+    const sent = JSON.stringify(precise().data)
+    assert.ok(!sent.includes('8.300395256916996') && !sent.includes('26.373626373626376'))
+    assert.ok(sent.includes('"relative_change":-8.3') && sent.includes('"value":26.37') && sent.includes('"value":2.35'))
+  })
+
+  test('un număr copiat cu toate zecimalele e același cu valoarea lui din date', () => {
+    const a = verifyAnswer(answer({ summary: 'Clickurile au scăzut cu 8,300395256916996 % față de anul trecut.', evidence_ids: ['metric:gsc_clicks'], metric_keys: ['gsc_clicks'] }), precise(), 'q')
+    assert.equal(a.status, 'ok')
+    // Dar un număr diferit, scris tot cu multe zecimale, rămâne nesusținut.
+    const b = verifyAnswer(answer({ summary: 'Clickurile au scăzut cu 8,300895256916996 %.', evidence_ids: ['metric:gsc_clicks'], metric_keys: ['gsc_clicks'] }), precise(), 'q')
+    assert.equal(b.status, 'insufficient_evidence')
+  })
+
+  test('valoarea rotunjită trimisă modelului și cea exactă din bază sunt amândouă acceptate; alta, nu', () => {
+    const ok = (summary: string) => verifyAnswer(answer({ summary, evidence_ids: ['metric:gsc_ctr', 'metric:gsc_clicks'], metric_keys: [] }), precise(), 'q').status
+    assert.equal(ok('CTR-ul a fost 2,35 %.'), 'ok', 'valoarea trimisă (rotunjită în sus)')
+    assert.equal(ok('CTR-ul a fost 2,345 %.'), 'ok', 'valoarea exactă')
+    assert.equal(ok('Scăderea a fost de 8,3 %.'), 'ok')
+    assert.equal(ok('Scăderea a fost de 8,30 %.'), 'ok')
+    assert.equal(ok('CTR-ul a fost 2,36 %.'), 'insufficient_evidence')
+    assert.equal(ok('Scăderea a fost de 8,4 %.'), 'insufficient_evidence')
+  })
+
+  test('cheia scrisă cu prefixul „metric:” în metric_keys e aceeași cheie; una necitată rămâne refuzată', () => {
+    const cited = { summary: 'Rata de citare proprie a fost 26,37 %.', evidence_ids: ['metric:ai_owned_citation_rate'] }
+    assert.equal(verifyAnswer(answer({ ...cited, metric_keys: ['metric:ai_owned_citation_rate'] }), precise(), 'q').status, 'ok')
+    assert.equal(verifyAnswer(answer({ ...cited, metric_keys: ['ai_owned_citation_rate'] }), precise(), 'q').status, 'ok')
+    const extra = verifyAnswer(answer({ ...cited, metric_keys: ['metric:gsc_clicks'] }), precise(), 'q')
+    assert.deepEqual([extra.status, extra.reason], ['insufficient_evidence', 'uncited_metric:metric:gsc_clicks'])
+  })
+})
+
 describe('verificarea ciornei', () => {
   const draft = (o: Record<string, unknown> = {}) => JSON.stringify({
     finding_type: 'draft', title: 'Sesiuni în creștere', summary: 'Sesiunile au fost 21.611, față de 18.663.', interpretation: 'Poate fi efectul campaniilor; e o ipoteză.', limits: 'Fără date despre conversii.',
