@@ -2,7 +2,7 @@
 // Modelul vede doar ce poate vedea utilizatorul: datele sunt citite cu sesiunea lui, prin RLS. Răspunsul e acceptat doar dacă
 // fiecare dovadă citată există în context și fiecare număr din text se regăsește în dovezile citate.
 
-export const PROMPT_VERSION = 'chat-v5'
+export const PROMPT_VERSION = 'chat-v6'
 export const MAX_QUESTION = 1000
 const MAX_INSIGHTS = 5
 export const MAX_DOCUMENT_FRAGMENTS = 5
@@ -149,11 +149,13 @@ export function buildContext(input: {
   period: Period
   comparisonPeriod: Period | null
   metrics: MetricRow[]
-  definitions: Array<{ metric_key: string; name_ro: string }>
+  /** `direction` vine din registrul de metrici (`metric_definitions.direction`); fără el, sensul nu se presupune. */
+  definitions: Array<{ metric_key: string; name_ro: string; direction?: string | null }>
   insights: InsightRow[]
   documents?: DocumentRow[]
 }): ChatContext {
   const names = new Map(input.definitions.map((d) => [d.metric_key, clean(d.name_ro, 200)]))
+  const lowerIsBetter = new Set(input.definitions.filter((d) => d.direction === 'lower_is_better').map((d) => d.metric_key))
   const evidence = new Map<string, Evidence>()
   const metrics = input.metrics
     .filter((m) => CHAT_METRIC_KEYS.includes(m.metric_key) && names.has(m.metric_key))
@@ -175,6 +177,12 @@ export function buildContext(input: {
         evidence_id: id, name: names.get(m.metric_key), unit: clean(m.unit, 32), currency: m.currency ?? null, ...row,
         // Variația absolută a unui procent e în puncte procentuale; cea relativă e mereu în procente.
         ...(isPercent && row.absolute_change !== null ? { absolute_change_unit: 'puncte procentuale' } : {}),
+        ...(m.unit === 'position' && row.absolute_change !== null ? { absolute_change_unit: 'poziții' } : {}),
+        // La un indicator unde mai mic e mai bine (poziția medie), „a crescut” singur induce în eroare: modelul primește
+        // sensul din registru și ce înseamnă schimbarea, ca să nu-l deducă.
+        ...(lowerIsBetter.has(m.metric_key)
+          ? { better_when: 'mai mic', ...(exact.absolute_change ? { change_meaning: exact.absolute_change > 0 ? 'înrăutățire' : 'îmbunătățire' } : {}) }
+          : {}),
         status: clean(m.status, 32), data_as_of: m.data_as_of ?? null,
       }
     })
@@ -229,6 +237,7 @@ export const SYSTEM_PROMPT = [
   '10. Scrie numerele cu virgulă zecimală (53,3) și datele ca „14 oct. 2026”. Nu folosi numele tehnice din DATE (value, status, not_connected): spune pe românește ce înseamnă.',
   '11. documents, când există, conține fragmente din documentele aprobate de brand: ele arată ce afirmă brandul despre produs, nu ce s-a măsurat în piață. Când folosești un fragment, spune că vine din documentul aprobat și pune-i evidence_id în evidence_ids. Nu prezenta o afirmație din documents ca rezultat măsurat și nicio cifră din metrics ca afirmație a brandului.',
   '12. Când un indicator are absolute_change_unit = „puncte procentuale”, variația lui absolută se scrie „cu 5,24 puncte procentuale” sau „cu 5,24 p.p.”, niciodată „cu 5,24 %”. relative_change e mereu în procente.',
+  '13. Când un indicator are better_when = „mai mic” (de exemplu poziția medie), o valoare mai mare e mai slabă. Nu scrie doar „a crescut” sau „a scăzut”: spune ce arată change_meaning (înrăutățire sau îmbunătățire), cu valorile, de exemplu „poziția medie s-a înrăutățit de la 6,88 la 7,47, cu 0,59 poziții”.',
 ].join('\n')
 
 export const RESPONSE_SCHEMA = {
@@ -339,7 +348,7 @@ export function verifyAnswer(raw: string, ctx: ChatContext, question: string): A
 
 // Ciorne de analiză generate (Etapa 4, deciziile O) ------------------------------------------------------------------------
 
-export const GENERATE_PROMPT_VERSION = 'insight-v3'
+export const GENERATE_PROMPT_VERSION = 'insight-v4'
 /** Câți indicatori i se cer modelului cel mult: o analiză alege ce contează, nu înșiră tot registrul. */
 export const MAX_DRAFT_EVIDENCE = 6
 export const MAX_DRAFT_RECOMMENDATIONS = 3
@@ -362,6 +371,7 @@ export const GENERATE_SYSTEM_PROMPT = [
   '10. Scrie în română, cu diacritice, fără formatare. summary și interpretation au cel mult 90 de cuvinte fiecare.',
   '11. Scrie numerele cu virgulă zecimală (53,3) și procentele cu semnul % (53,3 %), iar datele ca „14 oct. 2026”. Folosește numele indicatorilor așa cum apar în DATE (name). Nu folosi numele tehnice (value, status, not_connected): spune pe românește ce înseamnă.',
   '12. Când un indicator are absolute_change_unit = „puncte procentuale”, variația lui absolută se scrie „cu 5,24 puncte procentuale” sau „cu 5,24 p.p.”, niciodată „cu 5,24 %”. relative_change e mereu în procente.',
+  '13. Când un indicator are better_when = „mai mic” (de exemplu poziția medie), o valoare mai mare e mai slabă. Nu scrie doar „a crescut” sau „a scăzut”: spune ce arată change_meaning (înrăutățire sau îmbunătățire), cu valorile, de exemplu „poziția medie s-a înrăutățit de la 6,88 la 7,47, cu 0,59 poziții”.',
 ].join('\n')
 
 export const DRAFT_SCHEMA = {

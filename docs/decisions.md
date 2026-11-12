@@ -385,3 +385,18 @@ A treia verificare pe live a trecut 30 din 30, dar ciorna generată scria „Men
 | V-5 | Ce nu acoperă | — | Unitățile celorlalți indicatori (secunde, poziții, lei) nu se verifică; o cifră rotunjită la întreg care coincide cu altă variație poate fi oprită pe nedrept (rar; se vede în jurnal ca `points_as_percent`). Analizele scrise de om nu trec prin această verificare. |
 | V-6 | Impact | — | Timp: sub o oră, fără schimbare de schemă și fără interfață. Cost: o rulare de verificare pe live (circa 20.000 de tokeni). |
 
+## W — AdSy AI: la poziția medie, schimbarea se numește înrăutățire sau îmbunătățire (2026-11-12)
+
+La verificarea de după V, chatul a scris „Poziția medie în Search Console a fost 7,47, în creștere cu 0,59”. Cifrele sunt corecte, dar la poziție o valoare mai mare e mai slabă, iar „în creștere” se citește ca veste bună. Cererea proprietarului produsului: „corectează și formularea la poziția medie”.
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| W-1 | De unde vine sensul | (a) o listă de chei în codul funcției; (b) `metric_definitions.direction` | **(b).** Registrul spune deja, pentru fiecare metrică, dacă mai mare sau mai mic e mai bine (interfața colorează variațiile după el). Funcția îl citește odată cu numele, cu sesiunea utilizatorului. Dacă lipsește, nu se presupune nimic. |
+| W-2 | Ce primește modelul | (a) doar sensul; (b) sensul și ce înseamnă schimbarea | **(b).** `better_when: "mai mic"` și, la o variație diferită de zero, `change_meaning` („înrăutățire” sau „îmbunătățire”), calculat pe server din semnul variației. Un model mic greșește mai rar când nu trebuie să deducă. Fără variație sau cu variație zero nu se trimite `change_meaning`. Poziția primește și `absolute_change_unit: "poziții"`. |
+| W-3 | Indicatorii unde mai mare e mai bine | (a) primesc și ei sensul; (b) nimic în plus | **(b).** „A crescut” e deja limpede acolo, iar un sens trimis peste tot ar împinge modelul să judece fiecare cifră în constatare, care trebuie să rămână fără interpretare. |
+| W-4 | Verificare pe server | (a) respinge textul care spune „a crescut” la poziție; (b) doar date și prompt | **(b).** Spre deosebire de unitatea variației (V-3), aici nu e un tipar sigur: aceeași propoziție poate vorbi despre mai mulți indicatori, iar „a crescut” lângă poziție nu e fals, doar neclar. O regulă pe cuvinte ar respinge răspunsuri corecte. Rămâne în seama promptului și a revizuirii de către om. |
+| W-5 | Prompturile | — | `chat-v6` și `insight-v4`: la un indicator cu `better_when = „mai mic”`, textul nu scrie doar „a crescut” sau „a scăzut”, ci spune ce arată `change_meaning`, cu valorile. Răspunsurile vechi din cache nu se mai refolosesc. |
+| W-6 | Verificarea pe live | — | O întrebare în plus, despre poziția medie, ca formularea să se vadă la fiecare rulare (31 de verificări în loc de 30). Se judecă de mână: scriptul nu pică pe cuvinte. |
+| W-7 | Ce nu acoperă | — | Dintre cei 18 indicatori ai chatului, doar poziția medie e `lower_is_better`. Costurile de reclame și numărul de mențiuni sunt `neutral` în registru și rămân formulate neutru; ceilalți 13 sunt `higher_is_better`. |
+| W-8 | Impact | — | Timp: sub o oră, fără schimbare de schemă și fără interfață. Cost: o rulare de verificare pe live (circa 23.000 de tokeni). |
+

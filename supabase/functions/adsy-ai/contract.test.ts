@@ -254,6 +254,56 @@ describe('unitatea variației: puncte procentuale, nu procente (verificarea pe l
   })
 })
 
+describe('sensul indicatorului: la poziția medie, mai mic e mai bine (verificarea pe live din 12 nov. 2026)', () => {
+  // Cazul găsit pe live: „Poziția medie a fost 7,47, în creștere cu 0,59”, fără să spună că e o înrăutățire.
+  const position = (o: Partial<MetricRow> = {}) => metric('gsc_average_position', { value: 7.47, unit: 'position', comparison_value: 6.88, absolute_change: 0.59, relative_change: 8.58, ...o })
+  const rows = (metrics: MetricRow[], known: { direction?: string | null } = { direction: 'lower_is_better' }) =>
+    buildContext({
+      brandName: 'B', period: { start: '2026-10-15', end: '2026-11-11' }, comparisonPeriod: { start: '2026-09-17', end: '2026-10-14' }, metrics,
+      definitions: [{ metric_key: 'gsc_average_position', name_ro: 'Poziția medie (Search Console)', ...known }, { metric_key: 'ga4_sessions', name_ro: 'Sesiuni', direction: 'higher_is_better' }, { metric_key: 'mentions_count', name_ro: 'Mențiuni', direction: 'neutral' }],
+      insights: [],
+    }).data.metrics as Array<Record<string, unknown>>
+
+  test('modelul primește sensul din registru, ce înseamnă schimbarea și unitatea variației', () => {
+    const [worse] = rows([position()])
+    assert.deepEqual([worse!.better_when, worse!.change_meaning, worse!.absolute_change_unit], ['mai mic', 'înrăutățire', 'poziții'])
+    const [better] = rows([position({ value: 6.2, comparison_value: 6.88, absolute_change: -0.68, relative_change: -9.88 })])
+    assert.deepEqual([better!.better_when, better!.change_meaning], ['mai mic', 'îmbunătățire'])
+  })
+
+  test('fără variație sau cu variație zero nu se afirmă nimic despre schimbare: null și 0 rămân stări diferite de „mai bine”', () => {
+    const [none] = rows([position({ comparison_value: null, absolute_change: null, relative_change: null })])
+    assert.deepEqual([none!.better_when, 'change_meaning' in none!, 'absolute_change_unit' in none!], ['mai mic', false, false])
+    const [flat] = rows([position({ comparison_value: 7.47, absolute_change: 0, relative_change: 0 })])
+    assert.deepEqual([flat!.better_when, 'change_meaning' in flat!, flat!.absolute_change_unit], ['mai mic', false, 'poziții'])
+  })
+
+  test('indicatorii unde mai mare e mai bine sau fără sens bun nu primesc nimic în plus; sensul nu se presupune când lipsește din registru', () => {
+    for (const m of rows([metric('ga4_sessions'), metric('mentions_count')])) assert.deepEqual(['better_when' in m, 'change_meaning' in m], [false, false])
+    for (const missing of [{ direction: null }, {}]) {
+      const [m] = rows([position()], missing)
+      assert.deepEqual(['better_when' in m!, 'change_meaning' in m!, m!.absolute_change_unit], [false, false, 'poziții'])
+    }
+  })
+
+  test('ambele prompturi cer ca schimbarea să fie numită înrăutățire sau îmbunătățire, nu doar „a crescut”', () => {
+    for (const p of [SYSTEM_PROMPT, GENERATE_SYSTEM_PROMPT]) {
+      assert.ok(p.includes('better_when = „mai mic”'))
+      assert.ok(p.includes('change_meaning'))
+      assert.ok(p.includes('Nu scrie doar „a crescut” sau „a scăzut”'))
+    }
+  })
+
+  test('formularea cerută trece de verificarea cifrelor', () => {
+    const c = buildContext({
+      brandName: 'B', period: { start: '2026-10-15', end: '2026-11-11' }, comparisonPeriod: { start: '2026-09-17', end: '2026-10-14' }, metrics: [position()],
+      definitions: [{ metric_key: 'gsc_average_position', name_ro: 'Poziția medie (Search Console)', direction: 'lower_is_better' }], insights: [],
+    })
+    const a = verifyAnswer(answer({ summary: 'Poziția medie s-a înrăutățit de la 6,88 la 7,47, cu 0,59 poziții.', evidence_ids: ['metric:gsc_average_position'], metric_keys: ['gsc_average_position'] }), c, 'Cum a evoluat poziția medie?')
+    assert.equal(a.status, 'ok')
+  })
+})
+
 describe('verificarea ciornei', () => {
   const draft = (o: Record<string, unknown> = {}) => JSON.stringify({
     finding_type: 'draft', title: 'Sesiuni în creștere', summary: 'Sesiunile au fost 21.611, față de 18.663.', interpretation: 'Poate fi efectul campaniilor; e o ipoteză.', limits: 'Fără date despre conversii.',
