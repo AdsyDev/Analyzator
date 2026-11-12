@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildContext, GENERATE_SYSTEM_PROMPT, MAX_DRAFT_EVIDENCE, numbersIn, sha256Hex, SYSTEM_PROMPT, userPrompt, verifyAnswer, verifyDraft, withoutDates, type MetricRow } from './contract.ts'
+import { buildContext, GENERATE_SYSTEM_PROMPT, MAX_DRAFT_EVIDENCE, numbersIn, pointsWrittenAsPercent, sha256Hex, SYSTEM_PROMPT, userPrompt, verifyAnswer, verifyDraft, withoutDates, type MetricRow } from './contract.ts'
 
 const metric = (key: string, o: Partial<MetricRow> = {}): MetricRow => ({ metric_key: key, value: 21611, unit: 'count', comparison_value: 18663, absolute_change: 2948, relative_change: 15.8, status: 'ok', data_as_of: '2026-11-09', ...o })
 const ctx = (extra: { insights?: Parameters<typeof buildContext>[0]['insights'] } = {}) =>
@@ -161,6 +161,96 @@ describe('respingeri greșite găsite la verificarea pe live (12 nov. 2026)', ()
     assert.equal(verifyAnswer(answer({ ...cited, metric_keys: ['ai_owned_citation_rate'] }), precise(), 'q').status, 'ok')
     const extra = verifyAnswer(answer({ ...cited, metric_keys: ['metric:gsc_clicks'] }), precise(), 'q')
     assert.deepEqual([extra.status, extra.reason], ['insufficient_evidence', 'uncited_metric:metric:gsc_clicks'])
+  })
+})
+
+describe('unitatea variației: puncte procentuale, nu procente (verificarea pe live din 12 nov. 2026)', () => {
+  // Cazul găsit pe live: rata a urcat de la 32,81 % la 38,05 %, adică 5,24 puncte procentuale, iar ciorna scria „cu 5,24 %”.
+  const rates = () =>
+    buildContext({
+      brandName: 'Brand de test',
+      period: { start: '2026-10-14', end: '2026-11-10' },
+      comparisonPeriod: { start: '2026-09-16', end: '2026-10-13' },
+      metrics: [
+        metric('ai_mention_rate', { value: 38.05, unit: 'percent', comparison_value: 32.81, absolute_change: 5.24, relative_change: 15.97 }),
+        metric('gsc_ctr', { value: 2.5, unit: 'percent', comparison_value: 2.6, absolute_change: -0.1, relative_change: -3.85 }),
+        metric('ga4_sessions'),
+      ],
+      definitions: [{ metric_key: 'ai_mention_rate', name_ro: 'AI Overviews: Mention Rate' }, { metric_key: 'gsc_ctr', name_ro: 'CTR (Search Console)' }, { metric_key: 'ga4_sessions', name_ro: 'Sesiuni' }],
+      insights: [],
+    })
+  const rate = (summary: string, o: Record<string, unknown> = {}) => answer({ summary, evidence_ids: ['metric:ai_mention_rate'], metric_keys: ['ai_mention_rate'], ...o })
+  const draft = (summary: string, o: Record<string, unknown> = {}) => JSON.stringify({
+    finding_type: 'draft', title: 'Mention Rate în creștere', summary, interpretation: 'Poate fi efectul conținutului nou; e o ipoteză.', limits: 'Fără date despre conversii.',
+    evidence_ids: ['metric:ai_mention_rate'], recommendations: [], ...o,
+  })
+
+  test('modelul primește unitatea variației doar la indicatorii în procente care au variație', () => {
+    const rows = (c: ReturnType<typeof buildContext>) => c.data.metrics as Array<Record<string, unknown>>
+    const by = (id: string) => rows(rates()).find((m) => m.evidence_id === id)!
+    assert.equal(by('metric:ai_mention_rate').absolute_change_unit, 'puncte procentuale')
+    assert.equal(by('metric:gsc_ctr').absolute_change_unit, 'puncte procentuale')
+    assert.equal('absolute_change_unit' in by('metric:ga4_sessions'), false)
+    const none = buildContext({ brandName: 'B', period: { start: '2026-10-14', end: '2026-11-10' }, comparisonPeriod: null, metrics: [metric('gsc_ctr', { value: 2.5, unit: 'percent', comparison_value: null, absolute_change: null, relative_change: null })], definitions: [{ metric_key: 'gsc_ctr', name_ro: 'CTR' }], insights: [] })
+    assert.equal('absolute_change_unit' in rows(none)[0]!, false)
+  })
+
+  test('ambele prompturi cer „puncte procentuale” sau „p.p.” pentru variația unui procent', () => {
+    for (const p of [SYSTEM_PROMPT, GENERATE_SYSTEM_PROMPT]) {
+      assert.ok(p.includes('absolute_change_unit'))
+      assert.ok(p.includes('p.p.'))
+      assert.ok(p.includes('niciodată „cu 5,24 %”'))
+    }
+  })
+
+  test('ciorna care scrie variația în puncte procentuale ca procent e oprită', () => {
+    const d = verifyDraft(draft('AI Overviews: Mention Rate a crescut cu 5,24 %, ajungând la 38,05 %.'), rates())
+    assert.deepEqual([d.status, d.reason, d.title], ['insufficient_evidence', 'points_as_percent:5,24', ''])
+    for (const wrong of ['a crescut cu 5,24%', 'a crescut cu 5,24\u00a0%', 'a crescut cu 5,24 la sută', 'a crescut cu 5,24 procente', 'a crescut cu 5.24 %']) {
+      assert.equal(verifyDraft(draft(`Mention Rate ${wrong}.`), rates()).status, 'insufficient_evidence', wrong)
+    }
+    const inInterpretation = verifyDraft(draft('Mention Rate a ajuns la 38,05 %.', { interpretation: 'Creșterea de 5,24 % poate veni din conținutul nou; e o ipoteză.' }), rates())
+    assert.equal(inInterpretation.reason, 'points_as_percent:5,24')
+  })
+
+  test('formulările corecte trec: puncte procentuale, p.p., valoarea ratei și variația relativă în procente', () => {
+    for (const right of [
+      'Mention Rate a crescut cu 5,24 puncte procentuale, ajungând la 38,05 %.',
+      'Mention Rate a crescut cu 5,24 p.p., de la 32,81 % la 38,05 %.',
+      'Mention Rate a ajuns la 38,05 %, cu 15,97 % peste perioada anterioară.',
+      'Mention Rate a urcat cu 5,24 puncte (15,97 %).',
+    ]) {
+      const d = verifyDraft(draft(right), rates())
+      assert.deepEqual([d.status, d.metric_keys], ['ok', ['ai_mention_rate']], right)
+    }
+  })
+
+  test('și răspunsul din chat e oprit, inclusiv la o scădere și în pasul propus', () => {
+    const up = verifyAnswer(rate('Mention Rate a crescut cu 5,24 %.'), rates(), 'Cum a mers Mention Rate?')
+    assert.deepEqual([up.status, up.reason], ['insufficient_evidence', 'points_as_percent:5,24'])
+    const down = verifyAnswer(answer({ summary: 'CTR-ul a scăzut cu 0,1 %.', evidence_ids: ['metric:gsc_ctr'], metric_keys: ['gsc_ctr'] }), rates(), 'Cum a mers CTR-ul?')
+    assert.equal(down.reason, 'points_as_percent:0,1')
+    const action = verifyAnswer(rate('Mention Rate a ajuns la 38,05 %.', { proposed_action: 'De verificat de ce a urcat cu 5,24 %.' }), rates(), 'Cum a mers Mention Rate?')
+    assert.equal(action.reason, 'points_as_percent:5,24')
+    const ok = verifyAnswer(rate('Mention Rate a crescut cu 5,24 p.p., până la 38,05 %.'), rates(), 'Cum a mers Mention Rate?')
+    assert.equal(ok.status, 'ok')
+  })
+
+  test('variația unui indicator care nu e procent rămâne în unitatea lui; cea relativă e în procente', () => {
+    const d = verifyAnswer(answer({ summary: 'Sesiunile au crescut cu 2.948, adică 15,8 %.' }), rates(), 'Cum au mers sesiunile?')
+    assert.equal(d.status, 'ok')
+  })
+
+  test('un număr care e și procent adevărat într-o dovadă citată nu e socotit greșit', () => {
+    // Variația în puncte a unei rate (5,24) coincide cu variația relativă a altui indicator citat.
+    const c = buildContext({
+      brandName: 'B', period: { start: '2026-10-14', end: '2026-11-10' }, comparisonPeriod: { start: '2026-09-16', end: '2026-10-13' },
+      metrics: [metric('ai_mention_rate', { value: 38.05, unit: 'percent', comparison_value: 32.81, absolute_change: 5.24, relative_change: 15.97 }), metric('ga4_sessions', { value: 1052.4, comparison_value: 1000, absolute_change: 52.4, relative_change: 5.24 })],
+      definitions: [{ metric_key: 'ai_mention_rate', name_ro: 'Mention Rate' }, { metric_key: 'ga4_sessions', name_ro: 'Sesiuni' }], insights: [],
+    })
+    const all = [...c.evidence.values()]
+    assert.equal(pointsWrittenAsPercent('Sesiunile au crescut cu 5,24 %.', all), null)
+    assert.equal(pointsWrittenAsPercent('Rata a crescut cu 5,24 %.', all.filter((e) => e.id === 'metric:ai_mention_rate')), '5,24')
   })
 })
 
