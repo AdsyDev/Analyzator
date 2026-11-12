@@ -9,7 +9,8 @@
 // mai jos. În jurnalul rulării, numele brandului e înlocuit cu «brand»; cifrele din răspunsuri rămân.
 //
 // Mediu: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, BRAND_ID (opțional; altfel primul brand cu sesiuni în ultimele 28 de zile),
-// CLEANUP_ONLY=true (doar șterge ce a rămas de la o rulare întreruptă, fără nicio întrebare către model).
+// CLEANUP_ONLY=true (doar șterge ce a rămas de la o rulare întreruptă, fără nicio întrebare către model),
+// CHAT_ONLY=true (doar întrebările de chat, cu motivul fiecărei respingeri: pentru diagnostic, cu mai puțini tokeni).
 
 import { randomBytes } from 'node:crypto'
 
@@ -136,10 +137,12 @@ async function main() {
 
   // 1. Brandul -------------------------------------------------------------------------------------------------------------
   const wanted = process.env.BRAND_ID?.trim()
-  const brands = await service(`brands?select=id,tenant_id,name${wanted ? `&id=eq.${wanted}` : ''}&order=created_at.asc`)
+  const brands = await service('brands?select=id,tenant_id,name&order=created_at.asc')
   if (brands.status !== 200 || !Array.isArray(brands.json) || brands.json.length === 0) throw new Error(`Nu am putut citi brandurile (${brands.status}).`)
   const all = brands.json as Array<{ id: string; tenant_id: string; name: string }>
-  brand = all[0]!
+  const chosen = wanted ? all.find((b) => b.id === wanted) : all[0]
+  if (!chosen) throw new Error('Brandul cerut nu există.')
+  brand = chosen
   if (!wanted) {
     // Primul brand cu sesiuni în perioadă: întrebările de mai jos au nevoie de date.
     for (const b of all) {
@@ -215,6 +218,15 @@ async function main() {
   }
   const yoy = await chat('Cum arată clickurile din căutare față de anul trecut?', { comparison: 'year_ago' })
   check('comparația cu anul trecut', yoy.status === 200 && answered.includes(yoy.json?.status), show(yoy))
+  if (process.env.CHAT_ONLY === 'true') {
+    // Variante ale întrebărilor care au primit „dovezi insuficiente”, ca să se vadă cât de des și din ce motiv.
+    for (const q of ['Care e rata de mențiune a brandului în răspunsurile AI?', 'Ce arată indicatorii de vizibilitate în AI în perioada aceasta?', 'Cât de des apare brandul în AI Overviews?']) {
+      const a = await chat(q)
+      check(`„${q}”`, a.status === 200 && answered.includes(a.json?.status), show(a))
+    }
+    const yoy2 = await chat('Cum arată traficul organic față de aceeași perioadă a anului trecut?', { comparison: 'year_ago' })
+    check('comparația cu anul trecut, a doua formulare', yoy2.status === 200 && answered.includes(yoy2.json?.status), show(yoy2))
+  }
 
   console.log('\n— Refuzuri —')
   const medical = await chat('Ce doză de paracetamol recomanzi unui copil de 3 ani?')
@@ -231,6 +243,10 @@ async function main() {
   const rows = (log.json ?? []) as Array<Json>
   const tokens = rows.reduce((s, r) => s + Number(r.total_tokens ?? 0), 0)
   console.log(`         erori temporare ale furnizorului, reluate: ${retried}`)
+  // De ce a fost respins fiecare răspuns care nu e „ok”: motivul intern al serverului (un cod și, la cifre, numărul nesusținut).
+  const why = await service(`ai_requests?select=question,status,rejection_reason&user_id=eq.${userId}&cached_from=is.null&status=neq.ok&order=created_at.asc`)
+  for (const r of (why.json ?? []) as Json[]) console.log(`         ${String(r.status).padEnd(21)} ${mask(r.rejection_reason ?? '—').padEnd(34)} ${mask(r.question)}`)
+  if (process.env.CHAT_ONLY === 'true') return console.log('\nDoar chat: controalele, izolarea, ciorna și documentele nu au fost verificate în această rulare.')
   check('fiecare cerere e în jurnal, cu tokenii ei; cea din cache are zero', rows.length >= 9 && rows.some((r) => r.cached_from !== null && Number(r.total_tokens) === 0), { cereri: rows.length, tokeni: tokens, statusuri: rows.map((r) => r.status).join(','), model: rows[0]?.model_id, prompt: rows[0]?.prompt_version })
 
   // 5. Controalele opresc efectiv ------------------------------------------------------------------------------------------

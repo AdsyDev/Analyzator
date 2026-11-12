@@ -23,6 +23,10 @@ on:
         description: 'Doar șterge urmele unei rulări întrerupte (fără întrebări către model)'
         type: boolean
         default: false
+      chat_only:
+        description: 'Doar întrebările de chat, cu motivul fiecărei respingeri (diagnostic)'
+        type: boolean
+        default: false
   push:
     branches: ['claude/hopeful-heisenberg-9lc7tv']
     paths: ['.github/adsy-ai-live-check.trigger']
@@ -57,6 +61,8 @@ jobs:
           # Fișierul-martor poate cere doar curățarea urmelor unei rulări întrerupte.
           if grep -q '^cleanup-only' .github/adsy-ai-live-check.trigger 2>/dev/null && [ "${{ github.event_name }}" = "push" ]; then export CLEANUP_ONLY=true; fi
           if [ "${{ inputs.cleanup_only }}" = "true" ]; then export CLEANUP_ONLY=true; fi
+          if grep -q '^chat-only' .github/adsy-ai-live-check.trigger 2>/dev/null && [ "${{ github.event_name }}" = "push" ]; then export CHAT_ONLY=true; fi
+          if [ "${{ inputs.chat_only }}" = "true" ]; then export CHAT_ONLY=true; fi
           set -o pipefail
           node --experimental-strip-types scripts/adsy-ai-live-check.ts | tee check.log
       - name: Rezumat
@@ -66,6 +72,6 @@ jobs:
             echo "### Verificare AdSy AI: $(date -u +%Y-%m-%dT%H:%MZ)"
             echo
             echo '```'
-            [ -f check.log ] && grep -E '^(ok|PICAT|ATENȚIE|Rezultat|Rămas|Tokeni|Brand verificat|Doar curățare|— )' check.log || echo "fără output"
+            [ -f check.log ] && grep -E '^(ok|PICAT|ATENȚIE|Rezultat|Rămas|Tokeni|Brand verificat|Doar curățare|Doar chat|— )' check.log || echo "fără output"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

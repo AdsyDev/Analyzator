@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildContext, numbersIn, sha256Hex, SYSTEM_PROMPT, userPrompt, verifyAnswer, withoutDates, type MetricRow } from './contract.ts'
+import { buildContext, GENERATE_SYSTEM_PROMPT, MAX_DRAFT_EVIDENCE, numbersIn, sha256Hex, SYSTEM_PROMPT, userPrompt, verifyAnswer, verifyDraft, withoutDates, type MetricRow } from './contract.ts'
 
 const metric = (key: string, o: Partial<MetricRow> = {}): MetricRow => ({ metric_key: key, value: 21611, unit: 'count', comparison_value: 18663, absolute_change: 2948, relative_change: 15.8, status: 'ok', data_as_of: '2026-11-09', ...o })
 const ctx = (extra: { insights?: Parameters<typeof buildContext>[0]['insights'] } = {}) =>
@@ -114,6 +114,90 @@ describe('verifyAnswer', () => {
     for (const raw of ['nu e json', '[]', '{}', answer({ finding_type: 'altceva' }), answer({ evidence_ids: 'metric:ga4_sessions' }), answer({ summary: 5 }), answer({ proposed_action: { x: 1 } }), answer({ summary: '   ' })]) {
       assert.equal(verifyAnswer(raw, ctx(), 'q?').status, 'rejected', raw.slice(0, 40))
     }
+  })
+})
+
+describe('respingeri greșite găsite la verificarea pe live (12 nov. 2026)', () => {
+  const precise = () =>
+    buildContext({
+      brandName: 'Brand de test', period: { start: '2026-10-15', end: '2026-11-11' }, comparisonPeriod: { start: '2025-10-15', end: '2025-11-11' },
+      metrics: [
+        metric('gsc_clicks', { value: 1624, comparison_value: 1771, absolute_change: -147, relative_change: -8.300395256916996 }),
+        metric('ai_owned_citation_rate', { value: 26.373626373626376, unit: 'percent', comparison_value: 27.472527472527474, absolute_change: -1.098901098901098, relative_change: null }),
+        metric('gsc_ctr', { value: 2.345, unit: 'percent', comparison_value: 2.6, absolute_change: -0.255, relative_change: null }),
+      ],
+      definitions: [{ metric_key: 'gsc_clicks', name_ro: 'Clicks (Search Console)' }, { metric_key: 'ai_owned_citation_rate', name_ro: 'AI Owned Citation Rate' }, { metric_key: 'gsc_ctr', name_ro: 'CTR (Search Console)' }],
+      insights: [],
+    })
+  const answer = (o: Record<string, unknown>) => JSON.stringify({ finding_type: 'answer', summary: '', evidence_ids: [], metric_keys: [], limitations: '', proposed_action: null, ...o })
+
+  test('modelul primește cifrele cu cel mult două zecimale, nu cu 15', () => {
+    const sent = JSON.stringify(precise().data)
+    assert.ok(!sent.includes('8.300395256916996') && !sent.includes('26.373626373626376'))
+    assert.ok(sent.includes('"relative_change":-8.3') && sent.includes('"value":26.37') && sent.includes('"value":2.35'))
+  })
+
+  test('un număr copiat cu toate zecimalele e același cu valoarea lui din date', () => {
+    const a = verifyAnswer(answer({ summary: 'Clickurile au scăzut cu 8,300395256916996 % față de anul trecut.', evidence_ids: ['metric:gsc_clicks'], metric_keys: ['gsc_clicks'] }), precise(), 'q')
+    assert.equal(a.status, 'ok')
+    // Dar un număr diferit, scris tot cu multe zecimale, rămâne nesusținut.
+    const b = verifyAnswer(answer({ summary: 'Clickurile au scăzut cu 8,300895256916996 %.', evidence_ids: ['metric:gsc_clicks'], metric_keys: ['gsc_clicks'] }), precise(), 'q')
+    assert.equal(b.status, 'insufficient_evidence')
+  })
+
+  test('valoarea rotunjită trimisă modelului și cea exactă din bază sunt amândouă acceptate; alta, nu', () => {
+    const ok = (summary: string) => verifyAnswer(answer({ summary, evidence_ids: ['metric:gsc_ctr', 'metric:gsc_clicks'], metric_keys: [] }), precise(), 'q').status
+    assert.equal(ok('CTR-ul a fost 2,35 %.'), 'ok', 'valoarea trimisă (rotunjită în sus)')
+    assert.equal(ok('CTR-ul a fost 2,345 %.'), 'ok', 'valoarea exactă')
+    assert.equal(ok('Scăderea a fost de 8,3 %.'), 'ok')
+    assert.equal(ok('Scăderea a fost de 8,30 %.'), 'ok')
+    assert.equal(ok('CTR-ul a fost 2,36 %.'), 'insufficient_evidence')
+    assert.equal(ok('Scăderea a fost de 8,4 %.'), 'insufficient_evidence')
+  })
+
+  test('cheia scrisă cu prefixul „metric:” în metric_keys e aceeași cheie; una necitată rămâne refuzată', () => {
+    const cited = { summary: 'Rata de citare proprie a fost 26,37 %.', evidence_ids: ['metric:ai_owned_citation_rate'] }
+    assert.equal(verifyAnswer(answer({ ...cited, metric_keys: ['metric:ai_owned_citation_rate'] }), precise(), 'q').status, 'ok')
+    assert.equal(verifyAnswer(answer({ ...cited, metric_keys: ['ai_owned_citation_rate'] }), precise(), 'q').status, 'ok')
+    const extra = verifyAnswer(answer({ ...cited, metric_keys: ['metric:gsc_clicks'] }), precise(), 'q')
+    assert.deepEqual([extra.status, extra.reason], ['insufficient_evidence', 'uncited_metric:metric:gsc_clicks'])
+  })
+})
+
+describe('verificarea ciornei', () => {
+  const draft = (o: Record<string, unknown> = {}) => JSON.stringify({
+    finding_type: 'draft', title: 'Sesiuni în creștere', summary: 'Sesiunile au fost 21.611, față de 18.663.', interpretation: 'Poate fi efectul campaniilor; e o ipoteză.', limits: 'Fără date despre conversii.',
+    evidence_ids: ['metric:ga4_sessions'], recommendations: [], ...o,
+  })
+
+  test('dovezile ciornei sunt indicatorii ale căror cifre apar în text; unul citat, dar nefolosit, e lăsat deoparte', () => {
+    const d = verifyDraft(draft({ evidence_ids: ['metric:ga4_sessions', 'metric:gsc_ctr'] }), ctx())
+    assert.deepEqual([d.status, d.metric_keys], ['ok', ['ga4_sessions']])
+    const both = verifyDraft(draft({ summary: 'Sesiunile au fost 21.611, iar CTR-ul a fost 2,5 %.', evidence_ids: ['metric:ga4_sessions', 'metric:gsc_ctr'] }), ctx())
+    assert.deepEqual(both.metric_keys, ['ga4_sessions', 'gsc_ctr'])
+  })
+
+  test('un indicator fără valoare nu devine dovadă, chiar dacă modelul îl citează ca să spună că lipsește', () => {
+    const d = verifyDraft(draft({ limits: 'Key events nu au date.', evidence_ids: ['metric:ga4_sessions', 'metric:ga4_key_events'] }), ctx())
+    assert.deepEqual([d.status, d.metric_keys], ['ok', ['ga4_sessions']])
+    const none = verifyDraft(draft({ summary: 'Key events nu au date.', evidence_ids: ['metric:ga4_key_events'] }), ctx())
+    assert.deepEqual([none.status, none.reason, none.title], ['insufficient_evidence', 'no_evidence_with_values', ''])
+  })
+
+  test('o ciornă fără nicio cifră păstrează indicatorii citați care au valori', () => {
+    const d = verifyDraft(draft({ title: 'Trafic în creștere', summary: 'Sesiunile au crescut față de perioada anterioară.', evidence_ids: ['metric:ga4_sessions', 'metric:gsc_ctr', 'metric:ga4_key_events'] }), ctx())
+    assert.deepEqual([d.status, d.metric_keys], ['ok', ['ga4_sessions', 'gsc_ctr']])
+  })
+
+  test('o cifră a unui indicator necitat tot oprește ciorna', () => {
+    const d = verifyDraft(draft({ summary: 'Sesiunile au fost 21.611, iar CTR-ul a fost 2,5 %.' }), ctx())
+    assert.deepEqual([d.status, d.reason], ['insufficient_evidence', 'unverified_number:2,5'])
+  })
+
+  test('promptul cere alegerea a cel mult câțiva indicatori, un titlu fără numele brandului și niciun indicator fără date', () => {
+    assert.ok(GENERATE_SYSTEM_PROMPT.includes(`cel mult ${MAX_DRAFT_EVIDENCE} indicatori`))
+    assert.ok(GENERATE_SYSTEM_PROMPT.includes('Fără numele brandului'))
+    assert.ok(GENERATE_SYSTEM_PROMPT.includes('Nu îl cita'))
   })
 })
 
