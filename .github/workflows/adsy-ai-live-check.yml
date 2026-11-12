@@ -1,0 +1,64 @@
+# Verificarea AdSy AI pe aplicația live, cap la cap (scripts/adsy-ai-live-check.ts).
+#
+# Creează un cont temporar (strategist, acces la un singur brand), pornește politica AdSy AI a brandului doar pe durata
+# verificării, pune întrebări reale modelului, verifică refuzurile, cache-ul, controalele și generarea unei ciorne, apoi
+# șterge tot ce a creat și readuce politica la starea dinainte. Datele agregate ale brandului ajung la furnizorul modelului.
+#
+# Se rulează doar manual. Declanșarea prin push există ca să poată fi rulat de pe ramura de lucru înainte de a ajunge în
+# main: pornește numai când se schimbă fișierul-martor de mai jos.
+#
+# Secrete în environment-ul „staging": SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Cheia modelului NU e aici: stă în secretele
+# funcției din Supabase, iar verificarea trece prin funcție, ca un utilizator.
+
+name: adsy-ai-live-check
+
+on:
+  workflow_dispatch:
+    inputs:
+      brand_id:
+        description: 'ID-ul brandului verificat (gol = primul brand cu sesiuni în ultimele 28 de zile)'
+        type: string
+        required: false
+  push:
+    branches: ['claude/hopeful-heisenberg-9lc7tv']
+    paths: ['.github/adsy-ai-live-check.trigger']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: adsy-ai-live-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Verificare AdSy AI
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BRAND_ID: ${{ inputs.brand_id }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Lipsesc secretele SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY în environment-ul staging."
+            exit 1
+          fi
+          set -o pipefail
+          node --experimental-strip-types scripts/adsy-ai-live-check.ts | tee check.log
+      - name: Rezumat
+        if: always()
+        run: |
+          {
+            echo "### Verificare AdSy AI: $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo
+            echo '```'
+            [ -f check.log ] && grep -E '^(ok|PICAT|ATENȚIE|Rezultat|Rămas|Tokeni|Brand verificat|— )' check.log || echo "fără output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
