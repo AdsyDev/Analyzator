@@ -274,8 +274,18 @@ async function main() {
 
   // 7. Ciornă generată -----------------------------------------------------------------------------------------------------
   console.log('\n— Ciornă generată —')
-  const draft = await fn({ action: 'generate_insight', brand_id: brand.id, period })
-  check('cererea de ciornă: ok sau refuz explicit, niciodată o ciornă neverificată', draft.status === 200 && ['ok', 'insufficient_evidence', 'rejected'].includes(draft.json?.status), { status: draft.json?.status, existing: draft.json?.existing })
+  // Ca la chat: o eroare a furnizorului se reia o dată. Codul ei se afișează, altfel „model_error” nu spune nimic.
+  let draft = await fn({ action: 'generate_insight', brand_id: brand.id, period })
+  if (draft.json?.status === 'model_error') {
+    console.log(`         (furnizorul a răspuns cu eroarea „${draft.json?.code}” la ciornă; reîncerc)`)
+    await new Promise((r) => setTimeout(r, 4000))
+    draft = await fn({ action: 'generate_insight', brand_id: brand.id, period })
+  }
+  check('cererea de ciornă: ok sau refuz explicit, niciodată o ciornă neverificată', draft.status === 200 && ['ok', 'insufficient_evidence', 'rejected'].includes(draft.json?.status), { status: draft.json?.status, existing: draft.json?.existing, code: draft.json?.code })
+  if (draft.json?.status !== 'ok') {
+    const whyDraft = await service(`ai_requests?select=status,rejection_reason&user_id=eq.${userId}&task=eq.generate_insight&order=created_at.asc`)
+    for (const r of (whyDraft.json ?? []) as Json[]) console.log(`         ${String(r.status).padEnd(21)} ${mask(r.rejection_reason ?? '—')}`)
+  }
   if (draft.json?.status === 'ok') {
     const id = draft.json.insight_id as string
     const row = await service(`insights?select=title,summary,interpretation,limits,status,origin,author_id,ai_request_id&id=eq.${id}`)
