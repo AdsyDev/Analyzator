@@ -344,3 +344,17 @@ Lucrarea din Etapa 3 „client manager, comentarii, acceptarea recomandării” 
 | S-9 | Ce nu s-a construit | — | Notificarea echipei la un răspuns sau comentariu nou (se văd doar în pagina Analize); butonul general „Solicită ajustare” pentru configurarea dashboardului (specificație, cap. 1): aici „Solicită ajustare” e răspunsul la o recomandare. |
 | S-10 | Impact | — | O migrație aditivă (două tabele, `brand_insights` cu două câmpuri în plus), ecranul Analize. Timp: o zi. Cost de rulare: zero. |
 
+## T — Verificarea AdSy AI pe aplicația live și ștergerea ciornelor cu dovezi (2026-11-12)
+
+Cererea proprietarului produsului, după ce a pus cheia modelului în secretele funcției: „activează tu chatul pe un brand, pune câteva întrebări de test și testează complet funcționalitatea”.
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| T-1 | Cum se testează pe live fără o sesiune de utilizator | (a) cont temporar creat de verificare; (b) sesiune în numele unui utilizator real; (c) test manual | **(a).** `scripts/adsy-ai-live-check.ts`, rulat din workflow-ul `adsy-ai-live-check`: un cont temporar (strategist, acces la un singur brand, adresă pe un domeniu care nu există, parolă aleatoare neafișată), politica brandului pornită doar pe durata verificării, apoi tot ce a fost creat se șterge și politica revine la starea dinainte. Curățarea rulează și când o verificare pică. Nicio sesiune în numele unui om. |
+| T-2 | Ce rămâne după o rulare | — | Urmele din `audit_events` (contul, apartenența, politica), intenționat. Tokenii consumați rămân consumați, dar cererile de test se șterg din `ai_requests`, deci nu mai apar la consumul lunii. |
+| T-3 | Ce pleacă spre furnizor | — | Numele brandului, indicatorii lui agregați, analizele publicate și întrebările de test. În jurnalul rulării, numele brandului e mascat; cifrele din răspunsuri rămân vizibile celor cu acces la repo. |
+| T-4 | Documentele | — | Verificarea nu aprobă niciun document pe brandul real: unul aprobat nu se mai poate șterge. Citarea din documente rămâne acoperită de teste și de `eval:ai`. |
+| T-5 | Rezultatul primei rulări (12 nov. 2026) | — | 28 din 30. AdSy AI e configurat (`gemini-3.5-flash-lite`, `chat-v3`), răspunde pe dovezi, refuză sfatul medical și injecția de prompt, servește din cache, respectă politica și preferința, izolează brandurile și scrie ciorna marcată. O întrebare a primit o eroare temporară de la furnizor (după reîncercarea din adaptor). A doua problemă e T-6. |
+| T-6 | **Defect vechi găsit: o ciornă cu dovezi sau recomandări nu se putea șterge** | — | `require_draft_parent` refuza ștergerea în cascadă a dovezilor, pentru că analiza-părinte era deja ștearsă. „Șterge ciorna” din Analize eșua deci pentru orice ciornă cu o metrică citată, iar anularea unei ciorne generate pe jumătate ar fi lăsat-o în bază. Reparat în migrația `20261113150000_delete_draft_with_evidence.sql`: când părintele nu mai există, rândul-copil pleacă odată cu el. Restul regulii e neschimbat (pgTAP `33_delete_draft_with_evidence.test.sql`, 17 verificări). |
+| T-7 | Urmele primei rulări | — | Din cauza T-6 au rămas în producție ciorna de test, 10 cereri în jurnal și contul temporar, fără apartenență și fără acces. Verificarea le caută la pornire (după forma adresei) și le șterge, cu dovezile și recomandările întâi; are și un mod „doar curățare”. |
+

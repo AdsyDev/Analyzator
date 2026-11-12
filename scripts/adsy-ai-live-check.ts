@@ -8,7 +8,8 @@
 // Ce pleacă spre furnizorul modelului: numele brandului, indicatorii lui agregați, analizele publicate și întrebările de
 // mai jos. În jurnalul rulării, numele brandului e înlocuit cu «brand»; cifrele din răspunsuri rămân.
 //
-// Mediu: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, BRAND_ID (opțional; altfel primul brand cu sesiuni în ultimele 28 de zile).
+// Mediu: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, BRAND_ID (opțional; altfel primul brand cu sesiuni în ultimele 28 de zile),
+// CLEANUP_ONLY=true (doar șterge ce a rămas de la o rulare întreruptă, fără nicio întrebare către model).
 
 import { randomBytes } from 'node:crypto'
 
@@ -64,15 +65,50 @@ let brand: { id: string; tenant_id: string; name: string } | null = null
 let priorPolicy: Json | null | undefined
 let membershipMade = false
 
+let cleanupFailed = false
+const done = (what: string, r: Res) => {
+  if (r.status >= 300) cleanupFailed = true
+  console.log(`${r.status < 300 ? 'ok    ' : 'ATENȚIE'} ${what} (${r.status})`)
+}
+
+/** Șterge ce a scris un cont temporar: ciornele lui (dovezile și recomandările întâi), cererile din jurnal și preferința. */
+async function removeWritesOf(id: string) {
+  const drafts = await service(`insights?select=id&author_id=eq.${id}&status=eq.draft`)
+  const ids = ((drafts.json ?? []) as Array<{ id: string }>).map((d) => d.id)
+  if (ids.length > 0) {
+    const list = `in.(${ids.join(',')})`
+    // Întâi dovezile și recomandările: până la migrația 20261113150000, ștergerea în cascadă a unei ciorne cu dovezi era refuzată.
+    done('dovezile ciornelor de test, șterse', await service(`evidence_links?insight_id=${list}`, { method: 'DELETE' }))
+    done('recomandările ciornelor de test, șterse', await service(`recommendations?insight_id=${list}`, { method: 'DELETE' }))
+    done(`ciornele contului temporar (${ids.length}), șterse`, await service(`insights?id=${list}`, { method: 'DELETE' }))
+  }
+  done('cererile contului temporar din ai_requests, șterse', await service(`ai_requests?user_id=eq.${id}`, { method: 'DELETE' }))
+  done('preferința contului temporar, ștearsă', await service(`ai_user_preferences?user_id=eq.${id}`, { method: 'DELETE' }))
+  done('documentele-ciornă ale contului temporar, șterse', await service(`brand_documents?created_by=eq.${id}&status=eq.draft`, { method: 'DELETE' }))
+}
+
+/**
+ * Conturile temporare rămase de la o rulare întreruptă (adresa lor are o formă fixă, pe un domeniu care nu există):
+ * li se șterg urmele și apoi contul. O politică de brand scrisă de un astfel de cont e a verificării, deci se șterge și ea.
+ */
+async function removeStaleAccounts() {
+  const listed = await call('/auth/v1/admin/users?page=1&per_page=1000')
+  const users = ((listed.json?.users ?? []) as Array<{ id: string; email?: string }>).filter((u) => /^verificare-adsy-ai-[0-9a-f]{12}@analyzator\.invalid$/.test(u.email ?? '') && u.id !== userId)
+  if (listed.status !== 200) return console.log(`ATENȚIE lista conturilor nu a putut fi citită (${listed.status})`)
+  if (users.length === 0) return console.log('ok     niciun cont temporar rămas de la o rulare anterioară')
+  for (const u of users) {
+    console.log(`       cont temporar rămas: ${u.id}`)
+    await removeWritesOf(u.id)
+    done('politica scrisă de contul rămas, ștearsă', await service(`ai_brand_policies?updated_by=eq.${u.id}`, { method: 'DELETE' }))
+    done('accesul la brand al contului rămas, șters', await service(`brand_access?user_id=eq.${u.id}`, { method: 'DELETE' }))
+    done('apartenența contului rămas, ștearsă', await service(`memberships?user_id=eq.${u.id}`, { method: 'DELETE' }))
+    done('contul rămas, șters', await call(`/auth/v1/admin/users/${u.id}`, { method: 'DELETE' }))
+  }
+}
+
 async function cleanup() {
   console.log('\n— Curățare —')
-  const done = (what: string, r: Res) => console.log(`${r.status < 300 ? 'ok    ' : 'ATENȚIE'} ${what} (${r.status})`)
-  if (userId && brand) {
-    // Ciornele generate de contul temporar, apoi cererile lui din jurnal (ciorna ține de cerere).
-    done('ciornele generate de contul temporar, șterse', await service(`insights?author_id=eq.${userId}&status=eq.draft`, { method: 'DELETE' }))
-    done('cererile contului temporar din ai_requests, șterse', await service(`ai_requests?user_id=eq.${userId}`, { method: 'DELETE' }))
-    done('preferința contului temporar, ștearsă', await service(`ai_user_preferences?user_id=eq.${userId}`, { method: 'DELETE' }))
-  }
+  if (userId) await removeWritesOf(userId)
   if (brand && priorPolicy !== undefined) {
     if (priorPolicy === null) done('politica brandului, ștearsă (nu exista înainte)', await service(`ai_brand_policies?brand_id=eq.${brand.id}`, { method: 'DELETE' }))
     else {
@@ -94,6 +130,10 @@ async function cleanup() {
 }
 
 async function main() {
+  console.log('— Urme de la rulări anterioare —')
+  await removeStaleAccounts()
+  if (process.env.CLEANUP_ONLY === 'true') return console.log('\nDoar curățare: nicio întrebare nu a plecat spre model.')
+
   // 1. Brandul -------------------------------------------------------------------------------------------------------------
   const wanted = process.env.BRAND_ID?.trim()
   const brands = await service(`brands?select=id,tenant_id,name${wanted ? `&id=eq.${wanted}` : ''}&order=created_at.asc`)
@@ -139,7 +179,16 @@ async function main() {
   const token = login.json?.access_token as string | undefined
   if (login.status !== 200 || !token) throw new Error(`Autentificarea contului temporar a eșuat (${login.status}).`)
   const fn = (body: Json, t: string = token) => call('/functions/v1/adsy-ai', { method: 'POST', token: t, body })
-  const chat = (question: string, extra: Json = {}) => fn({ action: 'chat', brand_id: brand!.id, question, period, ...extra })
+  /** O întrebare; la o eroare temporară a furnizorului (`model_error`) se mai încearcă o dată, ca un utilizator. */
+  let retried = 0
+  const chat = async (question: string, extra: Json = {}) => {
+    const first = await fn({ action: 'chat', brand_id: brand!.id, question, period, ...extra })
+    if (first.json?.status !== 'model_error') return first
+    retried++
+    console.log(`         (furnizorul a răspuns cu eroare temporară „${first.json?.code}”; reîncerc)`)
+    await new Promise((r) => setTimeout(r, 4000))
+    return fn({ action: 'chat', brand_id: brand!.id, question, period, ...extra })
+  }
 
   // 3. Starea serverului și controalele ------------------------------------------------------------------------------------
   console.log('\n— Configurare și controale —')
@@ -181,6 +230,7 @@ async function main() {
   const log = await service(`ai_requests?select=task,status,total_tokens,cached_from,model_id,prompt_version&user_id=eq.${userId}&order=created_at.asc`)
   const rows = (log.json ?? []) as Array<Json>
   const tokens = rows.reduce((s, r) => s + Number(r.total_tokens ?? 0), 0)
+  console.log(`         erori temporare ale furnizorului, reluate: ${retried}`)
   check('fiecare cerere e în jurnal, cu tokenii ei; cea din cache are zero', rows.length >= 9 && rows.some((r) => r.cached_from !== null && Number(r.total_tokens) === 0), { cereri: rows.length, tokeni: tokens, statusuri: rows.map((r) => r.status).join(','), model: rows[0]?.model_id, prompt: rows[0]?.prompt_version })
 
   // 5. Controalele opresc efectiv ------------------------------------------------------------------------------------------
@@ -268,5 +318,5 @@ try {
   }
 }
 const bad = results.filter((r) => !r.ok)
-console.log(`\nRezultat: ${results.length - bad.length} din ${results.length} verificări reușite${bad.length ? `; picate: ${bad.map((b) => b.name).join(' | ')}` : ''}.`)
-process.exit(failed || bad.length > 0 ? 1 : 0)
+console.log(`\nRezultat: ${results.length - bad.length} din ${results.length} verificări reușite${bad.length ? `; picate: ${bad.map((b) => b.name).join(' | ')}` : ''}.${cleanupFailed ? ' CURĂȚAREA NU A FOST COMPLETĂ.' : ''}`)
+process.exit(failed || cleanupFailed || bad.length > 0 ? 1 : 0)

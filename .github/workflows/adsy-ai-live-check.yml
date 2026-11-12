@@ -19,6 +19,10 @@ on:
         description: 'ID-ul brandului verificat (gol = primul brand cu sesiuni în ultimele 28 de zile)'
         type: string
         required: false
+      cleanup_only:
+        description: 'Doar șterge urmele unei rulări întrerupte (fără întrebări către model)'
+        type: boolean
+        default: false
   push:
     branches: ['claude/hopeful-heisenberg-9lc7tv']
     paths: ['.github/adsy-ai-live-check.trigger']
@@ -50,6 +54,9 @@ jobs:
             echo "::error::Lipsesc secretele SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY în environment-ul staging."
             exit 1
           fi
+          # Fișierul-martor poate cere doar curățarea urmelor unei rulări întrerupte.
+          if grep -q '^cleanup-only' .github/adsy-ai-live-check.trigger 2>/dev/null && [ "${{ github.event_name }}" = "push" ]; then export CLEANUP_ONLY=true; fi
+          if [ "${{ inputs.cleanup_only }}" = "true" ]; then export CLEANUP_ONLY=true; fi
           set -o pipefail
           node --experimental-strip-types scripts/adsy-ai-live-check.ts | tee check.log
       - name: Rezumat
@@ -59,6 +66,6 @@ jobs:
             echo "### Verificare AdSy AI: $(date -u +%Y-%m-%dT%H:%MZ)"
             echo
             echo '```'
-            [ -f check.log ] && grep -E '^(ok|PICAT|ATENȚIE|Rezultat|Rămas|Tokeni|Brand verificat|— )' check.log || echo "fără output"
+            [ -f check.log ] && grep -E '^(ok|PICAT|ATENȚIE|Rezultat|Rămas|Tokeni|Brand verificat|Doar curățare|— )' check.log || echo "fără output"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
