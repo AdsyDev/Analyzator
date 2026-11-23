@@ -91,13 +91,17 @@ reset role;
 update public.source_connections set credential_status = 'valid' where id = '50000000-0000-0000-0000-0000000000e1';
 delete from public.sync_runs where id in ('a0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001');
 
--- stale: date vechi (peste toleranța GA4 de 2 zile)
+-- stale: date vechi (peste toleranța GA4 de 8 zile, decizia Z: ieri − 8 = azi − 9)
 delete from public.web_daily where brand_id = '20000000-0000-0000-0000-000000000011';
 insert into public.web_daily (tenant_id, brand_id, date, channel_group, source_medium, landing_page, landing_page_md5, sessions, source_id, collected_at, payload_hash, source_timezone, schema_version) values
   ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', (now() at time zone 'Europe/Bucharest')::date - 10, 'Direct', 'd', '/', md5('/'), 5,
    '50000000-0000-0000-0000-000000000011', now(), repeat('a', 64), 'Europe/Bucharest', 'test');
 select tests.authenticate_as('30000000-0000-0000-0000-000000000001');
 select is(pg_temp.st('20000000-0000-0000-0000-000000000011', 'ga4', 'state'), 'stale', 'C5: date mai vechi decât toleranța → stale');
+select is((select grace_days from public.source_status where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'ga4'), 8,
+  'C5: toleranța sursei = cea a versiunii curente a metricilor GA4 (decizia Z)');
+select is((select grace_days from public.source_status where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'gsc'), 10,
+  'C5: toleranța Search Console = 10 zile (decizia Z)');
 reset role;
 
 delete from public.web_daily where brand_id = '20000000-0000-0000-0000-000000000011';

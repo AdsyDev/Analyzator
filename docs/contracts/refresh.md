@@ -34,7 +34,7 @@ Fără funcții noi în `public` (garda A10/A11): statusul se citește din view-
 | `stale` | `data_as_of` mai vechi decât ieri − toleranța sursei |
 | `ok` | altfel |
 
-Prioritatea e cea din tabel (de sus în jos). Toleranța (`grace_days`) vine din registrul de metrici: maximul `freshness_grace_days` al metricilor sursei (GA4 2, GSC 3, Clarity 1, SEOmonitor 7), implicit 14 pentru sursele CSV.
+Prioritatea e cea din tabel (de sus în jos). Toleranța (`grace_days`) vine din registrul de metrici: maximul `freshness_grace_days` al metricilor sursei (GA4 8, GSC 10, Clarity 1, SEOmonitor 7; GA4 și GSC potrivite cu colectarea săptămânală, decizia Z), implicit 14 pentru sursele CSV.
 
 ### `data_as_of` și `coverage` (forma din `MetricResponse.meta`)
 
