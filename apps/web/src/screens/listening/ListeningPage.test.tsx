@@ -6,11 +6,16 @@ import { pageReady, renderApp, where } from '../../test/renderApp'
 const URINAL = '/brands/brand-urinal/listening'
 
 describe('Listening', () => {
-  it('KPI-urile fără registru sunt „Sursă neconectată", nu zero', async () => {
+  it('KPI-urile fără registru sunt „Indicator nedefinit", nu „Sursă neconectată" și nici zero', async () => {
     renderApp({ route: URINAL })
     await pageReady('Listening')
     for (const n of ['Mențiuni eligibile', 'Listening SoV', 'Pondere mențiuni negative']) {
-      expect(await screen.findByRole('article', { name: n })).toHaveAttribute('data-status', 'not_connected')
+      const card = await screen.findByRole('article', { name: n })
+      expect(card).toHaveAttribute('data-status', 'not_connected')
+      expect(await within(card).findByText('Indicator nedefinit')).toBeInTheDocument()
+      expect(within(card).queryByText('Sursă neconectată')).toBeNull()
+      expect(card).toHaveTextContent('Indicatorul vine din Planable, dar nu are încă definiție în registrul de metrici')
+      expect(within(card).queryByText(/^\d/)).toBeNull()
     }
   })
 
@@ -130,6 +135,34 @@ describe('Listening', () => {
       const dist = screen.getByRole('heading', { level: 2, name: 'Distribuția sentimentului' }).closest('section')!
       expect(await within(dist).findByText(/12 mențiuni au venit de la sursă fără text și fără link și nu pot fi revizuite\./)).toBeInTheDocument()
       expect(dist).toHaveTextContent(/2 mențiuni așteaptă revizuirea umană/)
+    })
+
+    it('mențiunile în altă limbă (deciziile Z): feed-ul și distribuția spun câte au fost lăsate deoparte', async () => {
+      const wrap: Wrap = (b) => ({
+        ...b,
+        mentions: {
+          ...b.mentions,
+          list: async (c, q) => { const r = await b.mentions.list(c, q); return r.kind === 'ready' ? { kind: 'ready' as const, data: { ...r.data, other_language: 37 } } : r },
+          sentiment: async (c) => { const r = await b.mentions.sentiment(c); return r.kind === 'ready' ? { kind: 'ready' as const, data: { ...r.data, other_language: 37 } } : r },
+        },
+      })
+      renderApp({ route: '/brands/brand-urinal/listening', wrap })
+      await pageReady('Listening')
+      const note = await within(feed()).findByRole('note')
+      expect(note).toHaveTextContent('37 mențiuni din perioadă sunt în altă limbă decât româna și nu sunt afișate.')
+      const dist = screen.getByRole('heading', { level: 2, name: 'Distribuția sentimentului' }).closest('section')!
+      expect(await within(dist).findByText('37 mențiuni sunt în altă limbă decât româna și nu sunt incluse.')).toBeInTheDocument()
+    })
+
+    it('doar mențiuni în altă limbă: starea goală spune de ce', async () => {
+      const wrap: Wrap = (b) => ({
+        ...b,
+        mentions: { ...b.mentions, list: async (c, q) => { const r = await b.mentions.list(c, q); return r.kind === 'ready' ? { kind: 'ready' as const, data: { ...r.data, items: [], total: 0, other_language: 1 } } : r } },
+      })
+      renderApp({ route: '/brands/brand-urinal/listening', wrap })
+      await pageReady('Listening')
+      expect(await within(feed()).findByText('Nicio mențiune de afișat')).toBeInTheDocument()
+      expect(feed()).toHaveTextContent('1 mențiune din perioadă e în altă limbă decât româna și nu e afișată.')
     })
 
     it('fără astfel de mențiuni, nu apare nicio notă', async () => {

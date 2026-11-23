@@ -34,7 +34,7 @@ describe('AI Visibility: structura din spec cap. 13', () => {
     await open()
     const c = screen.getByRole('article', { name })
     expect(c).toHaveAttribute('data-status', 'not_connected')
-    expect(within(c).getByText('Sursă neconectată')).toBeInTheDocument()
+    expect(within(c).getByText('Indicator nedefinit')).toBeInTheDocument()
     expect(within(c).queryByText(/^\d/)).toBeNull()
     await userEvent.click(within(c).getByRole('button', { name: 'Ce înseamnă indicatorul' }))
     expect(within(c).getByRole('tooltip')).toHaveTextContent('Definiția acestui indicator nu este încă în registrul de metrici.')

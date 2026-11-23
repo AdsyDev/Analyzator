@@ -46,13 +46,13 @@ function ListeningContent({ brand, ctx, admin }: { brand: Brand; ctx: QueryConte
   const key = ctxKey(ctx)
 
   const metrics = useMetrics(ctx, LISTENING_KPI_KEYS)
-  const { byKey } = useDefinitions(LISTENING_KPI_KEYS)
+  const { byKey, loaded: registryLoaded } = useDefinitions(LISTENING_KPI_KEYS)
   const sparks = useTrends(ctx, LISTENING_KPI_KEYS)
   const sentiment = useAsync(() => providers.mentions.sentiment(ctx), [providers, key])
 
   return (
     <div className="flex flex-col gap-5">
-      <KpiGrid slots={LISTENING_KPI_SLOTS} page="Listening" metrics={metrics.state} definitions={byKey} trends={sparks.state} onRetry={metrics.reload} onOpen={setTarget} />
+      <KpiGrid slots={LISTENING_KPI_SLOTS} page="Listening" metrics={metrics.state} definitions={byKey} registryLoaded={registryLoaded} trends={sparks.state} onRetry={metrics.reload} onOpen={setTarget} />
       <SentimentSection state={sentiment.state} onRetry={sentiment.reload} />
       <MentionFeed key={key} brand={brand} ctx={ctx} filters={filters} onChanged={() => {}} />
       {admin && (

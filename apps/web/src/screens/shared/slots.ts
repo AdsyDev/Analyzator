@@ -14,6 +14,12 @@ export interface KpiSlot {
 
 export const MISSING_DEFINITION = 'Definiția acestui indicator nu este încă în registrul de metrici.'
 
+/**
+ * Titlul unui card fără definiție în registru. Nu e „Sursă neconectată”: sursa poate fi conectată și cu date, dar
+ * indicatorul nu se calculează până nu are definiție aprobată.
+ */
+export const UNREGISTERED_TITLE = 'Indicator nedefinit'
+
 const listRo = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} și ${names[names.length - 1]}`)
 
 /**

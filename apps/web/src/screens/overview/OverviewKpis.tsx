@@ -7,7 +7,7 @@ import { formatInteger, formatMetricValue, formatRange } from '../../lib/format'
 import { isGoodChange, metricView } from '../../lib/metricView'
 import { brandPath } from '../../lib/navigation'
 import type { EvidenceTarget } from '../shared/EvidenceHost'
-import { MISSING_DEFINITION, unregisteredReason } from '../shared/slots'
+import { MISSING_DEFINITION, UNREGISTERED_TITLE, unregisteredReason } from '../shared/slots'
 import { positionRows } from './position'
 import { OVERVIEW_CARDS } from './slots'
 
@@ -17,6 +17,8 @@ interface Props {
   search: string
   metrics: AsyncState<MetricsBundle>
   definitions: Map<string, MetricDefinition>
+  /** Registrul a răspuns: o cheie fără definiție e atunci „Indicator nedefinit”, nu „Sursă neconectată”. */
+  registryLoaded: boolean
   sentiment: AsyncState<ProviderResult<SentimentDistribution>>
   matrix: AsyncState<ProviderResult<CompetitionMatrix>>
   onRetry: () => void
@@ -62,7 +64,7 @@ function gate<T>(state: AsyncState<ProviderResult<T>>): { data: T } | { tile: { 
  * dovezi la click); sentimentul și poziția competitivă vin din `brand_mention_sentiment` și din matricea de Concurență.
  * Fiecare card își păstrează starea: lipsa unei surse nu le blochează pe celelalte.
  */
-export function OverviewKpis({ brand, search, metrics, definitions, sentiment, matrix, onRetry, onOpen }: Props) {
+export function OverviewKpis({ brand, search, metrics, definitions, registryLoaded, sentiment, matrix, onRetry, onOpen }: Props) {
   const items = metrics.status === 'done' ? metrics.value.items : []
   return (
     <div className="grid grid-cols-2 gap-2.5 sm:gap-3 @3xl:grid-cols-3 @7xl:grid-cols-6" data-testid="kpi-grid">
@@ -124,7 +126,7 @@ export function OverviewKpis({ brand, search, metrics, definitions, sentiment, m
             deltaGood={view?.deltaDirection ? isGoodChange(def?.direction ?? 'neutral', view.deltaDirection) : null}
             sub={view?.deltaText && cmp ? `față de ${formatRange(cmp.start, cmp.end)}` : null}
             caveat={view?.caveat}
-            emptyTitle={view?.emptyTitle ?? 'Fără date pentru interval'}
+            emptyTitle={registryLoaded && def === null && item?.status === 'not_connected' ? UNREGISTERED_TITLE : (view?.emptyTitle ?? 'Fără date pentru interval')}
             emptyReason={def === null && item?.status === 'not_connected' ? unregisteredReason(card) : (view?.emptyReason ?? null)}
             detail={detail}
             onOpen={item ? () => onOpen({ page: 'Overview', label, query: item.evidence_query, item, definition: def }) : undefined}

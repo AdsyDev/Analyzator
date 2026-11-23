@@ -43,6 +43,11 @@ export function withoutContentNote(n: number): string {
   return `${formatInteger(n)} ${n === 1 ? 'mențiune din perioadă a venit' : 'mențiuni din perioadă au venit'} de la sursă fără text și fără link (de regulă, cele de pe web). ${n === 1 ? 'E numărată' : 'Sunt numărate'} la „Mențiuni”, dar nu ${n === 1 ? 'poate fi afișată sau revizuită' : 'pot fi afișate sau revizuite'}.`
 }
 
+/** Câte mențiuni au fost lăsate deoparte pentru limbă (deciziile Z): Listening arată doar mențiunile în română. */
+export function otherLanguageNote(n: number): string {
+  return `${formatInteger(n)} ${n === 1 ? 'mențiune din perioadă e' : 'mențiuni din perioadă sunt'} în altă limbă decât româna și nu ${n === 1 ? 'e afișată' : 'sunt afișate'}. Limba se stabilește din text; mențiunile prea scurte ca să se poată stabili rămân în listă.`
+}
+
 /**
  * Feed-ul de mențiuni, cu fiecare mențiune ca o postare (E-3): platforma, autorul (cont propriu sau extern, fără nume
  * inventate), data, textul complet, sentimentul cu starea validării și butonul de marcare pentru farmacovigilență.
@@ -58,14 +63,15 @@ export function MentionFeed({ brand, ctx, filters, onChanged }: { brand: Brand; 
       <Resolved state={state.state} onRetry={state.reload} loadingLabel="Se încarcă mențiunile" skeletonClass="h-64">
         {(p) =>
           p.items.length === 0 ? (
-            p.without_content > 0 ? (
-              <EmptyState compact title="Nicio mențiune de afișat" text={withoutContentNote(p.without_content)} />
+            p.without_content > 0 || p.other_language > 0 ? (
+              <EmptyState compact title="Nicio mențiune de afișat" text={[p.without_content > 0 ? withoutContentNote(p.without_content) : null, p.other_language > 0 ? otherLanguageNote(p.other_language) : null].filter(Boolean).join(' ')} />
             ) : (
               <EmptyState compact title="Nicio mențiune pentru filtrele alese" text="Schimbă sentimentul, sursa sau perioada." />
             )
           ) : (
             <div className="flex flex-col gap-3">
               {p.without_content > 0 && <p role="note" className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-[12.5px] leading-snug text-text-2">{withoutContentNote(p.without_content)}</p>}
+              {p.other_language > 0 && <p role="note" className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-[12.5px] leading-snug text-text-2">{otherLanguageNote(p.other_language)}</p>}
               <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {p.items.map((m) => {
                   const own = m.owned_account === true
