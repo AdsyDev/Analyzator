@@ -2,7 +2,7 @@ import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { groupTables, PgError, type Column, type PgSession, type PgTarget } from '../../supabase/functions/airbyte/inspect.ts'
 import { FakeDb } from '../shared/test-helpers.ts'
-import { collectAirbyte, type AirbyteOutcome } from './collect-core.ts'
+import { collectAirbyte, collectionWindow, type AirbyteOutcome } from './collect-core.ts'
 import { pickReport, reportQuery, toPaidRows, type ReportRow } from './streams.ts'
 
 const T = '11111111-1111-4111-8111-111111111111'
@@ -213,5 +213,32 @@ describe('colectarea', () => {
     assert.equal(by.meta_ads!.errors[0]!.code, 'airbyte_timeout')
     assert.equal(by.google_ads!.status, 'succeeded')
     assert.ok(by.google_ads!.errors.some((e) => e.code === 'parser_note' && /fusul orar/.test(e.message)))
+  })
+
+  test('fără date în fereastră: parțial, cu ultima zi sincronizată în Airbyte (sincronizare oprită)', async () => {
+    const { d } = db([link('a0000000-0000-4000-8000-000000000001', B1, 'meta_ads:111'), link('a0000000-0000-4000-8000-000000000002', B2, 'meta_ads:222')])
+    const pg = fakePg(META, { 'max(left(': [{ account_id: '111', last_date: '2026-09-18' }] })
+    const out = await collectAirbyte({ db: d, now: NOW, resolve: async () => ['89.41.38.210'], connect: pg.connect })
+    const by: Record<string, AirbyteOutcome> = Object.fromEntries(out.map((o) => [o.connection_id.slice(-1), o]))
+    assert.deepEqual([by['1']!.status, by['1']!.errors[0]!.code], ['partial', 'airbyte_stale'])
+    assert.match(by['1']!.errors[0]!.message, /ultima zi sincronizată e 2026-09-18/)
+    assert.deepEqual([by['2']!.status, by['2']!.errors[0]!.code], ['partial', 'airbyte_account_absent'])
+    assert.equal(d.tables.paid_daily, undefined)
+  })
+
+  test('reimportul istoricului: --from până ieri, doar site-ul cerut', async () => {
+    const { d } = db([link('a0000000-0000-4000-8000-000000000001', B1, 'meta_ads:111'), link('a0000000-0000-4000-8000-000000000002', B2, 'meta_ads:222')])
+    const pg = fakePg(META, { 'from "public"."ads_insights" where': [r({ account_id: '111', date: '2026-05-02', spend: '3', currency: 'RON' })] })
+    const out = await collectAirbyte({ db: d, now: NOW, resolve: async () => ['89.41.38.210'], connect: pg.connect, from: '2026-04-01', brandId: B1 })
+    assert.deepEqual(out.map((o) => [o.brand_id, o.status, o.rows_written]), [[B1, 'succeeded', 1]])
+    assert.deepEqual(pg.sql.find((q) => q.text.includes('distinct on'))!.params, ['111', '2026-04-01', '2026-11-22'])
+    assert.deepEqual(d.tables.sync_runs!.map((s) => [s.period_start, s.period_end]), [['2026-04-01', '2026-11-22']])
+  })
+
+  test('fereastra: implicit 35 de zile; --from validat (formă, viitor, cel mult 730 de zile)', () => {
+    assert.deepEqual(collectionWindow(NOW()), { start: '2026-10-19', end: '2026-11-22' })
+    assert.throws(() => collectionWindow(NOW(), '2026-13-01'), /invalid/)
+    assert.throws(() => collectionWindow(NOW(), '2026-11-23'), /după ieri/)
+    assert.throws(() => collectionWindow(NOW(), '2024-01-01'), /730/)
   })
 })

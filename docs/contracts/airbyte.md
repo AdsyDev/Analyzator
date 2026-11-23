@@ -114,7 +114,7 @@ Pe pagina oricărui site, cardul Airbyte, pasul „Conturile tuturor site-urilor
 
 ## Colectarea (E-8, etapa 2)
 
-`npm run collect:airbyte` (`connectors/airbyte/collect.ts`), zilnic din `.github/workflows/airbyte-daily.yml` (05:20 UTC, activ cu `CONNECTOR_AIRBYTE_ENABLED = true`). Reimportă ultimele 35 de zile, până ieri (Europe/Bucharest).
+`npm run collect:airbyte` (`connectors/airbyte/collect.ts`), zilnic din `.github/workflows/airbyte-daily.yml` (05:20 UTC, activ cu `CONNECTOR_AIRBYTE_ENABLED = true`). Reimportă ultimele 35 de zile, până ieri (Europe/Bucharest). **Istoricul:** `npm run collect:airbyte -- --from YYYY-MM-DD [--brand <uuid>]` sau Actions → `airbyte-daily` → Run workflow cu `from` (și opțional `brand`): de la acea zi până ieri, cel mult 730 de zile în urmă. Reimportul e idempotent (aceeași cheie `paid_daily`).
 
 **Conexiunea:** aceleași reguli ca la `inspect`: connection string-ul din Vault (`get_source_token`), doar nume public (SSRF, înainte și după DNS), conexiunea la IP-ul verificat, TLS verificat pe numele serverului (Node, `postgres.js` 3.4.5), sesiune read-only verificată înainte de orice citire, doar SELECT-uri cu identificatori din catalog. `statement_timeout` = 120 s (se citesc rânduri, nu agregate). Conturile și fereastra merg ca parametri.
 
@@ -141,4 +141,5 @@ Pe pagina oricărui site, cardul Airbyte, pasul „Conturile tuturor site-urilor
 | `failed`, `stream_not_found` | niciun flux recunoscut al platformei, citibil de utilizatorul read-only |
 | `failed`, `airbyte_timeout` / `airbyte_permission` | tabelul platformei nu a răspuns sau nu are GRANT (doar conturile acelei platforme) |
 | `failed`, `currency_missing` | moneda contului nu apare nici în raport, nici în catalog (nimic scris) |
-| `succeeded` cu 0 rânduri | contul nu are date în fereastră |
+| `partial`, `airbyte_stale` | contul are date în Airbyte, dar nu în fereastră; mesajul dă ultima zi sincronizată (sincronizarea Airbyte s-a oprit sau contul nu mai cheltuie) |
+| `partial`, `airbyte_account_absent` | contul nu apare deloc în tabelul platformei |
