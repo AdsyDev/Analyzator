@@ -30,7 +30,19 @@ export type MetricRow = {
   relative_change: number | null
   status: string
   data_as_of: string | null
+  /** AB: `comparison_period` e intervalul folosit efectiv pentru comparație (poate fi mai scurt decât cel al cererii). */
+  evidence_query?: { comparison_period?: Period | null } | null
 }
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+
+/** Intervalul efectiv al comparației unei metrici, doar când diferă de cel al cererii (AB). */
+function matchedPeriod(m: MetricRow, requested: Period | null): Period | null {
+  const p = m.evidence_query?.comparison_period
+  if (!p || typeof p.start !== 'string' || typeof p.end !== 'string' || !ISO_DAY.test(p.start) || !ISO_DAY.test(p.end)) return null
+  if (requested && p.start === requested.start && p.end === requested.end) return null
+  return { start: p.start, end: p.end }
+}
+
 export type InsightRow = { id: string; title: string; summary: string; interpretation?: string | null; limits?: string | null; status: string; period?: { from?: string; to?: string } }
 
 /** Un fragment dintr-un document aprobat și valabil al brandului, întors de `brand_document_search`. */
@@ -200,6 +212,9 @@ export function buildContext(input: {
           ? { better_when: 'mai mic', ...(exact.absolute_change ? { change_meaning: exact.absolute_change > 0 ? 'înrăutățire' : 'îmbunătățire' } : {}) }
           : {}),
         status: statusLabel(m.status), data_as_of: m.data_as_of ?? null,
+        // AB: când perioada curentă nu are date până la final, comparația ia doar aceeași porțiune din perioada de
+        // referință; modelul primește intervalul efectiv ca să nu atribuie variația întregii perioade de comparație.
+        ...(matchedPeriod(m, input.comparisonPeriod) ? { comparison_period: matchedPeriod(m, input.comparisonPeriod) } : {}),
       }
     })
   // Doar analizele publicate, cele mai recente; textele sunt ale echipei, dar rămân date, nu instrucțiuni.
@@ -227,7 +242,7 @@ export function buildContext(input: {
     })
 
   // Anii perioadelor și lungimea perioadei în zile; zilele și lunile se scot din text înainte de verificare (`withoutDates`).
-  const years = [input.period, input.comparisonPeriod].flatMap((p) => (p ? [Number(p.start.slice(0, 4)), Number(p.end.slice(0, 4))] : []))
+  const years = [input.period, input.comparisonPeriod, ...input.metrics.map((m) => matchedPeriod(m, input.comparisonPeriod))].flatMap((p) => (p ? [Number(p.start.slice(0, 4)), Number(p.end.slice(0, 4))] : []))
   const baseNumbers = [...years, daysBetween(input.period.start, input.period.end) + 1, ...[...names.values()].flatMap((n) => numbersIn(n).flatMap((x) => x.values))]
   return {
     // `documents` apare doar când există fragmente: fără ele, contextul și amprenta lui rămân cele dinainte.

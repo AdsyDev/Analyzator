@@ -427,6 +427,64 @@ select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('ga4_sessions'), '2026-11-26
 select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('ga4_sessions'), '2026-11-18', '2026-11-16')), 'partial',
   'AA4: GA4 a doua zi după rulare: doar ieri lipsește → partial, nu stale');
 
+-- AB (24 nov 2026): zile lipsă la sfârșitul perioadei → comparația pe aceeași porțiune din perioada de referință -----------
+-- Cazul din 23 nov: perioada 26 oct – 22 nov, GSC cu date până pe 14 nov (20 din 28 de zile).
+select is(metrics.matched_comparison_period('2026-10-26', '2026-11-22', 'custom', 'sum', 20, '2026-11-14'),
+  '{"start": "2026-09-28", "end": "2026-10-17", "matched": true}'::jsonb, 'AB1: zile lipsă la final → primele 20 de zile ale perioadei anterioare');
+select is(metrics.matched_comparison_period('2026-10-26', '2026-11-22', 'custom', 'sum', 28, '2026-11-22'),
+  '{"start": "2026-09-28", "end": "2026-10-25", "matched": false}'::jsonb, 'AB1: perioadă completă → comparația întreagă');
+select is(metrics.matched_comparison_period('2026-10-26', '2026-11-22', 'custom', 'sum', 25, '2026-11-22') ->> 'matched',
+  'false', 'AB1: zile lipsă doar la mijloc → comparația întreagă (rămâne partial)');
+select is(metrics.matched_comparison_period('2026-10-26', '2026-11-22', 'custom', 'ratio', 28, '2026-11-18') ->> 'matched',
+  'false', 'AB1: toate zilele acoperite (AI: colectare săptămânală cu 7 zile de acoperire) → comparația întreagă');
+select is(metrics.matched_comparison_period('2026-10-26', '2026-11-22', 'custom', 'last_observation', 1, '2026-11-14') ->> 'matched',
+  'false', 'AB1: last_observation nu se scurtează (compară deja ultima observație)');
+select is(metrics.matched_comparison_period('2026-10-26', '2026-11-22', 'custom', 'interval_report_only', 0, null) ->> 'matched',
+  'false', 'AB1: interval_report_only nu se scurtează');
+select is(metrics.matched_comparison_period('2026-10-26', '2026-11-22', 'custom', 'sum', 0, null) ->> 'matched',
+  'false', 'AB1: fără date → comparația întreagă (metrica e oricum indisponibilă)');
+select is(metrics.matched_comparison_period('2026-11-01', '2026-11-22', 'mtd', 'sum', 14, '2026-11-14'),
+  '{"start": "2026-10-01", "end": "2026-10-14", "matched": true}'::jsonb, 'AB1: MTD → aceleași 14 zile din luna anterioară');
+select is(metrics.matched_comparison_period('2026-10-26', '2026-11-22', 'yoy', 'sum', 20, '2026-11-14'),
+  '{"start": "2025-10-26", "end": "2025-11-14", "matched": true}'::jsonb, 'AB1: anul trecut → aceleași zile de acum un an');
+select is(metrics.matched_comparison_period('2026-10-26', '2026-11-22', 'custom', 'weighted_mean', 1, '2026-10-26'),
+  '{"start": "2026-09-28", "end": "2026-09-28", "matched": true}'::jsonb, 'AB1: o singură zi cu date → o singură zi comparată');
+
+-- metrics.compute: 20 de zile × 77 clicks față de 28 de zile × 65 (cazul real, rotunjit).
+create function pg_temp.ab(p_cmp_period jsonb) returns jsonb language sql as $$
+  select metrics.compute(jsonb_build_object(
+    'definition', pg_temp.cur('gsc_clicks'),
+    'brand_id', '20000000-0000-0000-0000-000000000011',
+    'as_of_date', '2026-11-23',
+    'period', '{"start": "2026-10-26", "end": "2026-11-22", "kind": "custom"}'::jsonb,
+    'connection', '{"connected": true, "query_ok": true}'::jsonb,
+    'current', jsonb_build_object(
+      'observations', (select jsonb_agg(jsonb_build_object('date', d::date, 'value', 77)) from generate_series('2026-10-26'::date, '2026-11-14', interval '1 day') d),
+      'confirmed_days', 20, 'data_as_of', '2026-11-14'),
+    'comparison', jsonb_build_object(
+      'observations', (select jsonb_agg(jsonb_build_object('date', d::date, 'value', 65)) from generate_series('2026-09-28'::date, '2026-10-25', interval '1 day') d),
+      'confirmed_days', 20, 'data_as_of', '2026-10-17', 'period', p_cmp_period)))
+$$;
+select is((pg_temp.ab('{"start": "2026-09-28", "end": "2026-10-17"}') -> 'metric' ->> 'comparison_value')::numeric, 1300::numeric,
+  'AB2: comparația adună doar zilele 28 sept – 17 oct (20 × 65), chiar dacă primește mai multe observații');
+select is((pg_temp.ab('{"start": "2026-09-28", "end": "2026-10-17"}') -> 'metric' ->> 'relative_change')::numeric > 0, true,
+  'AB2: pe zile comparabile, traficul a crescut (nu −14,7%)');
+select is(pg_temp.ab('{"start": "2026-09-28", "end": "2026-10-17"}') -> 'metric' ->> 'status', 'partial',
+  'AB2: statusul rămâne partial: valoarea curentă acoperă 20 din 28 de zile');
+select is(pg_temp.ab('{"start": "2026-09-28", "end": "2026-10-17"}') -> 'metric' -> 'evidence_query' -> 'comparison_period',
+  '{"start": "2026-09-28", "end": "2026-10-17"}'::jsonb, 'AB2: evidence_query.comparison_period = intervalul efectiv');
+select ok(pg_temp.has_warning(pg_temp.ab('{"start": "2026-09-28", "end": "2026-10-17"}'), 'comparison_matched'),
+  'AB2: avertismentul comparison_matched');
+select ok(not pg_temp.has_warning(pg_temp.ab('{"start": "2026-09-28", "end": "2026-10-17"}'), 'comparison_partial'),
+  'AB2: comparația are toate cele 20 de zile: nu e parțială');
+select throws_ok($$ select pg_temp.ab(null) $$, '22023', null,
+  'AB2: fără intervalul declarat, comparația nu se calculează pe zile numărate altfel');
+select throws_ok($$ select pg_temp.ab('{"start": "2026-09-28", "end": "2026-10-25"}') $$, '22023', null,
+  'AB2: intervalul întreg declarat pentru o perioadă cu zile lipsă e refuzat');
+select ok(not pg_temp.has_warning(pg_temp.run(pg_temp.def('gsc_clicks'), '[{"date": "2026-10-07", "value": 5}, {"date": "2026-10-08", "value": 5}]',
+    '{"comparison": {"observations": [{"date": "2026-10-05", "value": 4}], "confirmed_days": 2, "data_as_of": "2026-10-06"}}'), 'comparison_matched'),
+  'AB2: perioadă cu date până la final → fără comparison_matched, ca înainte');
+
 -- Ordinea statusurilor și condițiile secundare ---------------------------------------------------------
 
 select is(
