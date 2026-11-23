@@ -51,8 +51,6 @@ export interface CompetitionMatrix {
   set_version: number
   effective_from: IsoDate
   data_as_of: IsoDate | null
-  /** Ultima zi cu observații Planable pe entitate (grupul social); lipsește în răspunsurile vechi. */
-  social_as_of?: Record<string, IsoDate | null>
 }
 
 /** „Unde apare concurența și noi lipsim": subiecte în care un competitor e prezent, iar brandul lipsește sau e mai slab. */

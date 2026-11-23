@@ -69,7 +69,6 @@ Singura funcție din `public` apelabilă de utilizatori. Creează atomic o versi
 - **SECURITY INVOKER**, nu DEFINER: rulează cu drepturile apelantului, deci RLS (`competitor_sets_insert`, `competitor_set_members_insert`) rămâne autoritatea; funcția nu poate scrie nimic ce politicile nu permit. Nu primește actor din exterior: `created_by = auth.uid()`. Garda A10 (nicio funcție DEFINER executabilă de clienți) rămâne neschimbată. Nu e nevoie de Edge Function.
 - Verificarea explicită din corp (`private.has_brand_role`, agency_admin sau strategist) există pentru mesaje clare în română; brand inexistent, brand străin și rol insuficient dau **același** răspuns (fără oracol de existență).
 - Concurența: `pg_advisory_xact_lock` pe brand serializează apelurile, deci `max(version)+1` nu poate produce aceeași versiune de două ori, iar două „prime versiuni” concurente nu pot începe amândouă în trecut (verificarea datei stă după lock).
-- Constrângerea `competitor_set_members_social_profiles_check` (`private.valid_social_profiles`) verifică forma profilurilor și la inserările directe permise de RLS.
 - Data din trecut (23 nov. 2026): doar prima versiune a brandului o poate avea. Înainte de ea nu exista nicio comparație văzută, deci nimic nu se rescrie; versiunile următoare rămân de azi înainte.
 - Auditul: triggerele existente scriu în `audit_events` un rând pentru set și câte unul pentru fiecare membru, cu actorul din JWT, în aceeași tranzacție.
 - `anon` și `PUBLIC` nu au EXECUTE (A11/E4). Garda A11 admite exact această funcție pentru `authenticated`; orice altă funcție din `public` executabilă de clienți pică testul.
@@ -81,18 +80,18 @@ Singura funcție din `public` apelabilă de utilizatori. Creează atomic o versi
 | `p_brand_id` | uuid | brandul; tenantul se deduce din brand |
 | `p_effective_from` | date (ISO `YYYY-MM-DD`) | ≥ azi în Europe/Bucharest; **prima versiune** a brandului poate începe în trecut, dar nu înainte de 2020-01-01 (migrația `20261123090000`); unic per brand |
 | `p_note` | text sau null | tăiată; maximum 1000 de caractere; gol → null |
-| `p_members` | jsonb, listă de 1–10 obiecte `{ "name": text, "domain"?: text, "color"?: "#RRGGBB", "social"?: [{ "platform": text, "handle": text }] }` | ordinea din listă devine `sort_order`; `social` (Y-6): cel mult 10 profiluri pe membru, rețele cu analiza competitorilor în Planable (instagram, facebook, youtube, tiktok, linkedin), un profil la un singur membru din set |
+| `p_members` | jsonb, listă de 1–10 obiecte `{ "name": text, "domain"?: text, "color"?: "#RRGGBB" }` | ordinea din listă devine `sort_order` |
 
 Răspuns: un rând `{ competitor_set_id, version, effective_from, member_count }`.
 
-Normalizări: `name` tăiat (maximum 120 de caractere), unic fără deosebire de majuscule; `social`: rețeaua și handle-ul cu litere mici, handle fără „@” și fără spații, `/`, `?`, `#`; lipsă → `[]`; `domain` lowercase, fără schemă, utilizator, port, cale, query sau fragment, gol → null; `color` gol → null.
+Normalizări: `name` tăiat (maximum 120 de caractere), unic fără deosebire de majuscule; `domain` lowercase, fără schemă, utilizator, port, cale, query sau fragment, gol → null; `color` gol → null.
 
 Erori (`error.code` PostgREST = SQLSTATE, `error.message` în română, afișabil direct):
 
 | SQLSTATE | Cazuri |
 |---|---|
 | `42501` | „Nu ai dreptul să creezi o versiune a setului de competitori pentru acest brand” (fără sesiune, rol altul decât agency_admin/strategist, fără acces la brand, alt tenant, brand inexistent) |
-| `22023` | dată lipsă, în trecut (cu excepția primei versiuni) sau înainte de 2020-01-01; notă prea lungă; membrii nu sunt listă; mai puțin de 1 sau mai mult de 10 membri; nume lipsă, gol, prea lung sau duplicat; domeniu sau culoare invalide; profiluri sociale care nu sunt listă, cu rețea fără analiza competitorilor, handle invalid sau același profil la doi membri. Mesajele pe membru încep cu „Membrul N”. |
+| `22023` | dată lipsă, în trecut (cu excepția primei versiuni) sau înainte de 2020-01-01; notă prea lungă; membrii nu sunt listă; mai puțin de 1 sau mai mult de 10 membri; nume lipsă, gol, prea lung sau duplicat; domeniu sau culoare invalide. Mesajele pe membru încep cu „Membrul N”. |
 | `23505` | există deja o versiune cu aceeași `effective_from` |
 
 Orice eroare anulează toată tranzacția: nu rămâne set parțial. Versiunile existente nu se modifică. O versiune cu `effective_from` mai mică decât a unei versiuni viitoare existente primește totuși numărul următor (versiunea efectivă se alege după dată, nu după număr).
@@ -241,16 +240,6 @@ Migrația `20261023090000_people_identity_invite.sql`, decizia E-4. Emailul și 
 | F8 | Update și delete pe `competitor_sets` / `competitor_set_members` rămân interzise |
 
 Concurența reală (două sesiuni) nu poate fi reprodusă într-un test pgTAP, care rulează într-o singură tranzacție. Verificat manual pe 8 oct 2026, local: sesiunea A apelează funcția și ține tranzacția deschisă 4 s; sesiunea B apelează cu altă dată. B așteaptă lock-ul și primește versiunea imediat următoare (A=2, B=3, B întârziat cu 4 s).
-
-## Y. Metricile sociale ale competitorilor (pgTAP, `34_competitor_social.test.sql`)
-
-| # | Ce verifică |
-|---|---|
-| S1 | `create_competitor_set_version` cu profiluri sociale: rețea fără analiza competitorilor, handle invalid, același profil la doi membri și profiluri care nu sunt listă sunt respinse (22023); rețeaua și handle-ul se salvează cu litere mici, fără „@”; fără profiluri → `[]`; constrângerea ține și la insert direct (23514) |
-| S2 | `brand_competition`, grupul social: postări pe săptămână, urmăritori și interacțiuni publice pe postare pentru brand și competitori, din aceleași reguli; snapshoturile unei postări nu se dublează; X nu intră; competitorul fără profiluri sau fără observații e N/A cu motiv, nu 0; acoperirea sub 100% dă `partial`; `social_as_of` |
-| S3 | RLS pe `competitor_social_daily` și `competitor_social_posts`: clientul cu acces vede, clientul fără acces și adminul altui tenant nu văd nimic, nimeni nu scrie prin API |
-
-Gărzile de inventar includ cele 4 funcții private noi (A10: `competitor_social_platforms`, `valid_social_profiles` sunt pure; `competitor_social_stats`, `brand_social_public_stats` sunt INVOKER) și cele 2 politici SELECT noi (R1: 33). `tests/security/helpers.mjs` (`TABLES`) include tabelele noi, deci atacurile B1 le acoperă.
 
 ## B. Atacuri prin API (`tests/security/api-isolation.test.mjs`)
 

@@ -1,4 +1,4 @@
-import { failed, notConnected, ready, SOCIAL_PLATFORMS, type ProviderResult, type QueryContext, type SocialCompetitor, type SocialFilters, type SocialKpi, type SocialKpiKey, type SocialPlatform, type SocialPost, type SocialProvider } from '../../contracts'
+import { failed, notConnected, ready, SOCIAL_PLATFORMS, type ProviderResult, type QueryContext, type SocialFilters, type SocialKpi, type SocialKpiKey, type SocialPlatform, type SocialPost, type SocialProvider } from '../../contracts'
 import { METRIC_STATUSES } from '../../contracts'
 import { serverPeriodKind } from '../../lib/period'
 import type { DataClient } from './dataClient'
@@ -6,57 +6,7 @@ import type { DataClient } from './dataClient'
 const NO_SOURCE = 'Nu există date sociale pentru acest brand: Planable nu a rulat încă și nu există niciun import.'
 const CONTRACT = 'Răspunsul serverului nu respectă contractul așteptat. Reîncearcă sau anunță echipa tehnică.'
 const NO_FORMAT_TOPIC = 'Planable nu trimite formatul și subiectul postărilor, deci gruparea pe format și pe subiect nu se poate calcula.'
-const NO_SET = 'Brandul nu are încă un set de competitori în vigoare; comparația apare după configurarea lui.'
-const NO_PROFILES = 'Competitorii din set nu au profiluri sociale din Planable. Adaugă-le într-o versiune nouă a setului (Administrare → Configurare → Competitori).'
-const SOCIAL_KEYS = { posts_per_week: 'social_cadence', followers: 'social_followers', public_interactions_per_post: 'social_interactions_per_post' } as const
-
-type CompetitionCellRaw = { value?: unknown; status?: unknown; reason?: unknown }
-type CompetitionRaw = {
-  has_set?: unknown
-  entities?: Array<{ id?: unknown; name?: unknown; kind?: unknown; label?: unknown }>
-  groups?: Array<{ dimension?: unknown; rows?: Array<{ key?: unknown; cells?: Record<string, CompetitionCellRaw> }> }>
-  social_as_of?: Record<string, unknown>
-}
-
-/**
- * Concurența publică din matricea de Concurență (`brand_competition`, grupul social): aceleași valori și aceleași reguli ca
- * în ecranul Concurență. O celulă fără date (N/A, neconectată) devine `null`, nu 0.
- */
-export function socialCompetitors(raw: unknown): ProviderResult<SocialCompetitor[]> {
-  const d = raw as CompetitionRaw | null
-  if (!d || typeof d.has_set !== 'boolean') return failed(CONTRACT)
-  if (!d.has_set) return notConnected(NO_SET)
-  const social = d.groups?.find((g) => g.dimension === 'social')
-  if (!social || !Array.isArray(social.rows) || !Array.isArray(d.entities)) return failed(CONTRACT)
-  const cellOf = (key: string, id: string): CompetitionCellRaw | undefined => social.rows!.find((r) => r.key === key)?.cells?.[id]
-  const competitors = d.entities.filter((e) => e.kind === 'competitor')
-  if (!competitors.every((e) => typeof e.id === 'string' && typeof e.name === 'string' && typeof e.label === 'string')) return failed(CONTRACT)
-  const value = (key: string, id: string) => {
-    const c = cellOf(key, id)
-    if (c === undefined || !(METRIC_STATUSES as readonly string[]).includes(String(c.status))) throw new Error(CONTRACT)
-    return c.status === 'ok' || c.status === 'partial' ? num(c.value) : null
-  }
-  try {
-    const rows = competitors.map<SocialCompetitor>((e) => {
-      const id = e.id as string
-      const asOf = d.social_as_of?.[id]
-      return {
-        label: e.label as string,
-        name: e.name as string,
-        posts_per_week: value(SOCIAL_KEYS.posts_per_week, id),
-        followers: value(SOCIAL_KEYS.followers, id),
-        public_interactions_per_post: value(SOCIAL_KEYS.public_interactions_per_post, id),
-        as_of: typeof asOf === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(asOf) ? asOf : null,
-      }
-    })
-    // Niciun competitor nu are profiluri sociale: legătura cu datele Planable lipsește, nu datele.
-    const unlinked = competitors.every((e) => String(cellOf(SOCIAL_KEYS.posts_per_week, e.id as string)?.reason ?? '').includes('nu are profiluri sociale'))
-    if (competitors.length === 0 || unlinked) return notConnected(NO_PROFILES)
-    return ready(rows)
-  } catch {
-    return failed(CONTRACT)
-  }
-}
+const NO_COMPETITORS = 'Conturile sociale ale competitorilor nu se colectează încă; comparația apare după ce sunt adăugate.'
 
 /** Textele cardurilor (descrieri, nu formule: valorile vin din SQL). */
 const KPI_TEXT: Record<SocialKpiKey, { label: string; definition: string; note: string | null }> = {
@@ -158,10 +108,6 @@ export function createSupabaseSocial(client: DataClient): SocialProvider {
       )
     },
     groups: async () => notConnected(NO_FORMAT_TOPIC),
-    async competitors(ctx) {
-      const { data, error } = await client.rpc('brand_competition', { p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to, p_kind: serverPeriodKind(ctx.period.preset, ctx.comparison) })
-      if (error) return failed(error.code === '42501' ? 'Nu ai acces la acest spațiu de brand.' : 'Datele concurenței nu au putut fi citite. Reîncearcă.')
-      return socialCompetitors(data)
-    },
+    competitors: async () => notConnected(NO_COMPETITORS),
   }
 }

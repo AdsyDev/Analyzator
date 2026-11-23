@@ -130,7 +130,7 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
     },
   }
 
-  const versions = adminFile.competitor_versions as Record<string, Array<{ version: number; effective_from_days_ago: number; note: string | null; members: Array<{ id: string; name: string; domain: string | null; social_profiles?: Array<{ platform: string; handle: string }> }> }>>
+  const versions = adminFile.competitor_versions as Record<string, Array<{ version: number; effective_from_days_ago: number; note: string | null; members: Array<{ id: string; name: string; domain: string | null }> }>>
   const mappings: SeomonitorMapping[] = adminFile.seomonitor_mappings.map<SeomonitorMapping>((m) => ({
     campaign_id: m.campaign_id,
     group_id: m.group_id,
@@ -156,7 +156,7 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
         note: v.note,
         created_at: instantDaysAgo(v.effective_from_days_ago + 2),
         current: false,
-        members: v.members.map((m, i) => ({ ...m, social_profiles: m.social_profiles ?? [], label: `C${i + 1}` })),
+        members: v.members.map((m, i) => ({ ...m, label: `C${i + 1}` })),
       })),
     ].sort((a, b) => b.version - a.version)
     // În vigoare = cea mai mare dată de început ≤ azi (ca în providerul real).
@@ -192,7 +192,7 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
           note: input.note?.trim() || null,
           created_at: now().toISOString(),
           current: false,
-          members: input.members.map((m, i) => ({ id: `preview-${version}-${i}`, name: m.name.trim(), domain: m.domain?.trim().toLowerCase() || null, social_profiles: m.social.map((x) => ({ platform: x.platform, handle: x.handle.replace(/^@+/, '').toLowerCase() })), label: `C${i + 1}` })),
+          members: input.members.map((m, i) => ({ id: `preview-${version}-${i}`, name: m.name.trim(), domain: m.domain?.trim().toLowerCase() || null, label: `C${i + 1}` })),
         },
         ...(created[brandId] ?? []),
       ]

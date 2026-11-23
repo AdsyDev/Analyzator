@@ -76,12 +76,3 @@ API-ul Planable e nou și câteva lucruri nu sunt clare din documentație: dacă
 | Listening: puține mențiuni față de Planable | Planable trimite mențiuni fără URL sau fără dată; acestea nu pot fi scrise | Jurnalul rulării arată „N mențiuni sărite din <rețea>: <motiv>”. Rândurile se numără acolo, nu se pierd în tăcere; dacă o rețea întreagă e sărită, anunță echipa tehnică. |
 
 Importul CSV (`docs/connectors/csv.md`) rămâne o variantă de rezervă și scrie în aceleași tabele. O mențiune venită din ambele surse nu se dublează. Sentimentul corectat de echipă nu e suprascris nici de API, nici de CSV.
-
-## Competitorii (Y-6)
-
-| Simptom | Cauză | Ce faci |
-|---|---|---|
-| Notă „competitori: … add-on-ul Analytics e inactiv” | Pagina nu are add-on-ul Analytics sau tokenul nu o vede | Activează add-on-ul în Planable; nota dispare la următoarea rulare. |
-| Notă „@… nu are încă date în Planable” | Competitorul a fost adăugat recent; Planable nu l-a indexat (`scrapedPageId` lipsă) | Așteaptă indexarea Planable. |
-| În Concurență, celulele sociale ale unui competitor spun „nu are profiluri sociale” | Versiunea setului nu are profilurile lui | Administrare → Configurare → Competitori → Versiune nouă → „Propune din surse” și leagă profilurile. |
-| Notă „peste 100 de postări în săptămâna …” | Competitorul publică foarte des; ruta întoarce cel mult 100 de postări pe cerere | Ritmul acelei săptămâni poate fi subestimat. |

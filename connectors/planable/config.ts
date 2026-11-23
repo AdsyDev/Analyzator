@@ -3,8 +3,6 @@
 
 export const PLANABLE_BASE_URL = 'https://api.planable.io/api/v1'
 export const PLANABLE_SCHEMA_VERSION = 'openapi-2026-10-12'
-/** Rutele `/pages/{id}/competitors/*` au fost citite din specificație pe 2026-11-23 (Y-6). */
-export const PLANABLE_COMPETITORS_SCHEMA_VERSION = 'openapi-2026-11-23'
 
 /** Conexiunea la nivel de client (token) și conexiunea pe brand (workspace). */
 export const PLANABLE_CREDENTIAL_PROVIDER = 'planable_account'
@@ -30,6 +28,3 @@ export const PLANABLE_MENTIONS_PAGE_SIZE = 100
 export const PLANABLE_MAX_PAGES = 200
 
 export const PLANABLE_LOOKBACK_DAYS = 35
-
-/** /pages/{id}/competitors/top-posts: maximum 100 (documentat). O cerere care îl atinge se reia pe săptămâni. */
-export const PLANABLE_TOP_POSTS_LIMIT = 100

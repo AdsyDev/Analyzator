@@ -1,6 +1,6 @@
-import { CheckIcon, PlusIcon, SparkleIcon, TrashIcon, XIcon } from '@phosphor-icons/react'
+import { CheckIcon, PlusIcon, SparkleIcon, TrashIcon } from '@phosphor-icons/react'
 import { useId, useState, type FormEvent, type ReactNode } from 'react'
-import type { Brand, CompetitorSetVersion, CompetitorSuggestions, PlanableCompetitorSuggestion, ProviderResult, SocialProfile } from '../../contracts'
+import type { Brand, CompetitorSetVersion, CompetitorSuggestions, ProviderResult } from '../../contracts'
 import { Button } from '../../components/ui/Button'
 import { Dialog } from '../../components/ui/Dialog'
 import { useToast } from '../../components/ui/Toast'
@@ -16,11 +16,7 @@ const MIN_DATE = '2020-01-01'
 
 const PLATFORM_LABELS: Record<string, string> = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', tiktok: 'TikTok', linkedin: 'LinkedIn' }
 
-type Row = { key: number; name: string; domain: string; social: SocialProfile[] }
-
-/** Cheia unui profil, cum o salvează funcția SQL: rețea + handle cu litere mici, fără „@”. */
-const profileKey = (p: SocialProfile) => `${p.platform.toLowerCase()}:${p.handle.trim().replace(/^@+/, '').toLowerCase()}`
-const platformLabel = (p: string) => PLATFORM_LABELS[p] ?? p
+type Row = { key: number; name: string; domain: string }
 
 /**
  * Versiune nouă a setului de competitori. Pornește de la versiunea în vigoare (dacă există); „Propune din surse”
@@ -38,7 +34,7 @@ export function CompetitorSetDialog({ brand, versions, onClose, onCreated }: { b
   const [date, setDate] = useState(first ? addDays(today, -365) : today)
   const [note, setNote] = useState('')
   const [nextKey, setNextKey] = useState(base ? base.members.length + 1 : 2)
-  const [rows, setRows] = useState<Row[]>(base ? base.members.map((m, i) => ({ key: i + 1, name: m.name, domain: m.domain ?? '', social: m.social_profiles })) : [{ key: 1, name: '', domain: '', social: [] }])
+  const [rows, setRows] = useState<Row[]>(base ? base.members.map((m, i) => ({ key: i + 1, name: m.name, domain: m.domain ?? '' })) : [{ key: 1, name: '', domain: '' }])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<ProviderResult<CompetitorSuggestions> | 'loading' | null>(null)
@@ -58,9 +54,8 @@ export function CompetitorSetDialog({ brand, versions, onClose, onCreated }: { b
   else if (!first && date < today) problems.push('O versiune nouă începe azi sau mai târziu; doar prima versiune poate începe în trecut.')
   else if (versions.some((v) => v.effective_from === date)) problems.push(`Există deja o versiune care începe pe ${formatDate(date)}.`)
 
+  const usedNames = new Set(rows.map((r) => r.name.trim().toLowerCase()).filter(Boolean))
   const usedDomains = new Set(rows.map((r) => normalizeDomain(r.domain)).filter((d): d is string => !!d))
-  /** Profilurile deja legate: cheie → eticheta competitorului (C1…). */
-  const usedProfiles = new Map(rows.flatMap((r, i) => r.social.map((p) => [profileKey(p), `C${i + 1}`] as const)))
 
   function update(key: number, patch: Partial<Row>) {
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)))
@@ -74,28 +69,11 @@ export function CompetitorSetDialog({ brand, versions, onClose, onCreated }: { b
     })
     setNextKey((k) => k + 1)
   }
-  /**
-   * Un profil Planable se leagă de competitorul cu același nume; altfel devine un competitor nou. Prin profil se leagă
-   * metricile sociale colectate: fără el, rândurile sociale ale competitorului rămân N/A.
-   */
-  function addProfile(c: PlanableCompetitorSuggestion) {
-    const profile = { platform: c.platform, handle: c.handle }
-    if (usedProfiles.has(profileKey(profile))) return
-    const same = rows.find((r) => r.name.trim().toLowerCase() === c.name.toLowerCase())
-    if (same) update(same.key, { social: [...same.social, profile] })
-    else add({ name: c.name, domain: '', social: [profile] })
-  }
-  function linkProfile(c: PlanableCompetitorSuggestion, key: number) {
-    const profile = { platform: c.platform, handle: c.handle }
-    if (usedProfiles.has(profileKey(profile))) return
-    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, social: [...r.social, profile] } : r)))
-  }
-
   /** Leagă un domeniu de un competitor deja ales fără domeniu; altfel îl adaugă ca rând nou. */
   function addDomain(domain: string) {
     const target = rows.find((r) => r.name.trim() && !r.domain.trim())
     if (target) update(target.key, { domain })
-    else add({ name: domain, domain, social: [] })
+    else add({ name: domain, domain })
   }
 
   async function propose() {
@@ -111,7 +89,7 @@ export function CompetitorSetDialog({ brand, versions, onClose, onCreated }: { b
     const r = await providers.config.createCompetitorSetVersion(brand.id, {
       effective_from: date,
       note: note.trim() || null,
-      members: filled.map((m) => ({ name: m.name.trim(), domain: normalizeDomain(m.domain) ?? null, social: m.social })),
+      members: filled.map((m) => ({ name: m.name.trim(), domain: normalizeDomain(m.domain) ?? null })),
     })
     setBusy(false)
     if (r.kind !== 'ready') return setError(r.kind === 'error' ? r.message : r.reason)
@@ -140,7 +118,7 @@ export function CompetitorSetDialog({ brand, versions, onClose, onCreated }: { b
       <form id="competitor-set-form" onSubmit={submit} className="flex flex-col gap-5">
         <p className="text-[13px] leading-snug text-text-2">
           {first
-            ? `Primul set de competitori pentru ${brand.name}. Brief-ul cere trei competitori, validați cu Account și Strategie. Domeniul leagă competitorul de răspunsurile AI din SEOmonitor, iar profilurile din Planable de metricile sociale; fără ele, comparațiile respective rămân N/A.`
+            ? `Primul set de competitori pentru ${brand.name}. Brief-ul cere trei competitori, validați cu Account și Strategie. Domeniul leagă competitorul de răspunsurile AI din SEOmonitor; fără el, comparația AI rămâne N/A.`
             : `Pornește de la v${base?.version ?? versions[0]?.version} (în vigoare). Versiunile sunt imutabile: se creează v${Math.max(...versions.map((v) => v.version)) + 1}, iar istoricul rămâne.`}
         </p>
 
@@ -172,24 +150,6 @@ export function CompetitorSetDialog({ brand, versions, onClose, onCreated }: { b
                     autoComplete="off"
                     className={`${field} font-mono`}
                   />
-                  {r.social.length > 0 && (
-                    <ul className="flex flex-wrap gap-1.5 sm:col-span-2" aria-label={`Profilurile sociale ale competitorului ${i + 1}`}>
-                      {r.social.map((p) => (
-                        <li key={profileKey(p)} className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-2 py-0.5 pl-2.5 pr-1 text-[12px]">
-                          <span className="text-text-2">{platformLabel(p.platform)}</span>
-                          <span className="font-mono text-[11.5px]">@{p.handle.replace(/^@+/, '')}</span>
-                          <button
-                            type="button"
-                            className="grid size-5 place-items-center rounded-full text-text-3 hover:bg-neutral-soft hover:text-text"
-                            aria-label={`Scoate profilul ${platformLabel(p.platform)} @${p.handle.replace(/^@+/, '')} de la competitorul ${i + 1}`}
-                            onClick={() => update(r.key, { social: r.social.filter((x) => profileKey(x) !== profileKey(p)) })}
-                          >
-                            <XIcon size={11} weight="bold" />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                 </div>
                 <Button variant="ghost" className="px-2.5" icon={<TrashIcon size={14} />} aria-label={`Scoate competitorul ${i + 1}`} disabled={rows.length === 1} onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} />
               </li>
@@ -198,23 +158,13 @@ export function CompetitorSetDialog({ brand, versions, onClose, onCreated }: { b
           <datalist id={ids.names}>{planableNames.map((n) => <option key={n} value={n} />)}</datalist>
           <datalist id={ids.domains}>{seoDomains.map((d) => <option key={d} value={d} />)}</datalist>
           <div>
-            <Button variant="ghost" icon={<PlusIcon size={14} weight="bold" />} disabled={rows.length >= MAX_MEMBERS} onClick={() => { setRows((rs) => [...rs, { key: nextKey, name: '', domain: '', social: [] }]); setNextKey((k) => k + 1) }}>
+            <Button variant="ghost" icon={<PlusIcon size={14} weight="bold" />} disabled={rows.length >= MAX_MEMBERS} onClick={() => { setRows((rs) => [...rs, { key: nextKey, name: '', domain: '' }]); setNextKey((k) => k + 1) }}>
               Adaugă competitor
             </Button>
           </div>
         </fieldset>
 
-        <Suggestions
-          state={suggestions}
-          onPropose={propose}
-          usedProfiles={usedProfiles}
-          usedDomains={usedDomains}
-          full={rows.length >= MAX_MEMBERS && rows.every((r) => r.name.trim() || r.domain.trim())}
-          targets={rows.flatMap((r, i) => (r.name.trim() ? [{ key: r.key, label: `C${i + 1} · ${r.name.trim()}` }] : []))}
-          onAddProfile={addProfile}
-          onLinkProfile={linkProfile}
-          onAddDomain={addDomain}
-        />
+        <Suggestions state={suggestions} onPropose={propose} usedNames={usedNames} usedDomains={usedDomains} full={rows.length >= MAX_MEMBERS && rows.every((r) => r.name.trim() || r.domain.trim())} onAddName={(name) => add({ name, domain: '' })} onAddDomain={addDomain} />
 
         <div className="flex flex-col gap-1">
           <label htmlFor={ids.note} className="text-[12.5px] font-semibold">Notă <span className="font-normal text-text-3">(opțional)</span></label>
@@ -235,22 +185,18 @@ export function CompetitorSetDialog({ brand, versions, onClose, onCreated }: { b
 function Suggestions({
   state,
   onPropose,
-  usedProfiles,
+  usedNames,
   usedDomains,
   full,
-  targets,
-  onAddProfile,
-  onLinkProfile,
+  onAddName,
   onAddDomain,
 }: {
   state: ProviderResult<CompetitorSuggestions> | 'loading' | null
   onPropose: () => void
-  usedProfiles: Map<string, string>
+  usedNames: Set<string>
   usedDomains: Set<string>
   full: boolean
-  targets: Array<{ key: number; label: string }>
-  onAddProfile: (c: PlanableCompetitorSuggestion) => void
-  onLinkProfile: (c: PlanableCompetitorSuggestion, key: number) => void
+  onAddName: (name: string) => void
   onAddDomain: (domain: string) => void
 }) {
   return (
@@ -267,16 +213,9 @@ function Suggestions({
         <div className="flex flex-col gap-3">
           <SourceBlock title="Planable · profiluri urmărite drept competitori" outcome={state.data.planable.outcome} message={state.data.planable.message} notes={state.data.planable.notes}>
             {state.data.planable.competitors.map((c) => {
-              const usedBy = usedProfiles.get(profileKey(c)) ?? null
+              const used = usedNames.has(c.name.toLowerCase())
               return (
-                <SuggestionItem
-                  key={`${c.platform}:${c.handle}`}
-                  used={usedBy ? `La ${usedBy}` : null}
-                  disabled={full && !targets.some((t) => t.label.toLowerCase().endsWith(`· ${c.name.toLowerCase()}`))}
-                  onAdd={() => onAddProfile(c)}
-                  label={`Adaugă ${c.name}`}
-                  link={targets.length > 0 ? { name: c.name, targets, onLink: (key) => onLinkProfile(c, key) } : null}
-                >
+                <SuggestionItem key={`${c.platform}:${c.handle}`} used={used} disabled={full} onAdd={() => onAddName(c.name)} label={`Adaugă ${c.name}`}>
                   <span className="font-medium">{c.name}</span>
                   <span className="text-text-2"> · {PLATFORM_LABELS[c.platform] ?? c.platform} <span className="font-mono text-[11.5px]">@{c.handle.replace(/^@/, '')}</span></span>
                   <span className="block text-[11.5px] text-text-3">urmărit pe {c.tracked_from.join(', ')}</span>
@@ -288,7 +227,7 @@ function Suggestions({
             {state.data.seomonitor.domains.map((d) => {
               const used = usedDomains.has(d.domain.replace(/^www\./, ''))
               return (
-                <SuggestionItem key={d.domain} used={used ? 'În set' : null} disabled={false} onAdd={() => onAddDomain(d.domain)} label={`Adaugă ${d.domain}`} link={null}>
+                <SuggestionItem key={d.domain} used={used} disabled={false} onAdd={() => onAddDomain(d.domain)} label={`Adaugă ${d.domain}`}>
                   <span className="font-mono text-[12.5px]">{d.domain}</span>
                   <span className="text-text-2"> · {d.keywords} {d.keywords === 1 ? 'cuvânt cheie' : 'cuvinte cheie'}</span>
                 </SuggestionItem>
@@ -331,42 +270,14 @@ function SourceBlock({ title, outcome, message, notes, children }: { title: stri
   )
 }
 
-function SuggestionItem({
-  used,
-  disabled,
-  onAdd,
-  label,
-  link,
-  children,
-}: {
-  used: string | null
-  disabled: boolean
-  onAdd: () => void
-  label: string
-  /** Legarea unui profil de un competitor deja ales (de ex. pagina de Facebook a aceluiași competitor). */
-  link: { name: string; targets: Array<{ key: number; label: string }>; onLink: (key: number) => void } | null
-  children: ReactNode
-}) {
+function SuggestionItem({ used, disabled, onAdd, label, children }: { used: boolean; disabled: boolean; onAdd: () => void; label: string; children: ReactNode }) {
   return (
-    <li className="flex flex-wrap items-center gap-2 rounded-[10px] border border-border bg-surface px-2.5 py-1.5 text-[13px]">
-      <span className="min-w-0 flex-1 basis-48">{children}</span>
+    <li className="flex items-center gap-2 rounded-[10px] border border-border bg-surface px-2.5 py-1.5 text-[13px]">
+      <span className="min-w-0 flex-1">{children}</span>
       {used ? (
-        <span className="inline-flex items-center gap-1 text-[12px] text-pos-text"><CheckIcon size={13} weight="bold" /> {used}</span>
+        <span className="inline-flex items-center gap-1 text-[12px] text-pos-text"><CheckIcon size={13} weight="bold" /> În set</span>
       ) : (
-        <span className="flex items-center gap-1">
-          {link && (
-            <select
-              aria-label={`Leagă ${link.name} de un competitor ales`}
-              value=""
-              onChange={(e) => e.target.value && link.onLink(Number(e.target.value))}
-              className="h-8 max-w-40 rounded-[10px] border border-border-strong bg-surface px-2 text-[12.5px] text-text-2"
-            >
-              <option value="">Leagă de…</option>
-              {link.targets.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-            </select>
-          )}
-          <Button variant="ghost" className="h-8 px-2.5" icon={<PlusIcon size={13} weight="bold" />} aria-label={label} disabled={disabled} onClick={onAdd}>Adaugă</Button>
-        </span>
+        <Button variant="ghost" className="h-8 px-2.5" icon={<PlusIcon size={13} weight="bold" />} aria-label={label} disabled={disabled} onClick={onAdd}>Adaugă</Button>
       )}
     </li>
   )

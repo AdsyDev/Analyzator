@@ -14,7 +14,6 @@ import { Section } from '../shared/Section'
 import { CompetitorSetDialog } from './CompetitorSetDialog'
 
 const KIND_LABELS = { brand: 'Brand', multi_brand: 'Multi-brand', excluded: 'Exclus' } as const
-const PLATFORM_LABELS: Record<string, string> = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', tiktok: 'TikTok', linkedin: 'LinkedIn' }
 
 const versionColumns: Column<CompetitorSetVersion>[] = [
   {
@@ -38,9 +37,6 @@ const versionColumns: Column<CompetitorSetVersion>[] = [
           <li key={m.id}>
             <span className="font-mono text-[11px] text-text-3">{m.label}</span> {m.name}
             {m.domain && <span className="text-text-2"> · {m.domain}</span>}
-            {m.social_profiles.length > 0 && (
-              <span className="block pl-6 text-[11.5px] text-text-3">{m.social_profiles.map((p) => `${PLATFORM_LABELS[p.platform] ?? p.platform} @${p.handle}`).join(' · ')}</span>
-            )}
           </li>
         ))}
         {v.members.length === 0 && <li className="text-text-3">Fără competitori</li>}
