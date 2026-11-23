@@ -388,3 +388,41 @@ export function coveredFrom(previous: { covered_from: string | null; covered_to:
   const continuous = dayAfter.toISOString().slice(0, 10) >= windowStart
   return continuous && previous.covered_from < windowStart ? previous.covered_from : windowStart
 }
+
+/** Un membru al setului de competitori în vigoare, cu eticheta din matrice (C1, C2…). */
+export type SetMember = { label: string; name: string; listening_keywords: string[]; social_handles: string[] }
+
+const sameWord = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+/** Competitorii cărora le aparține un cuvânt de tip „competitor”: cuvintele lor sau, la lista goală, numele (ca în SQL). */
+export function keywordOwners(members: SetMember[], text: string): SetMember[] {
+  return members.filter((m) => (m.listening_keywords.length ? m.listening_keywords : [m.name]).some((w) => sameWord(w, text)))
+}
+
+/** Competitorii cărora le aparține un profil Planable Competitors: handle-urile lor sau, la lista goală, cheia numelui (ca în SQL). */
+export function profileOwners(members: SetMember[], handle: string, displayName: string): SetMember[] {
+  const h = handle.trim().replace(/^@/, '').toLowerCase()
+  return members.filter((m) =>
+    m.social_handles.length ? m.social_handles.includes(h) : [accountKey(displayName), accountKey(handle)].includes(accountKey(m.name)) && accountKey(m.name) !== '',
+  )
+}
+
+/**
+ * Raportul de atribuire pentru jurnalul rulării: ce cuvânt sau profil a mers la care competitor din setul în vigoare, ce a rămas
+ * neatribuit și ce competitor nu are nimic. Doar nume de branduri și cuvinte urmărite, nimic despre autori. Nu schimbă statusul.
+ */
+export function attributionNotes(o: { brand: string; version: number | null; members: SetMember[]; kind: 'cuvântul' | 'profilul'; items: Array<{ text: string; owners: SetMember[] }> }): string[] {
+  if (o.version === null) return [`${o.brand}: brandul nu are un set de competitori în vigoare; datele nu apar în Concurență până la configurare`]
+  const out: string[] = []
+  const MAX = 25
+  for (const i of o.items.slice(0, MAX)) {
+    out.push(i.owners.length
+      ? `${o.brand}, set v${o.version}: ${o.kind} „${i.text}” → ${i.owners.map((m) => `${m.label} ${m.name}`).join(', ')}`
+      : `${o.brand}, set v${o.version}: ${o.kind} „${i.text}” nu corespunde niciunui competitor din set; nu apare în Concurență`)
+  }
+  if (o.items.length > MAX) out.push(`${o.brand}: încă ${o.items.length - MAX} elemente, nelistate`)
+  for (const m of o.members) {
+    if (!o.items.some((i) => i.owners.includes(m))) out.push(`${o.brand}, set v${o.version}: ${m.label} ${m.name} nu are niciun ${o.kind === 'cuvântul' ? 'cuvânt urmărit' : 'profil urmărit'}; apare N/A`)
+  }
+  return out
+}
