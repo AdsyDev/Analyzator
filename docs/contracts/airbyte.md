@@ -113,6 +113,8 @@ Pe pagina oricărui site, cardul Airbyte, pasul „Conturile tuturor site-urilor
 - Doar site-urile active primesc propuneri. Un cont legat deja (pe orice site al clientului) nu se mai propune.
 - Nimic nu se leagă fără „Leagă conturile alese”. Fiecare legătură e o conexiune `airbyte` obișnuită (RLS, `agency_admin`), cu numele contului ca nume afișat; erorile apar pe rândul contului. Dacă conexiunile unui site nu pot fi citite, nu se propune nimic (altfel s-ar putea propune un cont deja legat).
 
+**Din worker:** `npm run map:airbyte` (sau Actions → `airbyte-map`) folosește aceeași propunere. Fără `--apply` doar o afișează; cu `--apply` leagă conturile cu un singur site propus (conexiuni `airbyte` cu numele contului), iar cele ambigue și cele fără potrivire rămân nelegate și apar în rezumat. Brandurile și conexiunile se citesc filtrat pe tenantul destinației.
+
 ## Colectarea (E-8, etapa 2)
 
 `npm run collect:airbyte` (`connectors/airbyte/collect.ts`), zilnic din `.github/workflows/airbyte-daily.yml` (05:20 UTC, activ cu `CONNECTOR_AIRBYTE_ENABLED = true`). Reimportă ultimele 35 de zile, până ieri (Europe/Bucharest). **Istoricul:** `npm run collect:airbyte -- --from YYYY-MM-DD [--brand <uuid>]` sau Actions → `airbyte-daily` → Run workflow cu `from` (și opțional `brand`): de la acea zi până ieri, cel mult 730 de zile în urmă. Reimportul e idempotent (aceeași cheie `paid_daily`).
