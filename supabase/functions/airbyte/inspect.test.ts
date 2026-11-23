@@ -121,6 +121,31 @@ describe('detectarea tabelelor', () => {
   })
 })
 
+describe('lista de conturi pentru mapare', () => {
+  test('conturile doar din catalog apar, cu rânduri null (nu 0)', async () => {
+    const f = fakeSession([...META, ...META_CATALOG], {
+      'from "meta"."ad_account"': [{ account_id: '111', name: 'Aflamin RO' }, { account_id: '333', name: 'Proenzi RO' }],
+      'from "meta"."ads_insights"': [account('111', null, 50, '2026-09-01', '2026-10-25')],
+    })
+    const r = await inspect(f.session, Date.now() + 60_000)
+    assert.deepEqual(r.accounts.map((a) => [a.account_id, a.name, a.rows, a.tables]), [['111', 'Aflamin RO', 50, 1], ['333', 'Proenzi RO', null, 0]])
+  })
+
+  test('rapoartele mici se citesc întâi; cataloagele nu intră în plafon', async () => {
+    const reports = Array.from({ length: 41 }, (_, i) => table('meta', `r${i}`, [['account_id', 'text'], ['date_start', 'date'], ['spend', 'numeric']])).flat()
+    const f = fakeSession([...reports, ...META_CATALOG], {
+      'pg_catalog.pg_class': Array.from({ length: 41 }, (_, i) => ({ schema: 'meta', table: `r${i}`, est: i === 0 ? 1_000_000 : i })),
+    })
+    const r = await inspect(f.session, Date.now() + 60_000)
+    const read = f.sql.filter((q) => q.includes('group by 1')).map((q) => /from "meta"\."([^"]+)"/.exec(q)![1])
+    assert.equal(read[0], 'ad_account', 'catalogul întâi')
+    assert.equal(read[1], 'r1')
+    assert.equal(read.includes('r0'), false, 'cel mai mare raport rămâne peste plafon')
+    assert.equal(read.length, 41)
+    assert.equal(r.truncated, true)
+  })
+})
+
 describe('erori și limite', () => {
   test('un tabel cu timeout rămâne marcat, celelalte se citesc', async () => {
     const f = fakeSession([...META, ...TIKTOK], {

@@ -116,9 +116,16 @@ describe('sources.statuses (supabase)', () => {
     expect((await get({ source_connections: [conn({ credential_status: 'missing' })], sync_runs: [], import_batches: [] })).clarity).toMatchObject({ state: 'not_connected', note: 'Token neconfigurat.' })
   })
 
-  it('Airbyte: conturi legate, dar fără colector încă → neconectat, cu motivul (E-6, etapa 2)', async () => {
-    const s = await get({ source_connections: [conn({ provider: 'airbyte', external_account_id: 'meta_ads:123', credential_status: 'missing' })], sync_runs: [], import_batches: [] })
-    expect(s.airbyte).toMatchObject({ state: 'not_connected', note: expect.stringContaining('colectarea din Airbyte în Paid Media nu e încă activă') })
+  it('Airbyte: rulările cu sursa platformei sunt ale cardului Airbyte (după conexiune), nu ale conectorului API', async () => {
+    const ab = conn({ id: 'c-ab', provider: 'airbyte', external_account_id: 'meta_ads:123', credential_status: 'missing' })
+    expect((await get({ source_connections: [ab], sync_runs: [], import_batches: [] })).airbyte).toMatchObject({ state: 'not_connected', note: 'Fără nicio sincronizare încheiată cu date.' })
+    const s = await get({ source_connections: [ab], sync_runs: [run({ source: 'meta_ads', source_connection_id: 'c-ab', period_end: '2026-11-22' })], import_batches: [] })
+    expect(s.airbyte).toMatchObject({ state: 'connected', data_as_of: '2026-11-22' })
+    expect(s.meta_ads?.state).toBe('not_connected')
+    // O rulare a conectorului API Meta rămâne a lui.
+    const api = await get({ source_connections: [ab, conn({ id: 'c-meta', provider: 'meta_ads', external_account_id: 'act_9' })], sync_runs: [run({ source: 'meta_ads', source_connection_id: 'c-meta' })], import_batches: [] })
+    expect(api.meta_ads?.state).toBe('connected')
+    expect(api.airbyte?.state).toBe('not_connected')
   })
 
   it('SEOmonitor: contul e al clientului; site-ul cu rulări e conectat fără conexiune proprie, fără rulări rămâne neconectat', async () => {

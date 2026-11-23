@@ -1,6 +1,6 @@
 # Ghid: Airbyte (Paid Ads din destinația Postgres)
 
-Pentru agenție (`agency_admin`). Airbyte-ul AdSymphony sincronizează deja conturile Meta, Google Ads și TikTok într-o bază Postgres. Analyzator se conectează la ea cu un utilizator **doar de citire**, arată ce tabele, conturi și metrici găsește, iar tu legi conturile de site-uri. Colectarea datelor în Paid Media e etapa 2 (încă nefăcută, decizia E-6). Detalii tehnice: `docs/contracts/airbyte.md`.
+Pentru agenție (`agency_admin`). Airbyte-ul AdSymphony sincronizează deja conturile Meta, Google Ads și TikTok într-o bază Postgres. Analyzator se conectează la ea cu un utilizator **doar de citire**, arată ce tabele, conturi și metrici găsește, iar tu legi conturile de site-uri (toate deodată sau unul câte unul). Apoi colectorul zilnic aduce costul, afișările, clickurile și conversiile în Paid Media (deciziile E-6 și E-8). Detalii tehnice: `docs/contracts/airbyte.md`.
 
 ## 1. Pe serverul Postgres (o singură dată)
 
@@ -9,15 +9,17 @@ Funcțiile server Supabase se conectează doar criptat și verifică certificatu
 1. **Un nume de domeniu** pentru server, de exemplu `airbyte-db.adsymphony.ro`. Un IP nu merge, pentru că certificatul se verifică pe nume.
 2. **TLS activ în Postgres, cu un certificat valid pentru acel nume.** Două variante:
    - **Certificat public (recomandat):** Let's Encrypt (certbot) pentru `airbyte-db.adsymphony.ro`, apoi în `postgresql.conf`: `ssl = on`, `ssl_cert_file = '.../fullchain.pem'`, `ssl_key_file = '.../privkey.pem'` (cheia citibilă doar de utilizatorul `postgres`). Repornește sau reîncarcă Postgres. Certificatul se reînnoiește la 90 de zile; reîncarcă Postgres după reînnoire.
-   - **Autoritate proprie (CA):** creezi un CA și un certificat de server semnat de el, cu numele în `subjectAltName`. La pasul 3 atașezi certificatul CA (doar partea publică). Comenzi orientative:
+   - **Autoritate proprie (CA):** creezi un CA și un certificat de server semnat de el, cu numele în `subjectAltName`. La pasul 3 atașezi certificatul CA (doar partea publică). Comenzi orientative (merg pe OpenSSL 1.1.1 și 3.x):
      ```bash
-     openssl req -new -x509 -days 3650 -nodes -subj "/CN=AdSymphony Airbyte CA" -keyout ca.key -out ca.crt \
-       -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign"
-     openssl req -new -nodes -subj "/CN=airbyte-db.adsymphony.ro" -keyout server.key -out server.csr
-     printf "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:airbyte-db.adsymphony.ro\n" > server.ext
+     printf "[req]\ndistinguished_name=dn\nx509_extensions=v3_ca\nprompt=no\n[dn]\nCN=AdSymphony Airbyte CA\n[v3_ca]\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign\nsubjectKeyIdentifier=hash\n" > ca.cnf
+     openssl req -new -x509 -days 3650 -nodes -newkey rsa:2048 -config ca.cnf -keyout ca.key -out ca.crt
+     openssl req -new -nodes -newkey rsa:2048 -subj "/CN=airbyte-db.adsymphony.ro" -keyout server.key -out server.csr
+     printf "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:airbyte-db.adsymphony.ro\nauthorityKeyIdentifier=keyid\n" > server.ext
      openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 825 -out server.crt -extfile server.ext
+     openssl verify -CAfile ca.crt -verify_hostname airbyte-db.adsymphony.ro server.crt   # trebuie: server.crt: OK
      ```
      `server.crt` și `server.key` merg în Postgres. `ca.crt` se lipește în aplicație. `ca.key` rămâne offline.
+     **Nu folosi `-addext` la CA pe OpenSSL 1.1.1** (Ubuntu 20.04): extensia se adaugă a doua oară peste cea din configurația implicită, CA-ul devine invalid, iar verificarea dă `unable to verify the first certificate` / `tls_failed`. Fișierul `ca.cnf` de mai sus evită configurația implicită.
    - **Nu merge:** un certificat self-signed simplu (`openssl req -x509` pentru server, fără CA separat) și nici serverul fără TLS.
 3. **Portul deschis din internet** (de obicei 5432) și o regulă în `pg_hba.conf` pentru utilizatorul read-only, cu `hostssl` (doar conexiuni criptate) și `scram-sha-256`. Funcțiile server Supabase nu au IP-uri de ieșire fixe garantate, deci regula e pe utilizator, parolă și TLS, nu pe IP: `hostssl airbyte analyzator_ro 0.0.0.0/0 scram-sha-256` (și `::/0` pentru IPv6).
 
@@ -47,10 +49,11 @@ alter default privileges for role airbyte_user in schema meta, google_ads, tikto
    `postgresql://analyzator_ro:<parolă>@airbyte-db.adsymphony.ro:5432/airbyte?sslmode=require`
    Parola trebuie codată în URL dacă are caractere speciale (`@` → `%40`, `:` → `%3A`, `/` → `%2F`). Câmpul se golește după salvare, iar connection string-ul nu se mai poate citi din aplicație.
 3. **Inspectează datele:** vezi tabelele găsite pe platforme (raport sau catalog de nume), conturile, perioada, ultima sincronizare Airbyte și metricile. Ai 30 de inspecții pe zi per client.
-4. **Pasul 2, conturile site-ului:** alegi contul din listă (propus după numele site-ului) → **Adaugă conexiunea**. Formularul rămâne pentru următorul cont (de exemplu Meta și Google Ads pe același site). Manual: `meta_ads:<ID>`, `google_ads:<ID fără cratime>`, `tiktok_ads:<ID>`.
-5. Celelalte site-uri ale clientului refolosesc destinația. La ele faci doar pasul 2.
+4. **Pasul 3, conturile tuturor site-urilor (recomandat):** **Propune conturile pentru toate site-urile**. Fiecare cont nelegat primește site-ul potrivit după nume și domeniu (de ex. „Proenzi RO (EUR)” → Proenzi), pe Meta, Google Ads și TikTok. Verifică lista: schimbi site-ul din meniu, „—” înseamnă că nu se leagă, iar „Ambiguu” cere să alegi tu. Apoi **Leagă conturile alese**. Conturile deja legate nu se mai propun. Consumă o inspecție.
+5. **Pasul 2, un singur cont pe site:** alegi contul din listă (propus după numele site-ului) → **Adaugă conexiunea**. Manual: `meta_ads:<ID>`, `google_ads:<ID fără cratime>`, `tiktok_ads:<ID>`.
+6. **Colectarea:** zilnic la 05:20 UTC (`airbyte-daily`, după ce administratorul activează `CONNECTOR_AIRBYTE_ENABLED`), sau imediat din GitHub Actions → `airbyte-daily` → Run workflow. După prima rulare, conexiunea contului arată „Acces confirmat” și numărul de rânduri, iar datele apar în Paid Media.
 
-Conexiunea contului apare cu „Colectare neactivă” până la etapa 2.
+**Un cont, o singură metodă:** dacă un cont e legat și la cardul Meta Ads / Google Ads / TikTok Ads (API), colectarea din Airbyte îl sare (motivul apare în rulare). Scoate una dintre conexiuni.
 
 ## Când ceva nu merge
 
@@ -65,3 +68,6 @@ Conexiunea contului apare cu „Colectare neactivă” până la etapa 2.
 | Utilizatorul nu vede niciun tabel… (`ok` fără tabele) | Lipsesc `grant usage` / `grant select` pe schemele Airbyte. |
 | Tabelul nu a răspuns la timp | Tabelul e foarte mare (de obicei rapoartele pe anunț). Restul se citește; conturile apar din celelalte tabele. |
 | Limita de 30 de inspecții (`budget_exhausted`) | Revino mâine (ziua UTC). |
+| Colectarea: `stream_not_found` | Utilizatorul read-only nu vede fluxul standard al platformei (`ads_insights`, `campaign` / `account_performance_report`, `*_reports_daily`). Activează fluxul în conexiunea Airbyte sau dă `GRANT SELECT`. |
+| Colectarea: `currency_missing` | Moneda contului nu e în raport și nici în catalog (`ad_account`, `customer`, `advertisers`). Activează fluxul-catalog în Airbyte. |
+| Colectarea: „colectat deja prin conectorul API” | Contul e legat și la cardul API al platformei. Păstrează o singură conexiune. |

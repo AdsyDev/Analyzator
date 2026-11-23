@@ -30,6 +30,7 @@
     "collect:meta": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/meta/collect.ts",
     "collect:planable": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/planable/collect.ts",
     "collect:ads-transparency": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/ads-transparency/collect.ts",
+    "collect:airbyte": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/airbyte/collect.ts",
     "docs:csv": "node --experimental-strip-types scripts/generate-csv-docs.ts",
     "send:notifications": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/send-notifications.ts",
     "refresh:weekly": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/orchestrator/run.ts",
@@ -43,6 +44,7 @@
     "@google-analytics/data": "^7.2.1",
     "@googleapis/searchconsole": "^11.0.1",
     "google-auth-library": "^11.2.0",
+    "postgres": "3.4.5",
     "zod": "^4.6.5"
   }
 }
