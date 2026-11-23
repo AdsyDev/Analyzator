@@ -62,6 +62,26 @@ export const MentionSchema = z
     author: z.object({ name: z.string().nullable().optional(), username: z.string().nullable().optional() }).passthrough().nullable().optional(),
   })
   .passthrough()
+// Planable Competitors (specificația din 23 nov. 2026): profilurile urmărite pe o pagină proprie, seria zilnică și comparația.
+export const TrackedCompetitorSchema = z
+  .object({ trackedCompetitorId: z.string(), scrapedPageId: z.string().nullable(), handle: z.string(), displayName: z.string(), platform: z.string(), syncStatus: z.string().nullish(), lastSyncedAt: z.string().nullish() })
+  .passthrough()
+export const TrackedCompetitorsSchema = z.object({ data: z.array(TrackedCompetitorSchema) }).passthrough()
+const nullableNum = z.number().finite().nullable()
+export const CompetitorSeriesSchema = z
+  .object({
+    data: z.array(
+      z.object({ id: z.string(), isOwn: z.boolean(), handle: z.string().nullish(), displayName: z.string().nullish(), platform: z.string(), points: z.array(z.object({ date: z.string(), followers: nullableNum, engagement: nullableNum.optional() }).passthrough()) }).passthrough(),
+    ),
+  })
+  .passthrough()
+export const CompetitorComparisonSchema = z
+  .object({
+    data: z.array(z.object({ id: z.string(), isOwn: z.boolean(), handle: z.string().nullish(), displayName: z.string().nullish(), platform: z.string(), posts: nullableNum, totalEngagement: nullableNum }).passthrough()),
+  })
+  .passthrough()
+export type TrackedCompetitor = z.infer<typeof TrackedCompetitorSchema>
+
 export const MentionsSchema = z.object({ data: z.array(MentionSchema), pagination: z.object({ nextCursor: z.number().nullable() }).passthrough() }).passthrough()
 
 export type Page = z.infer<typeof PageSchema>

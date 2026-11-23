@@ -2,7 +2,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { advertisersByBrand, collectAdsTransparency } from './collect-core.ts'
 import { runQuery, type AuthedRequest } from './bigquery.ts'
-import { CREATIVES_SQL, adRow, countOf, formatOf, isoDateOf, regionFields } from './normalize.ts'
+import { SCHEMA_SQL, adRow, countOf, creativesSql, formatOf, isoDateOf, regionFields } from './normalize.ts'
 import { FakeDb } from '../shared/test-helpers.ts'
 
 // Răspunsurile BigQuery sunt construite după forma documentată a jobs.query (rânduri `f`/`v`, schema cu nume de câmpuri).
@@ -24,6 +24,11 @@ const bqRow = (adv: string, cr: string, fmt: string, first: string | null, last:
   f: [adv, `Advertiser ${adv}`, cr, fmt, `https://adstransparency.google.com/advertiser/${adv}/creative/${cr}?region=RO`, 'RO', region(first, last, extra)].map((v) => ({ v })),
 })
 const page = (rows: unknown[], o: Record<string, unknown> = {}) => ({ jobComplete: true, jobReference: { projectId: 'stada-proj', jobId: 'job1', location: 'US' }, schema: { fields: FIELDS.map((name) => ({ name, type: 'STRING' })) }, rows, totalBytesBilled: '12000000000', ...o })
+
+const ALL_FIELDS = ['advertiser_id', 'advertiser_disclosed_name', 'creative_id', 'ad_format_type', 'creative_page_url', 'topic', 'region_stats', 'region_stats.region_code',
+  'region_stats.first_shown', 'region_stats.last_shown', 'region_stats.times_shown_lower_bound', 'region_stats.times_shown_upper_bound']
+const schemaPage = (paths: string[] = ALL_FIELDS) => ({ status: 200, data: { jobComplete: true, jobReference: { projectId: 'stada-proj', jobId: 'schema', location: 'US' },
+  schema: { fields: [{ name: 'field_path' }, { name: 'data_type' }] }, rows: paths.map((p) => ({ f: [{ v: p }, { v: 'STRING' }] })), totalBytesBilled: '10485760' } })
 
 function fakeRequest(responses: Array<{ status: number; data: unknown }>) {
   const calls: Array<{ url: string; method: string; data?: unknown }> = []
@@ -93,9 +98,17 @@ describe('normalizare', () => {
     assert.equal(ok.row.first_shown, null)
   })
   test('interogarea citește doar coloanele folosite și filtrează pe parametri, nu pe text concatenat', () => {
-    assert.match(CREATIVES_SQL, /IN UNNEST\(@advertiser_ids\)/)
-    assert.match(CREATIVES_SQL, /rs\.region_code = @region/)
-    assert.doesNotMatch(CREATIVES_SQL, /SELECT \*|cs\.\*/)
+    const sql = creativesSql(new Set(ALL_FIELDS))
+    assert.match(sql, /IN UNNEST\(@advertiser_ids\)/)
+    assert.match(sql, /rs\.region_code = @region/)
+    assert.match(sql, /cs\.creative_page_url/)
+    assert.doesNotMatch(sql, /SELECT \*|cs\.\*|topic/)
+    assert.match(SCHEMA_SQL, /INFORMATION_SCHEMA\.COLUMN_FIELD_PATHS/)
+  })
+  test('o coloană opțională absentă din schemă devine NULL în interogare, nu o eroare', () => {
+    const sql = creativesSql(new Set(ALL_FIELDS.filter((f) => f !== 'ad_format_type')))
+    assert.match(sql, /CAST\(NULL AS STRING\) AS ad_format_type/)
+    assert.doesNotMatch(sql, /cs\.ad_format_type/)
   })
 })
 
@@ -144,16 +157,17 @@ describe('runQuery', () => {
 describe('collectAdsTransparency', () => {
   test('o interogare per client, scrisă pe fiecare brand doar pentru advertiserii lui; trackerii au și advertiserii fără reclame', async () => {
     const db = setup()
-    const f = fakeRequest([{ status: 200, data: page([
+    const f = fakeRequest([schemaPage(), { status: 200, data: page([
       bqRow('AR11111', 'CR1', 'IMAGE', '2026-11-01', '2026-11-20', { times_shown_lower_bound: 1000, times_shown_upper_bound: 2000 }),
       bqRow('AR11111', 'CR2', 'VIDEO', '2025-01-01', '2025-02-01'),
       bqRow('AR11111', 'bad id!', 'TEXT', '2026-11-01', '2026-11-02'),
     ]) }])
     const out = await collectAdsTransparency({ db, request: () => f.request, now: () => NOW, env: {} })
-    assert.equal(f.calls.length, 1, 'o singură interogare pentru client')
-    const params = (f.calls[0]!.data as { queryParameters: Array<{ name: string; parameterValue: unknown }> }).queryParameters
+    assert.equal(f.calls.length, 2, 'schema și o singură interogare pentru client')
+    assert.match((f.calls[0]!.data as { query: string }).query, /COLUMN_FIELD_PATHS/)
+    const params = (f.calls[1]!.data as { queryParameters: Array<{ name: string; parameterValue: unknown }> }).queryParameters
     assert.deepEqual(params.find((p) => p.name === 'advertiser_ids')!.parameterValue, { arrayValues: [{ value: 'AR11111' }, { value: 'AR22222' }] })
-    assert.match(f.calls[0]!.url, /\/projects\/stada-proj\/queries$/, 'plătește proiectul service account-ului')
+    assert.match(f.calls[1]!.url, /\/projects\/stada-proj\/queries$/, 'plătește proiectul service account-ului')
 
     assert.deepEqual(out.map((o) => [o.brand_id, o.status]).sort(), [[B1, 'succeeded'], [B2, 'succeeded']])
     const ads = db.tables.competitor_ads!
@@ -172,17 +186,18 @@ describe('collectAdsTransparency', () => {
     assert.ok(b1.errors.some((e) => e.dimension === 'ads_skipped' && /1 reclamă sărită/.test(e.message)))
     assert.ok(b1.errors.some((e) => e.dimension === 'bytes_billed' && /12\.00 GB/.test(e.message)))
     assert.equal(db.tables.sync_runs!.filter((r) => r.source === 'ads_transparency').length, 2)
-    assert.deepEqual(db.tables.provider_api_calls!.map((c) => [c.brand_id, c.calls]), [[null, 1]])
+    assert.deepEqual(db.tables.provider_api_calls!.map((c) => [c.brand_id, c.calls]), [[null, 2]])
+    assert.ok(!b1.errors.some((e) => e.dimension === 'schema'), 'toate câmpurile există: fără notă de schemă')
     assert.ok(!JSON.stringify(db.tables).includes('SECRET'), 'cheia privată nu ajunge în baza de date')
   })
 
   test('plafonul de bytes depășit: toate rulările clientului eșuează, cu indicația plafonului', async () => {
     const db = setup()
-    const f = fakeRequest([{ status: 400, data: { error: { message: 'Query exceeded limit for bytes billed', errors: [{ reason: 'bytesBilledLimitExceeded' }] } } }])
+    const f = fakeRequest([schemaPage(), { status: 400, data: { error: { message: 'Query exceeded limit for bytes billed', errors: [{ reason: 'bytesBilledLimitExceeded' }] } } }])
     const out = await collectAdsTransparency({ db, request: () => f.request, now: () => NOW, env: { ADS_TRANSPARENCY_MAX_GB: '20' } })
     assert.deepEqual(out.map((o) => o.status), ['failed', 'failed'])
     assert.match(out[0]!.errors[0]!.message, /Plafonul e 20 GB/)
-    assert.equal((f.calls[0]!.data as { maximumBytesBilled: string }).maximumBytesBilled, '20000000000')
+    assert.equal((f.calls[1]!.data as { maximumBytesBilled: string }).maximumBytesBilled, '20000000000')
     assert.equal(db.tables.competitor_trackers!.length, 0, 'fără trackeri: nimic nu pare colectat')
   })
 
@@ -206,9 +221,9 @@ describe('collectAdsTransparency', () => {
         { competitor_set_id: 's3', tenant_id: T2, brand_id: B3, ads_advertiser_ids: ['AR99999'] },
       ],
     })
-    const f = fakeRequest([{ status: 200, data: page([bqRow('AR99999', 'CR9', 'TEXT', '2026-11-01', '2026-11-02')]) }])
+    const f = fakeRequest([schemaPage(), { status: 200, data: page([bqRow('AR99999', 'CR9', 'TEXT', '2026-11-01', '2026-11-02')]) }])
     const out = await collectAdsTransparency({ db, request: () => f.request, now: () => NOW, env: {} })
-    const params = (f.calls[0]!.data as { queryParameters: Array<{ name: string; parameterValue: unknown }> }).queryParameters
+    const params = (f.calls[1]!.data as { queryParameters: Array<{ name: string; parameterValue: unknown }> }).queryParameters
     assert.deepEqual(params.find((p) => p.name === 'advertiser_ids')!.parameterValue, { arrayValues: [{ value: 'AR11111' }] })
     assert.equal(db.tables.competitor_ads!.length, 0, 'un rând al altui advertiser din răspuns nu se scrie')
     assert.deepEqual(out.map((o) => [o.tenant_id, o.status]).sort(), [[T1, 'succeeded'], [T2, 'not_connected']])
@@ -217,11 +232,35 @@ describe('collectAdsTransparency', () => {
   test('rezultat trunchiat: rulare parțială, trackeri marcați incompleți', async () => {
     const db = setup()
     const f = fakeRequest([
+      schemaPage(),
       { status: 200, data: page([bqRow('AR11111', 'CR1', 'IMAGE', '2026-11-01', '2026-11-20')], { pageToken: 'more' }) },
       ...Array.from({ length: 19 }, () => ({ status: 200, data: { rows: [], pageToken: 'more' } })),
     ])
     const out = await collectAdsTransparency({ db, request: () => f.request, now: () => NOW, env: {} })
     assert.deepEqual(out.map((o) => o.status), ['partial', 'partial'])
     assert.ok(db.tables.competitor_trackers!.every((t) => t.complete === false))
+  })
+
+  test('un câmp obligatoriu lipsă din schemă: toate rulările eșuează cu lista câmpurilor găsite, fără interogarea mare', async () => {
+    const db = setup()
+    const f = fakeRequest([schemaPage(ALL_FIELDS.filter((x) => x !== 'creative_id'))])
+    const out = await collectAdsTransparency({ db, request: () => f.request, now: () => NOW, env: {} })
+    assert.deepEqual(out.map((o) => [o.status, o.errors[0]!.code]), [['failed', 'schema_changed'], ['failed', 'schema_changed']])
+    assert.match(out[0]!.errors[0]!.message, /nu are câmpurile creative_id\. Câmpuri găsite: .*advertiser_id/)
+    assert.equal(f.calls.length, 1)
+  })
+
+  test('câmpuri opționale absente: interogarea merge, valorile rămân NULL, iar rularea notează câmpurile lipsă', async () => {
+    const db = setup()
+    const f = fakeRequest([
+      schemaPage(ALL_FIELDS.filter((x) => x !== 'creative_page_url' && x !== 'region_stats.times_shown_upper_bound')),
+      { status: 200, data: page([{ f: ['AR11111', 'Advertiser AR11111', 'CR1', 'IMAGE', null, 'RO', region('2026-11-01', '2026-11-20')].map((v) => ({ v })) }]) },
+    ])
+    const out = await collectAdsTransparency({ db, request: () => f.request, now: () => NOW, env: {} })
+    assert.match((f.calls[1]!.data as { query: string }).query, /CAST\(NULL AS STRING\) AS creative_page_url/)
+    assert.equal(db.tables.competitor_ads![0]!.source_url, null)
+    const note = out[0]!.errors.find((e) => e.dimension === 'schema')!
+    assert.match(note.message, /creative_page_url, region_stats\.times_shown_upper_bound/)
+    assert.equal(out[0]!.status, 'succeeded', 'o notă nu schimbă statusul')
   })
 })

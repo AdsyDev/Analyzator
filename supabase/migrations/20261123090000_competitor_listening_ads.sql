@@ -2,12 +2,16 @@
 --
 -- 1. Identificatorii competitorilor, pe membrii setului (versionați ca restul setului):
 --    `listening_keywords` = cuvintele de tip „competitor” din Planable Listening atribuite competitorului (lista goală = numele lui);
+--    `social_handles` = profilurile competitorului urmărite în Planable Competitors (lista goală = numele lui);
 --    `ads_advertiser_ids` = ID-urile de advertiser Google (AR…) din Ads Transparency Center.
 -- 2. `competitor_trackers`: ce a interogat colectarea (un cuvânt, un advertiser), cu intervalul acoperit. Deosebește
 --    „zero mențiuni / reclame” de „nu s-a colectat” (regula 8), fără să citească `sync_runs` (pe care clientul nu le vede, G-7).
 -- 3. `competitor_mentions`: mențiunile cuvintelor de tip „competitor”. Fără text și fără autor (doar rețea, link, dată, sentimentul furnizorului).
 -- 4. `competitor_ads`: reclamele advertiserilor competitorilor afișate într-o regiune, cu intervalul declarat de Google.
--- 5. `brand_competition`: Listening (mențiuni, share of voice) și Reclame pentru competitori; `brand_competitor_ads`: lista reclamelor. Regimul E8.
+-- 5. `competitor_social_daily`: Planable Competitors, pe profil și zi (followers, postări, interacțiuni), plus pagina proprie din
+--    aceeași comparație.
+-- 6. `brand_competition`: Social public, Listening (mențiuni, share of voice) și Reclame pentru competitori; `brand_competitor_ads`:
+--    lista reclamelor; `brand_social_competitors`: concurența publică din ecranul Social. Regimul E8.
 --
 -- Scrise doar de worker (service role). Nimic nu se deduce: un competitor fără cuvânt sau fără advertiser rămâne N/A cu motiv.
 
@@ -15,11 +19,17 @@
 
 alter table public.competitor_set_members
   add column listening_keywords text[] not null default '{}',
+  add column social_handles text[] not null default '{}',
   add column ads_advertiser_ids text[] not null default '{}',
   add constraint competitor_set_members_listening_keywords_check check (
     cardinality(listening_keywords) <= 10
     and array_position(listening_keywords, null) is null
     and length(array_to_string(listening_keywords, '')) <= 2000
+  ),
+  add constraint competitor_set_members_social_handles_check check (
+    cardinality(social_handles) <= 10
+    and array_position(social_handles, null) is null
+    and length(array_to_string(social_handles, '')) <= 1000
   ),
   add constraint competitor_set_members_ads_advertiser_ids_check check (
     cardinality(ads_advertiser_ids) <= 10
@@ -28,6 +38,8 @@ alter table public.competitor_set_members
 
 comment on column public.competitor_set_members.listening_keywords is
   'Cuvintele de tip „competitor” din Planable Listening atribuite competitorului (comparate fără diferență de majuscule). Lista goală = numele competitorului.';
+comment on column public.competitor_set_members.social_handles is
+  'Profilurile competitorului din Planable Competitors (handle, fără @, comparat fără majuscule). Lista goală = profilurile al căror nume corespunde numelui competitorului.';
 comment on column public.competitor_set_members.ads_advertiser_ids is
   'ID-urile de advertiser din Google Ads Transparency Center (AR urmat de cifre). Lista goală = reclamele competitorului nu se colectează.';
 
@@ -62,6 +74,8 @@ declare
   v_words_all text[] := '{}';
   v_ads       text[];
   v_ads_all   text[] := '{}';
+  v_handles   text[];
+  v_handles_all text[] := '{}';
 begin
   -- Același răspuns pentru brand inexistent, brand străin și rol insuficient (fără oracol de existență).
   if (select auth.uid()) is null
@@ -191,6 +205,32 @@ begin
       v_words_all := v_words_all || v_text;
     end loop;
 
+    -- Profilurile din Planable Competitors: handle-ul, fără @ și cu litere mici, fiecare la un singur competitor.
+    v_handles := '{}';
+    if jsonb_typeof(v_member -> 'social_handles') not in ('array', 'null') and v_member ? 'social_handles' then
+      raise exception 'Membrul % (%): social_handles trebuie să fie o listă de texte', v_pos, v_name using errcode = '22023';
+    end if;
+    if jsonb_typeof(v_member -> 'social_handles') = 'array' then
+      for v_item in select value from jsonb_array_elements(v_member -> 'social_handles') loop
+        if jsonb_typeof(v_item) <> 'string' then
+          raise exception 'Membrul % (%): fiecare profil din social_handles trebuie să fie text', v_pos, v_name using errcode = '22023';
+        end if;
+        v_text := lower(regexp_replace(btrim(v_item #>> '{}'), '^@', ''));
+        if v_text = '' or length(v_text) > 100 or v_text ~ '\s' then
+          raise exception 'Membrul % (%): profilul „%” trebuie să aibă între 1 și 100 de caractere, fără spații', v_pos, v_name, v_item #>> '{}'
+            using errcode = '22023';
+        end if;
+        if v_text = any (v_handles_all) then
+          raise exception 'Membrul % (%): profilul % apare de mai multe ori în set', v_pos, v_name, v_text using errcode = '22023';
+        end if;
+        v_handles := v_handles || v_text;
+        v_handles_all := v_handles_all || v_text;
+      end loop;
+      if cardinality(v_handles) > 10 then
+        raise exception 'Membrul % (%): cel mult 10 profiluri în social_handles', v_pos, v_name using errcode = '22023';
+      end if;
+    end if;
+
     -- ID-urile de advertiser Google (Ads Transparency Center): AR urmat de cifre, fiecare la un singur competitor.
     v_ads := '{}';
     if jsonb_typeof(v_member -> 'ads_advertiser_ids') not in ('array', 'null') and v_member ? 'ads_advertiser_ids' then
@@ -217,8 +257,8 @@ begin
       end if;
     end if;
 
-    insert into public.competitor_set_members (tenant_id, brand_id, competitor_set_id, name, domain, color, sort_order, listening_keywords, ads_advertiser_ids)
-    values (v_tenant_id, p_brand_id, v_set_id, v_name, v_domain, v_color, v_pos - 1, v_keywords, v_ads);
+    insert into public.competitor_set_members (tenant_id, brand_id, competitor_set_id, name, domain, color, sort_order, listening_keywords, social_handles, ads_advertiser_ids)
+    values (v_tenant_id, p_brand_id, v_set_id, v_name, v_domain, v_color, v_pos - 1, v_keywords, v_handles, v_ads);
   end loop;
 
   return query select v_set_id, v_version, p_effective_from, v_count;
@@ -232,10 +272,13 @@ create table public.competitor_trackers (
   tenant_id     uuid not null,
   brand_id      uuid not null,
   -- planable_listening: un cuvânt de tip „competitor” (external_id = keywordId, label = textul cuvântului);
+  -- planable_competitors: un profil urmărit în Planable Competitors (external_id = scrapedPageId, label = handle-ul);
   -- google_ads_transparency: un advertiser (external_id = ID-ul AR…, label = numele declarat de advertiser).
-  source        text not null check (source in ('planable_listening', 'google_ads_transparency')),
+  source        text not null check (source in ('planable_listening', 'planable_competitors', 'google_ads_transparency')),
   external_id   text not null check (length(external_id) between 1 and 128),
   label         text check (length(label) <= 512),
+  -- planable_competitors: numele afișat al profilului (atribuirea după numele competitorului); NULL pentru celelalte surse.
+  display_name  text check (length(display_name) <= 512),
   -- Zilele (Europe/Bucharest) pentru care colectarea a citit tot ce oferă sursa. covered_from NULL = fără limită inferioară
   -- declarată (Ads Transparency dă tot istoricul reclamelor păstrate de Google).
   covered_from  date,
@@ -331,14 +374,51 @@ create index competitor_ads_brand_shown_idx on public.competitor_ads (tenant_id,
 create trigger competitor_ads_updated_at before update on public.competitor_ads
   for each row execute function private.set_updated_at();
 
+-- 5. Planable Competitors ----------------------------------------------------------------------------------------------------
+
+create table public.competitor_social_daily (
+  id             bigint generated always as identity primary key,
+  tenant_id      uuid not null,
+  brand_id       uuid not null,
+  platform       text not null check (platform ~ '^[a-z_]{1,32}$'),
+  -- Profilul: scrapedPageId pentru un competitor; ID-ul paginii Planable pentru pagina proprie (is_own).
+  profile_id     text not null check (length(profile_id) between 1 and 128),
+  is_own         boolean not null,
+  handle         text check (length(handle) <= 256),
+  display_name   text check (length(display_name) <= 512),
+  -- Ziua, în fusul workspace-ului. NULL = sursa nu a dat valoarea (nu zero).
+  date           date not null,
+  -- Urmăritorii din seria zilnică (/competitors/metrics).
+  followers      numeric check (followers >= 0),
+  -- Postările publicate în zi și interacțiunile lor (/competitors/comparison pe fereastra unei zile).
+  posts          numeric check (posts >= 0),
+  engagement     numeric check (engagement >= 0),
+  source_id      uuid not null,
+  sync_run_id    uuid references public.sync_runs (id) on delete set null,
+  collected_at   timestamptz not null,
+  payload_hash   text not null check (payload_hash ~ '^[0-9a-f]{64}$'),
+  schema_version text not null,
+  updated_at     timestamptz not null default now(),
+  unique (tenant_id, brand_id, platform, profile_id, date),
+  foreign key (tenant_id, brand_id) references public.brands (tenant_id, id) on delete restrict,
+  foreign key (tenant_id, source_id) references public.source_connections (tenant_id, id) on delete restrict
+);
+comment on table public.competitor_social_daily is
+  'Planable Competitors: profilurile publice ale competitorilor și pagina proprie, pe zi. Interacțiunile competitorilor sunt colectate '
+  'de Planable din pagina publică, ale paginii proprii raportate de platformă (Planable: „baze ușor diferite”). Scris doar de worker.';
+create index competitor_social_daily_brand_idx on public.competitor_social_daily (tenant_id, brand_id, date);
+create trigger competitor_social_daily_updated_at before update on public.competitor_social_daily
+  for each row execute function private.set_updated_at();
+
 -- RLS: citire pentru oricine are acces la brand (inclusiv clientul), scriere doar service role ------------------------------
 
 alter table public.competitor_trackers enable row level security;
 alter table public.competitor_mentions enable row level security;
 alter table public.competitor_ads enable row level security;
-revoke all on public.competitor_trackers, public.competitor_mentions, public.competitor_ads from public, anon, authenticated;
-grant select on public.competitor_trackers, public.competitor_mentions, public.competitor_ads to authenticated;
-grant all on public.competitor_trackers, public.competitor_mentions, public.competitor_ads to service_role;
+alter table public.competitor_social_daily enable row level security;
+revoke all on public.competitor_trackers, public.competitor_mentions, public.competitor_ads, public.competitor_social_daily from public, anon, authenticated;
+grant select on public.competitor_trackers, public.competitor_mentions, public.competitor_ads, public.competitor_social_daily to authenticated;
+grant all on public.competitor_trackers, public.competitor_mentions, public.competitor_ads, public.competitor_social_daily to service_role;
 
 create policy competitor_trackers_select on public.competitor_trackers for select to authenticated
   using (brand_id in (select private.accessible_brand_ids()));
@@ -357,6 +437,86 @@ create policy competitor_ads_select on public.competitor_ads for select to authe
 create policy competitor_ads_insert on public.competitor_ads for insert to authenticated with check (false);
 create policy competitor_ads_update on public.competitor_ads for update to authenticated using (false);
 create policy competitor_ads_delete on public.competitor_ads for delete to authenticated using (false);
+
+create policy competitor_social_daily_select on public.competitor_social_daily for select to authenticated
+  using (brand_id in (select private.accessible_brand_ids()));
+create policy competitor_social_daily_insert on public.competitor_social_daily for insert to authenticated with check (false);
+create policy competitor_social_daily_update on public.competitor_social_daily for update to authenticated using (false);
+create policy competitor_social_daily_delete on public.competitor_social_daily for delete to authenticated using (false);
+
+-- Social public pe competitor, pentru matrice și pentru ecranul Social (aceleași valori). SECURITY INVOKER: citește prin RLS.
+-- Profilurile competitorului: handle-urile din `social_handles` sau, la lista goală, cele al căror nume afișat ori handle are
+-- aceeași cheie ca numele lui (fără diacritice, majuscule, spații și semne). Postările și interacțiunile vin din comparația pe zi;
+-- urmăritorii = suma, pe profiluri, a ultimei valori din perioadă (ca la brand). Acoperirea: zilele colectate pentru toate profilurile.
+create function private.competitor_social(p_brand_id uuid, p_set uuid, p_start date, p_end date)
+returns jsonb language plpgsql stable set search_path = '' as $$
+declare
+  m         record;
+  v_out     jsonb := '{}'::jsonb;
+  v_ids     text[];
+  v_n       bigint;
+  v_from    date;
+  v_to      date;
+  v_complete boolean;
+  v_days    integer;
+  v_cov     numeric;
+  v_posts   numeric;
+  v_eng     numeric;
+  v_fol     numeric;
+  v_asof    date;
+  v_reason  text;
+  v_status  text;
+  v_any     boolean := exists (select 1 from public.competitor_trackers t where t.brand_id = p_brand_id and t.source = 'planable_competitors');
+begin
+  for m in select mm.id, mm.name, mm.social_handles from public.competitor_set_members mm where mm.competitor_set_id = p_set loop
+    if not v_any then
+      v_out := v_out || jsonb_build_object(m.id::text, jsonb_build_object('status', 'not_connected', 'coverage', null, 'as_of', null,
+        'posts_per_week', null, 'followers', null, 'interactions_per_post', null,
+        'reason', 'Profilurile competitorilor nu au fost încă colectate (Planable Competitors).'));
+      continue;
+    end if;
+    select count(*), max(t.covered_from), min(t.covered_to), coalesce(bool_and(t.complete), false), coalesce(array_agg(t.external_id), '{}')
+      into v_n, v_from, v_to, v_complete, v_ids
+    from public.competitor_trackers t
+    where t.brand_id = p_brand_id and t.source = 'planable_competitors'
+      and (lower(t.label) = any (m.social_handles)
+           or (cardinality(m.social_handles) = 0 and regexp_replace(lower(translate(m.name, 'ĂÂÎȘŞȚŢăâîșşțţ', 'AAISSTTaaisstt')), '[^a-z0-9]', '', 'g')
+               in (regexp_replace(lower(translate(coalesce(t.display_name, ''), 'ĂÂÎȘŞȚŢăâîșşțţ', 'AAISSTTaaisstt')), '[^a-z0-9]', '', 'g'),
+                   regexp_replace(lower(translate(coalesce(t.label, ''), 'ĂÂÎȘŞȚŢăâîșşțţ', 'AAISSTTaaisstt')), '[^a-z0-9]', '', 'g'))));
+    if v_n = 0 then
+      v_out := v_out || jsonb_build_object(m.id::text, jsonb_build_object('status', 'unavailable', 'coverage', null, 'as_of', null,
+        'posts_per_week', null, 'followers', null, 'interactions_per_post', null,
+        'reason', 'Niciun profil urmărit în Planable Competitors nu corespunde competitorului (căutat: '
+                  || case when cardinality(m.social_handles) > 0 then array_to_string(m.social_handles, ', ') else m.name end || ').'));
+      continue;
+    end if;
+    v_days := greatest(0, least(p_end, v_to) - greatest(p_start, coalesce(v_from, p_start)) + 1);
+    v_cov := round(v_days::numeric / (p_end - p_start + 1), 4);
+    select sum(d.posts), sum(d.engagement), max(d.date) into v_posts, v_eng, v_asof
+    from public.competitor_social_daily d
+    where d.brand_id = p_brand_id and not d.is_own and d.profile_id = any (v_ids) and d.date between p_start and p_end;
+    select sum(l.followers) into v_fol from (
+      select distinct on (d.profile_id) d.followers from public.competitor_social_daily d
+      where d.brand_id = p_brand_id and not d.is_own and d.profile_id = any (v_ids) and d.date between p_start and p_end and d.followers is not null
+      order by d.profile_id, d.date desc) l;
+    v_status := case when v_days = 0 then 'unavailable' when v_cov < 1 or not v_complete then 'partial' else 'ok' end;
+    v_reason := case
+      when v_days = 0 then 'Perioada e în afara zilelor colectate pentru acest competitor (' || coalesce(to_char(v_from, 'DD.MM.YYYY'), '…') || ' – ' || to_char(v_to, 'DD.MM.YYYY') || ').'
+      when v_cov < 1 then 'Profilurile competitorului sunt colectate doar pentru ' || coalesce(to_char(v_from, 'DD.MM.YYYY'), '…') || ' – ' || to_char(v_to, 'DD.MM.YYYY') || '.'
+      when not v_complete then 'Ultima colectare nu a citit toate zilele competitorului.'
+    end;
+    v_out := v_out || jsonb_build_object(m.id::text, jsonb_build_object('status', v_status, 'coverage', case when v_days > 0 then v_cov end,
+      'as_of', v_asof, 'reason', v_reason,
+      -- Ritmul pe zilele acoperite: o perioadă colectată parțial nu se împarte la săptămâni necolectate.
+      'posts_per_week', case when v_days > 0 and v_posts is not null then metrics.ratio(v_posts, greatest(v_days::numeric / 7, 1)) end,
+      'followers', case when v_days > 0 then v_fol end,
+      'interactions_per_post', case when v_days > 0 and v_posts > 0 then metrics.ratio(v_eng, v_posts) end));
+  end loop;
+  return v_out;
+end;
+$$;
+revoke all on function private.competitor_social(uuid, uuid, date, date) from public, anon;
+grant execute on function private.competitor_social(uuid, uuid, date, date) to authenticated, service_role;
 
 -- 5. Concurența în ecran ----------------------------------------------------------------------------------------------------
 -- Aceeași funcție ca în 20261012250000 (cu modificările din 20261110120000: perioada yoy și asistenții AI fără AI Overviews),
@@ -407,6 +567,14 @@ declare
   v_total     numeric;
   v_all_ok    boolean;
   v_ads_asof  date;
+  -- Social public pe competitori (Planable Competitors).
+  v_cs        jsonb;
+  v_cad_cells jsonb := '{}'::jsonb;
+  v_fol_cells jsonb := '{}'::jsonb;
+  v_ipp_cells jsonb := '{}'::jsonb;
+  v_c         jsonb;
+  v_own_posts numeric;
+  v_own_eng   numeric;
 begin
   perform private.ai_check(p_brand_id, p_start, p_end, null, null);
   if coalesce(p_kind, '') not in ('custom', 'mtd', 'yoy') then raise exception 'Tip de perioadă necunoscut: %', p_kind using errcode = '22023'; end if;
@@ -472,6 +640,38 @@ begin
                                  'unit', 'count', 'coverage', null, 'reason', null,
                                  'status', case when private.brand_source_connected(p_brand_id, 'planable_analytics') then 'ok' else 'not_connected' end);
   if v_social ->> 'status' = 'not_connected' then v_social := v_social || jsonb_build_object('value', null); end if;
+
+  -- Social public pe competitori (Y-13): Planable Competitors. Brandul: ritmul din postările lui (ca mai sus), urmăritorii din
+  -- social_daily (suma, pe conturi, a ultimei valori din perioadă, ca în ecranul Social) și interacțiunile pe postare ale paginii
+  -- proprii din aceeași comparație Planable ca a competitorilor.
+  v_cs := private.competitor_social(p_brand_id, v_set.id, p_start, p_end);
+  v_cad_cells := jsonb_build_object(p_brand_id::text, v_social);
+  v_fol_cells := jsonb_build_object(p_brand_id::text, case
+    when not private.brand_source_connected(p_brand_id, 'planable_analytics') then jsonb_build_object('value', null, 'unit', 'count', 'status', 'not_connected', 'coverage', null, 'reason', null)
+    else (select jsonb_build_object('value', sum(l.followers), 'unit', 'count', 'status', case when count(*) = 0 then 'unavailable' else 'ok' end, 'coverage', null,
+                                    'reason', case when count(*) = 0 then 'Niciun cont al brandului nu are urmăritori raportați în perioadă.' end)
+          from (select distinct on (sd.platform, sd.account_id) sd.followers from public.social_daily sd
+                where sd.brand_id = p_brand_id and sd.date between p_start and p_end and sd.followers is not null
+                order by sd.platform, sd.account_id, sd.date desc) l)
+  end);
+  select sum(d.posts), sum(d.engagement) into v_own_posts, v_own_eng from public.competitor_social_daily d
+  where d.brand_id = p_brand_id and d.is_own and d.date between p_start and p_end;
+  v_ipp_cells := jsonb_build_object(p_brand_id::text, case
+    when not exists (select 1 from public.competitor_trackers t where t.brand_id = p_brand_id and t.source = 'planable_competitors')
+      then jsonb_build_object('value', null, 'unit', 'count', 'status', 'not_connected', 'coverage', null, 'reason', 'Comparația Planable Competitors nu a fost încă colectată.')
+    when coalesce(v_own_posts, 0) = 0 then jsonb_build_object('value', null, 'unit', 'count', 'status', case when v_own_posts = 0 then 'base_zero' else 'unavailable' end, 'coverage', null,
+      'reason', 'Pagina proprie nu are postări în comparația Planable din perioadă.')
+    else jsonb_build_object('value', metrics.ratio(v_own_eng, v_own_posts), 'unit', 'count', 'status', 'ok', 'coverage', null, 'reason', null)
+  end);
+  for m in select mm.id from public.competitor_set_members mm where mm.competitor_set_id = v_set.id loop
+    v_c := v_cs -> m.id::text;
+    v_cad_cells := v_cad_cells || jsonb_build_object(m.id::text, jsonb_build_object('value', v_c -> 'posts_per_week', 'unit', 'count', 'status', v_c ->> 'status', 'coverage', v_c -> 'coverage', 'reason', v_c ->> 'reason'));
+    v_fol_cells := v_fol_cells || jsonb_build_object(m.id::text, jsonb_build_object('value', v_c -> 'followers', 'unit', 'count', 'status', v_c ->> 'status', 'coverage', v_c -> 'coverage', 'reason', v_c ->> 'reason'));
+    v_ipp_cells := v_ipp_cells || jsonb_build_object(m.id::text, jsonb_build_object('value', v_c -> 'interactions_per_post', 'unit', 'count',
+      'status', case when v_c ->> 'status' in ('ok', 'partial') and jsonb_typeof(v_c -> 'interactions_per_post') <> 'number' then 'base_zero' else v_c ->> 'status' end,
+      'coverage', v_c -> 'coverage',
+      'reason', case when v_c ->> 'status' in ('ok', 'partial') and jsonb_typeof(v_c -> 'interactions_per_post') <> 'number' then 'Nicio postare a competitorului în perioadă.' else v_c ->> 'reason' end));
+  end loop;
 
   -- Listening pe competitori (Y-3): mențiunile cuvintelor Planable de tip „competitor” atribuite competitorului (lista lui sau
   -- numele lui), publicate în perioadă (Europe/Bucharest). O mențiune găsită de două cuvinte ale aceluiași competitor se numără o dată.
@@ -598,10 +798,16 @@ begin
         jsonb_build_object('key', 'seomonitor_visibility_latest', 'label', 'Visibility (desktop)', 'direction', 'higher_is_better',
           'definition', 'Visibility raportată de SEOmonitor, ultima observație.',
           'cells', (select jsonb_object_agg(e ->> 'id', case when e ->> 'kind' = 'brand' then v_seo_vis else v_na || jsonb_build_object('unit', 'score', 'reason', 'Visibility-ul competitorilor nu e colectat.') end) from jsonb_array_elements(v_entities) e)))),
-      jsonb_build_object('dimension', 'social', 'title', 'Social public', 'source', 'Planable', 'rows', jsonb_build_array(
+      jsonb_build_object('dimension', 'social', 'title', 'Social public', 'source', 'Planable și Planable Competitors', 'rows', jsonb_build_array(
         jsonb_build_object('key', 'social_cadence', 'label', 'Postări pe săptămână', 'direction', 'neutral',
-          'definition', 'Postări publicate în perioadă / numărul de săptămâni ale perioadei.',
-          'cells', (select jsonb_object_agg(e ->> 'id', case when e ->> 'kind' = 'brand' then v_social else v_na || jsonb_build_object('unit', 'count', 'reason', 'Conturile sociale ale competitorilor (Planable Competitors) nu sunt încă importate.') end) from jsonb_array_elements(v_entities) e)))),
+          'definition', 'Postări publicate în perioadă / numărul de săptămâni ale perioadei (pentru competitori, ale zilelor colectate din profilurile lor publice).',
+          'cells', v_cad_cells),
+        jsonb_build_object('key', 'social_followers', 'label', 'Urmăritori', 'direction', 'higher_is_better',
+          'definition', 'Suma, pe conturi sau profiluri, a ultimei valori a urmăritorilor din perioadă.',
+          'cells', v_fol_cells),
+        jsonb_build_object('key', 'social_interactions_per_post', 'label', 'Interacțiuni pe postare', 'direction', 'higher_is_better',
+          'definition', 'Interacțiunile postărilor publicate în perioadă / postările din perioadă, din comparația Planable Competitors. Planable: interacțiunile competitorilor sunt colectate din pagina publică, ale paginii proprii raportate de platformă.',
+          'cells', v_ipp_cells))),
       jsonb_build_object('dimension', 'listening', 'title', 'Listening', 'source', 'Planable Listening', 'rows', jsonb_build_array(
         jsonb_build_object('key', 'mentions_count', 'label', 'Mențiuni', 'direction', 'neutral',
           'definition', 'Mențiuni distincte publicate în perioadă: pentru brand, ale cuvintelor de tip „brand”; pentru competitori, ale cuvintelor de tip „competitor” atribuite lor în set.',
@@ -666,6 +872,35 @@ begin
     'total', v_total, 'items', v_rows);
 end;
 $$;
+
+-- Concurența publică din ecranul Social (Planable Competitors): aceleași valori ca rândurile „Social public” din matrice. Regimul E8.
+create function public.brand_social_competitors(p_brand_id uuid, p_start date, p_end date)
+returns jsonb language plpgsql stable security invoker set search_path = '' as $$
+declare
+  v_set uuid;
+  v_cs  jsonb;
+begin
+  perform private.ai_check(p_brand_id, p_start, p_end, null, null);
+  select cs.id into v_set from public.competitor_sets cs where cs.brand_id = p_brand_id and cs.effective_from <= p_end order by cs.effective_from desc limit 1;
+  if v_set is null then return jsonb_build_object('has_set', false); end if;
+  if not exists (select 1 from public.competitor_trackers t where t.brand_id = p_brand_id and t.source = 'planable_competitors') then
+    return jsonb_build_object('has_set', true, 'connected', false);
+  end if;
+  v_cs := private.competitor_social(p_brand_id, v_set, p_start, p_end);
+  return jsonb_build_object('has_set', true, 'connected', true, 'items', (
+    select coalesce(jsonb_agg(jsonb_build_object(
+        'label', 'C' || x.rn, 'name', x.name,
+        'posts_per_week', v_cs -> x.id::text -> 'posts_per_week', 'followers', v_cs -> x.id::text -> 'followers',
+        'public_interactions_per_post', v_cs -> x.id::text -> 'interactions_per_post', 'as_of', v_cs -> x.id::text -> 'as_of',
+        'status', v_cs -> x.id::text ->> 'status', 'reason', v_cs -> x.id::text ->> 'reason') order by x.rn), '[]'::jsonb)
+    from (select mm.id, mm.name, row_number() over (order by mm.sort_order, mm.name) as rn from public.competitor_set_members mm where mm.competitor_set_id = v_set) x));
+end;
+$$;
+
+revoke all on function public.brand_social_competitors(uuid, date, date) from public, anon;
+grant execute on function public.brand_social_competitors(uuid, date, date) to authenticated, service_role;
+comment on function public.brand_social_competitors(uuid, date, date) is
+  'Concurența publică (Planable Competitors) pentru ecranul Social: ritm, urmăritori, interacțiuni pe postare pe competitor. SECURITY INVOKER; verifică has_brand_access (E8).';
 
 revoke all on function public.brand_competitor_ads(uuid, date, date, integer, integer) from public, anon;
 grant execute on function public.brand_competitor_ads(uuid, date, date, integer, integer) to authenticated, service_role;

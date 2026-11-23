@@ -2,24 +2,39 @@
 // iar un rând fără identificatori valizi se sare cu motiv (regula 8).
 
 import { createHash } from 'node:crypto'
-import { ADS_SOURCE, BQ_TABLE, SCHEMA_VERSION } from './config.ts'
+import { ADS_SOURCE, BQ_DATASET, BQ_TABLE, SCHEMA_VERSION } from './config.ts'
+
+/** Schema tabelului, citită înaintea interogării: numele câmpurilor (inclusiv cele din STRUCT, ca `region_stats.first_shown`). */
+export const SCHEMA_SQL = `
+SELECT field_path, data_type
+FROM \`${BQ_DATASET}.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS\`
+WHERE table_name = 'creative_stats'
+`.trim()
+
+/** Câmpurile fără de care interogarea nu are sens. */
+export const REQUIRED_FIELDS = ['advertiser_id', 'creative_id', 'region_stats', 'region_stats.region_code'] as const
+/** Coloanele de nivel unu citite dacă există; o coloană absentă devine NULL, cu notă. */
+export const OPTIONAL_COLUMNS = ['advertiser_disclosed_name', 'ad_format_type', 'creative_page_url'] as const
+/** Câmpurile din `region_stats` citite (din JSON); absența lor se notează. */
+export const REGION_FIELDS = ['first_shown', 'last_shown', 'times_shown_lower_bound', 'times_shown_upper_bound'] as const
 
 /**
- * Interogarea: doar coloanele folosite (costul BigQuery depinde de coloanele citite), regiunea ca JSON ca să nu depindem
- * de numele exacte ale câmpurilor din `region_stats` (citite tolerant în `regionFields`).
+ * Interogarea, din câmpurile găsite în schemă: doar coloanele folosite (costul depinde de ele), regiunea ca JSON ca să nu depindem
+ * de tipul exact al câmpurilor din `region_stats`. Numele vin din listele de mai sus, nu din răspuns: nimic nu se concatenează din afară.
  */
-export const CREATIVES_SQL = `
+export function creativesSql(present: ReadonlySet<string>): string {
+  const optional = OPTIONAL_COLUMNS.map((c) => (present.has(c) ? `  cs.${c},` : `  CAST(NULL AS STRING) AS ${c},`)).join('\n')
+  return `
 SELECT
   cs.advertiser_id,
-  cs.advertiser_disclosed_name,
   cs.creative_id,
-  cs.ad_format_type,
-  cs.creative_page_url,
+${optional}
   rs.region_code,
   TO_JSON_STRING(rs) AS region_stats
 FROM \`${BQ_TABLE}\` AS cs, UNNEST(cs.region_stats) AS rs
 WHERE cs.advertiser_id IN UNNEST(@advertiser_ids) AND rs.region_code = @region
 `.trim()
+}
 
 export const ADVERTISER_ID = /^AR[0-9]{5,40}$/
 const CREATIVE_ID = /^[A-Za-z0-9_-]{1,128}$/

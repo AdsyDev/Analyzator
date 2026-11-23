@@ -26,9 +26,13 @@ select throws_ok($$ select * from public.create_competitor_set_version('20000000
     '[{"name":"A","listening_keywords":["  "]}]') $$, '22023', null, 'Y1: cuvânt gol, refuzat');
 select throws_ok($$ select * from public.create_competitor_set_version('20000000-0000-0000-0000-000000000011', current_date, null,
     '[{"name":"A","listening_keywords":["x","X"]}]') $$, '22023', null, 'Y1: același cuvânt de două ori, refuzat');
+select throws_ok($$ select * from public.create_competitor_set_version('20000000-0000-0000-0000-000000000011', current_date, null,
+    '[{"name":"A","social_handles":["are spatii"]}]') $$, '22023', null, 'Y1: profil cu spații, refuzat');
+select throws_ok($$ select * from public.create_competitor_set_version('20000000-0000-0000-0000-000000000011', current_date, null,
+    '[{"name":"A","social_handles":["@alfa"]},{"name":"B","social_handles":["ALFA"]}]') $$, '22023', null, 'Y1: același profil la doi competitori, refuzat');
 select lives_ok($$ select * from public.create_competitor_set_version('20000000-0000-0000-0000-000000000011', current_date, 'Y',
     '[{"name":"Competitor 1","domain":"competitor1.test","ads_advertiser_ids":[" ar11111 "]},
-      {"name":"Competitor 2","domain":"competitor2.test","listening_keywords":["comp2"," Comp Doi "],"ads_advertiser_ids":["AR22222","AR22223"]},
+      {"name":"Competitor 2","domain":"competitor2.test","listening_keywords":["comp2"," Comp Doi "],"social_handles":[" @Comp2.Ro "],"ads_advertiser_ids":["AR22222","AR22223"]},
       {"name":"Competitor 3","domain":"competitor3.test"}]') $$,
   'Y1: versiune nouă cu cuvinte și advertiseri');
 reset role;
@@ -38,6 +42,9 @@ select is((select ads_advertiser_ids from public.competitor_set_members m join p
 select is((select listening_keywords from public.competitor_set_members m join public.competitor_sets s on s.id = m.competitor_set_id
            where s.brand_id = '20000000-0000-0000-0000-000000000011' and s.effective_from = current_date and m.name = 'Competitor 2'),
   array['comp2', 'Comp Doi'], 'Y1: cuvintele sunt păstrate, fără spațiile de la capete');
+select is((select social_handles from public.competitor_set_members m join public.competitor_sets s on s.id = m.competitor_set_id
+           where s.brand_id = '20000000-0000-0000-0000-000000000011' and s.effective_from = current_date and m.name = 'Competitor 2'),
+  array['comp2.ro'], 'Y1: profilul e normalizat (fără @, spații și majuscule)');
 select is((select listening_keywords from public.competitor_set_members m join public.competitor_sets s on s.id = m.competitor_set_id
            where s.brand_id = '20000000-0000-0000-0000-000000000011' and s.effective_from = current_date and m.name = 'Competitor 3'),
   '{}'::text[], 'Y1: fără cuvinte, lista e goală (se caută numele)');
@@ -216,6 +223,57 @@ reset role;
 update public.competitor_trackers set complete = false where external_id = 'k4';
 select tests.authenticate_as('30000000-0000-0000-0000-000000000004');
 select is(pg_temp.cell('listening', 'mentions_sov', pg_temp.c('Competitor 1')) ->> 'status', 'unavailable', 'Y7: un competitor citit incomplet oprește cota tuturor');
+
+-- Y8. Social public (Planable Competitors) ------------------------------------------------------------------------------------
+select tests.authenticate_as('30000000-0000-0000-0000-000000000004');
+select is(public.brand_social_competitors('20000000-0000-0000-0000-000000000011', current_date - 19, current_date) ->> 'connected', 'false',
+  'Y8: înainte de colectare, concurența publică e neconectată');
+select is(pg_temp.cell('social', 'social_cadence', pg_temp.c('Competitor 1')) ->> 'status', 'not_connected', 'Y8: matricea, la fel');
+reset role;
+create function pg_temp.profile(p_id text, p_handle text, p_name text, p_from date, p_complete boolean default true) returns void language sql as $$
+  insert into public.competitor_trackers (tenant_id, brand_id, source, external_id, label, display_name, covered_from, covered_to, complete, last_seen_at, source_id)
+  values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', 'planable_competitors', p_id, p_handle, p_name, p_from, current_date,
+          p_complete, now(), '50000000-0000-0000-0000-0000000000a1')
+$$;
+create function pg_temp.day(p_id text, p_own boolean, p_day date, p_followers numeric, p_posts numeric, p_eng numeric) returns void language sql as $$
+  insert into public.competitor_social_daily (tenant_id, brand_id, platform, profile_id, is_own, handle, display_name, date, followers, posts, engagement,
+                                              source_id, collected_at, payload_hash, schema_version)
+  values ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', 'instagram', p_id, p_own, p_id, p_id, p_day, p_followers, p_posts, p_eng,
+          '50000000-0000-0000-0000-0000000000a1', now(), repeat('d', 64), 't')
+$$;
+-- Competitor 1: fără profiluri în set, găsit după numele afișat. Competitor 2: după handle, colectat doar de 10 zile.
+select pg_temp.profile('sp1', 'competitor_1_official', 'Competitor 1', current_date - 40);
+select pg_temp.profile('sp2', 'comp2.ro', 'Alt nume', current_date - 9);
+select pg_temp.profile('sp9', 'altcineva', 'Alt brand', current_date - 40);
+select pg_temp.day('sp1', false, current_date - 2, 1000, 2, 50);
+select pg_temp.day('sp1', false, current_date - 1, 1010, 1, 40);
+select pg_temp.day('sp1', false, current_date - 30, 900, 5, 500);
+select pg_temp.day('sp2', false, current_date - 1, 500, 0, 0);
+select pg_temp.day('own1', true, current_date - 1, 2000, 4, 100);
+select tests.authenticate_as('30000000-0000-0000-0000-000000000004');
+select is((pg_temp.cell('social', 'social_cadence', pg_temp.c('Competitor 1')) ->> 'value')::numeric, metrics.ratio(3, 20::numeric / 7),
+  'Y8: ritmul competitorului = postările din perioadă / săptămânile ei (fără ziua de acum 30 de zile)');
+select is(pg_temp.cell('social', 'social_followers', pg_temp.c('Competitor 1')) ->> 'value', '1010', 'Y8: urmăritorii = ultima valoare din perioadă');
+select is((pg_temp.cell('social', 'social_interactions_per_post', pg_temp.c('Competitor 1')) ->> 'value')::numeric, 30::numeric, 'Y8: interacțiuni pe postare = 90 / 3');
+select is(pg_temp.cell('social', 'social_cadence', pg_temp.c('Competitor 2')) ->> 'status', 'partial', 'Y8: profilul colectat de 10 zile = parțial');
+select is(pg_temp.cell('social', 'social_interactions_per_post', pg_temp.c('Competitor 2')) ->> 'status', 'base_zero', 'Y8: fără postări, interacțiunile pe postare nu au bază');
+select is(pg_temp.cell('social', 'social_cadence', pg_temp.c('Competitor 3')) ->> 'status', 'unavailable', 'Y8: competitor fără profil = indisponibil');
+select ok(pg_temp.cell('social', 'social_cadence', pg_temp.c('Competitor 3')) ->> 'reason' like '%Competitor 3%', 'Y8: motivul spune după ce s-a căutat');
+select is((pg_temp.cell('social', 'social_interactions_per_post', '20000000-0000-0000-0000-000000000011') ->> 'value')::numeric, 25::numeric,
+  'Y8: brandul, din pagina proprie a aceleiași comparații = 100 / 4');
+select is((public.brand_social_competitors('20000000-0000-0000-0000-000000000011', current_date - 19, current_date) -> 'items' -> 0 ->> 'followers'), '1010',
+  'Y8: ecranul Social primește aceleași valori');
+select is((public.brand_social_competitors('20000000-0000-0000-0000-000000000011', current_date - 19, current_date) -> 'items' -> 0 ->> 'as_of')::date, current_date - 1,
+  'Y8: „la data” = ultima zi cu date din perioadă');
+select is(jsonb_array_length(public.brand_social_competitors('20000000-0000-0000-0000-000000000011', current_date - 19, current_date) -> 'items'), 3,
+  'Y8: câte un rând pe competitor din set');
+select is((select count(*) from public.competitor_social_daily), 5::bigint, 'Y8: clientul cu acces citește seria');
+select tests.authenticate_as('30000000-0000-0000-0000-000000000005');
+select is((select count(*) from public.competitor_social_daily), 0::bigint, 'Y8: client fără acces nu vede seria');
+select throws_ok($$ select public.brand_social_competitors('20000000-0000-0000-0000-000000000011', current_date - 19, current_date) $$, '42501', null,
+  'Y8: client fără acces, refuzat');
+select tests.authenticate_as('30000000-0000-0000-0000-000000000001');
+select throws_ok($$ delete from public.competitor_social_daily $$, '42501', null, 'Y8: seria nu se șterge din aplicație');
 
 select * from finish();
 rollback;

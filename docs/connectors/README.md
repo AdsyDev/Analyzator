@@ -7,7 +7,7 @@ Ghiduri pas cu pas pentru agenție (rolul `agency_admin`): de unde obții cheia,
 | Microsoft Clarity | [clarity.md](clarity.md) | comportament pe site (sesiuni, rage clicks, scroll) | Complet din aplicație, cu buton de test |
 | SEOmonitor | [seomonitor.md](seomonitor.md) | rankuri, visibility, AI Search, AI Overview | Contul din aplicație; maparea grupurilor pe branduri încă din SQL |
 | Google Analytics 4 și Search Console | [google.md](google.md) | sesiuni, key events, clicks și impresii din căutare | Din aplicație: cheia clientului (fișier JSON) și proprietățile pe brand |
-| Planable | [planable.md](planable.md) | social propriu (pagini, postări), Listening pe brand și pe competitori | Din aplicație: tokenul clientului, cu test, și workspace-ul pe brand |
+| Planable | [planable.md](planable.md) | social propriu (pagini, postări), Listening pe brand și pe competitori, Planable Competitors | Din aplicație: tokenul clientului, cu test, și workspace-ul pe brand |
 | Google Ads Transparency | [ads-transparency.md](ads-transparency.md) | reclamele competitorilor afișate în România | Proiectul Google Cloud o dată, apoi ID-urile de advertiser în setul de competitori |
 | Meta Ads | [meta-ads.md](meta-ads.md) | cost, afișări, clickuri pe zi și reclamă | Din aplicație: tokenul system user, cu test, și contul de ads pe brand |
 | Google Ads | [google-ads.md](google-ads.md) | cost, afișări, clickuri, conversii pe zi și campanie | „Conectează cu Google” (OAuth), apoi customer ID-ul pe brand |

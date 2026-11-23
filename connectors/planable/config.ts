@@ -3,6 +3,8 @@
 
 export const PLANABLE_BASE_URL = 'https://api.planable.io/api/v1'
 export const PLANABLE_SCHEMA_VERSION = 'openapi-2026-10-12'
+/** Rutele Planable Competitors și tipurile de cuvinte, recitite din specificație la 23 nov. 2026. */
+export const PLANABLE_COMPETITORS_SCHEMA_VERSION = 'openapi-2026-11-23'
 
 /** Conexiunea la nivel de client (token) și conexiunea pe brand (workspace). */
 export const PLANABLE_CREDENTIAL_PROVIDER = 'planable_account'
@@ -12,9 +14,14 @@ export const PLANABLE_PROVIDER = 'planable'
 export const SOURCE_ANALYTICS = 'planable_analytics'
 export const SOURCE_LISTENING = 'planable_listening'
 /** Mențiunile cuvintelor de tip „competitor” (deciziile Y): sync_run separat, scrise în competitor_mentions. */
+export const SOURCE_LISTENING_COMPETITORS = 'planable_listening_competitors'
+/** Planable Competitors (deciziile Y): profilurile publice urmărite pe paginile brandului → competitor_social_daily. */
 export const SOURCE_COMPETITORS = 'planable_competitors'
-/** Sursa din competitor_trackers pentru cuvintele Planable de tip „competitor”. */
+/** Sursele din competitor_trackers: cuvintele de tip „competitor” și profilurile din Planable Competitors. */
 export const TRACKER_SOURCE_LISTENING = 'planable_listening'
+export const TRACKER_SOURCE_COMPETITORS = 'planable_competitors'
+/** Platformele pe care Planable Competitors funcționează (documentat: Instagram, Facebook, YouTube, TikTok, LinkedIn). */
+export const COMPETITOR_PLATFORMS = ['instagram', 'facebook', 'youtube', 'tiktok', 'linkedin']
 
 /** Limitele nu sunt documentate (doar 429): ritm conservator, cel mult 4 cereri pe secundă. */
 export const PLANABLE_MIN_INTERVAL_MS = 250

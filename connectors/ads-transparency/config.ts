@@ -1,11 +1,13 @@
 // Constantele colectorului Google Ads Transparency (deciziile Y). Contract: docs/contracts/ads-transparency.md.
 //
 // Ruta: setul public BigQuery `bigquery-public-data.google_ads_transparency_center` (Google nu publică un API REST pentru
-// Ads Transparency Center). Interogarea e plătită de proiectul Google Cloud al service account-ului clientului (același JSON
-// ca la GA4 și Search Console). Numele coloanelor sunt din memoria publică a setului, NECONFIRMATE pe o rulare reală:
-// o coloană greșită face interogarea să eșueze cu mesajul BigQuery, nu să scrie date greșite.
+// Ads Transparency Center; setul acoperă reclamele din Spațiul Economic European și Turcia). Interogarea e plătită de proiectul
+// Google Cloud al service account-ului clientului (același JSON ca la GA4 și Search Console); primul 1 TB pe lună e gratuit.
+// Schema oficială nu e publicată în afara consolei: colectorul o citește din INFORMATION_SCHEMA la fiecare rulare și construiește
+// interogarea doar din câmpurile care există (`creativesSql`). Confirmate public: advertiser_id, creative_id.
 
-export const BQ_TABLE = 'bigquery-public-data.google_ads_transparency_center.creative_stats'
+export const BQ_DATASET = 'bigquery-public-data.google_ads_transparency_center'
+export const BQ_TABLE = `${BQ_DATASET}.creative_stats`
 /** Seturile publice BigQuery stau în multi-regiunea US; jobul trebuie să ruleze acolo. */
 export const BQ_LOCATION = 'US'
 export const BQ_BASE_URL = 'https://bigquery.googleapis.com/bigquery/v2'
@@ -18,7 +20,9 @@ export const CREDENTIAL_PROVIDER = 'google_service_account'
 export const SOURCE = 'ads_transparency'
 export const TRACKER_SOURCE = 'google_ads_transparency'
 export const ADS_SOURCE = 'google_ads_transparency'
-export const SCHEMA_VERSION = 'bq-creative_stats-neconfirmat-2026-11'
+export const SCHEMA_VERSION = 'bq-creative_stats-schema-citita-2026-11'
+/** Plafonul pentru interogarea schemei (metadate; BigQuery facturează minimum 10 MB). */
+export const SCHEMA_MAX_BYTES = 1e9
 
 /** Regiunea colectată: doar afișările din România (spec cap. 08: valorile pe toată UE nu sunt reach România). */
 export const REGION = 'RO'

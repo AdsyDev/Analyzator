@@ -4,6 +4,7 @@
 - **Social:** pe zi și pe pagină: urmăritori, afișări, reach, interacțiuni, aprecieri, comentarii, distribuiri, vizualizări video. Plus postările publicate, cu metricile lor.
 - **Listening:** mențiunile brandului (Instagram, TikTok, Facebook, X, YouTube, Reddit), cu sentimentul dat de Planable.
 - **Listening pe competitori:** mențiunile cuvintelor de tip **„competitor”**, numărate pe competitor în Concurență (mențiuni și share of voice). Doar rețeaua, linkul, data și sentimentul Planable; fără textul și autorul mențiunii.
+- **Planable Competitors:** profilurile publice ale competitorilor urmărite pe paginile brandului (Instagram, Facebook, YouTube, TikTok, LinkedIn): urmăritori, postări și interacțiuni pe zi. Apar în Concurență („Social public”) și în Social („Concurență publică”).
 
 Ultimele 35 de zile se reimportă la fiecare rulare.
 
@@ -13,7 +14,8 @@ Ultimele 35 de zile se reimportă la fiecare rulare.
 - plan Planable **Pro** sau **Enterprise** (pe Basic nu se pot crea tokenuri);
 - rol de **Owner** sau **Administrator** al companiei în Planable;
 - pentru Listening: cuvintele brandului urmărite în Planable, de tip **„brand”**.
-- pentru Listening pe competitori: cuvintele competitorilor urmărite în Planable, de tip **„competitor”**.
+- pentru Listening pe competitori: cuvintele competitorilor urmărite în Planable, de tip **„competitor”**;
+- pentru Planable Competitors: add-on-ul **Analytics** activ și competitorii adăugați pe paginile brandului (Analytics → pagina → Competitors).
 
 ## 1. Creează tokenul în Planable (o dată per client)
 
@@ -59,7 +61,7 @@ Repetă pasul 3 pentru fiecare brand.
 
 ## 5. Verifică
 
-Pagina site-ului → „Istoricul sincronizărilor”: pentru fiecare site apar rulările **Planable** (social), **Listening** și, dacă workspace-ul urmărește cuvinte de tip „competitor”, **planable_competitors**, cu status și număr de rânduri.
+Pagina site-ului → „Istoricul sincronizărilor”: pentru fiecare site apar rulările **Planable** (social), **Listening** și, dacă există, **Planable Listening (competitori)** și **Planable Competitors**, cu status și număr de rânduri.
 
 ## Competitorii în Listening
 
@@ -67,6 +69,12 @@ Pagina site-ului → „Istoricul sincronizărilor”: pentru fiecare site apar 
 2. Cuvântul se leagă de competitor după text, fără diferență de majuscule: implicit, cuvântul trebuie să fie **numele competitorului din setul de competitori** (Administrare → Configurare → „Competitori”). Dacă în Planable urmărești alte cuvinte (de ex. „Prostamol Uno”), echipa tehnică le pune pe competitor (`listening_keywords`) într-o versiune nouă a setului. Un cuvânt aparține unui singur competitor.
 3. Un cuvânt de tip „competitor” care nu corespunde niciunui competitor din set se colectează, dar nu apare nicăieri.
 4. Mențiunile se colectează de la prima rulare (ultimele 35 de zile); pentru perioade mai vechi, celula competitorului e „parțial” sau N/A, nu zero.
+
+## Competitorii în Planable Competitors
+
+1. În Planable, pe fiecare pagină a brandului (Instagram, Facebook, YouTube, TikTok, LinkedIn): Analytics → **Competitors** → adaugă profilurile competitorilor. Planable le preia în câteva ore.
+2. Profilul se leagă de competitorul din set după nume: numele afișat sau handle-ul trebuie să corespundă numelui competitorului (fără diacritice, majuscule, spații). Altfel, echipa tehnică pune handle-urile pe competitor (`social_handles`) într-o versiune nouă a setului.
+3. Colectarea citește ultimele 35 de zile, zi cu zi (aproximativ 37 de cereri pe pagină). Planable spune că interacțiunile competitorilor sunt colectate din pagina publică, iar ale paginii proprii sunt raportate de platformă, deci comparația e orientativă.
 
 ## Prima rulare
 
@@ -80,7 +88,10 @@ API-ul Planable e nou și câteva lucruri nu sunt clare din documentație: dacă
 | `access_denied` pe ambele rulări | Token expirat sau șters; tokenul e marcat refuzat | Token nou, „Rotește tokenul”. |
 | `workspace_not_found` | ID-ul workspace-ului e greșit sau tokenul nu are acces la el | Verifică ID-ul (pasul 3) și workspace-urile tokenului (pasul 1). |
 | Listening `not_connected`: „niciun cuvânt de tip brand” | Workspace-ul nu urmărește cuvinte de tip „brand” | Adaugă cuvintele în Planable Listening. Cele de tip „topic” nu se colectează; cele de tip „competitor” au rularea lor. |
-| `planable_competitors` `not_connected` | Workspace-ul nu urmărește cuvinte de tip „competitor” | „Competitorii în Listening”, pasul 1. |
+| `planable_listening_competitors` `not_connected` | Workspace-ul nu urmărește cuvinte de tip „competitor” | „Competitorii în Listening”, pasul 1. |
+| `planable_competitors` `not_connected` | Nicio pagină a brandului nu urmărește competitori | „Competitorii în Planable Competitors”, pasul 1. |
+| `planable_competitors` `access_denied` | Add-on-ul Analytics e inactiv sau tokenul nu vede pagina | Verifică abonamentul Planable și accesul tokenului. |
+| Competitor „N/A” la Social public | Niciun profil urmărit nu corespunde numelui lui | „Competitorii în Planable Competitors”, pasul 2. |
 | Competitor „N/A” la Mențiuni | Niciun cuvânt urmărit nu are numele lui sau un cuvânt atribuit lui | „Competitorii în Listening”, pasul 2. |
 | 403 pe metricile unei pagini | Add-on-ul Analytics e inactiv sau tokenul nu vede pagina | Verifică abonamentul Planable și accesul tokenului. |
 | Pagină sărită („nu e conectată în Planable”) | Canalul social e deconectat în Planable | Reconectează canalul în Planable. |

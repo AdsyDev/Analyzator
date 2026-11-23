@@ -12,8 +12,8 @@ import { finishSyncRun, startSyncRun, type SyncRunError, type SyncRunHandle, typ
 import { assertUuid, type Db, type Row } from '../shared/supabase-rest.ts'
 import { upsertScoped } from '../shared/upsert.ts'
 import { runQuery, serviceAccountRequest, type AuthedRequest } from './bigquery.ts'
-import { BILLING_PROJECT_ENV, CREDENTIAL_PROVIDER, DEFAULT_MAX_GB, MAX_GB_ENV, MAX_ROWS, REGION, SOURCE, TRACKER_SOURCE } from './config.ts'
-import { AD_SKIP_LABELS, ADVERTISER_ID, CREATIVES_SQL, adRow, recordsOf, type AdSkipReason } from './normalize.ts'
+import { BILLING_PROJECT_ENV, CREDENTIAL_PROVIDER, DEFAULT_MAX_GB, MAX_GB_ENV, MAX_ROWS, REGION, SCHEMA_MAX_BYTES, SOURCE, TRACKER_SOURCE } from './config.ts'
+import { AD_SKIP_LABELS, ADVERTISER_ID, OPTIONAL_COLUMNS, REGION_FIELDS, REQUIRED_FIELDS, SCHEMA_SQL, adRow, creativesSql, recordsOf, type AdSkipReason } from './normalize.ts'
 
 export type AdsDeps = {
   db: Db
@@ -130,16 +130,36 @@ async function collectTenant(
 
   const allIds = [...new Set(brands.flatMap((b) => b.ids))].sort()
   const request = (deps.request ?? serviceAccountRequest)({ client_email: sa.value.client_email, private_key: sa.value.private_key })
+
+  // Schema tabelului, înaintea interogării: numele câmpurilor nu sunt publicate în afara consolei Google Cloud.
+  const schema = await runQuery(request, { project, sql: SCHEMA_SQL, params: [], maxBytesBilled: SCHEMA_MAX_BYTES })
+  if (!schema.ok) {
+    await recordProviderCalls(db, { tenant_id: tenantId, brand_id: null, source_connection_id: credentialId, call_date_utc: utcDay(now()), purpose: 'collect', calls: schema.calls })
+    const hint = schema.reason === 'access_denied' || schema.reason === 'accessDenied' ? ' Service account-ul are nevoie de rolul BigQuery Job User în proiect și de API-ul BigQuery activ.' : ''
+    return await failAll({ code: schema.reason, status: schema.status, dimension: 'schema', message: `${schema.message}${hint}` })
+  }
+  const fieldIdx = schema.fields.indexOf('field_path')
+  const present = new Set(schema.rows.map((r) => (r[fieldIdx] ?? '').toLowerCase()).filter(Boolean))
+  const missing = REQUIRED_FIELDS.filter((f) => !present.has(f))
+  if (missing.length > 0) {
+    await recordProviderCalls(db, { tenant_id: tenantId, brand_id: null, source_connection_id: credentialId, call_date_utc: utcDay(now()), purpose: 'collect', calls: schema.calls })
+    const found = [...present].sort().slice(0, 60).join(', ') || 'niciunul'
+    return await failAll({ code: 'schema_changed', status: null, dimension: 'schema', message: `Tabelul creative_stats nu are câmpurile ${missing.join(', ')}. Câmpuri găsite: ${found}.` })
+  }
+  const schemaNotes: SyncRunError[] = []
+  const absent = [...OPTIONAL_COLUMNS.filter((c) => !present.has(c)), ...REGION_FIELDS.filter((f) => !present.has(`region_stats.${f}`)).map((f) => `region_stats.${f}`)]
+  if (absent.length > 0) schemaNotes.push({ code: 'parser_note', status: null, dimension: 'schema', message: `câmpuri absente din creative_stats, lăsate NULL: ${absent.join(', ')}` })
+
   const result = await runQuery(request, {
     project,
-    sql: CREATIVES_SQL,
+    sql: creativesSql(present),
     params: [
       { name: 'advertiser_ids', type: 'ARRAY<STRING>', values: allIds },
       { name: 'region', type: 'STRING', value: REGION },
     ],
     maxBytesBilled,
   })
-  await recordProviderCalls(db, { tenant_id: tenantId, brand_id: null, source_connection_id: credentialId, call_date_utc: utcDay(now()), purpose: 'collect', calls: result.calls })
+  await recordProviderCalls(db, { tenant_id: tenantId, brand_id: null, source_connection_id: credentialId, call_date_utc: utcDay(now()), purpose: 'collect', calls: schema.calls + result.calls })
   if (!result.ok) {
     const hint = result.reason === 'bytesBilledLimitExceeded'
       ? ` Plafonul e ${maxBytesBilled / 1e9} GB (${MAX_GB_ENV}).`
@@ -151,7 +171,7 @@ async function collectTenant(
 
   const records = recordsOf(result.fields, result.rows)
   const collectedAt = now().toISOString()
-  const notes: SyncRunError[] = []
+  const notes: SyncRunError[] = [...schemaNotes]
   if (result.bytesBilled !== null) notes.push({ code: 'parser_note', status: null, dimension: 'bytes_billed', message: `BigQuery: ${(result.bytesBilled / 1e9).toFixed(2)} GB facturați pentru ${allIds.length} advertiseri` })
   const truncated = result.truncated || records.length > MAX_ROWS
   const out: AdsOutcome[] = []

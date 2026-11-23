@@ -1,6 +1,8 @@
 # Contract Google Ads Transparency (reclamele competitorilor)
 
-Deciziile Y din `docs/decisions.md`. **Nicio rulare reală încă.** Ruta și numele coloanelor sunt din cunoștințele publice despre setul BigQuery, **neconfirmate**: documentația Google nu a putut fi citită din mediul de dezvoltare (accesul la documentație a fost refuzat la 23 nov. 2026). O coloană greșită face interogarea să eșueze cu mesajul BigQuery; nu se scriu date ghicite.
+Deciziile Y din `docs/decisions.md`. **Nicio rulare reală încă.**
+
+**Ce spune documentația citită la 23 nov. 2026:** pagina Google „Ads transparency” (Advertising Policies Help): „Google provides API access to data about ads served in the EEA in the Ads Transparency Center”, sub termenii Ads Transparency Center. Pagina BigQuery „Public datasets”: plătești doar interogările, „the first 1 TB per month is free”, iar până la 1 TB se poate interoga fără facturare activă. Descrierea setului (citată pe forumul Google Developers, ianuarie 2025): datele acoperă „the European Economic Area or Turkey”, se actualizează periodic și pot întârzia față de site. **Schema oficială a tabelului nu e publicată în afara consolei Google Cloud** (pagina cere autentificare); din surse publice sunt confirmate `advertiser_id`, `creative_id` și `times_shown_lower_bound`. De aceea colectorul citește schema la fiecare rulare (mai jos).
 
 ## Ruta
 
@@ -10,10 +12,12 @@ Google nu publică un API REST pentru Ads Transparency Center. Ruta programatic�
 - **Interogare:** `POST https://bigquery.googleapis.com/bigquery/v2/projects/{project}/queries` (jobs.query), standard SQL, parametri numiți, `location = US`, `maximumBytesBilled`; un job neterminat se așteaptă cu `GET …/queries/{jobId}` (jobs.getQueryResults), paginat.
 - **Autentificare:** service account-ul Google al clientului (conexiunea `google_service_account`, același JSON din Vault ca la GA4 și Search Console), scope `https://www.googleapis.com/auth/bigquery`.
 - **Cine plătește:** proiectul `project_id` din JSON-ul service account-ului sau variabila `ADS_TRANSPARENCY_BILLING_PROJECT`. Service account-ul are nevoie de rolul **BigQuery Job User** în acel proiect și de API-ul BigQuery activ.
-- **Cost:** BigQuery facturează bytes citiți din coloanele folosite. Interogarea citește doar `advertiser_id`, `advertiser_disclosed_name`, `creative_id`, `ad_format_type`, `creative_page_url` și `region_stats`. Plafon pe interogare: `ADS_TRANSPARENCY_MAX_GB` (implicit 100 GB); peste el BigQuery oprește jobul înainte de facturare (`bytesBilledLimitExceeded`), iar rularea eșuează cu plafonul în mesaj. Bytes facturați se scriu în `sync_runs.errors` ca notă (`dimension = bytes_billed`). Mărimea tabelului și clusterizarea lui nu sunt confirmate.
+- **Schema, înaintea interogării:** `SELECT field_path, data_type FROM bigquery-public-data.google_ads_transparency_center.INFORMATION_SCHEMA.COLUMN_FIELD_PATHS WHERE table_name = 'creative_stats'` (metadate, plafon 1 GB; BigQuery facturează minimum 10 MB). Obligatorii: `advertiser_id`, `creative_id`, `region_stats`, `region_stats.region_code`; dacă lipsește unul, toate rulările clientului eșuează cu `schema_changed` și lista câmpurilor găsite, fără interogarea mare. Opționale: `advertiser_disclosed_name`, `ad_format_type`, `creative_page_url` (absente → `NULL` în interogare) și câmpurile din `region_stats` (absente → NULL); cele absente apar într-o notă `schema`.
+- **Cost:** BigQuery facturează bytes citiți din coloanele folosite. Interogarea citește doar `advertiser_id`, `creative_id`, coloanele opționale găsite și `region_stats`. Plafon pe interogare: `ADS_TRANSPARENCY_MAX_GB` (implicit 100 GB); peste el BigQuery oprește jobul înainte de facturare (`bytesBilledLimitExceeded`), iar rularea eșuează cu plafonul în mesaj. Bytes facturați se scriu în `sync_runs.errors` ca notă (`dimension = bytes_billed`). Mărimea tabelului și clusterizarea lui nu sunt confirmate.
 
 ```sql
-SELECT cs.advertiser_id, cs.advertiser_disclosed_name, cs.creative_id, cs.ad_format_type, cs.creative_page_url,
+-- cu toate câmpurile opționale găsite în schemă
+SELECT cs.advertiser_id, cs.creative_id, cs.advertiser_disclosed_name, cs.ad_format_type, cs.creative_page_url,
        rs.region_code, TO_JSON_STRING(rs) AS region_stats
 FROM `bigquery-public-data.google_ads_transparency_center.creative_stats` AS cs, UNNEST(cs.region_stats) AS rs
 WHERE cs.advertiser_id IN UNNEST(@advertiser_ids) AND rs.region_code = @region   -- @region = 'RO'
@@ -54,8 +58,9 @@ Se colectează advertiserii din versiunea setului în vigoare azi și din versiu
 
 ## De confirmat la prima rulare reală
 
-1. Numele coloanelor din interogare și forma `region_stats` (în special `first_shown`, `last_shown`, `times_shown_lower_bound`, `times_shown_upper_bound`).
+1. Câmpurile reale: nota `schema` (sau eroarea `schema_changed`) le arată la prima rulare; dacă `first_shown`/`last_shown` au alt nume, se adaugă în `REGION_FIELDS` și în `regionFields`.
 2. Bytes facturați pe interogare (nota `bytes_billed`) și dacă tabelul e clusterizat pe `advertiser_id`.
 3. Întârzierea setului: dacă „ieri” e o limită corectă pentru `covered_to`.
 4. Valorile `ad_format_type` (presupuse `TEXT`, `IMAGE`, `VIDEO`).
 5. Dacă reclamele eliminate de Google dispar din `creative_stats` (există și `removed_creative_stats`, necitit).
+6. Acoperirea: un utilizator raporta (ianuarie 2025) mult mai puține reclame în BigQuery decât pe site pentru un advertiser; explicația dată a fost filtrul pe SEE și Turcia. De comparat, pe un competitor, numărul din aplicație cu site-ul filtrat pe România.
