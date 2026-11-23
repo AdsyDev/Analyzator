@@ -120,7 +120,7 @@ export function createCompetitionFixtures({ allowed, ai, search, social, mention
           rows: [
             row('social_cadence', 'Postări / săptămână', 'Ritmul de publicare observat pe profilurile publice.', 'higher_is_better', all((e) => (e.kind === 'brand' ? cell(r1(sPosts.data.length / weeks), 'count') : cell(comp(e)?.posts_per_week ?? null, 'count', { reason: none })))),
             row('social_followers', 'Followers', 'Followers observați la data ultimei observații publice.', 'higher_is_better', all((e) => (e.kind === 'brand' ? cell(followers, 'count') : cell(comp(e)?.followers ?? null, 'count', { reason: none })))),
-            row('social_interactions', 'Interacțiuni publice pe postare', 'Interacțiunile publice pe postare; reach-ul nu e public pentru competitori.', 'higher_is_better', all((e) => (e.kind === 'brand' ? cell(withPerf.length ? Math.round(withPerf.reduce((a, p) => a + (p.interactions ?? 0), 0) / withPerf.length) : null, 'count') : cell(comp(e)?.public_interactions_per_post ?? null, 'count', { reason: none })))),
+            row('social_interactions_per_post', 'Interacțiuni publice pe postare', 'Interacțiunile publice pe postare; reach-ul nu e public pentru competitori.', 'higher_is_better', all((e) => (e.kind === 'brand' ? cell(withPerf.length ? Math.round(withPerf.reduce((a, p) => a + (p.interactions ?? 0), 0) / withPerf.length) : null, 'count') : cell(comp(e)?.public_interactions_per_post ?? null, 'count', { reason: none })))),
           ],
         })
       } else {

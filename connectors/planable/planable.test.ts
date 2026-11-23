@@ -41,6 +41,8 @@ function routes(overrides: Record<string, FakeResponse | ((url: URL) => FakeResp
     }),
     '/api/v1/posts': json({ data: [post('p1'), post('p2', { published: false, status: 'draft' })], pagination: { offset: 0, limit: 50, hasMore: false } }),
     '/api/v1/posts/p1/metrics': json({ data: { postId: 'p1', pageId: 'pg-ig', pageType: 'instagram', fetchedAt: '2026-10-07T06:00:00Z', impressions: 400, engagement: 30, reactions: 25, instagram: {} } }),
+    // Fără competitori urmăriți pe pagină: nicio altă cerere de competitori (testele dedicate sunt în competitors.test.ts).
+    '/api/v1/pages/pg-ig/competitors': json({ data: [] }),
     '/api/v1/keywords': json({ data: [{ keywordId: 'k1', text: 'Urinal', type: 'brand', createdAt: '2026-01-01T00:00:00Z' }] }),
     '/api/v1/keywords/k1/mentions': (url) =>
       url.searchParams.get('cursor') === '1'

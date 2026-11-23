@@ -32,7 +32,7 @@ export const TABLES = [
   'tenants', 'brands', 'memberships', 'brand_access', 'competitor_sets', 'competitor_set_members',
   'source_connections', 'sync_runs', 'import_batches', 'audit_events', 'provider_api_calls',
   'web_daily', 'web_key_events', 'web_active_users_interval', 'search_daily', 'search_queries', 'source_reconciliations',
-  'paid_daily', 'social_daily', 'social_posts', 'mentions', 'import_batch_rows',
+  'paid_daily', 'social_daily', 'social_posts', 'mentions', 'import_batch_rows', 'competitor_social_daily', 'competitor_social_posts',
   'insights', 'evidence_links', 'insight_snapshots', 'recommendations', 'actions', 'insight_transitions', 'action_transitions',
   'pv_contacts', 'pv_flags', 'pv_flag_events', 'pv_notifications',
   'alert_contacts', 'ops_notifications',

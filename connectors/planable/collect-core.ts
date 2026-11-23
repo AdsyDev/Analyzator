@@ -1,4 +1,5 @@
-// Colectarea Planable (Public API v1): social propriu (social_daily, social_posts) și Listening (mentions), per brand.
+// Colectarea Planable (Public API v1): social propriu (social_daily, social_posts), competitorii urmăriți în Planable
+// (competitor_social_daily, competitor_social_posts) și Listening (mentions), per brand.
 // Configurare: o conexiune `planable_account` per client (tokenul în Vault) și câte o conexiune `planable` per brand
 // (external_account_id = workspace-ul). Contract: docs/contracts/planable.md.
 //
@@ -12,6 +13,7 @@ import { assertUuid, type Db, type Row } from '../shared/supabase-rest.ts'
 import { upsertScoped } from '../shared/upsert.ts'
 import { isValidTimeZone, lookbackWindow } from '../google/dates.ts'
 import { PlanableClient, type GetResult, type Params } from './client.ts'
+import { collectPageCompetitors, COMPETITOR_KEYS } from './competitors.ts'
 import {
   PLANABLE_CREDENTIAL_PROVIDER,
   PLANABLE_LOOKBACK_DAYS,
@@ -69,6 +71,7 @@ export const KEYS = {
   social_daily: ['tenant_id', 'brand_id', 'platform', 'account_id', 'date'],
   social_posts: ['tenant_id', 'brand_id', 'platform', 'account_id', 'post_id', 'snapshot_date', 'metrics_scope'],
   mentions: ['tenant_id', 'brand_id', 'native_id'],
+  ...COMPETITOR_KEYS,
 } as const
 
 type BrandConnection = { id: string; tenant_id: string; brand_id: string | null; provider: string; external_account_id: string; status: string }
@@ -280,6 +283,8 @@ async function runAnalytics(deps: PlanableDeps, client: PlanableClient, conn: Br
 
     const daily: Row[] = []
     const posts: Row[] = []
+    const competitorDaily: Row[] = []
+    const competitorPosts: Row[] = []
     const startIso = `${window.start}T00:00:00.000Z`
     const endIso = `${window.end}T23:59:59.999Z`
     for (const { item: page } of pages.items) {
@@ -317,10 +322,18 @@ async function runAnalytics(deps: PlanableDeps, client: PlanableClient, conn: Br
         }
         posts.push(socialPostRow(post, parsed.data.data, tz, { ...provenance, payload_hash: r.payloadHash }, notes))
       }
+
+      // Competitorii urmăriți pe pagină (Y-6): aceeași fereastră, aceeași rulare.
+      const competitors = await collectPageCompetitors(client, page, window, tz, { ...scope, source_id: conn.id, sync_run_id: handle.id, collected_at: collectedAt }, notes)
+      competitorDaily.push(...competitors.daily)
+      competitorPosts.push(...competitors.posts)
+      errors.push(...competitors.errors)
     }
 
     rows += await upsertScoped(db, 'social_daily', KEYS.social_daily, daily, scope)
     rows += await upsertScoped(db, 'social_posts', KEYS.social_posts, posts, scope)
+    rows += await upsertScoped(db, 'competitor_social_daily', KEYS.competitor_social_daily, competitorDaily, scope)
+    rows += await upsertScoped(db, 'competitor_social_posts', KEYS.competitor_social_posts, competitorPosts, scope)
     for (const n of [...new Set(notes)]) errors.push({ code: 'parser_note', status: null, message: n })
     const covered = new Set(daily.map((r) => r.date as string).filter((d) => d >= window.start && d <= window.end)).size
     return await finish(deps, handle, conn, SOURCE_ANALYTICS, errors, rows, false, now, {

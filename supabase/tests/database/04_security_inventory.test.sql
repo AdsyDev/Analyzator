@@ -169,13 +169,16 @@ select is_empty(
 -- brandului/tenantului și răspund pentru auth.uid(); brand_source_* (E8) întorc boolean și răspund false fără acces;
 -- compute_metric_snapshot, metric_observations și utilitarele AI ai_* (E8) sunt SECURITY INVOKER: citesc prin RLS-ul apelantului.
 -- H-2 (10 nov 2026): ai_assistant_scope = ai_scope fără Google AI Overviews, tot INVOKER, pentru matricea de Concurență.
+-- Y (23 nov 2026): competitor_social_stats și brand_social_public_stats (INVOKER, citesc prin RLS, pentru matricea de Concurență);
+-- competitor_social_platforms și valid_social_profiles sunt pure (IMMUTABLE, fără tabele), folosite în constrângeri.
 select results_eq(
   $$ select p.proname::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'private' and has_function_privilege('authenticated', p.oid, 'execute')
      order by 1 $$,
   $$ values ('accessible_brand_ids'::text collate "C"), ('ai_assistant_scope'), ('ai_check'), ('ai_engine_db'), ('ai_engine_ui'), ('ai_outcome'), ('ai_scope'),
-            ('brand_source_connected'), ('brand_source_query_ok'), ('can_see_tenant'), ('competition_registry_cell'), ('compute_metric_snapshot'),
-            ('has_brand_access'), ('has_brand_role'), ('has_role'), ('metric_observations') $$,
+            ('brand_social_public_stats'), ('brand_source_connected'), ('brand_source_query_ok'), ('can_see_tenant'), ('competition_registry_cell'),
+            ('competitor_social_platforms'), ('competitor_social_stats'), ('compute_metric_snapshot'),
+            ('has_brand_access'), ('has_brand_role'), ('has_role'), ('metric_observations'), ('valid_social_profiles') $$,
   'A10: doar funcțiile aprobate (autorizare + E8) sunt executabile de authenticated'
 );
 select is_empty(

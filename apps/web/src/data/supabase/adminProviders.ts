@@ -159,9 +159,9 @@ export function createSupabaseConfig(client: DataClient, now: () => Date = () =>
     async competitorVersions(brandId) {
       const sets = await client.from('competitor_sets').select('id, version, effective_from, note, created_at').eq('brand_id', brandId).order('version', { ascending: false })
       if (sets.error) return failed(QUERY_FAILED)
-      const members = await client.from('competitor_set_members').select('id, competitor_set_id, name, domain, sort_order').eq('brand_id', brandId).order('sort_order')
+      const members = await client.from('competitor_set_members').select('id, competitor_set_id, name, domain, social_profiles, sort_order').eq('brand_id', brandId).order('sort_order')
       if (members.error) return failed(QUERY_FAILED)
-      const memberRows = (members.data ?? []) as unknown as Array<{ id: string; competitor_set_id: string; name: string; domain: string | null }>
+      const memberRows = (members.data ?? []) as unknown as Array<{ id: string; competitor_set_id: string; name: string; domain: string | null; social_profiles?: unknown }>
       const setRows = (sets.data ?? []) as unknown as Array<{ id: string; version: number; effective_from: string; note: string | null; created_at: string }>
       const today = todayBucharest(now())
       const effective = setRows.filter((s) => s.effective_from <= today).sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0]?.id
@@ -172,7 +172,7 @@ export function createSupabaseConfig(client: DataClient, now: () => Date = () =>
           note: s.note,
           created_at: s.created_at,
           current: s.id === effective,
-          members: memberRows.filter((m) => m.competitor_set_id === s.id).map((m, i) => ({ id: m.id, name: m.name, domain: m.domain, label: `C${i + 1}` })),
+          members: memberRows.filter((m) => m.competitor_set_id === s.id).map((m, i) => ({ id: m.id, name: m.name, domain: m.domain, social_profiles: socialProfiles(m.social_profiles), label: `C${i + 1}` })),
         })),
       )
     },
@@ -182,7 +182,7 @@ export function createSupabaseConfig(client: DataClient, now: () => Date = () =>
         p_brand_id: brandId,
         p_effective_from: input.effective_from,
         p_note: input.note,
-        p_members: input.members.map((m) => ({ name: m.name, domain: m.domain })),
+        p_members: input.members.map((m) => ({ name: m.name, domain: m.domain, social: m.social.map(({ platform, handle }) => ({ platform, handle })) })),
       })
       if (error) {
         // Mesajele funcției SQL sunt în română și afișabile direct (docs/security-tests.md, E4).
@@ -305,4 +305,10 @@ export function parseCompetitorSuggestions(data: unknown): CompetitorSuggestions
       domains: domains.map((x) => ({ domain: x.domain as string, keywords: x.keywords as number })),
     },
   }
+}
+
+/** Profilurile sociale ale unui membru, așa cum le salvează funcția SQL; orice altă formă se ignoră (nu se ghicește). */
+function socialProfiles(v: unknown): Array<{ platform: string; handle: string }> {
+  if (!Array.isArray(v)) return []
+  return v.filter((x): x is { platform: string; handle: string } => !!x && typeof x.platform === 'string' && typeof x.handle === 'string').map(({ platform, handle }) => ({ platform, handle }))
 }

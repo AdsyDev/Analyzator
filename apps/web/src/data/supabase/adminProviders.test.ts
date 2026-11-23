@@ -141,7 +141,7 @@ describe('config (supabase)', () => {
           { id: 's3', brand_id: 'b1', version: 3, effective_from: '2026-12-01', note: null, created_at: '2026-10-05T00:00:00Z' },
         ],
         competitor_set_members: [
-          { id: 'm1', brand_id: 'b1', competitor_set_id: 's2', name: 'Alfa', domain: 'alfa.example', sort_order: 0 },
+          { id: 'm1', brand_id: 'b1', competitor_set_id: 's2', name: 'Alfa', domain: 'alfa.example', social_profiles: [{ platform: 'instagram', handle: 'alfa' }], sort_order: 0 },
           { id: 'm2', brand_id: 'b1', competitor_set_id: 's2', name: 'Beta', domain: null, sort_order: 1 },
         ],
       },
@@ -149,20 +149,23 @@ describe('config (supabase)', () => {
     const r = await createSupabaseConfig(client, NOW).competitorVersions('b1')
     if (r.kind !== 'ready') throw new Error('nu e ready')
     expect(r.data.map((v) => [v.version, v.current])).toEqual([[3, false], [2, true], [1, false]])
-    expect(r.data[1]?.members).toEqual([{ id: 'm1', name: 'Alfa', domain: 'alfa.example', label: 'C1' }, { id: 'm2', name: 'Beta', domain: null, label: 'C2' }])
+    expect(r.data[1]?.members).toEqual([
+      { id: 'm1', name: 'Alfa', domain: 'alfa.example', social_profiles: [{ platform: 'instagram', handle: 'alfa' }], label: 'C1' },
+      { id: 'm2', name: 'Beta', domain: null, social_profiles: [], label: 'C2' },
+    ])
   })
 
   it('createCompetitorSetVersion: apelează funcția SQL cu data, nota și membrii (nume, domeniu), fără scrieri directe', async () => {
     const fake = fakeDataClient({ rpc: () => ({ data: [{ competitor_set_id: 'x', version: 1, effective_from: '2025-11-23', member_count: 2 }] }) })
-    const input = { effective_from: '2025-11-23', note: 'Validat', members: [{ name: 'Alfa', domain: 'alfa.ro' }, { name: 'Beta', domain: null }] }
+    const input = { effective_from: '2025-11-23', note: 'Validat', members: [{ name: 'Alfa', domain: 'alfa.ro', social: [{ platform: 'instagram', handle: 'alfa' }] }, { name: 'Beta', domain: null, social: [] }] }
     expect(await createSupabaseConfig(fake.client, NOW).createCompetitorSetVersion('b1', input)).toEqual({ kind: 'ready', data: { version: 1, effective_from: '2025-11-23', member_count: 2 } })
-    expect(fake.rpcs).toEqual([{ fn: 'create_competitor_set_version', args: { p_brand_id: 'b1', p_effective_from: '2025-11-23', p_note: 'Validat', p_members: [{ name: 'Alfa', domain: 'alfa.ro' }, { name: 'Beta', domain: null }] } }])
+    expect(fake.rpcs).toEqual([{ fn: 'create_competitor_set_version', args: { p_brand_id: 'b1', p_effective_from: '2025-11-23', p_note: 'Validat', p_members: [{ name: 'Alfa', domain: 'alfa.ro', social: [{ platform: 'instagram', handle: 'alfa' }] }, { name: 'Beta', domain: null, social: [] }] } }])
     expect(fake.calls).toEqual([])
   })
 
   it('createCompetitorSetVersion: mesajul în română al funcției SQL ajunge în interfață; alte erori și forme greșite, mesaj generic', async () => {
     const past = 'Data de la care se aplică versiunea nu poate fi în trecut (azi este 2026-11-23, Europe/Bucharest); doar prima versiune a setului poate începe în trecut'
-    const input = { effective_from: '2026-11-01', note: null, members: [{ name: 'Alfa', domain: null }] }
+    const input = { effective_from: '2026-11-01', note: null, members: [{ name: 'Alfa', domain: null, social: [] }] }
     const refused = fakeDataClient({ rpc: () => ({ error: { code: '22023', message: past } }) })
     expect(await createSupabaseConfig(refused.client, NOW).createCompetitorSetVersion('b1', input)).toEqual({ kind: 'error', message: past })
     const internal = fakeDataClient({ rpc: () => ({ error: { code: 'XX000', message: 'relation "x" does not exist' } }) })

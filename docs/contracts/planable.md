@@ -35,6 +35,25 @@ Sursa: specificația OpenAPI 3.1 publică, `https://api.planable.io/api/v1/opena
 
 Cuvintele de tip `topic` și `competitor` nu se colectează la pilot: mențiunile din `mentions` sunt ale brandului.
 
+### Competitorii urmăriți (Analytics → Competitors, decizia Y-6, 23 nov. 2026)
+
+Rute citite din specificația OpenAPI pe 2026-11-23 (`schema_version = openapi-2026-11-23`); **nu au rulat încă pe date reale**. Doar paginile Instagram, Facebook, YouTube, TikTok și LinkedIn au analiza competitorilor.
+
+| Rută | Folosire |
+|---|---|
+| `GET /pages/{id}/competitors` | profilurile urmărite pe pagina brandului (`handle`, `displayName`, `platform`, `scrapedPageId`) |
+| `GET /pages/{id}/competitors/metrics?startDate&endDate` | seriile zilnice → `competitor_social_daily` (seria proprie, `isOwn = true`, nu se salvează) |
+| `GET /pages/{id}/competitors/top-posts?sortBy=likes&limit=100&scrapedPageIds&startDate&endDate` | postările fiecărui competitor → `competitor_social_posts`; o cerere care întoarce 100 se reia pe ferestre de 7 zile |
+
+| Tabel | Cheie naturală | Reguli |
+|---|---|---|
+| `competitor_social_daily` | tenant, brand, platform, handle, date | `handle` cu litere mici, fără „@”; `date` = ziua punctului în fusul workspace-ului; mai multe puncte în aceeași zi → ultimul; `followers` întreg ≥ 0, `engagement` ≥ 0, altfel NULL cu notă |
+| `competitor_social_posts` | tenant, brand, platform, handle, post_key | `post_key` = primele 32 de caractere hex din SHA-256(url); `likes`, `comments`, `shares`, `views` la ultima observație, NULL când lipsesc (de ex. distribuirile pe Instagram); textul postării nu se salvează |
+
+- Rulează în aceeași rulare `planable_analytics`, pe aceeași fereastră de 35 de zile. 400 (rețea fără analiza competitorilor) și 403 (add-on Analytics inactiv sau fără acces la pagină) sunt note: nu schimbă statusul. Alte eșecuri și formele schimbate sunt erori (rularea devine parțială). Un competitor fără `scrapedPageId` (încă neindexat de Planable) e o notă.
+- Datele se leagă de competitorii din set doar prin `competitor_set_members.social_profiles` (rețea + handle), salvate din formularul de configurare; nu se potrivește nimic după nume.
+- Metricile din matricea de Concurență și din secțiunea „Concurență publică” (Social): postări pe săptămână, urmăritori (ultima observație din perioadă, sumă pe profiluri), interacțiuni publice pe postare ((like-uri + comentarii + distribuiri) / postări). Formulele: `private.competitor_social_stats`, `private.brand_social_public_stats` (migrația `20261123120000`). Engagement-ul zilnic al competitorilor se salvează, dar nu intră încă în nicio metrică: Planable spune că baza lui diferă de a brandului.
+
 ## Tabele și reguli
 
 Aceleași tabele și chei ca importul CSV (`docs/contracts/csv-planable-analytics.md`, `csv-planable-listening.md`); proveniența API e `collection_method = 'api'`, `source_id` (conexiunea `planable` a brandului) și `sync_run_id` (migrația `20261012120000_import_tables_api_provenance.sql`).

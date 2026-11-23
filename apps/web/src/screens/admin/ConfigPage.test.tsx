@@ -66,8 +66,17 @@ describe('Administrare → Configurare (fixtures de previzualizare)', () => {
     expect(within(dialog).getByLabelText('Domeniul competitorului 1')).toHaveValue('digestil.example')
     expect(within(dialog).getByLabelText('Numele competitorului 2')).toHaveValue('Enzimax')
     expect(within(dialog).getByLabelText('Domeniul competitorului 2')).toHaveValue('')
-    // Același profil pe altă rețea nu se adaugă de două ori.
+    // Profilul Instagram adăugat odată cu competitorul; profilul de Facebook al aceluiași competitor se leagă de C1.
     expect(within(dialog).queryByRole('button', { name: 'Adaugă Digestil' })).toBeNull()
+    await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Leagă Digestil România de un competitor ales' }), 'C1 · Digestil')
+    const c1 = within(dialog).getByRole('list', { name: 'Profilurile sociale ale competitorului 1' })
+    expect(c1).toHaveTextContent('Instagram@digestil.ro')
+    expect(c1).toHaveTextContent('Facebook@digestil')
+    expect(within(dialog).getByRole('list', { name: 'Profilurile sociale ale competitorului 2' })).toHaveTextContent(/^Instagram@enzimax/)
+    // Un profil se poate scoate.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Scoate profilul Facebook @digestil de la competitorul 1' }))
+    expect(c1).not.toHaveTextContent('Facebook')
+    await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Leagă Digestil România de un competitor ales' }), 'C1 · Digestil')
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Creează versiunea' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -77,6 +86,7 @@ describe('Administrare → Configurare (fixtures de previzualizare)', () => {
     expect(within(rows[0]!).getByText('v1')).toBeInTheDocument()
     expect(within(rows[0]!).getByText('În vigoare')).toBeInTheDocument()
     expect(rows[0]).toHaveTextContent('Digestil · digestil.example')
+    expect(rows[0]).toHaveTextContent('Instagram @digestil.ro · Facebook @digestil')
     expect(rows[0]).toHaveTextContent('Enzimax')
   })
 

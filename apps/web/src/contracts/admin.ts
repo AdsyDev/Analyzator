@@ -71,10 +71,18 @@ export interface UsersProvider {
   createAccount(input: NewAccount): Promise<ProviderResult<AccountResult>>
 }
 
+/** Un profil social al unui competitor în Planable: rețeaua și handle-ul (litere mici, fără „@”). */
+export interface SocialProfile {
+  platform: string
+  handle: string
+}
+
 export interface CompetitorMember {
   id: string
   name: string
   domain: string | null
+  /** Profilurile prin care se leagă metricile sociale colectate din Planable; listă goală = fără date sociale. */
+  social_profiles: SocialProfile[]
   /** C1, C2, C3 în ordinea setului. */
   label: string
 }
@@ -126,6 +134,7 @@ export interface NewSeomonitorMapping {
 export interface NewCompetitorMember {
   name: string
   domain: string | null
+  social: SocialProfile[]
 }
 
 /** O versiune nouă a setului; prima versiune a brandului poate începe în trecut, următoarele de azi înainte. */

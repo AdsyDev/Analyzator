@@ -36,12 +36,58 @@ describe('createSupabaseSocial', () => {
     expect((await createSupabaseSocial(client).summary(ctx, { platform: null, format: null })).kind).toBe('not_connected')
   })
 
-  it('formatul, subiectul și concurența nu se inventează', async () => {
+  it('formatul și subiectul nu se inventează', async () => {
     const { client, rpcs } = fakeDataClient()
     const p = createSupabaseSocial(client)
     expect((await p.groups(ctx, { platform: null, format: null })).kind).toBe('not_connected')
-    expect((await p.competitors(ctx)).kind).toBe('not_connected')
     expect(rpcs).toHaveLength(0)
+  })
+
+  const cell = (value: number | null, status: string, reason: string | null = null) => ({ value, unit: 'count', status, coverage: null, reason })
+  const matrix = (cells: Record<string, [ReturnType<typeof cell>, ReturnType<typeof cell>, ReturnType<typeof cell>]>) => ({
+    has_set: true,
+    entities: [{ id: 'b1', name: 'Urinal', kind: 'brand', label: 'Urinal' }, { id: 'm1', name: 'Cystenal', kind: 'competitor', label: 'C1' }, { id: 'm2', name: 'Afrodor', kind: 'competitor', label: 'C2' }],
+    groups: [
+      { dimension: 'ai', rows: [] },
+      { dimension: 'social', rows: ['social_cadence', 'social_followers', 'social_interactions_per_post'].map((key, i) => ({ key, cells: Object.fromEntries(Object.entries(cells).map(([id, c]) => [id, c[i]])) })) },
+    ],
+    social_as_of: { b1: '2026-10-07', m1: '2026-10-06', m2: null },
+  })
+  const NO_PROFILE = 'Competitorul nu are profiluri sociale în setul de competitori.'
+
+  it('concurența publică: din matricea de Concurență (grupul social), N/A devine null; brandul nu apare', async () => {
+    const data = matrix({
+      b1: [cell(2, 'ok'), cell(1010, 'ok'), cell(null, 'unavailable')],
+      m1: [cell(3, 'partial'), cell(206, 'partial'), cell(13.33, 'partial')],
+      m2: [cell(null, 'unavailable', NO_PROFILE), cell(null, 'unavailable', NO_PROFILE), cell(null, 'unavailable', NO_PROFILE)],
+    })
+    const { client, rpcs } = fakeDataClient({ rpc: () => ({ data }) })
+    const r = await createSupabaseSocial(client).competitors(ctx)
+    expect(rpcs[0]).toMatchObject({ fn: 'brand_competition', args: { p_brand_id: 'b1', p_start: '2026-09-10', p_end: '2026-10-07' } })
+    expect(r).toEqual({
+      kind: 'ready',
+      data: [
+        { label: 'C1', name: 'Cystenal', posts_per_week: 3, followers: 206, public_interactions_per_post: 13.33, as_of: '2026-10-06' },
+        { label: 'C2', name: 'Afrodor', posts_per_week: null, followers: null, public_interactions_per_post: null, as_of: null },
+      ],
+    })
+  })
+
+  it('concurența publică: fără set sau fără niciun profil social: „Sursă neconectată” cu motivul; contract greșit: eroare', async () => {
+    const none = fakeDataClient({ rpc: () => ({ data: { has_set: false } }) })
+    const r1 = await createSupabaseSocial(none.client).competitors(ctx)
+    expect(r1.kind === 'not_connected' && r1.reason).toMatch(/set de competitori/)
+    const unlinked = matrix({
+      b1: [cell(2, 'ok'), cell(1010, 'ok'), cell(null, 'unavailable')],
+      m1: [cell(null, 'unavailable', NO_PROFILE), cell(null, 'unavailable', NO_PROFILE), cell(null, 'unavailable', NO_PROFILE)],
+      m2: [cell(null, 'unavailable', NO_PROFILE), cell(null, 'unavailable', NO_PROFILE), cell(null, 'unavailable', NO_PROFILE)],
+    })
+    const r2 = await createSupabaseSocial(fakeDataClient({ rpc: () => ({ data: unlinked }) }).client).competitors(ctx)
+    expect(r2.kind === 'not_connected' && r2.reason).toMatch(/profiluri sociale/)
+    const bad = matrix({ b1: [cell(1, 'ok'), cell(1, 'ok'), cell(1, 'ok')], m1: [cell(1, 'maybe'), cell(1, 'ok'), cell(1, 'ok')], m2: [cell(1, 'ok'), cell(1, 'ok'), cell(1, 'ok')] })
+    expect((await createSupabaseSocial(fakeDataClient({ rpc: () => ({ data: bad }) }).client).competitors(ctx)).kind).toBe('error')
+    const denied = fakeDataClient({ rpc: () => ({ error: { code: '42501', message: 'x' } }) })
+    expect(await createSupabaseSocial(denied.client).competitors(ctx)).toEqual({ kind: 'error', message: 'Nu ai acces la acest spațiu de brand.' })
   })
 
   it('o platformă necunoscută în postări încalcă contractul', async () => {
