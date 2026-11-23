@@ -141,7 +141,7 @@ describe('config (supabase)', () => {
           { id: 's3', brand_id: 'b1', version: 3, effective_from: '2026-12-01', note: null, created_at: '2026-10-05T00:00:00Z' },
         ],
         competitor_set_members: [
-          { id: 'm1', brand_id: 'b1', competitor_set_id: 's2', name: 'Alfa', domain: 'alfa.example', sort_order: 0 },
+          { id: 'm1', brand_id: 'b1', competitor_set_id: 's2', name: 'Alfa', domain: 'alfa.example', sort_order: 0, listening_keywords: ['alfa ro'], social_handles: ['alfa.ro'], ads_advertiser_ids: ['AR11111'] },
           { id: 'm2', brand_id: 'b1', competitor_set_id: 's2', name: 'Beta', domain: null, sort_order: 1 },
         ],
       },
@@ -149,7 +149,10 @@ describe('config (supabase)', () => {
     const r = await createSupabaseConfig(client, NOW).competitorVersions('b1')
     if (r.kind !== 'ready') throw new Error('nu e ready')
     expect(r.data.map((v) => [v.version, v.current])).toEqual([[3, false], [2, true], [1, false]])
-    expect(r.data[1]?.members).toEqual([{ id: 'm1', name: 'Alfa', domain: 'alfa.example', label: 'C1' }, { id: 'm2', name: 'Beta', domain: null, label: 'C2' }])
+    expect(r.data[1]?.members).toEqual([
+      { id: 'm1', name: 'Alfa', domain: 'alfa.example', label: 'C1', listening_keywords: ['alfa ro'], social_handles: ['alfa.ro'], ads_advertiser_ids: ['AR11111'] },
+      { id: 'm2', name: 'Beta', domain: null, label: 'C2', listening_keywords: [], social_handles: [], ads_advertiser_ids: [] },
+    ])
   })
 
   it('aliasurile: „Sursă neconectată" cu motiv (nu există tabel)', async () => {

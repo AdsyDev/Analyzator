@@ -1,11 +1,16 @@
-import { failed, METRIC_STATUSES, METRIC_UNITS, notConnected, ready, type CompetitionGap, type CompetitionMatrix, type CompetitionProvider } from '../../contracts'
+import { failed, METRIC_STATUSES, METRIC_UNITS, notConnected, ready, type CompetitionGap, type CompetitionMatrix, type CompetitionProvider, type CompetitorAd } from '../../contracts'
 import { serverPeriodKind } from '../../lib/period'
 import type { DataClient } from './dataClient'
 import { QUERY_FAILED } from './dataClient'
 
 const CONTRACT = 'Răspunsul serverului nu respectă contractul așteptat. Reîncearcă sau anunță echipa tehnică.'
 const NO_SET = 'Brandul nu are încă un set de competitori în vigoare; comparațiile apar după configurarea lui.'
-const DIMENSIONS = ['ai', 'seo', 'social', 'listening']
+const DIMENSIONS = ['ai', 'seo', 'social', 'listening', 'ads']
+const AD_FORMATS = ['text', 'image', 'video', 'unknown']
+const NO_ADS = 'Reclamele competitorilor nu au fost încă colectate din Google Ads Transparency Center. Apar după prima colectare, pentru competitorii cu ID de advertiser configurat.'
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+const dateOrNull = (v: unknown) => v === null || (typeof v === 'string' && ISO_DATE.test(v))
+const countOrNull = (v: unknown) => v === null || (typeof v === 'number' && Number.isFinite(v) && v >= 0)
 const DIRECTIONS = ['higher_is_better', 'lower_is_better', 'neutral']
 const rpcError = (e: { code?: string } | null) => (e?.code === '42501' ? 'Nu ai acces la acest spațiu de brand.' : QUERY_FAILED)
 
@@ -41,6 +46,23 @@ export function createSupabaseCompetition(client: DataClient): CompetitionProvid
       if (d.connected === false) return notConnected('Răspunsurile AI (SEOmonitor) nu sunt conectate pentru acest brand.')
       if (!Array.isArray(d.gaps)) return failed(CONTRACT)
       return ready(d.gaps)
+    },
+
+    async ads(ctx, { page, page_size }) {
+      const { data, error } = await client.rpc('brand_competitor_ads', { p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to, p_limit: page_size, p_offset: (page - 1) * page_size })
+      if (error) return failed(rpcError(error))
+      const d = data as { has_set?: boolean; connected?: boolean; total?: number; items?: CompetitorAd[]; data_as_of?: string | null } | null
+      if (!d || typeof d.has_set !== 'boolean') return failed(CONTRACT)
+      if (!d.has_set) return notConnected(NO_SET)
+      if (d.connected === false) return notConnected(NO_ADS)
+      if (!Array.isArray(d.items) || typeof d.total !== 'number' || !dateOrNull(d.data_as_of ?? null)) return failed(CONTRACT)
+      for (const a of d.items) {
+        if (typeof a.id !== 'string' || typeof a.ad_id !== 'string' || typeof a.competitor_label !== 'string' || !AD_FORMATS.includes(a.format)) return failed(CONTRACT)
+        if (!dateOrNull(a.first_shown) || !dateOrNull(a.last_shown) || !countOrNull(a.times_shown_lower) || !countOrNull(a.times_shown_upper)) return failed(CONTRACT)
+        // Linkul se deschide în pagina clientului: doar spre Ads Transparency Center, altfel nu se afișează.
+        if (a.source_url !== null && !/^https:\/\/adstransparency\.google\.com\//.test(a.source_url)) a.source_url = null
+      }
+      return ready({ items: d.items, total: d.total, page, page_size, data_as_of: d.data_as_of ?? null })
     },
   }
 }

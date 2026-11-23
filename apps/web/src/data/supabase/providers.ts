@@ -202,6 +202,7 @@ const clients: ClientsProvider = {
 const competition: CompetitionProvider = {
   matrix: async () => notConnected('Datele despre competitori nu sunt încă disponibile pentru acest brand.'),
   gaps: async () => notConnected('Datele despre competitori nu sunt încă disponibile pentru acest brand.'),
+  ads: async () => notConnected('Datele despre competitori nu sunt încă disponibile pentru acest brand.'),
 }
 
 const AI_OFF = 'AdSy AI nu este disponibil pentru acest brand.'
