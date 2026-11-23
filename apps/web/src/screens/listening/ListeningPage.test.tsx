@@ -98,6 +98,69 @@ describe('Listening', () => {
     expect(screen.getAllByRole('button', { name: /Autor:\s*Cont propriu/ }).length).toBeGreaterThan(0)
   })
 
+  describe('filtrul „Limbă” (farmacovigilență, deciziile Z)', () => {
+    type Wrap = NonNullable<Parameters<typeof renderApp>[0]['wrap']>
+    const spy = (seen: Array<string | null | undefined>): Wrap => (b) => ({
+      ...b,
+      mentions: {
+        ...b.mentions,
+        list: async (c, q) => {
+          seen.push(q.language)
+          const r = await b.mentions.list(c, q)
+          return r.kind === 'ready' ? { kind: 'ready' as const, data: { ...r.data, other_language: q.language === 'all' ? 0 : 5 } } : r
+        },
+      },
+    })
+    const feed = () => screen.getByRole('heading', { level: 2, name: 'Mențiuni' }).closest('section')!
+
+    it('agency_admin: implicit doar română, cu nota care spune cum vezi și celelalte limbi', async () => {
+      const seen: Array<string | null | undefined> = []
+      renderApp({ route: URINAL, wrap: spy(seen) })
+      await pageReady('Listening')
+      const note = await within(feed()).findByRole('note')
+      expect(note).toHaveTextContent('5 mențiuni din perioadă sunt în altă limbă decât româna și nu sunt afișate.')
+      expect(note).toHaveTextContent('Pentru verificarea de farmacovigilență, alege „Limbă: Toate limbile”.')
+      expect(seen.every((l) => l === null)).toBe(true)
+      expect(screen.getAllByRole('button', { name: 'Limbă' }).length).toBeGreaterThan(0)
+    })
+
+    it('agency_admin: „Toate limbile” din URL ajunge la provider, iar feed-ul spune ce nu se schimbă', async () => {
+      const seen: Array<string | null | undefined> = []
+      renderApp({ route: `${URINAL}?language=all`, wrap: spy(seen) })
+      await pageReady('Listening')
+      expect(await within(feed()).findByText(/Afișezi mențiunile în toate limbile, pentru verificarea de farmacovigilență/)).toBeInTheDocument()
+      expect(feed()).toHaveTextContent('Distribuția sentimentului și indicatorii rămân doar pe limba română.')
+      expect(feed()).not.toHaveTextContent('în altă limbă decât româna și nu')
+      expect(seen).toContain('all')
+      expect(screen.getAllByRole('button', { name: /Limbă:\s*Toate limbile/ }).length).toBeGreaterThan(0)
+      expect(within(feed()).getAllByRole('button', { name: 'Marchează pentru farmacovigilență' }).length).toBeGreaterThan(0)
+    })
+
+    it('filtrul se alege din bară și schimbă cererea', async () => {
+      const seen: Array<string | null | undefined> = []
+      renderApp({ route: URINAL, wrap: spy(seen) })
+      await pageReady('Listening')
+      await within(feed()).findAllByTestId('mention')
+      await userEvent.click(screen.getAllByRole('button', { name: 'Limbă' })[0]!)
+      await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Toate limbile' }))
+      await waitFor(() => expect(seen).toContain('all'))
+      expect(where()).toContain('language=all')
+    })
+
+    it.each(['strategist', 'client_viewer'] as const)('%s: filtrul nu apare, iar ?language=all din URL e ignorat', async (role) => {
+      const seen: Array<string | null | undefined> = []
+      renderApp({ route: `${URINAL}?language=all`, role, wrap: spy(seen) })
+      await pageReady('Listening')
+      const note = await within(feed()).findByRole('note')
+      expect(note).toHaveTextContent('5 mențiuni din perioadă sunt în altă limbă decât româna și nu sunt afișate.')
+      expect(note).not.toHaveTextContent('Toate limbile')
+      expect(seen.length).toBeGreaterThan(0)
+      expect(seen.every((l) => l === null)).toBe(true)
+      expect(screen.queryByRole('button', { name: 'Limbă' })).toBeNull()
+      expect(screen.queryByRole('button', { name: /Limbă:/ })).toBeNull()
+    })
+  })
+
   describe('mențiuni fără conținut (web, din Planable)', () => {
     type Wrap = NonNullable<Parameters<typeof renderApp>[0]['wrap']>
     const withCount = (n: number, empty = false): Wrap => (b) => ({

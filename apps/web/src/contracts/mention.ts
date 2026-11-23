@@ -52,10 +52,14 @@ export type SentimentFilter = Sentiment | 'unreviewed'
 /** Filtrul de autor: doar autorii externi (inclusiv necunoscuți), doar conturile proprii, sau `null` = toți. */
 export type AuthorFilter = 'external' | 'owned'
 
+/** Limba mențiunilor: `all` = toate limbile (doar agenția, pentru farmacovigilență); `null` = implicit, doar română. */
+export type LanguageFilter = 'all'
+
 export interface MentionQuery {
   sentiment: SentimentFilter | null
   source: string | null
   author: AuthorFilter | null
+  language?: LanguageFilter | null
   page: number
   page_size: number
 }

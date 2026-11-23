@@ -36,6 +36,8 @@ export function createSupabaseMentions(client: DataClient): MentionsProvider {
       const { data, error } = await client.rpc('brand_mentions', {
         p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to,
         p_sentiment: q.sentiment, p_source: q.source, p_page: q.page, p_page_size: q.page_size, p_author: q.author ?? 'all',
+        // Implicit serverul arată doar româna (deciziile Z); „toate limbile” se cere explicit.
+        ...(q.language === 'all' ? { p_language: 'all' } : {}),
       })
       if (error) return failed(rpcError(error))
       const d = data as (Page<Mention> & { without_content?: unknown; other_language?: unknown }) | null
@@ -46,7 +48,7 @@ export function createSupabaseMentions(client: DataClient): MentionsProvider {
         without_content: typeof d.without_content === 'number' ? d.without_content : 0,
         other_language: typeof d.other_language === 'number' ? d.other_language : 0,
       }
-      if (d.total === 0 && q.page === 1 && !q.sentiment && !q.source && !q.author) {
+      if (d.total === 0 && q.page === 1 && !q.sentiment && !q.source && !q.author && !q.language) {
         const s = await this.sentiment(ctx)
         if (s.kind === 'not_connected') return s
       }

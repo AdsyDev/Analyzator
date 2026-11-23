@@ -19,6 +19,11 @@ export interface BrandModule {
   /** Sursele de care depinde modulul; când toate lipsesc, modulul afișează „Sursă neconectată". */
   sources: readonly SourceProviderId[]
   filters: readonly FilterDef[]
+  /**
+   * Filtre doar pentru `agency_admin` (de ex. limba mențiunilor, pentru farmacovigilență). Pentru celelalte roluri nu
+   * apar în bară, iar parametrul din URL e ignorat (allowlist-ul din `parseQueryContext`).
+   */
+  adminFilters?: readonly FilterDef[]
   dynamicFilter?: DynamicFilter
   /** Textul pentru modulul fără sursă conectată, din design. */
   disconnected?: (brandName: string) => string
@@ -103,6 +108,20 @@ export const AUTHOR_FILTER: FilterDef = {
     { value: 'all', label: 'Toți' },
     { value: 'external', label: 'Externi' },
     { value: 'owned', label: 'Cont propriu' },
+  ],
+}
+
+/**
+ * Limba mențiunilor (deciziile Z): Listening arată implicit doar româna. „Toate limbile” e pentru verificarea de
+ * farmacovigilență (o mențiune din altă țară poate descrie un eveniment advers), doar pentru `agency_admin`.
+ */
+export const LANGUAGE_FILTER: FilterDef = {
+  key: 'language',
+  label: 'Limbă',
+  defaultValue: 'ro',
+  options: [
+    { value: 'ro', label: 'Română' },
+    { value: 'all', label: 'Toate limbile' },
   ],
 }
 
@@ -197,7 +216,7 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
     filters: [SOCIAL_PLATFORM_FILTER],
     disconnected: (b) => `Datele despre postările ${b} vin din Planable, care nu e încă conectat. Pentru comparația publică cu competitorii, vezi Concurență.`,
   },
-  listening: { segment: 'listening', title: 'Listening', subtitle: () => 'Mențiunile publice despre brand, cu sentiment revizuit de echipa AdSymphony.', sources: [], filters: [SENTIMENT_FILTER, AUTHOR_FILTER], dynamicFilter: MENTION_SOURCES },
+  listening: { segment: 'listening', title: 'Listening', subtitle: () => 'Mențiunile publice despre brand, cu sentiment revizuit de echipa AdSymphony.', sources: [], filters: [SENTIMENT_FILTER, AUTHOR_FILTER], adminFilters: [LANGUAGE_FILTER], dynamicFilter: MENTION_SOURCES },
   pharmacovigilance: {
     segment: 'pharmacovigilance',
     title: 'Farmacovigilență',

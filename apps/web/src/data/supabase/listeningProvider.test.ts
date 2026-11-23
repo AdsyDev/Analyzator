@@ -32,8 +32,11 @@ describe('createSupabaseMentions', () => {
     const fake = fakeDataClient({ rpc: () => ({ data: { items: [mention], total: 1, page: 1, page_size: 20, without_content: 0, other_language: 42 } }) })
     const r = await createSupabaseMentions(fake.client).list(ctx, { sentiment: null, source: null, author: null, page: 1, page_size: 20 })
     expect(r.kind === 'ready' && r.data.other_language).toBe(42)
-    // Limba nu se alege din client: serverul aplică implicit „doar română”.
+    // Implicit, limba nu se trimite: serverul aplică „doar română”.
     expect(fake.rpcs[0]!.args).not.toHaveProperty('p_language')
+    const all = fakeDataClient({ rpc: () => ({ data: { items: [mention], total: 1, page: 1, page_size: 20, without_content: 0, other_language: 0 } }) })
+    await createSupabaseMentions(all.client).list(ctx, { sentiment: null, source: null, author: null, language: 'all', page: 1, page_size: 20 })
+    expect(all.rpcs[0]).toEqual({ fn: 'brand_mentions', args: expect.objectContaining({ p_language: 'all' }) })
     const older = fakeDataClient({ rpc: () => ({ data: { items: [mention], total: 1, page: 1, page_size: 20 } }) })
     const o = await createSupabaseMentions(older.client).list(ctx, { sentiment: null, source: null, author: null, page: 1, page_size: 20 })
     expect(o.kind === 'ready' && o.data.other_language).toBe(0)
