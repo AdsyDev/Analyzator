@@ -42,3 +42,12 @@ const RUN_SOURCES: Partial<Record<SourceProviderId, readonly string[]>> = {
   planable: ['planable', 'planable_analytics', 'planable_listening'],
 }
 export const runSourcesFor = (provider: SourceProviderId): readonly string[] => RUN_SOURCES[provider] ?? [provider]
+
+/**
+ * O rulare aparține cardului conexiunii care a produs-o: Airbyte scrie rulări cu sursa platformei (meta_ads, google_ads,
+ * tiktok_ads), dar ele sunt ale cardului Airbyte, nu ale conectorului API. Fără conexiune cunoscută, după sursă.
+ */
+export function runBelongsTo(provider: SourceProviderId, source: string, connectionId: string | null | undefined, providerOf: ReadonlyMap<string, string>): boolean {
+  const owner = connectionId ? providerOf.get(connectionId) : undefined
+  return owner !== undefined ? owner === provider : runSourcesFor(provider).includes(source)
+}

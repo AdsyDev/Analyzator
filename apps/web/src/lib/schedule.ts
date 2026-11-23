@@ -3,7 +3,7 @@ import type { SourceProviderId } from '../contracts'
 /**
  * Programarea colectării, în UTC: oglinda cron-urilor din `.github/workflows` (un test compară cele două).
  * Folosită doar pentru „Următoarea actualizare estimată": nu spune că rularea a avut loc și nu ține loc de
- * „Date până la". O sursă fără programare (import CSV, Airbyte) nu are estimare.
+ * „Date până la". O sursă fără programare (import CSV) nu are estimare.
  */
 export type Schedule = { kind: 'weekly'; weekday: number; hour: number; minute: number } | { kind: 'daily'; hour: number; minute: number }
 
@@ -18,6 +18,7 @@ export const COLLECTION_SCHEDULE: Partial<Record<SourceProviderId, Schedule>> = 
   meta_ads: WEEKLY,
   tiktok_ads: WEEKLY,
   clarity: { kind: 'daily', hour: 22, minute: 5 },
+  airbyte: { kind: 'daily', hour: 5, minute: 20 },
 }
 
 /** Următoarea rulare programată după `now`; `null` pentru o sursă fără programare. */

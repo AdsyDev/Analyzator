@@ -53,7 +53,7 @@ const accountColumns: Column<AirbyteAccount>[] = [
     ),
   },
   { key: 'period', header: 'Perioadă', sortValue: (a) => a.first_date, render: (a) => <span className="font-mono text-[12px]">{period(a.first_date, a.last_date)}</span> },
-  { key: 'rows', header: 'Rânduri', align: 'right', sortValue: (a) => a.rows, render: (a) => a.rows.toLocaleString('ro-RO') },
+  { key: 'rows', header: 'Rânduri', align: 'right', sortValue: (a) => a.rows, render: (a) => (a.rows === null ? '—' : a.rows.toLocaleString('ro-RO')) },
   { key: 'synced', header: 'Sincronizat de Airbyte', sortValue: (a) => a.last_synced_at, render: (a) => <span className="font-mono text-[12px]">{a.last_synced_at ? formatDateTime(a.last_synced_at) : '—'}</span> },
 ]
 
