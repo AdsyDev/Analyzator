@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import type { Brand, MetricItem, QueryContext } from '../../contracts'
 import { FilterBar } from '../../components/FilterBar'
+import { BrandMark } from '../../components/ui/BrandMark'
 import { SortableTable, type Column } from '../../components/ui/SortableTable'
 import { useProviders } from '../../data/DataProvidersContext'
 import { useDefinitions } from '../../data/hooks'
@@ -65,11 +66,14 @@ export function PortfolioPage() {
       cardTitle: true,
       sortValue: (r) => r.brand.name,
       render: (r) => (
-        <div className="flex flex-col">
-          <Link to={{ pathname: brandPath(r.brand.id, 'overview'), search }} className="font-semibold text-accent-text hover:underline">
-            {r.brand.name}
-          </Link>
-          {r.error && <span role="alert" className="text-[12px] text-neg-text">{r.error}</span>}
+        <div className="flex items-center gap-3">
+          <BrandMark name={r.brand.name} domain={r.brand.domain} decorative />
+          <div className="flex min-w-0 flex-col">
+            <Link to={{ pathname: brandPath(r.brand.id, 'overview'), search }} className="font-semibold text-accent-text hover:underline">
+              {r.brand.name}
+            </Link>
+            {r.error && <span role="alert" className="text-[12px] text-neg-text">{r.error}</span>}
+          </div>
         </div>
       ),
     },

@@ -1,8 +1,9 @@
-import { act, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { Avatar, initials } from './Avatar'
+import { BrandMark, brandIconSources } from './BrandMark'
 import { Button } from './Button'
 import { FilterChip, StatusChip } from './Chip'
 import { Dialog } from './Dialog'
@@ -48,6 +49,44 @@ describe('Avatar', () => {
     expect(initials('  ')).toBe('?')
     render(<Avatar name="Ștefan Ionescu" />)
     expect(screen.getByRole('img', { name: 'Ștefan Ionescu' })).toHaveTextContent('ȘI')
+  })
+})
+
+describe('BrandMark', () => {
+  const img = (c: HTMLElement) => c.querySelector('img')
+  const loadWith = (el: HTMLImageElement, width: number) => {
+    Object.defineProperty(el, 'naturalWidth', { configurable: true, value: width })
+    fireEvent.load(el)
+  }
+
+  it('iconițele vin doar de pe site-ul brandului; domeniu lipsă sau invalid → nicio cerere', () => {
+    expect(brandIconSources('urinal.ro')).toEqual(['https://urinal.ro/apple-touch-icon.png', 'https://urinal.ro/favicon.ico'])
+    for (const d of [null, undefined, '', 'nu e domeniu', 'evil.ro/x?y', 'javascript:alert(1)']) expect(brandIconSources(d)).toEqual([])
+    const { container } = render(<BrandMark name="Urinal" domain={null} />)
+    expect(screen.getByRole('img', { name: 'Urinal' })).toHaveTextContent('U')
+    expect(img(container)).toBeNull()
+  })
+
+  it('monograma rămâne până se încarcă iconița; o iconiță lipsă trece la următoarea, apoi la monogramă', () => {
+    const { container } = render(<BrandMark name="Proenzi" domain="proenzi.ro" />)
+    const mark = screen.getByRole('img', { name: 'Proenzi' })
+    expect(mark).toHaveTextContent('P')
+    expect(img(container)).toHaveAttribute('src', 'https://proenzi.ro/apple-touch-icon.png')
+    expect(img(container)).toHaveAttribute('referrerpolicy', 'no-referrer')
+    fireEvent.error(img(container)!)
+    expect(img(container)).toHaveAttribute('src', 'https://proenzi.ro/favicon.ico')
+    loadWith(img(container)!, 1)
+    expect(img(container)).toBeNull()
+    expect(mark).toHaveTextContent('P')
+  })
+
+  it('cu iconița încărcată, monograma dispare; decorativ, semnul nu dublează numele pentru cititoarele de ecran', () => {
+    const { container } = render(<BrandMark name="Modafen" domain="modafen.ro" decorative />)
+    expect(screen.queryByRole('img', { name: 'Modafen' })).toBeNull()
+    loadWith(img(container)!, 180)
+    expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true')
+    expect(container.firstElementChild).toHaveTextContent('')
+    expect(img(container)).toHaveAttribute('src', 'https://modafen.ro/apple-touch-icon.png')
   })
 })
 
