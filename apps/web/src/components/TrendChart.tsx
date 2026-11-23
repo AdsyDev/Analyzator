@@ -1,7 +1,8 @@
 import { ChartLineIcon, TableIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { useId, useMemo, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type { ChartFormat, ChartSeries } from '../lib/chartData'
-import { continuousRuns, linePath } from '../lib/chartPath'
+import { continuousRuns, coveredDays, linePath, seriesMaxStep } from '../lib/chartPath'
+import { niceScale } from '../lib/chartScale'
 import { cn } from '../lib/cn'
 import { formatCompact } from '../lib/format'
 import { Button } from './ui/Button'
@@ -16,10 +17,10 @@ function fmtValue(v: number | null, f: ChartFormat): string {
   if (f === 'idx') return RO.format(v)
   return RO0.format(Math.round(v))
 }
-function fmtAxis(v: number, f: ChartFormat): string {
-  if (f === 'pct') return `${RO0.format(v)}%`
-  if (f === 'idx') return RO0.format(v)
-  return formatCompact(v)
+function fmtAxis(v: number, f: ChartFormat, decimals: number): string {
+  if (f === 'int') return formatCompact(v)
+  const text = new Intl.NumberFormat('ro-RO', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(v)
+  return f === 'pct' ? `${text}%` : text
 }
 
 export interface TrendChartProps {
@@ -41,9 +42,16 @@ export interface TrendChartProps {
   endMarkers?: boolean
   /** Umple, în degrade, aria de sub seria principală. Golurile rămân goluri. */
   area?: boolean
+  /**
+   * Cel mai rar ritm de colectare așteptat, în zile (7 pentru AI, decizia D-15). Peste 1, fiecare serie își ia pragul
+   * din distanțele dintre propriile valori, plafonat la acest ritm: linia unește colectările consecutive, iar hașura și
+   * ruptura liniei apar doar când lipsește o colectare a acelei serii. Un engine zilnic se rupe la prima zi lipsă, unul
+   * săptămânal doar la o săptămână lipsă. Tooltipul sare din colectare în colectare.
+   */
+  cadenceDays?: number
 }
 
-export function TrendChart({ title, series, labels, height = 240, format = 'int', note, loading = false, error = null, onRetry, unavailableReason = null, smooth = false, endMarkers = false, area = false }: TrendChartProps) {
+export function TrendChart({ title, series, labels, height = 240, format = 'int', note, loading = false, error = null, onRetry, unavailableReason = null, smooth = false, endMarkers = false, area = false, cadenceDays = 1 }: TrendChartProps) {
   const [hidden, setHidden] = useState<Record<string, boolean>>({})
   const [hover, setHover] = useState<number | null>(null)
   const [asTable, setAsTable] = useState(false)
@@ -77,66 +85,85 @@ export function TrendChart({ title, series, labels, height = 240, format = 'int'
     )
   }
 
-  let min = allValues.length ? Math.min(...allValues) : 0
-  let max = allValues.length ? Math.max(...allValues) : 1
-  const pad = (max - min) * 0.15 || 1
-  min -= pad
-  max += pad
-  if (format !== 'idx' && min < 0) min = 0
+  const scale = niceScale(allValues, format)
+  const { min, max } = scale
   const span = max - min || 1
+  // Distanța maximă, în zile, între două valori unite de linie, pe fiecare serie după ritmul ei.
+  const stepOf = (values: Array<number | null>) => seriesMaxStep(values, cadenceDays)
+  const observed = (values: Array<number | null>) => values.flatMap((v, i) => (v === null || v === undefined ? [] : [i]))
   const X = (i: number) => (n > 1 ? (i / (n - 1)) * 1000 : 500)
   const xp = (i: number) => (n > 1 ? (i / (n - 1)) * 100 : 50)
   const Y = (v: number) => height - ((v - min) / span) * height
 
   const pointsOf = (values: Array<number | null>, idx: number[]) => idx.map((i) => ({ x: X(i), y: Y(values[i] as number) }))
-  const pathFor = (values: Array<number | null>) => continuousRuns(values).map((idx) => linePath(pointsOf(values, idx), smooth)).join(' ')
+  const pathFor = (values: Array<number | null>) => continuousRuns(values, stepOf(values)).map((idx) => linePath(pointsOf(values, idx), smooth)).join(' ')
   /** Aria de sub linie, pe fiecare porțiune continuă: linia, apoi închiderea pe baza graficului. */
   const areaFor = (values: Array<number | null>) =>
-    continuousRuns(values)
+    continuousRuns(values, stepOf(values))
       .filter((idx) => idx.length > 1)
       .map((idx) => `${linePath(pointsOf(values, idx), smooth)} L${X(idx[idx.length - 1]!).toFixed(1)} ${height} L${X(idx[0]!).toFixed(1)} ${height} Z`)
       .join(' ')
   /** Primul și ultimul punct cu valoare al unei serii. */
   const endsOf = (values: Array<number | null>) => {
-    const idx = values.map((v, i) => (v === null || v === undefined ? -1 : i)).filter((i) => i >= 0)
+    const idx = observed(values)
     return idx.length === 0 ? [] : [...new Set([idx[0]!, idx[idx.length - 1]!])]
   }
+  /**
+   * Punctele desenate: valorile fără vecin în ziua dinainte sau de după. O serie colectată săptămânal are astfel un punct
+   * la fiecare colectare, una zilnică rămâne o linie curată, iar o valoare izolată nu dispare (o linie de un punct nu se vede).
+   */
+  const dotsOf = (values: Array<number | null>) => {
+    const has = (i: number) => values[i] !== null && values[i] !== undefined
+    const ends = endMarkers ? new Set(endsOf(values)) : new Set<number>()
+    return observed(values).filter((i) => !has(i - 1) && !has(i + 1) && !ends.has(i))
+  }
 
-  // Goluri: zilele fără date ale seriei principale (prima vizibilă), hașurate. Seria de comparație e secundară
-  // și nu ascunde golul principalei; fiecare serie își întrerupe oricum linia la `null`.
+  // Goluri: zilele pe care nicio serie plină vizibilă nu le acoperă, hașurate. Seriile egale (de ex. engine-urile) se
+  // acoperă una pe alta; seria de comparație (punctată) e secundară și nu ascunde golul. Fiecare serie acoperă zilele
+  // dintre colectările ei consecutive după propriul ritm (`seriesMaxStep`), deci hașura apare doar unde lipsește o
+  // colectare a tuturor seriilor.
   const gaps: Array<{ left: number; width: number }> = []
   const half = n > 1 ? 50 / (n - 1) : 50
   const primary = visible[0]
+  const solid = visible.filter((s) => !s.dashed)
+  const gapSource = solid.length ? solid : primary ? [primary] : []
+  const covers = gapSource.map((s) => coveredDays(s.values.slice(0, n), stepOf(s.values)))
   let start = -1
-  for (let i = 0; i < n; i++) {
-    const empty = !primary || primary.values[i] === null || primary.values[i] === undefined
+  for (let i = 0; i <= n; i++) {
+    const empty = i < n && !covers.some((c) => c[i])
     if (empty && start < 0) start = i
-    if (start >= 0 && (!empty || i === n - 1)) {
-      const end = empty ? i : i - 1
+    if (!empty && start >= 0) {
       const left = Math.max(0, xp(start) - half)
-      const right = Math.min(100, xp(end) + half)
+      const right = Math.min(100, xp(i - 1) + half)
       gaps.push({ left, width: right - left })
       start = -1
     }
   }
 
-  const grid = [0, 1, 2, 3].map((k) => {
-    const v = min + (span * k) / 3
-    return { top: Y(v), label: fmtAxis(v, format) }
-  })
+  const grid = scale.ticks.map((v) => ({ top: Y(v), label: fmtAxis(v, format, scale.decimals) }))
   const tickIdx = [...new Set([0, Math.round((n - 1) * 0.25), Math.round((n - 1) * 0.5), Math.round((n - 1) * 0.75), n - 1])]
 
   const hi = hover !== null && hover < n ? hover : null
+  // Pe o serie periodică, hoverul și tastatura merg din colectare în colectare (zilele dintre ele n-au valoare proprie).
+  const stops = cadenceDays > 1 ? [...new Set(visible.flatMap((s) => observed(s.values)))].sort((a, b) => a - b) : []
 
   function onMove(e: PointerEvent<HTMLDivElement>) {
     const r = e.currentTarget.getBoundingClientRect()
     if (r.width === 0) return
     const ratio = (e.clientX - r.left) / r.width
-    setHover(Math.max(0, Math.min(n - 1, Math.round(ratio * (n - 1)))))
+    const raw = Math.max(0, Math.min(n - 1, Math.round(ratio * (n - 1))))
+    setHover(stops.length ? stops.reduce((best, i) => (Math.abs(i - raw) < Math.abs(best - raw) ? i : best)) : raw)
   }
   function onKey(e: KeyboardEvent<HTMLDivElement>) {
     const cur = hover ?? -1
-    if (e.key === 'ArrowRight') setHover(Math.min(n - 1, cur + 1))
+    if (stops.length) {
+      if (e.key === 'ArrowRight') setHover(stops.find((i) => i > cur) ?? stops[stops.length - 1]!)
+      else if (e.key === 'ArrowLeft') setHover(cur < 0 ? stops[stops.length - 1]! : ([...stops].reverse().find((i) => i < cur) ?? stops[0]!))
+      else if (e.key === 'Home') setHover(stops[0]!)
+      else if (e.key === 'End') setHover(stops[stops.length - 1]!)
+      else if (e.key === 'Escape') setHover(null)
+      else return
+    } else if (e.key === 'ArrowRight') setHover(Math.min(n - 1, cur + 1))
     else if (e.key === 'ArrowLeft') setHover(Math.max(0, (cur < 0 ? n : cur) - 1))
     else if (e.key === 'Home') setHover(0)
     else if (e.key === 'End') setHover(n - 1)
@@ -263,6 +290,13 @@ export function TrendChart({ title, series, labels, height = 240, format = 'int'
                 />
               ))}
             </svg>
+            {visible
+              .filter((s) => !s.dashed)
+              .flatMap((s) =>
+                dotsOf(s.values).map((i) => (
+                  <span key={`${s.key}-dot-${i}`} aria-hidden="true" data-testid="chart-point" className="pointer-events-none absolute -ml-[3.5px] -mt-[3.5px] size-[7px] rounded-full ring-2 ring-surface" style={{ left: `${xp(i)}%`, top: Y(s.values[i] as number), background: s.color }} />
+                )),
+              )}
             {endMarkers &&
               visible
                 .filter((s) => !s.dashed)
@@ -274,8 +308,10 @@ export function TrendChart({ title, series, labels, height = 240, format = 'int'
             {endMarkers && hi === null && primary && !primary.dashed && (() => {
               const last = endsOf(primary.values).at(-1)
               if (last === undefined) return null
+              // Lângă marginea de sus, eticheta coboară sub punct, ca să nu iasă din grafic.
+              const top = Y(primary.values[last] as number)
               return (
-                <span aria-hidden="true" className="pointer-events-none absolute -translate-x-full -translate-y-[calc(100%+10px)] whitespace-nowrap rounded-md border border-border-strong bg-surface-2 px-2 py-1 font-mono text-[11px] text-text" style={{ left: `${xp(last)}%`, top: Y(primary.values[last] as number) }}>
+                <span aria-hidden="true" className={cn('pointer-events-none absolute -translate-x-full whitespace-nowrap', top < 36 ? 'translate-y-[10px]' : '-translate-y-[calc(100%+10px)]', 'rounded-md border border-border-strong bg-surface-2 px-2 py-1 font-mono text-[11px] text-text')} style={{ left: `${xp(last)}%`, top }}>
                   {labels[last]} · {fmtValue(primary.values[last] ?? null, format)}
                 </span>
               )
