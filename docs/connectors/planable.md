@@ -66,14 +66,14 @@ Pagina site-ului → „Istoricul sincronizărilor”: pentru fiecare site apar 
 ## Competitorii în Listening
 
 1. În Planable Listening, adaugă pentru fiecare competitor cuvintele lui, de tip **„competitor”**.
-2. Cuvântul se leagă de competitor după text, fără diferență de majuscule: implicit, cuvântul trebuie să fie **numele competitorului din setul de competitori** (Administrare → Configurare → „Competitori”). Dacă în Planable urmărești alte cuvinte (de ex. „Prostamol Uno”), echipa tehnică le pune pe competitor (`listening_keywords`) într-o versiune nouă a setului. Un cuvânt aparține unui singur competitor.
+2. Cuvântul se leagă de competitor după text, fără diferență de majuscule: implicit, cuvântul trebuie să fie **numele competitorului din setul de competitori** (Administrare → Configurare → „Competitori”). Dacă în Planable urmărești alte cuvinte (de ex. „Prostamol Uno”), le pui pe competitor din Administrare → **Configurare** → „Competitori” → **Versiune nouă**, câmpul „Cuvinte Planable Listening”. Un cuvânt aparține unui singur competitor.
 3. Un cuvânt de tip „competitor” care nu corespunde niciunui competitor din set se colectează, dar nu apare nicăieri.
 4. Mențiunile se colectează de la prima rulare (ultimele 35 de zile); pentru perioade mai vechi, celula competitorului e „parțial” sau N/A, nu zero.
 
 ## Competitorii în Planable Competitors
 
 1. În Planable, pe fiecare pagină a brandului (Instagram, Facebook, YouTube, TikTok, LinkedIn): Analytics → **Competitors** → adaugă profilurile competitorilor. Planable le preia în câteva ore.
-2. Profilul se leagă de competitorul din set după nume: numele afișat sau handle-ul trebuie să corespundă numelui competitorului (fără diacritice, majuscule, spații). Altfel, echipa tehnică pune handle-urile pe competitor (`social_handles`) într-o versiune nouă a setului.
+2. Profilul se leagă de competitorul din set după nume: numele afișat sau handle-ul trebuie să corespundă numelui competitorului (fără diacritice, majuscule, spații). Altfel, pui handle-urile pe competitor din Administrare → **Configurare** → „Competitori” → **Versiune nouă**, câmpul „Profiluri Planable Competitors”.
 3. Colectarea citește ultimele 35 de zile, zi cu zi (aproximativ 37 de cereri pe pagină). Planable spune că interacțiunile competitorilor sunt colectate din pagina publică, iar ale paginii proprii sunt raportate de platformă, deci comparația e orientativă.
 
 ## Prima rulare

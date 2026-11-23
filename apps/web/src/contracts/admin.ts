@@ -128,8 +128,29 @@ export interface NewSeomonitorMapping {
   is_primary_visibility: boolean
 }
 
+/** Un competitor dintr-o versiune nouă a setului. Listele goale înseamnă: se caută numele (cuvinte, profiluri), nu se colectează (advertiseri). */
+export interface NewCompetitorMember {
+  name: string
+  domain: string | null
+  listening_keywords: string[]
+  social_handles: string[]
+  ads_advertiser_ids: string[]
+}
+
+/** O versiune nouă, imutabilă, a setului de competitori, în vigoare de la `effective_from` (azi sau mai târziu, Europe/Bucharest). */
+export interface NewCompetitorSetVersion {
+  effective_from: IsoDate
+  note: string | null
+  members: NewCompetitorMember[]
+}
+
 export interface ConfigProvider {
   competitorVersions(brandId: BrandId): Promise<ProviderResult<CompetitorSetVersion[]>>
+  /**
+   * Versiune nouă a setului (`create_competitor_set_version`, excepția E4): agency_admin sau strategist cu acces la brand.
+   * Validarea e pe server; mesajele lui de eroare sunt în română și se afișează ca atare.
+   */
+  createCompetitorVersion(brandId: BrandId, input: NewCompetitorSetVersion): Promise<ProviderResult<{ version: number; effective_from: IsoDate }>>
   aliases(brandId: BrandId): Promise<ProviderResult<BrandAlias[]>>
   seomonitorMappings(): Promise<ProviderResult<SeomonitorMapping[]>>
   /**

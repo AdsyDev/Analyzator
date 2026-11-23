@@ -24,13 +24,7 @@ Dacă alt proiect trebuie să plătească, setează în GitHub variabila `ADS_TR
 
 ## 3. Pune ID-urile în setul de competitori
 
-Setul de competitori e versionat: ID-urile intră într-o **versiune nouă**, de azi sau din viitor, creată de echipa tehnică cu `create_competitor_set_version` (contractul în `docs/security-tests.md`, E4). Fiecare competitor primește `ads_advertiser_ids`, de exemplu:
-
-```json
-[{ "name": "Prostamol", "domain": "prostamol.ro", "ads_advertiser_ids": ["AR01234567890123456789"] }]
-```
-
-În aplicație, Administrare → **Configurare** → „Competitori” arată, pe fiecare competitor, ID-urile salvate.
+Setul de competitori e versionat: ID-urile intră într-o **versiune nouă**, de azi sau din viitor. În aplicație: Administrare → **Configurare** → „Competitori” → **Versiune nouă** (doar agenția). Formularul pornește de la versiunea în vigoare; la fiecare competitor completezi „ID-uri advertiser Google”, separate prin virgulă, apoi „Creează versiunea”. Tabelul arată apoi, pe fiecare competitor, ID-urile salvate.
 
 ## 4. Pornește colectarea
 

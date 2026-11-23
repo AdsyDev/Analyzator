@@ -155,6 +155,26 @@ describe('config (supabase)', () => {
     ])
   })
 
+  it('versiune nouă a setului: RPC-ul E4 cu membrii ca atare; răspunsul dă versiunea și data', async () => {
+    const { client, rpcs } = fakeDataClient({ rpc: () => ({ data: [{ competitor_set_id: 's9', version: 4, effective_from: '2026-10-08', member_count: 2 }] }) })
+    const members = [
+      { name: 'Alfa', domain: 'alfa.ro', listening_keywords: ['alfa'], social_handles: ['alfa.ro'], ads_advertiser_ids: ['AR11111'] },
+      { name: 'Beta', domain: null, listening_keywords: [], social_handles: [], ads_advertiser_ids: [] },
+    ]
+    const r = await createSupabaseConfig(client, NOW).createCompetitorVersion('b1', { effective_from: '2026-10-08', note: null, members })
+    expect(rpcs).toEqual([{ fn: 'create_competitor_set_version', args: { p_brand_id: 'b1', p_effective_from: '2026-10-08', p_note: null, p_members: members } }])
+    expect(r).toEqual({ kind: 'ready', data: { version: 4, effective_from: '2026-10-08' } })
+  })
+
+  it('versiune nouă: mesajul de validare al serverului se afișează ca atare; dreptul refuzat are mesaj fix', async () => {
+    const invalid = fakeDataClient({ rpc: () => ({ error: { code: '22023', message: 'Membrul 2 (Beta): ID-ul de advertiser „X” nu are forma AR urmat de cifre' } }) })
+    const input = { effective_from: '2026-10-08', note: null, members: [{ name: 'Beta', domain: null, listening_keywords: [], social_handles: [], ads_advertiser_ids: ['X'] }] }
+    expect(await createSupabaseConfig(invalid.client, NOW).createCompetitorVersion('b1', input)).toEqual({ kind: 'error', message: 'Membrul 2 (Beta): ID-ul de advertiser „X” nu are forma AR urmat de cifre' })
+    const denied = fakeDataClient({ rpc: () => ({ error: { code: '42501', message: 'detaliu intern' } }) })
+    const r = await createSupabaseConfig(denied.client, NOW).createCompetitorVersion('b1', input)
+    expect(r).toEqual({ kind: 'error', message: 'Nu ai dreptul să creezi o versiune a setului de competitori pentru acest brand.' })
+  })
+
   it('aliasurile: „Sursă neconectată" cu motiv (nu există tabel)', async () => {
     const { client } = fakeDataClient()
     expect((await createSupabaseConfig(client, NOW).aliases('b1')).kind).toBe('not_connected')
