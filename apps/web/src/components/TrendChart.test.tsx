@@ -88,6 +88,30 @@ describe('TrendChart', () => {
     expect(screen.getAllByTestId('chart-point')).toHaveLength(1) // valoarea singură a ChatGPT
   })
 
+  it('prag pe fiecare engine: finalul fără AI Overviews (zilnic) e hașurat chiar dacă Gemini e săptămânal', () => {
+    const days = Array.from({ length: 28 }, (_, i) => `${i + 1} nov.`)
+    const aio = days.map((_, i) => (i <= 21 ? 3 : null)) // zilnic, oprit după ziua 21
+    const gemini = days.map((_, i) => (i % 7 === 2 && i <= 16 ? 10 : null)) // zilele 2, 9, 16; următoarea abia pe 23
+    render(<TrendChart title="Engine" labels={days} format="pct" cadenceDays={7} series={[
+      { key: 'g', name: 'Gemini', color: 'var(--lav)', values: gemini },
+      { key: 'a', name: 'AI Overviews', color: 'var(--s3)', values: aio },
+    ]} />)
+    // Gemini: ultima colectare în ziua 16, iar 27 − 16 = 11 atinge pragul (1,5 × 7), deci finalul nu mai e acoperit.
+    // AI Overviews (prag 1) se rupe după ziua 21: zilele 22–27 nu sunt acoperite de nicio serie.
+    expect(screen.getAllByTestId('chart-gap')).toHaveLength(1)
+  })
+
+  it('prag pe fiecare engine: un engine săptămânal la zi acoperă zilele dintre colectări, chiar dacă cel zilnic s-a oprit', () => {
+    const days = Array.from({ length: 28 }, (_, i) => `${i + 1} nov.`)
+    const aio = days.map((_, i) => (i <= 21 ? 3 : null))
+    const gemini = days.map((_, i) => (i % 7 === 2 ? 10 : null)) // 2, 9, 16, 23
+    render(<TrendChart title="Engine" labels={days} format="pct" cadenceDays={7} series={[
+      { key: 'g', name: 'Gemini', color: 'var(--lav)', values: gemini },
+      { key: 'a', name: 'AI Overviews', color: 'var(--s3)', values: aio },
+    ]} />)
+    expect(screen.queryAllByTestId('chart-gap')).toHaveLength(0)
+  })
+
   it('serie zilnică continuă: fără puncte pe fiecare zi', () => {
     render(<TrendChart title="Trafic" labels={labels} cadenceDays={7} series={[{ key: 'a', name: 'Clicks', color: 'var(--accent)', values: [1, 2, 3, 4, 5] }]} />)
     expect(screen.queryAllByTestId('chart-point')).toHaveLength(0)

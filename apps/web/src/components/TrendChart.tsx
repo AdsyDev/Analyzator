@@ -1,7 +1,7 @@
 import { ChartLineIcon, TableIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { useId, useMemo, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type { ChartFormat, ChartSeries } from '../lib/chartData'
-import { continuousRuns, linePath } from '../lib/chartPath'
+import { continuousRuns, coveredDays, linePath, seriesMaxStep } from '../lib/chartPath'
 import { niceScale } from '../lib/chartScale'
 import { cn } from '../lib/cn'
 import { formatCompact } from '../lib/format'
@@ -43,9 +43,10 @@ export interface TrendChartProps {
   /** Umple, în degrade, aria de sub seria principală. Golurile rămân goluri. */
   area?: boolean
   /**
-   * La câte zile se colectează seria (7 pentru AI, decizia D-15). Peste 1, fiecare colectare primește un punct, linia
-   * unește colectările consecutive, iar hașura și ruptura liniei apar doar când lipsește o colectare, nu pe zilele
-   * dintre două colectări. Tooltipul sare din colectare în colectare.
+   * Cel mai rar ritm de colectare așteptat, în zile (7 pentru AI, decizia D-15). Peste 1, fiecare serie își ia pragul
+   * din distanțele dintre propriile valori, plafonat la acest ritm: linia unește colectările consecutive, iar hașura și
+   * ruptura liniei apar doar când lipsește o colectare a acelei serii. Un engine zilnic se rupe la prima zi lipsă, unul
+   * săptămânal doar la o săptămână lipsă. Tooltipul sare din colectare în colectare.
    */
   cadenceDays?: number
 }
@@ -87,18 +88,18 @@ export function TrendChart({ title, series, labels, height = 240, format = 'int'
   const scale = niceScale(allValues, format)
   const { min, max } = scale
   const span = max - min || 1
-  // Distanța maximă, în zile, între două valori unite de linie. O întârziere mică a colectării nu rupe linia.
-  const maxStep = cadenceDays > 1 ? Math.ceil(cadenceDays * 1.5) : 1
+  // Distanța maximă, în zile, între două valori unite de linie, pe fiecare serie după ritmul ei.
+  const stepOf = (values: Array<number | null>) => seriesMaxStep(values, cadenceDays)
   const observed = (values: Array<number | null>) => values.flatMap((v, i) => (v === null || v === undefined ? [] : [i]))
   const X = (i: number) => (n > 1 ? (i / (n - 1)) * 1000 : 500)
   const xp = (i: number) => (n > 1 ? (i / (n - 1)) * 100 : 50)
   const Y = (v: number) => height - ((v - min) / span) * height
 
   const pointsOf = (values: Array<number | null>, idx: number[]) => idx.map((i) => ({ x: X(i), y: Y(values[i] as number) }))
-  const pathFor = (values: Array<number | null>) => continuousRuns(values, maxStep).map((idx) => linePath(pointsOf(values, idx), smooth)).join(' ')
+  const pathFor = (values: Array<number | null>) => continuousRuns(values, stepOf(values)).map((idx) => linePath(pointsOf(values, idx), smooth)).join(' ')
   /** Aria de sub linie, pe fiecare porțiune continuă: linia, apoi închiderea pe baza graficului. */
   const areaFor = (values: Array<number | null>) =>
-    continuousRuns(values, maxStep)
+    continuousRuns(values, stepOf(values))
       .filter((idx) => idx.length > 1)
       .map((idx) => `${linePath(pointsOf(values, idx), smooth)} L${X(idx[idx.length - 1]!).toFixed(1)} ${height} L${X(idx[0]!).toFixed(1)} ${height} Z`)
       .join(' ')
@@ -117,33 +118,26 @@ export function TrendChart({ title, series, labels, height = 240, format = 'int'
     return observed(values).filter((i) => !has(i - 1) && !has(i + 1) && !ends.has(i))
   }
 
-  // Goluri: zilele în care nicio serie plină vizibilă nu are date, hașurate. Seriile egale (de ex. engine-urile) se
-  // acoperă una pe alta; seria de comparație (punctată) e secundară și nu ascunde golul. La o serie periodică, zilele
-  // dintre două colectări nu sunt goluri: se hașurează doar distanțele mai mari decât `maxStep` (o colectare lipsă) și
-  // capetele perioadei fără colectare.
+  // Goluri: zilele pe care nicio serie plină vizibilă nu le acoperă, hașurate. Seriile egale (de ex. engine-urile) se
+  // acoperă una pe alta; seria de comparație (punctată) e secundară și nu ascunde golul. Fiecare serie acoperă zilele
+  // dintre colectările ei consecutive după propriul ritm (`seriesMaxStep`), deci hașura apare doar unde lipsește o
+  // colectare a tuturor seriilor.
   const gaps: Array<{ left: number; width: number }> = []
   const half = n > 1 ? 50 / (n - 1) : 50
   const primary = visible[0]
   const solid = visible.filter((s) => !s.dashed)
   const gapSource = solid.length ? solid : primary ? [primary] : []
-  const addGap = (from: number, to: number) => {
-    if (to < from) return
-    const left = Math.max(0, xp(from) - half)
-    const right = Math.min(100, xp(to) + half)
-    gaps.push({ left, width: right - left })
-  }
-  const primaryObs = [...new Set(gapSource.flatMap((s) => observed(s.values)))].sort((a, b) => a - b)
-  if (primaryObs.length === 0) addGap(0, n - 1)
-  else {
-    const first = primaryObs[0]!
-    const last = primaryObs[primaryObs.length - 1]!
-    if (first >= maxStep) addGap(0, first - 1)
-    for (let k = 0; k < primaryObs.length - 1; k++) {
-      const a = primaryObs[k]!
-      const b = primaryObs[k + 1]!
-      if (b - a > maxStep) addGap(a + 1, b - 1)
+  const covers = gapSource.map((s) => coveredDays(s.values.slice(0, n), stepOf(s.values)))
+  let start = -1
+  for (let i = 0; i <= n; i++) {
+    const empty = i < n && !covers.some((c) => c[i])
+    if (empty && start < 0) start = i
+    if (!empty && start >= 0) {
+      const left = Math.max(0, xp(start) - half)
+      const right = Math.min(100, xp(i - 1) + half)
+      gaps.push({ left, width: right - left })
+      start = -1
     }
-    if (n - 1 - last >= maxStep) addGap(last + 1, n - 1)
   }
 
   const grid = scale.ticks.map((v) => ({ top: Y(v), label: fmtAxis(v, format, scale.decimals) }))

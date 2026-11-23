@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { continuousRuns, linePath } from './chartPath'
+import { continuousRuns, coveredDays, linePath, seriesMaxStep } from './chartPath'
 
 const numbers = (d: string) => (d.match(/-?\d+(\.\d+)?/g) ?? []).map(Number)
 
@@ -28,6 +28,21 @@ describe('chartPath', () => {
   it('porțiunile continue se rup la null, care nu e tratat ca zero', () => {
     expect(continuousRuns([1, 2, null, 0, undefined, 5])).toEqual([[0, 1], [3], [5]])
     expect(continuousRuns([null, null])).toEqual([])
+  })
+
+  it('pragul fiecărei serii vine din ritmul ei, plafonat la ritmul declarat', () => {
+    const daily = [1, 2, 3, null, 5, 6]
+    const weekly = [1, null, null, null, null, null, null, 2, null, null, null, null, null, null, 3]
+    expect(seriesMaxStep(daily, 7)).toBe(1)
+    expect(seriesMaxStep(weekly, 7)).toBe(11)
+    expect(seriesMaxStep([null, 4, null], 7)).toBe(11) // o singură valoare: ritmul declarat
+    expect(seriesMaxStep(weekly, 1)).toBe(1) // serie zilnică: niciodată unite peste un gol
+  })
+
+  it('zilele acoperite: între colectări apropiate și la capetele mai scurte decât pragul', () => {
+    expect(coveredDays([null, 1, null, null, 2, null], 3)).toEqual([true, true, true, true, true, true])
+    expect(coveredDays([1, 2, null, null], 1)).toEqual([true, true, false, false])
+    expect(coveredDays([null, null], 3)).toEqual([false, false])
   })
 
   it('o serie săptămânală unește colectările consecutive și se rupe doar când lipsește o colectare', () => {
