@@ -4,7 +4,7 @@ import type { AiEngineStat, CompetitionMatrix, MetricDefinition, MetricItem, Met
 import { Sparkline } from '../../components/Sparkline'
 import { TrendChart } from '../../components/TrendChart'
 import type { AsyncState } from '../../data/useAsync'
-import { AI_ENGINE_LABELS } from '../../lib/ai'
+import { AI_CADENCE_DAYS, AI_ENGINE_LABELS } from '../../lib/ai'
 import { toChartSeries, type ChartSeries } from '../../lib/chartData'
 import { formatDayMonth, formatInteger, formatMetricValue, formatRange } from '../../lib/format'
 import { resolvePeriod } from '../../lib/period'
@@ -83,9 +83,10 @@ export function AiTrendCard({ ctx, trends, label, onRetry, href }: { ctx: QueryC
     chart = { labels: main.labels, series: main.series.map((s) => ({ ...s, name: label })) }
     if (series.comparison_points) chart.series.push({ key: `${series.metric_key}:cmp`, name: 'Perioada de comparație', color: 'var(--text-3)', dashed: true, values: series.comparison_points.map((p) => p.value) })
   }
-  const hasGaps = !!series?.points.some((p) => p.value === null) && series.points.some((p) => p.value !== null)
+  const hasData = !!series?.points.some((p) => p.value !== null)
+  const hasComparison = !!series?.comparison_points?.some((p) => p.value !== null)
   return (
-    <Card id="ai-trend" title="Evoluția vizibilității AI" description={`${label}, ${formatRange(ctx.period.from, ctx.period.to)}. Linia punctată e perioada de comparație.`} action={<div className="flex flex-wrap items-center gap-3"><QuickPeriod ctx={ctx} />{more(href, 'Vizibilitate AI')}</div>} className="@5xl:col-span-2">
+    <Card id="ai-trend" title="Evoluția vizibilității AI" description={`${label}, ${formatRange(ctx.period.from, ctx.period.to)}.${hasComparison ? ' Linia punctată e perioada de comparație.' : ''}`} action={<div className="flex flex-wrap items-center gap-3"><QuickPeriod ctx={ctx} />{more(href, 'Vizibilitate AI')}</div>} className="@5xl:col-span-2">
       <TrendChart
         title={`Evoluție: ${label}`}
         labels={chart.labels}
@@ -95,11 +96,12 @@ export function AiTrendCard({ ctx, trends, label, onRetry, href }: { ctx: QueryC
         smooth
         area
         endMarkers
+        cadenceDays={AI_CADENCE_DAYS}
         loading={trends.status === 'loading'}
         error={trends.status === 'failed' ? trends.message : null}
         onRetry={onRetry}
         unavailableReason={series ? trendReason(series.status) : trends.status === 'done' ? 'Seria nu a venit de la server pentru acest interval.' : null}
-        note={hasGaps ? 'Zilele fără date apar hașurate; nu sunt zero.' : undefined}
+        note={hasData ? 'Colectare săptămânală: fiecare punct e o colectare. O săptămână fără colectare apare hașurată, nu ca zero.' : undefined}
       />
     </Card>
   )

@@ -1,5 +1,5 @@
 import adminFile from '../../../../../tests/fixtures/ui/admin.json'
-import { failed, ready, type AccessPerson, type BrandAlias, type CompetitorSetVersion, type ConfigProvider, type MappingKind, type Role, type SeomonitorMapping, type UsersProvider } from '../../contracts'
+import { failed, ready, type AccessPerson, type BrandAlias, type CompetitorSetVersion, type CompetitorSuggestions, type ConfigProvider, type MappingKind, type Role, type SeomonitorMapping, type UsersProvider } from '../../contracts'
 import { addDays, todayBucharest } from '../../lib/period'
 
 interface Options {
@@ -144,21 +144,82 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
   }))
   const aliases = adminFile.aliases as Record<string, Array<{ id: string; alias: string; used_in: string }>>
 
+  const suggestions = adminFile.competitor_suggestions as Record<string, { planable: CompetitorSuggestions['planable']['competitors']; seomonitor: CompetitorSuggestions['seomonitor']['domains'] }>
+  // Versiunile create în previzualizare rămân în memorie cât ține sesiunea.
+  const created: Record<string, CompetitorSetVersion[]> = {}
+  const listVersions = (brandId: string): CompetitorSetVersion[] => {
+    const all = [
+      ...(created[brandId] ?? []),
+      ...(versions[brandId] ?? []).map<CompetitorSetVersion>((v) => ({
+        version: v.version,
+        effective_from: addDays(today(), -v.effective_from_days_ago),
+        note: v.note,
+        created_at: instantDaysAgo(v.effective_from_days_ago + 2),
+        current: false,
+        members: v.members.map((m, i) => ({ ...m, label: `C${i + 1}`, listening_keywords: [], social_handles: [], ads_advertiser_ids: [] })),
+      })),
+    ].sort((a, b) => b.version - a.version)
+    // În vigoare = cea mai mare dată de început ≤ azi (ca în providerul real).
+    const effective = all.filter((v) => v.effective_from <= today()).sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0]?.version
+    return all.map((v) => ({ ...v, current: v.version === effective }))
+  }
+
   const config: ConfigProvider = {
     competitorVersions: async (brandId) => {
       if (!allowed.has(brandId)) return failed('Acces refuzat la acest spațiu de brand.')
-      const list = versions[brandId] ?? []
-      const effective = list.filter((v) => addDays(today(), -v.effective_from_days_ago) <= today()).sort((a, b) => b.version - a.version)[0]?.version
-      return ready(
-        list.map<CompetitorSetVersion>((v) => ({
-          version: v.version,
-          effective_from: addDays(today(), -v.effective_from_days_ago),
-          note: v.note,
-          created_at: instantDaysAgo(v.effective_from_days_ago + 2),
-          current: v.version === effective,
-          members: v.members.map((m, i) => ({ ...m, label: `C${i + 1}`, listening_keywords: [], social_handles: [], ads_advertiser_ids: [] })),
-        })),
-      )
+      return ready(listVersions(brandId))
+    },
+    createCompetitorSetVersion: async (brandId, input) => {
+      // Aceleași reguli ca funcția SQL (E4), cu aceleași mesaje.
+      if (!allowed.has(brandId) || !['agency_admin', 'strategist'].includes(getRole())) return failed('Nu ai dreptul să creezi o versiune a setului de competitori pentru acest brand')
+      const existing = listVersions(brandId)
+      if (input.effective_from < today() && existing.length > 0) return failed(`Data de la care se aplică versiunea nu poate fi în trecut (azi este ${today()}, Europe/Bucharest); doar prima versiune a setului poate începe în trecut`)
+      if (input.effective_from < '2020-01-01') return failed('Data de la care se aplică versiunea nu poate fi înainte de 2020-01-01')
+      if (input.members.length < 1 || input.members.length > 10) return failed(`Setul de competitori trebuie să aibă între 1 și 10 membri (primit: ${input.members.length})`)
+      const seen = new Set<string>()
+      for (const [i, m] of input.members.entries()) {
+        const name = m.name.trim()
+        if (!name) return failed(`Membrul ${i + 1}: numele nu poate fi gol`)
+        if (seen.has(name.toLowerCase())) return failed(`Membrul ${i + 1}: numele „${name}” apare de mai multe ori`)
+        seen.add(name.toLowerCase())
+      }
+      if (existing.some((v) => v.effective_from === input.effective_from)) return failed(`Există deja o versiune a setului cu data de aplicare ${input.effective_from}`)
+      const version = Math.max(0, ...existing.map((v) => v.version)) + 1
+      created[brandId] = [
+        {
+          version,
+          effective_from: input.effective_from,
+          note: input.note?.trim() || null,
+          created_at: now().toISOString(),
+          current: false,
+          members: input.members.map((m, i) => ({
+            id: `preview-${version}-${i}`,
+            name: m.name.trim(),
+            domain: m.domain?.trim().toLowerCase() || null,
+            label: `C${i + 1}`,
+            listening_keywords: m.listening_keywords.map((k) => k.trim()),
+            social_handles: m.social_handles.map((h) => h.trim().replace(/^@/, '').toLowerCase()),
+            ads_advertiser_ids: m.ads_advertiser_ids.map((x) => x.trim().toUpperCase()),
+          })),
+        },
+        ...(created[brandId] ?? []),
+      ]
+      return ready({ version, effective_from: input.effective_from, member_count: input.members.length })
+    },
+    competitorSuggestions: async (brandId) => {
+      if (!allowed.has(brandId)) return failed('Acces refuzat la acest spațiu de brand.')
+      if (getRole() !== 'agency_admin') return failed('Doar agency_admin al clientului poate gestiona sursele.')
+      const s = suggestions[brandId]
+      if (!s) {
+        return ready<CompetitorSuggestions>({
+          planable: { outcome: 'not_connected', message: 'Brandul nu are un workspace Planable ales în pagina site-ului.', competitors: [], notes: [] },
+          seomonitor: { outcome: 'not_connected', message: 'Clientul nu are SEOmonitor conectat.', since: addDays(today(), -120), domains: [] },
+        })
+      }
+      return ready<CompetitorSuggestions>({
+        planable: { outcome: 'ok', message: s.planable.length === 0 ? 'Paginile brandului din Planable nu urmăresc niciun competitor (Analytics → Competitors).' : null, competitors: s.planable, notes: [] },
+        seomonitor: { outcome: 'ok', message: null, since: addDays(today(), -120), domains: s.seomonitor },
+      })
     },
     aliases: async (brandId) => {
       if (!allowed.has(brandId)) return failed('Acces refuzat la acest spațiu de brand.')

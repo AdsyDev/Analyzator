@@ -253,5 +253,91 @@
    "is_primary_visibility": false,
    "note": "Grup de test, ignorat intenționat."
   }
- ]
+ ],
+ "competitor_suggestions": {
+  "brand-proenzi": {
+   "planable": [
+    {
+     "platform": "instagram",
+     "handle": "digestil.ro",
+     "name": "Digestil",
+     "tracked_from": [
+      "Proenzi România"
+     ]
+    },
+    {
+     "platform": "facebook",
+     "handle": "digestil",
+     "name": "Digestil România",
+     "tracked_from": [
+      "Proenzi"
+     ]
+    },
+    {
+     "platform": "instagram",
+     "handle": "enzimax",
+     "name": "Enzimax",
+     "tracked_from": [
+      "Proenzi România"
+     ]
+    },
+    {
+     "platform": "tiktok",
+     "handle": "flexiart.ro",
+     "name": "FlexiArt",
+     "tracked_from": [
+      "Proenzi"
+     ]
+    }
+   ],
+   "seomonitor": [
+    {
+     "domain": "digestil.example",
+     "keywords": 41
+    },
+    {
+     "domain": "enzimax.example",
+     "keywords": 27
+    },
+    {
+     "domain": "flexiart.example",
+     "keywords": 12
+    }
+   ]
+  },
+  "brand-urinal": {
+   "planable": [
+    {
+     "platform": "instagram",
+     "handle": "uronova",
+     "name": "Uronova",
+     "tracked_from": [
+      "Urinal"
+     ]
+    },
+    {
+     "platform": "facebook",
+     "handle": "cisticare.ro",
+     "name": "Cisticare",
+     "tracked_from": [
+      "Urinal România"
+     ]
+    }
+   ],
+   "seomonitor": [
+    {
+     "domain": "uronova.example",
+     "keywords": 58
+    },
+    {
+     "domain": "cisticare.example",
+     "keywords": 33
+    },
+    {
+     "domain": "vitamerin.example",
+     "keywords": 9
+    }
+   ]
+  }
+ }
 }

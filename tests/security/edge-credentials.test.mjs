@@ -3,7 +3,7 @@
 // Vezi docs/security-tests.md (secțiunea D).
 import { test, describe, before } from 'node:test'
 import assert from 'node:assert/strict'
-import { API_URL, ANON_KEY, SERVICE_ROLE_KEY, U, T1, B1A, CLARITY_1A, CLARITY_2A, signJwt, userToken, req, asService } from './helpers.mjs'
+import { API_URL, ANON_KEY, SERVICE_ROLE_KEY, U, T1, B1A, B2A, CLARITY_1A, CLARITY_2A, signJwt, userToken, req, asService } from './helpers.mjs'
 
 const FN = '/functions/v1/source-credentials'
 const TOKEN_1A = `edge-secret-1a-${Date.now()}`
@@ -175,5 +175,46 @@ describe('D5. Bugetul de apeluri', () => {
     assert.equal(res.status, 200)
     assert.notEqual(res.json.outcome, 'budget_exhausted')
     assert.equal(await callsToday(CLARITY_2A), before + 1)
+  })
+})
+
+describe('D6. Propuneri de competitori (competitor_suggestions, 23 nov. 2026)', () => {
+  const ask = (brandId, user) => fn({ action: 'competitor_suggestions', brand_id: brandId }, { token: user === undefined ? undefined : userToken(user) })
+  const auditCount = async () => (await asService(`audit_events?select=id&action=eq.competitors_suggested`)).json.length
+
+  test('fără identitate: 401', async () => {
+    const res = await fn({ action: 'competitor_suggestions', brand_id: B1A }, { token: ANON_KEY })
+    assert.equal(res.status, 401)
+  })
+  test('admin T2 pe brandul din T1 și brand inexistent: același 404, fără efecte', async () => {
+    const before = await auditCount()
+    const foreign = await ask(B1A, U.admin2)
+    const missing = await ask('20000000-0000-0000-0000-0000000000ff', U.admin2)
+    assert.equal(foreign.status, 404)
+    assert.equal(missing.status, 404)
+    assert.deepEqual(foreign.json, missing.json)
+    assert.equal(await auditCount(), before)
+  })
+  for (const [label, user] of [['strategist T1', U.strat1], ['account T1', U.account1], ['client T1', U.client1]]) {
+    test(`${label}: 403`, async () => {
+      assert.equal((await ask(B1A, user)).status, 403)
+    })
+  }
+  test('brand_id cu filtre PostgREST: 400', async () => {
+    for (const id of [`${B1A}&tenant_id=neq.x`, `${B1A},${B2A}`, 'not.is.null', '']) {
+      const res = await fn({ action: 'competitor_suggestions', brand_id: id }, { token: userToken(U.admin1) })
+      assert.equal(res.status, 400, `"${id}": ${res.status}`)
+    }
+  })
+  test('admin T1: 200, fiecare sursă cu starea ei, fără token și fără scriere în setul de competitori', async () => {
+    const sets = (await asService(`competitor_sets?select=id&brand_id=eq.${B1A}`)).json.length
+    const res = await ask(B1A, U.admin1)
+    assert.equal(res.status, 200)
+    assertNoSecret(res)
+    // Seed: brandul 1A nu are workspace Planable; tenantul T1 are SEOmonitor.
+    assert.equal(res.json.planable.outcome, 'not_connected')
+    assert.equal(res.json.seomonitor.outcome, 'ok')
+    assert.ok(Array.isArray(res.json.seomonitor.domains))
+    assert.equal((await asService(`competitor_sets?select=id&brand_id=eq.${B1A}`)).json.length, sets)
   })
 })

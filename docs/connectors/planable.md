@@ -92,7 +92,7 @@ API-ul Planable e nou și câteva lucruri nu sunt clare din documentație: dacă
 | `planable_competitors` `not_connected` | Nicio pagină a brandului nu urmărește competitori | „Competitorii în Planable Competitors”, pasul 1. |
 | `planable_competitors` `access_denied` | Add-on-ul Analytics e inactiv sau tokenul nu vede pagina | Verifică abonamentul Planable și accesul tokenului. |
 | Competitor „N/A” la Social public | Niciun profil urmărit nu corespunde numelui lui | „Competitorii în Planable Competitors”, pasul 2. |
-| Competitor „N/A” la Mențiuni | Niciun cuvânt urmărit nu are numele lui sau un cuvânt atribuit lui | „Competitorii în Listening”, pasul 2. |
+| Competitor „N/A” la Mențiuni | Niciun cuvânt urmărit nu are numele lui sau un cuvânt atribuit lui | „Competitorii în Listening”, pasul 2. Jurnalul rulării (Actions → planable-weekly) listează, pe brand, ce cuvânt și ce profil a mers la care competitor și ce a rămas neatribuit. |
 | 403 pe metricile unei pagini | Add-on-ul Analytics e inactiv sau tokenul nu vede pagina | Verifică abonamentul Planable și accesul tokenului. |
 | Pagină sărită („nu e conectată în Planable”) | Canalul social e deconectat în Planable | Reconectează canalul în Planable. |
 | Listening: puține mențiuni față de Planable | Planable trimite mențiuni fără URL sau fără dată; acestea nu pot fi scrise | Jurnalul rulării arată „N mențiuni sărite din <rețea>: <motiv>”. Rândurile se numără acolo, nu se pierd în tăcere; dacă o rețea întreagă e sărită, anunță echipa tehnică. |
