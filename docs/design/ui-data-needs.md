@@ -147,7 +147,7 @@ Doar citire. Nu există tabele pentru analize și acțiuni în `supabase/migrati
 
 | Metodă | Tabele | Note |
 |---|---|---|
-| `competitorVersions(brandId)` | `competitor_sets` + `competitor_set_members` | Citire. Versiunea în vigoare = cea mai mare `effective_from <= azi`. **Scriere:** `createCompetitorVersion`, legat în Configurare → „Versiune nouă” (Y-16). |
+| `competitorVersions(brandId)` | `competitor_sets` + `competitor_set_members` | Citire. Versiunea în vigoare = cea mai mare `effective_from <= azi`. **Scriere disponibilă server-side** (UI încă nelegat): vezi „Versiune nouă” mai jos. |
 | `aliases(brandId)` | — | Nu există tabel: `not_connected` cu motiv. |
 | `seomonitorMappings()` | `seomonitor_group_mappings` | Doar citire; ultima versiune în vigoare per (campanie, grup). **Depinde de migrația `20261008120000_seomonitor.sql`, încă necomisă în repo la data scrierii.** |
 
@@ -166,4 +166,4 @@ const { data, error } = await supabase.rpc('create_competitor_set_version', {
 - Tranzacție unică: set + membri + audit, sau nimic. Rolul (agency_admin sau strategist cu acces la brand) este verificat în funcție și de RLS; UI-ul poate ascunde formularul pentru ceilalți, dar nu se bazează pe asta.
 - `error.message` este în română și se poate afișa direct; `error.code`: `42501` (drept), `22023` (validare, mesaje „Membrul N: …”), `23505` (dată deja folosită).
 - Domeniul se stochează normalizat (fără schemă și cale); formularul poate afișa valoarea normalizată din citirea ulterioară.
-- Formularul „Versiune nouă” (Y-16, 23 nov. 2026) pornește de la versiunea în vigoare și trimite și `listening_keywords`, `social_handles`, `ads_advertiser_ids`. Previzualizarea diferențelor față de versiunea curentă nu e construită.
+- Formularul „Versiune nouă” cu previzualizarea diferențelor față de versiunea curentă rămâne un task separat în `apps/web`.

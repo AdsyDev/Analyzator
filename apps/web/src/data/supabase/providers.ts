@@ -184,7 +184,6 @@ const users: UsersProvider = {
 }
 
 const config: ConfigProvider = {
-  createCompetitorVersion: async () => notConnected('Setul de competitori nu se poate modifica fără conexiunea la server.'),
   competitorVersions: async () => notConnected('Setul de competitori nu este încă disponibil.'),
   aliases: async () => notConnected('Aliasurile brandului nu sunt încă disponibile.'),
   seomonitorMappings: async () => notConnected('Maparea grupurilor nu este încă disponibilă.'),

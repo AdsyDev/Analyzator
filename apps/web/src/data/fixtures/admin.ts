@@ -1,6 +1,6 @@
 import adminFile from '../../../../../tests/fixtures/ui/admin.json'
 import { failed, ready, type AccessPerson, type BrandAlias, type CompetitorSetVersion, type ConfigProvider, type MappingKind, type Role, type SeomonitorMapping, type UsersProvider } from '../../contracts'
-import { addDays, daysBetween, todayBucharest } from '../../lib/period'
+import { addDays, todayBucharest } from '../../lib/period'
 
 interface Options {
   now: () => Date
@@ -130,8 +130,7 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
     },
   }
 
-  type FixtureMember = { id: string; name: string; domain: string | null; listening_keywords?: string[]; social_handles?: string[]; ads_advertiser_ids?: string[] }
-  const versions = structuredClone(adminFile.competitor_versions) as Record<string, Array<{ version: number; effective_from_days_ago: number; note: string | null; members: FixtureMember[] }>>
+  const versions = adminFile.competitor_versions as Record<string, Array<{ version: number; effective_from_days_ago: number; note: string | null; members: Array<{ id: string; name: string; domain: string | null }> }>>
   const mappings: SeomonitorMapping[] = adminFile.seomonitor_mappings.map<SeomonitorMapping>((m) => ({
     campaign_id: m.campaign_id,
     group_id: m.group_id,
@@ -157,24 +156,9 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
           note: v.note,
           created_at: instantDaysAgo(v.effective_from_days_ago + 2),
           current: v.version === effective,
-          members: v.members.map((m, i) => ({ id: m.id, name: m.name, domain: m.domain, label: `C${i + 1}`, listening_keywords: m.listening_keywords ?? [], social_handles: m.social_handles ?? [], ads_advertiser_ids: m.ads_advertiser_ids ?? [] })),
+          members: v.members.map((m, i) => ({ ...m, label: `C${i + 1}`, listening_keywords: [], social_handles: [], ads_advertiser_ids: [] })),
         })),
       )
-    },
-    // Ca serverul: rolul, data (azi sau mai târziu, unică pe brand), 1–10 membri cu nume unic. Restul validării rămâne pe server.
-    createCompetitorVersion: async (brandId, input) => {
-      if (!allowed.has(brandId) || !['agency_admin', 'strategist'].includes(getRole())) return failed('Nu ai dreptul să creezi o versiune a setului de competitori pentru acest brand.')
-      if (input.effective_from < today()) return failed(`Data de la care se aplică versiunea nu poate fi în trecut (azi este ${today()}, Europe/Bucharest)`)
-      if (input.members.length < 1 || input.members.length > 10) return failed(`Setul de competitori trebuie să aibă între 1 și 10 membri (primit: ${input.members.length})`)
-      const names = input.members.map((m) => m.name.trim().toLowerCase())
-      if (names.some((n) => !n)) return failed('Membrul fără nume: numele este obligatoriu')
-      if (new Set(names).size !== names.length) return failed('Același nume apare de mai multe ori')
-      const list = (versions[brandId] ??= [])
-      const daysAgo = daysBetween(input.effective_from, today())
-      if (list.some((v) => v.effective_from_days_ago === daysAgo)) return failed(`Există deja o versiune a setului cu data de aplicare ${input.effective_from}`)
-      const version = list.reduce((max, v) => Math.max(max, v.version), 0) + 1
-      list.push({ version, effective_from_days_ago: daysAgo, note: input.note, members: input.members.map((m, i) => ({ ...m, id: `fx-${brandId}-${version}-${i}` })) })
-      return ready({ version, effective_from: input.effective_from })
     },
     aliases: async (brandId) => {
       if (!allowed.has(brandId)) return failed('Acces refuzat la acest spațiu de brand.')

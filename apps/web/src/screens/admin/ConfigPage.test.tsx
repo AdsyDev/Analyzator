@@ -1,5 +1,4 @@
 import { screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { createSupabaseConfig } from '../../data/supabase/adminProviders'
 import { createSupabaseProviders } from '../../data/supabase/providers'
@@ -25,59 +24,7 @@ describe('Administrare → Configurare (fixtures de previzualizare)', () => {
     expect(within(rows[1]!).queryByText('În vigoare')).toBeNull()
     expect(within(rows[2]!).getByText('Set inițial, validat cu clientul.')).toBeInTheDocument()
     expect(s).toHaveTextContent(/Versiunile sunt imutabile/)
-    // O versiune existentă nu se editează: doar „Versiune nouă” (deciziile Y-16).
-    expect(within(s).queryByRole('button', { name: /Modifică|Editează|Șterge/ })).toBeNull()
-    expect(within(s).getByRole('button', { name: 'Versiune nouă' })).toBeInTheDocument()
-  })
-
-  it('versiune nouă: pornește de la versiunea în vigoare, adaugă un competitor și identificatorii, devine versiunea în vigoare', async () => {
-    useBrand('brand-urinal')
-    const user = userEvent.setup()
-    renderApp({ route: URL })
-    await pageReady('Configurare')
-    const s = await section('Competitori')
-    await user.click(await within(s).findByRole('button', { name: 'Versiune nouă' }))
-    const dialog = await screen.findByRole('dialog', { name: /Versiune nouă: competitorii Urinal/ })
-    expect(within(dialog).getByText(/Pornește de la v3/)).toBeInTheDocument()
-    const names = within(dialog).getAllByLabelText('Nume')
-    expect(names[0]).toHaveValue('Uronova')
-    await user.type(within(dialog).getAllByLabelText(/Cuvinte Planable Listening/)[0]!, 'uronova, uronova forte')
-    await user.click(within(dialog).getByRole('button', { name: 'Adaugă competitor' }))
-    const last = within(dialog).getAllByLabelText('Nume').at(-1)!
-    await user.type(last, 'Prostamol')
-    await user.type(within(dialog).getAllByLabelText('ID-uri advertiser Google').at(-1)!, 'AR01234567890')
-    await user.click(within(dialog).getByRole('button', { name: 'Creează versiunea' }))
-    expect(await screen.findByText(/Versiunea v4 a setului de competitori a fost creată/)).toBeInTheDocument()
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: /Versiune nouă/ })).toBeNull())
-    const rows = within(await within(s).findByRole('table')).getAllByRole('row').slice(1)
-    await waitFor(() => expect(within(s).getByText('v4')).toBeInTheDocument())
-    const v4 = within(s).getByText('v4').closest('tr')!
-    expect(within(v4).getByText('În vigoare')).toBeInTheDocument()
-    expect(v4).toHaveTextContent('uronova, uronova forte')
-    expect(v4).toHaveTextContent('Prostamol')
-    expect(v4).toHaveTextContent('AR01234567890')
-    expect(rows.length).toBeGreaterThanOrEqual(3)
-  })
-
-  it('versiune nouă: un rând fără nume blochează trimiterea; eroarea serverului se afișează, iar dialogul rămâne deschis', async () => {
-    useBrand('brand-urinal')
-    const user = userEvent.setup()
-    renderApp({
-      route: URL,
-      wrap: (b) => ({ ...b, config: { ...b.config, createCompetitorVersion: async () => ({ kind: 'error' as const, message: 'Membrul 2 (Cisticare): ID-ul de advertiser „X1” nu are forma AR urmat de cifre' }) } }),
-    })
-    await pageReady('Configurare')
-    const s = await section('Competitori')
-    await user.click(await within(s).findByRole('button', { name: 'Versiune nouă' }))
-    const dialog = await screen.findByRole('dialog', { name: /Versiune nouă/ })
-    const submit = within(dialog).getByRole('button', { name: 'Creează versiunea' })
-    await user.clear(within(dialog).getAllByLabelText('Nume')[0]!)
-    expect(submit).toBeDisabled()
-    await user.type(within(dialog).getAllByLabelText('Nume')[0]!, 'Uronova')
-    expect(submit).toBeEnabled()
-    await user.click(submit)
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Membrul 2 (Cisticare): ID-ul de advertiser')
-    expect(screen.getByRole('dialog', { name: /Versiune nouă/ })).toBeInTheDocument()
+    expect(within(s).queryByRole('button', { name: /Adaugă|Modifică|Editează|Salvează|Creează/ })).toBeNull() // fără editare din aplicație
   })
 
   it('aliasuri: listă; brand fără aliasuri are stare goală explicată', async () => {

@@ -179,25 +179,6 @@ export function createSupabaseConfig(client: DataClient, now: () => Date = () =>
       )
     },
 
-    async createCompetitorVersion(brandId, input) {
-      const { data, error } = await client.rpc('create_competitor_set_version', {
-        p_brand_id: brandId,
-        p_effective_from: input.effective_from,
-        p_note: input.note,
-        p_members: input.members,
-      })
-      if (error) {
-        const e = error as { code?: string; message?: string }
-        if (e.code === '42501') return failed('Nu ai dreptul să creezi o versiune a setului de competitori pentru acest brand.')
-        // Validarea (22023) și data deja folosită (23505): mesajul serverului e în română, cu numărul membrului.
-        if ((e.code === '22023' || e.code === '23505') && e.message) return failed(e.message)
-        return failed(QUERY_FAILED)
-      }
-      const row = (Array.isArray(data) ? data[0] : data) as { version?: unknown; effective_from?: unknown } | null
-      if (!row || typeof row.version !== 'number' || typeof row.effective_from !== 'string') return failed(QUERY_FAILED)
-      return ready({ version: row.version, effective_from: row.effective_from })
-    },
-
     // Aliasurile brandului nu au un tabel în schema curentă: nu inventăm o sursă.
     aliases: async () => notConnected('Aliasurile brandului nu au încă un loc în baza de date. Se vor putea vedea aici după ce schema le primește.'),
 

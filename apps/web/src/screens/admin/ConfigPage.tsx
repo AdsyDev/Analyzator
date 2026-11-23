@@ -1,16 +1,10 @@
-import { useId, useState, type FormEvent } from 'react'
-import { PlusIcon, TrashIcon } from '@phosphor-icons/react'
-import type { Brand, CompetitorSetVersion, NewCompetitorMember, SeomonitorMapping } from '../../contracts'
+import type { Brand, CompetitorSetVersion, SeomonitorMapping } from '../../contracts'
 import { EmptyState } from '../../components/EmptyState'
-import { Button } from '../../components/ui/Button'
 import { StatusChip } from '../../components/ui/Chip'
-import { Dialog } from '../../components/ui/Dialog'
 import { SortableTable, type Column } from '../../components/ui/SortableTable'
-import { useToast } from '../../components/ui/Toast'
 import { useProviders } from '../../data/DataProvidersContext'
 import { useAsync } from '../../data/useAsync'
 import { formatDate } from '../../lib/format'
-import { todayBucharest } from '../../lib/period'
 import { useLayout } from '../../routing/AppLayout'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
@@ -68,23 +62,13 @@ function BrandConfig({ brand }: { brand: Brand }) {
   const providers = useProviders()
   const versions = useAsync(() => providers.config.competitorVersions(brand.id), [providers, brand.id])
   const aliases = useAsync(() => providers.config.aliases(brand.id), [providers, brand.id])
-  const [editing, setEditing] = useState(false)
-  const list = versions.state.status === 'done' && versions.state.value.kind === 'ready' ? versions.state.value.data : null
-  // Formularul pornește de la versiunea în vigoare (sau de la cea mai recentă), ca o schimbare să nu ceară rescrierea setului.
-  const base = list ? (list.find((v) => v.current) ?? [...list].sort((a, b) => b.version - a.version)[0] ?? null) : null
   return (
     <>
       <Section
         id="competitors"
         title="Competitori"
-        description={`Setul pentru ${brand.name}. Versiunile sunt imutabile: o schimbare creează o versiune nouă, cu dată efectivă, iar istoricul rămâne. Pe fiecare competitor: cuvintele Planable Listening de tip „competitor”, profilurile din Planable Competitors și ID-urile de advertiser din Google Ads Transparency.`}
-        action={
-          <Button variant="primary" icon={<PlusIcon size={14} />} disabled={list === null} onClick={() => setEditing(true)}>
-            Versiune nouă
-          </Button>
-        }
+        description={`Setul pentru ${brand.name}. Versiunile sunt imutabile: o schimbare creează o versiune nouă, cu dată efectivă, iar istoricul rămâne. Modificarea se face la cererea echipei, nu din aplicație. Pe fiecare competitor: cuvintele Planable Listening de tip „competitor”, profilurile din Planable Competitors și ID-urile de advertiser din Google Ads Transparency.`}
       >
-        {editing && <CompetitorVersionDialog brand={brand} base={base} onClose={() => setEditing(false)} onCreated={versions.reload} />}
         <Resolved state={versions.state} onRetry={versions.reload} loadingLabel="Se încarcă competitorii" skeletonClass="h-40">
           {(list) =>
             list.length === 0 ? (
@@ -153,156 +137,5 @@ function Mappings({ brands }: { brands: Brand[] }) {
         }
       </Resolved>
     </Section>
-  )
-}
-
-const field = 'h-9 w-full rounded-[10px] border border-border-strong bg-surface px-3 text-[13px]'
-const MAX_MEMBERS = 10
-
-type Draft = { key: number; name: string; domain: string; keywords: string; handles: string; advertisers: string }
-
-/** „a, b ,, c” → ['a', 'b', 'c']: listele se scriu separate prin virgulă; normalizarea (majuscule, @) o face serverul. */
-const csv = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean)
-
-function draftsFrom(base: CompetitorSetVersion | null): Draft[] {
-  if (!base || base.members.length === 0) return [1, 2, 3].map((key) => ({ key, name: '', domain: '', keywords: '', handles: '', advertisers: '' }))
-  return base.members.map((m, i) => ({
-    key: i + 1,
-    name: m.name,
-    domain: m.domain ?? '',
-    keywords: m.listening_keywords.join(', '),
-    handles: m.social_handles.join(', '),
-    advertisers: m.ads_advertiser_ids.join(', '),
-  }))
-}
-
-/**
- * Versiune nouă a setului de competitori (`create_competitor_set_version`, E4). Pornește de la versiunea de bază; serverul
- * validează tot (data, nume unice, formatul ID-urilor, un cuvânt sau profil la un singur competitor) și răspunde în română.
- */
-function CompetitorVersionDialog({ brand, base, onClose, onCreated }: { brand: Brand; base: CompetitorSetVersion | null; onClose: () => void; onCreated: () => void }) {
-  const providers = useProviders()
-  const toast = useToast()
-  const id = useId()
-  const today = todayBucharest()
-  const [effectiveFrom, setEffectiveFrom] = useState(today)
-  const [note, setNote] = useState('')
-  const [drafts, setDrafts] = useState<Draft[]>(() => draftsFrom(base))
-  const [nextKey, setNextKey] = useState(() => drafts.length + 1)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const filled = drafts.filter((d) => d.name.trim() !== '' || d.domain.trim() !== '' || d.keywords.trim() !== '' || d.handles.trim() !== '' || d.advertisers.trim() !== '')
-  const ok = filled.length >= 1 && filled.every((d) => d.name.trim() !== '') && /^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom) && effectiveFrom >= today
-
-  const update = (key: number, patch: Partial<Draft>) => setDrafts((list) => list.map((d) => (d.key === key ? { ...d, ...patch } : d)))
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    if (!ok || busy) return
-    setBusy(true)
-    setError(null)
-    const members: NewCompetitorMember[] = filled.map((d) => ({
-      name: d.name.trim(),
-      domain: d.domain.trim() || null,
-      listening_keywords: csv(d.keywords),
-      social_handles: csv(d.handles),
-      ads_advertiser_ids: csv(d.advertisers),
-    }))
-    const r = await providers.config.createCompetitorVersion(brand.id, { effective_from: effectiveFrom, note: note.trim() || null, members })
-    setBusy(false)
-    if (r.kind !== 'ready') return setError(r.kind === 'error' ? r.message : r.reason)
-    toast(`Versiunea v${r.data.version} a setului de competitori a fost creată, în vigoare din ${formatDate(r.data.effective_from)}.`)
-    onCreated()
-    onClose()
-  }
-
-  return (
-    <Dialog
-      open
-      onClose={onClose}
-      title={`Versiune nouă: competitorii ${brand.name}`}
-      placement="right"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Anulează</Button>
-          <Button variant="primary" type="submit" form="competitor-version" loading={busy} disabled={!ok}>Creează versiunea</Button>
-        </>
-      }
-    >
-      <form id="competitor-version" onSubmit={submit} className="flex flex-col gap-4" aria-describedby={`${id}-intro`}>
-        <p id={`${id}-intro`} className="text-[13px] leading-snug text-text-2">
-          {base ? `Pornește de la v${base.version}. ` : ''}Versiunile anterioare rămân neschimbate; perioadele de dinainte de data aplicării folosesc setul vechi. Datele deja colectate apar imediat ce cuvintele și profilurile se potrivesc.
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1">
-            <label htmlFor={`${id}-from`} className="text-[12.5px] font-semibold">Se aplică din</label>
-            <input id={`${id}-from`} type="date" min={today} value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} className={field} required />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label htmlFor={`${id}-note`} className="text-[12.5px] font-semibold">Notă (opțional)</label>
-            <input id={`${id}-note`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} placeholder="de ex. Intră Competitor X" className={field} />
-          </div>
-        </div>
-
-        <ol className="flex flex-col gap-3" aria-label="Competitorii versiunii">
-          {drafts.map((d, i) => {
-            const fid = `${id}-m${d.key}`
-            return (
-              <li key={d.key} className="flex flex-col gap-2 rounded-xl border border-border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-[12px] font-semibold text-text-2">C{i + 1}</span>
-                  {drafts.length > 1 && (
-                    <Button variant="ghost" icon={<TrashIcon size={14} />} onClick={() => setDrafts((list) => list.filter((x) => x.key !== d.key))} aria-label={`Scoate competitorul C${i + 1}`}>
-                      Scoate
-                    </Button>
-                  )}
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor={`${fid}-name`} className="text-[12px] font-semibold">Nume</label>
-                    <input id={`${fid}-name`} value={d.name} onChange={(e) => update(d.key, { name: e.target.value })} maxLength={120} className={field} autoComplete="off" />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor={`${fid}-domain`} className="text-[12px] font-semibold">Domeniu</label>
-                    <input id={`${fid}-domain`} value={d.domain} onChange={(e) => update(d.key, { domain: e.target.value })} placeholder="exemplu.ro" className={`${field} font-mono`} autoComplete="off" />
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label htmlFor={`${fid}-kw`} className="text-[12px] font-semibold">Cuvinte Planable Listening (tip „competitor”)</label>
-                  <input id={`${fid}-kw`} value={d.keywords} onChange={(e) => update(d.key, { keywords: e.target.value })} placeholder="separate prin virgulă; gol = numele" className={field} aria-describedby={`${id}-lists`} />
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor={`${fid}-handles`} className="text-[12px] font-semibold">Profiluri Planable Competitors</label>
-                    <input id={`${fid}-handles`} value={d.handles} onChange={(e) => update(d.key, { handles: e.target.value })} placeholder="handle, fără @; gol = numele" className={`${field} font-mono`} aria-describedby={`${id}-lists`} />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label htmlFor={`${fid}-ads`} className="text-[12px] font-semibold">ID-uri advertiser Google</label>
-                    <input id={`${fid}-ads`} value={d.advertisers} onChange={(e) => update(d.key, { advertisers: e.target.value })} placeholder="AR…, separate prin virgulă" className={`${field} font-mono`} aria-describedby={`${id}-lists`} />
-                  </div>
-                </div>
-              </li>
-            )
-          })}
-        </ol>
-        {drafts.length < MAX_MEMBERS && (
-          <div>
-            <Button
-              icon={<PlusIcon size={14} />}
-              onClick={() => {
-                setDrafts((list) => [...list, { key: nextKey, name: '', domain: '', keywords: '', handles: '', advertisers: '' }])
-                setNextKey((k) => k + 1)
-              }}
-            >
-              Adaugă competitor
-            </Button>
-          </div>
-        )}
-        <p id={`${id}-lists`} className="text-[12px] leading-snug text-text-3">
-          Listele se scriu separate prin virgulă. Fără cuvinte, mențiunile se caută după numele competitorului; fără profiluri, profilurile Planable al căror nume corespunde numelui lui. ID-ul de advertiser e în adresa paginii advertiserului din Ads Transparency Center (/advertiser/AR…). Un cuvânt, un profil sau un advertiser aparține unui singur competitor. Rândurile goale nu se trimit.
-        </p>
-        <div aria-live="polite">{error && <p role="alert" className="text-[12.5px] text-neg-text">{error}</p>}</div>
-      </form>
-    </Dialog>
   )
 }
