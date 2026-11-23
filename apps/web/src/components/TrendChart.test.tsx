@@ -80,6 +80,19 @@ describe('TrendChart', () => {
     expect(screen.getAllByTestId('chart-gap')).toHaveLength(2)
   })
 
+  it('serii egale: hașura apare doar în zilele în care nicio serie nu are date, nu după prima serie', () => {
+    const a: ChartSeries = { key: 'a', name: 'ChatGPT', color: 'var(--accent)', values: [20, null, null, null, null] }
+    const b: ChartSeries = { key: 'b', name: 'AI Overviews', color: 'var(--lav)', values: [3, 4, 4, 5, null] }
+    render(<TrendChart title="Engine" labels={labels} format="pct" series={[a, b]} />)
+    expect(screen.getAllByTestId('chart-gap')).toHaveLength(1) // doar 5 oct.
+    expect(screen.getAllByTestId('chart-point')).toHaveLength(1) // valoarea singură a ChatGPT
+  })
+
+  it('serie zilnică continuă: fără puncte pe fiecare zi', () => {
+    render(<TrendChart title="Trafic" labels={labels} cadenceDays={7} series={[{ key: 'a', name: 'Clicks', color: 'var(--accent)', values: [1, 2, 3, 4, 5] }]} />)
+    expect(screen.queryAllByTestId('chart-point')).toHaveLength(0)
+  })
+
   it('legenda ascunde și arată seriile', async () => {
     render(<TrendChart title="Trafic" series={series} labels={labels} />)
     const btn = screen.getByRole('button', { name: 'Sessions' })

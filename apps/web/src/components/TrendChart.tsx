@@ -107,26 +107,32 @@ export function TrendChart({ title, series, labels, height = 240, format = 'int'
     const idx = observed(values)
     return idx.length === 0 ? [] : [...new Set([idx[0]!, idx[idx.length - 1]!])]
   }
-  /** Punctele desenate: fiecare colectare la seriile periodice, iar la cele zilnice doar valorile izolate (fără linie). */
+  /**
+   * Punctele desenate: valorile fără vecin în ziua dinainte sau de după. O serie colectată săptămânal are astfel un punct
+   * la fiecare colectare, una zilnică rămâne o linie curată, iar o valoare izolată nu dispare (o linie de un punct nu se vede).
+   */
   const dotsOf = (values: Array<number | null>) => {
+    const has = (i: number) => values[i] !== null && values[i] !== undefined
     const ends = endMarkers ? new Set(endsOf(values)) : new Set<number>()
-    const idx = cadenceDays > 1 ? observed(values) : continuousRuns(values, maxStep).filter((r) => r.length === 1).flat()
-    return idx.filter((i) => !ends.has(i))
+    return observed(values).filter((i) => !has(i - 1) && !has(i + 1) && !ends.has(i))
   }
 
-  // Goluri: zilele fără date ale seriei principale (prima vizibilă), hașurate. Seria de comparație e secundară
-  // și nu ascunde golul principalei. La o serie periodică, zilele dintre două colectări nu sunt goluri: se hașurează
-  // doar distanțele mai mari decât `maxStep` (o colectare lipsă) și capetele perioadei fără colectare.
+  // Goluri: zilele în care nicio serie plină vizibilă nu are date, hașurate. Seriile egale (de ex. engine-urile) se
+  // acoperă una pe alta; seria de comparație (punctată) e secundară și nu ascunde golul. La o serie periodică, zilele
+  // dintre două colectări nu sunt goluri: se hașurează doar distanțele mai mari decât `maxStep` (o colectare lipsă) și
+  // capetele perioadei fără colectare.
   const gaps: Array<{ left: number; width: number }> = []
   const half = n > 1 ? 50 / (n - 1) : 50
   const primary = visible[0]
+  const solid = visible.filter((s) => !s.dashed)
+  const gapSource = solid.length ? solid : primary ? [primary] : []
   const addGap = (from: number, to: number) => {
     if (to < from) return
     const left = Math.max(0, xp(from) - half)
     const right = Math.min(100, xp(to) + half)
     gaps.push({ left, width: right - left })
   }
-  const primaryObs = primary ? observed(primary.values) : []
+  const primaryObs = [...new Set(gapSource.flatMap((s) => observed(s.values)))].sort((a, b) => a - b)
   if (primaryObs.length === 0) addGap(0, n - 1)
   else {
     const first = primaryObs[0]!
