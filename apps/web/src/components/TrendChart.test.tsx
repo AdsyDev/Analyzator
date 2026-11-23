@@ -60,6 +60,26 @@ describe('TrendChart', () => {
     expect(screen.getAllByTestId('chart-gap')).toHaveLength(1)
   })
 
+  it('serie săptămânală: punct la fiecare colectare, fără hașură între colectări; hașură doar pentru o colectare lipsă', async () => {
+    const days = Array.from({ length: 36 }, (_, i) => `${i + 1} oct.`)
+    const values: Array<number | null> = days.map(() => null)
+    for (const i of [0, 7, 14, 28, 35]) values[i] = 40 + i // ziua 21 lipsește
+    render(<TrendChart title="SoV" labels={days} format="pct" cadenceDays={7} series={[{ key: 'sov', name: 'SoV', color: 'var(--accent)', values }]} />)
+    expect(screen.getAllByTestId('chart-point')).toHaveLength(5)
+    expect(screen.getAllByTestId('chart-gap')).toHaveLength(1)
+    const chart = screen.getByRole('group', { name: /SoV\. Folosește săgețile/ })
+    chart.focus()
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}') // sare din colectare în colectare: 1 oct., apoi 8 oct.
+    expect(screen.getByRole('tooltip')).toHaveTextContent('8 oct.')
+    expect(screen.getByRole('tooltip')).toHaveTextContent('47,0 %')
+  })
+
+  it('serie zilnică: o valoare izolată între goluri rămâne vizibilă ca punct', () => {
+    render(<TrendChart title="Trafic" labels={labels} series={[{ key: 'a', name: 'Clicks', color: 'var(--accent)', values: [null, 5, null, 7, 8] }]} />)
+    expect(screen.getAllByTestId('chart-point')).toHaveLength(1)
+    expect(screen.getAllByTestId('chart-gap')).toHaveLength(2)
+  })
+
   it('legenda ascunde și arată seriile', async () => {
     render(<TrendChart title="Trafic" series={series} labels={labels} />)
     const btn = screen.getByRole('button', { name: 'Sessions' })

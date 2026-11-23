@@ -29,4 +29,11 @@ describe('chartPath', () => {
     expect(continuousRuns([1, 2, null, 0, undefined, 5])).toEqual([[0, 1], [3], [5]])
     expect(continuousRuns([null, null])).toEqual([])
   })
+
+  it('o serie săptămânală unește colectările consecutive și se rupe doar când lipsește o colectare', () => {
+    const week = (v: number) => [v, null, null, null, null, null, null]
+    // colectări în zilele 0, 7, 14, apoi lipsește 21, revine la 28
+    const values = [...week(1), ...week(2), ...week(3), null, null, null, null, null, null, null, 4]
+    expect(continuousRuns(values, 11)).toEqual([[0, 7, 14], [28]])
+  })
 })

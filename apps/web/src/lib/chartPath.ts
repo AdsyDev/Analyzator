@@ -42,15 +42,23 @@ export function linePath(points: readonly PathPoint[], smooth: boolean): string 
   return d
 }
 
-/** Porțiunile continue ale unei serii: indicii consecutivi cu valoare. Un `null` întrerupe linia, nu o coboară la zero. */
-export function continuousRuns(values: ReadonlyArray<number | null | undefined>): number[][] {
+/**
+ * Porțiunile continue ale unei serii: indicii cu valoare aflați la cel mult `maxStep` poziții unul de altul. Pe o serie
+ * zilnică (`maxStep = 1`) orice `null` întrerupe linia; pe o serie colectată săptămânal, zilele dintre două colectări nu
+ * sunt lipsă, deci linia unește colectările consecutive și se rupe doar când lipsește o colectare. Niciodată nu coboară
+ * la zero.
+ */
+export function continuousRuns(values: ReadonlyArray<number | null | undefined>, maxStep = 1): number[][] {
   const runs: number[][] = []
   let run: number[] = []
   values.forEach((v, i) => {
-    if (v === null || v === undefined) {
-      if (run.length) runs.push(run)
+    if (v === null || v === undefined) return
+    const prev = run[run.length - 1]
+    if (prev !== undefined && i - prev > maxStep) {
+      runs.push(run)
       run = []
-    } else run.push(i)
+    }
+    run.push(i)
   })
   if (run.length) runs.push(run)
   return runs
