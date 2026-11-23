@@ -122,8 +122,57 @@ export interface NewSeomonitorMapping {
   is_primary_visibility: boolean
 }
 
+/** Un competitor dintr-o versiune nouă. Domeniul leagă competitorul de observațiile SEOmonitor (comparația AI). */
+export interface NewCompetitorMember {
+  name: string
+  domain: string | null
+}
+
+/** O versiune nouă a setului; prima versiune a brandului poate începe în trecut, următoarele de azi înainte. */
+export interface NewCompetitorSetVersion {
+  effective_from: IsoDate
+  note: string | null
+  members: NewCompetitorMember[]
+}
+
+export interface CreatedCompetitorSetVersion {
+  version: number
+  effective_from: IsoDate
+  member_count: number
+}
+
+/** Un profil social urmărit drept competitor în Planable (Analytics → Competitors), pe o pagină a brandului. */
+export interface PlanableCompetitorSuggestion {
+  platform: string
+  handle: string
+  name: string
+  tracked_from: string[]
+}
+
+/** Un domeniu raportat de SEOmonitor drept concurent în răspunsurile AI ale brandului. */
+export interface SeomonitorDomainSuggestion {
+  domain: string
+  /** Cuvinte cheie distincte în care apare. */
+  keywords: number
+}
+
+/**
+ * Starea fiecărei surse de propuneri. `ok` cu listă goală e diferit de `not_connected` (sursa lipsește) și de
+ * erori (`invalid`, `rate_limited`, `provider_error`, `budget_exhausted`).
+ */
+export type SuggestionOutcome = 'ok' | 'not_connected' | 'invalid' | 'rate_limited' | 'provider_error' | 'budget_exhausted'
+
+export interface CompetitorSuggestions {
+  planable: { outcome: SuggestionOutcome; message: string | null; competitors: PlanableCompetitorSuggestion[]; notes: string[] }
+  seomonitor: { outcome: 'ok' | 'not_connected'; message: string | null; since: IsoDate; domains: SeomonitorDomainSuggestion[] }
+}
+
 export interface ConfigProvider {
   competitorVersions(brandId: BrandId): Promise<ProviderResult<CompetitorSetVersion[]>>
+  /** Doar agency_admin / strategist cu acces la brand (funcția SQL `create_competitor_set_version`, E4). */
+  createCompetitorSetVersion(brandId: BrandId, input: NewCompetitorSetVersion): Promise<ProviderResult<CreatedCompetitorSetVersion>>
+  /** Propuneri din Planable și SEOmonitor (funcția server `source-credentials`); nu scrie nimic în set. */
+  competitorSuggestions(brandId: BrandId): Promise<ProviderResult<CompetitorSuggestions>>
   aliases(brandId: BrandId): Promise<ProviderResult<BrandAlias[]>>
   seomonitorMappings(): Promise<ProviderResult<SeomonitorMapping[]>>
   /**

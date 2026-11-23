@@ -185,6 +185,8 @@ const users: UsersProvider = {
 
 const config: ConfigProvider = {
   competitorVersions: async () => notConnected('Setul de competitori nu este încă disponibil.'),
+  createCompetitorSetVersion: async () => notConnected('Setul de competitori nu este încă disponibil.'),
+  competitorSuggestions: async () => notConnected('Propunerile de competitori nu sunt încă disponibile.'),
   aliases: async () => notConnected('Aliasurile brandului nu sunt încă disponibile.'),
   seomonitorMappings: async () => notConnected('Maparea grupurilor nu este încă disponibilă.'),
   saveSeomonitorMappings: async () => notConnected('Maparea grupurilor nu este încă disponibilă.'),

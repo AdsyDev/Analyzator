@@ -68,7 +68,8 @@ Singura funcție din `public` apelabilă de utilizatori. Creează atomic o versi
 
 - **SECURITY INVOKER**, nu DEFINER: rulează cu drepturile apelantului, deci RLS (`competitor_sets_insert`, `competitor_set_members_insert`) rămâne autoritatea; funcția nu poate scrie nimic ce politicile nu permit. Nu primește actor din exterior: `created_by = auth.uid()`. Garda A10 (nicio funcție DEFINER executabilă de clienți) rămâne neschimbată. Nu e nevoie de Edge Function.
 - Verificarea explicită din corp (`private.has_brand_role`, agency_admin sau strategist) există pentru mesaje clare în română; brand inexistent, brand străin și rol insuficient dau **același** răspuns (fără oracol de existență).
-- Concurența: `pg_advisory_xact_lock` pe brand serializează apelurile, deci `max(version)+1` nu poate produce aceeași versiune de două ori.
+- Concurența: `pg_advisory_xact_lock` pe brand serializează apelurile, deci `max(version)+1` nu poate produce aceeași versiune de două ori, iar două „prime versiuni” concurente nu pot începe amândouă în trecut (verificarea datei stă după lock).
+- Data din trecut (23 nov. 2026): doar prima versiune a brandului o poate avea. Înainte de ea nu exista nicio comparație văzută, deci nimic nu se rescrie; versiunile următoare rămân de azi înainte.
 - Auditul: triggerele existente scriu în `audit_events` un rând pentru set și câte unul pentru fiecare membru, cu actorul din JWT, în aceeași tranzacție.
 - `anon` și `PUBLIC` nu au EXECUTE (A11/E4). Garda A11 admite exact această funcție pentru `authenticated`; orice altă funcție din `public` executabilă de clienți pică testul.
 
@@ -77,7 +78,7 @@ Singura funcție din `public` apelabilă de utilizatori. Creează atomic o versi
 | Parametru | Tip | Note |
 |---|---|---|
 | `p_brand_id` | uuid | brandul; tenantul se deduce din brand |
-| `p_effective_from` | date (ISO `YYYY-MM-DD`) | ≥ azi în Europe/Bucharest; unic per brand |
+| `p_effective_from` | date (ISO `YYYY-MM-DD`) | ≥ azi în Europe/Bucharest; **prima versiune** a brandului poate începe în trecut, dar nu înainte de 2020-01-01 (migrația `20261123090000`); unic per brand |
 | `p_note` | text sau null | tăiată; maximum 1000 de caractere; gol → null |
 | `p_members` | jsonb, listă de 1–10 obiecte `{ "name": text, "domain"?: text, "color"?: "#RRGGBB" }` | ordinea din listă devine `sort_order` |
 
@@ -90,7 +91,7 @@ Erori (`error.code` PostgREST = SQLSTATE, `error.message` în română, afișabi
 | SQLSTATE | Cazuri |
 |---|---|
 | `42501` | „Nu ai dreptul să creezi o versiune a setului de competitori pentru acest brand” (fără sesiune, rol altul decât agency_admin/strategist, fără acces la brand, alt tenant, brand inexistent) |
-| `22023` | dată lipsă sau în trecut; notă prea lungă; membrii nu sunt listă; mai puțin de 1 sau mai mult de 10 membri; nume lipsă, gol, prea lung sau duplicat; domeniu sau culoare invalide. Mesajele pe membru încep cu „Membrul N”. |
+| `22023` | dată lipsă, în trecut (cu excepția primei versiuni) sau înainte de 2020-01-01; notă prea lungă; membrii nu sunt listă; mai puțin de 1 sau mai mult de 10 membri; nume lipsă, gol, prea lung sau duplicat; domeniu sau culoare invalide. Mesajele pe membru încep cu „Membrul N”. |
 | `23505` | există deja o versiune cu aceeași `effective_from` |
 
 Orice eroare anulează toată tranzacția: nu rămâne set parțial. Versiunile existente nu se modifică. O versiune cu `effective_from` mai mică decât a unei versiuni viitoare existente primește totuși numărul următor (versiunea efectivă se alege după dată, nu după număr).
@@ -230,7 +231,8 @@ Migrația `20261023090000_people_identity_invite.sql`, decizia E-4. Emailul și 
 |---|---|
 | F1 | Respinși: strategist fără acces la brand, client_viewer (cu și fără acces), account, admin al altui tenant, brand inexistent (același mesaj ca brand străin), anon; nicio versiune creată |
 | F2 | 0 și 11 membri, nume gol (al doilea membru, după ce primul fusese inserat), nume lipsă, duplicat (majuscule/spații), culoare și domeniu invalide, membri non-listă: niciun set parțial, niciun membru orfan |
-| F3 | `effective_from` în trecut (inclusiv ieri în Europe/Bucharest) și null respins |
+| F3 | `effective_from` în trecut (inclusiv ieri în Europe/Bucharest) și null respins când brandul are deja un set |
+| F3b | Prima versiune a unui brand fără set începe acum 60 de zile; înainte de 2020-01-01 e respinsă; a doua versiune nu poate începe ieri, dar poate începe azi |
 | F4 | Succes cu data de azi: versiune = max+1, normalizare (nume, domeniu, notă), `created_by`, `tenant_id` din brand, ordinea; versiunea 1 neatinsă |
 | F5 | Audit: un eveniment pentru set și unul pe membru, cu actor |
 | F6 | `effective_from` duplicat respins; versiunea crește la 3; lock advisory luat pe brand |

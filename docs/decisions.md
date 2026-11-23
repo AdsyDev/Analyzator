@@ -414,3 +414,15 @@ Verificarea de după W a trecut 31 din 31 la a doua rulare. Au rămas două form
 | X-6 | Ce nu acoperă | — | Lista de cuvinte fără diacritice e scurtă și orientativă. Alte abateri de stil (de exemplu „o scădere relativă de -8,3 %”) nu sunt semnalate. |
 | X-7 | Impact | — | Timp: sub o oră, fără schimbare de schemă și fără interfață. Cost: o rulare de verificare pe live (circa 25.000 de tokeni). |
 
+
+## Y — Setul de competitori din aplicație, cu propuneri din surse (2026-11-23)
+
+Cererea proprietarului produsului din 23 nov. 2026: cardul „Competitori” din Overview arăta „Sursă neconectată” pentru că brandul nu avea niciun set în baza de date, iar setul nu se putea introduce din aplicație. „Fă formularul și permite data din trecut.”
+
+| # | Decizia | Variante | Alegerea și motivul |
+|---|---|---|---|
+| Y-1 | Data primei versiuni | (a) de azi înainte, ca până acum; (b) prima versiune poate începe în trecut | **(b)**, migrația `20261123090000`. Comparația folosește setul în vigoare la sfârșitul perioadei, deci un set introdus azi lăsa toate perioadele trecute fără comparație. Înainte de prima versiune nu exista nicio comparație văzută, așa că nimic nu se rescrie. Versiunile următoare rămân de azi înainte. Limita de jos: 2020-01-01. Verificarea stă după lock-ul advisory (două „prime versiuni” concurente nu trec amândouă). pgTAP: F3b. |
+| Y-2 | Formularul | — | Administrare → Configurare → Competitori: „Configurează competitorii” (fără set) sau „Versiune nouă”. Pornește de la versiunea în vigoare; 1–10 competitori cu nume și domeniu opțional; dată și notă. Scrierea e prin `create_competitor_set_version` (E4), cu mesajele ei în română. Prima versiune propune implicit data de acum un an, ca și comparațiile față de anul trecut să aibă setul. |
+| Y-3 | Preluarea din Planable | (a) sincronizare automată; (b) propuneri pe care adminul le alege | **(b).** Planable urmărește competitorii pe fiecare cont social, nu pe brand, și nu dă domenii; setul e validat de Account și Strategie, iar o sincronizare ar crea versiuni fără decizie. „Propune din surse” cheamă funcția `source-credentials` (`competitor_suggestions`, doar `agency_admin`): profilurile din `GET /pages/{id}/competitors` pe paginile workspace-ului brandului (Instagram, Facebook, YouTube, TikTok, LinkedIn) și domeniile concurenților din `ai_brand_observations` (SEOmonitor, ultimele 120 de zile, fără apel la furnizor). Cererile Planable se contorizează la `discover` pe cheia clientului; tokenul nu iese din funcție. Fiecare sursă are starea ei (neconectată, eroare, listă goală). Rutele Planable sunt citite din specificația OpenAPI; **nu au rulat pe date reale**. |
+| Y-4 | Ce nu face | — | Nu colectează metricile sociale ale competitorilor din Planable (`/competitors/comparison`, `/metrics`): coloana „social public” din matrice rămâne N/A. E următorul pas, estimat la 1–2 zile. |
+| Y-5 | Impact | — | Timp: aproximativ o zi și jumătate. Cost extern: niciunul; câteva cereri Planable pe propunere, în limita de 30 pe zi pe cheie. |

@@ -108,6 +108,33 @@ select throws_ok(
 select throws_ok(
   $$ select * from public.create_competitor_set_version('20000000-0000-0000-0000-000000000011', null, null, '[{"name":"A"}]') $$,
   '22023', 'Data de la care se aplică versiunea este obligatorie', 'F3: effective_from null respins');
+reset role;
+
+-- F3b. Prima versiune a unui brand poate începe în trecut (migrația 20261123090000) --------
+insert into public.brands (id, tenant_id, slug, name, domain) values
+  ('20000000-0000-0000-0000-000000000013', '10000000-0000-0000-0000-000000000001', 'brand-1c', 'Brand 1C', 'brand1c.test');
+select tests.authenticate_as('30000000-0000-0000-0000-000000000001');
+select throws_ok(
+  $$ select * from public.create_competitor_set_version('20000000-0000-0000-0000-000000000013', '2019-12-31', null, '[{"name":"A"}]') $$,
+  '22023', 'Data de la care se aplică versiunea nu poate fi înainte de 2020-01-01', 'F3b: prima versiune nu poate începe înainte de 2020');
+select lives_ok(
+  $$ create temporary table r0 on commit drop as
+     select * from public.create_competitor_set_version('20000000-0000-0000-0000-000000000013',
+       ((now() at time zone 'Europe/Bucharest')::date) - 60, null, '[{"name":"Alfa","domain":"alfa.ro"}]') $$,
+  'F3b: prima versiune a brandului 1C începe acum 60 de zile');
+grant select on r0 to public;
+select is((select version from r0), 1, 'F3b: prima versiune are numărul 1');
+select is((select effective_from from r0), ((now() at time zone 'Europe/Bucharest')::date) - 60, 'F3b: data din trecut se păstrează');
+select throws_ok(
+  $$ select * from public.create_competitor_set_version('20000000-0000-0000-0000-000000000013',
+       ((now() at time zone 'Europe/Bucharest')::date) - 1, null, '[{"name":"Beta"}]') $$,
+  '22023', null, 'F3b: a doua versiune nu poate începe în trecut, nici cu o zi');
+select lives_ok(
+  $$ select * from public.create_competitor_set_version('20000000-0000-0000-0000-000000000013',
+       (now() at time zone 'Europe/Bucharest')::date, null, '[{"name":"Beta"}]') $$,
+  'F3b: a doua versiune poate începe azi');
+-- F4 continuă ca strategistul T1 (ca după F3).
+select tests.authenticate_as('30000000-0000-0000-0000-000000000002');
 
 -- F4. Succes: versiune, membri, normalizare, autor ----------------------------------------
 select lives_ok(

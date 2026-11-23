@@ -1,5 +1,8 @@
+import { PlusIcon } from '@phosphor-icons/react'
+import { useState } from 'react'
 import type { Brand, CompetitorSetVersion, SeomonitorMapping } from '../../contracts'
 import { EmptyState } from '../../components/EmptyState'
+import { Button } from '../../components/ui/Button'
 import { StatusChip } from '../../components/ui/Chip'
 import { SortableTable, type Column } from '../../components/ui/SortableTable'
 import { useProviders } from '../../data/DataProvidersContext'
@@ -8,6 +11,7 @@ import { formatDate } from '../../lib/format'
 import { useLayout } from '../../routing/AppLayout'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
+import { CompetitorSetDialog } from './CompetitorSetDialog'
 
 const KIND_LABELS = { brand: 'Brand', multi_brand: 'Multi-brand', excluded: 'Exclus' } as const
 
@@ -57,23 +61,33 @@ function BrandConfig({ brand }: { brand: Brand }) {
   const providers = useProviders()
   const versions = useAsync(() => providers.config.competitorVersions(brand.id), [providers, brand.id])
   const aliases = useAsync(() => providers.config.aliases(brand.id), [providers, brand.id])
+  const [editing, setEditing] = useState(false)
+  const list = versions.state.status === 'done' && versions.state.value.kind === 'ready' ? versions.state.value.data : null
+  const open = () => setEditing(true)
   return (
     <>
       <Section
         id="competitors"
         title="Competitori"
-        description={`Setul pentru ${brand.name}. Versiunile sunt imutabile: o schimbare creează o versiune nouă, cu dată efectivă, iar istoricul rămâne. Modificarea se face la cererea echipei, nu din aplicație.`}
+        description={`Setul pentru ${brand.name}. Versiunile sunt imutabile: o schimbare creează o versiune nouă, cu dată efectivă, iar istoricul rămâne. Prima versiune poate începe în trecut; următoarele, de azi înainte.`}
+        action={list && list.length > 0 ? <Button icon={<PlusIcon size={14} weight="bold" />} onClick={open}>Versiune nouă</Button> : undefined}
       >
         <Resolved state={versions.state} onRetry={versions.reload} loadingLabel="Se încarcă competitorii" skeletonClass="h-40">
           {(list) =>
             list.length === 0 ? (
-              <EmptyState compact title="Niciun set de competitori" text={`${brand.name} nu are încă un set de competitori. Până la configurare, comparațiile cu competitorii apar ca N/A.`} />
+              <EmptyState
+                compact
+                title="Niciun set de competitori"
+                text={`${brand.name} nu are încă un set de competitori, așa că paginile Overview și Concurență arată „Sursă neconectată”. Configurează-l: poți porni de la propunerile din Planable și SEOmonitor.`}
+                action={{ label: 'Configurează competitorii', onClick: open, icon: <PlusIcon size={14} weight="bold" /> }}
+              />
             ) : (
               <SortableTable caption="Versiunile setului de competitori" columns={versionColumns} rows={list} rowKey={(v) => String(v.version)} pageSize={6} emptyText="Nicio versiune." />
             )
           }
         </Resolved>
       </Section>
+      {editing && list && <CompetitorSetDialog brand={brand} versions={list} onClose={() => setEditing(false)} onCreated={versions.reload} />}
       <Section id="aliases" title="Aliasuri" description="Denumirile sub care brandul e căutat în răspunsurile AI și în mențiuni.">
         <Resolved state={aliases.state} onRetry={aliases.reload} loadingLabel="Se încarcă aliasurile" skeletonClass="h-24">
           {(list) =>
