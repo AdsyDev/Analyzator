@@ -1,0 +1,73 @@
+# Maparea conturilor Airbyte (Meta, Google Ads, TikTok) pe site-urile clienților, din worker (E-8). Doar manual.
+#
+# Fără „apply”: afișează propunerea (nimic scris). Cu „apply”: leagă conturile cu un singur site propus; cele ambigue și
+# cele fără potrivire rămân nelegate și apar în rezumat. Aceeași potrivire ca pasul „Conturile tuturor site-urilor” din
+# aplicație. Connection string-ul Airbyte rămâne în Supabase Vault.
+#
+# Secrete în environment-ul GitHub ales (implicit „staging"): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+
+name: airbyte-map
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment GitHub cu secretele Supabase'
+        type: choice
+        options: [staging]
+        default: staging
+      apply:
+        description: 'Leagă conturile propuse (nebifat = doar propunerea)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airbyte-map
+  cancel-in-progress: false
+
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dependențe
+        run: npm ci
+
+      - name: Teste (fără rețea)
+        run: node --experimental-strip-types --test 'connectors/airbyte/**/*.test.ts' 'supabase/functions/airbyte/**/*.test.ts'
+
+      - name: Mapare
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          APPLY: ${{ inputs.apply }}
+        shell: bash
+        run: |
+          set -o pipefail
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Lipsesc secretele SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY."
+            exit 1
+          fi
+          node --experimental-strip-types connectors/airbyte/map.ts $([ "$APPLY" = "true" ] && echo --apply) | tee map.log
+
+      - name: Rezumat
+        if: always()
+        run: |
+          {
+            echo "### Mapare Airbyte: $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo
+            echo '```'
+            [ -f map.log ] && cat map.log || echo "fără output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
