@@ -1,4 +1,4 @@
--- Z: toleranța de prospețime a metricilor GA4 și Search Console, potrivită cu colectarea săptămânală.
+-- AA: toleranța de prospețime a metricilor GA4 și Search Console, potrivită cu colectarea săptămânală.
 --
 -- Colectarea Google rulează marțea (google-weekly, cron `0 4 * * 2`). GA4 aduce date până ieri; Search Console până
 -- cu 2 zile înainte de ieri (GSC_FINAL_LAG_DAYS, D-25). Între două rulări, ultima zi cu date ajunge astfel la
@@ -10,7 +10,7 @@
 -- O rulare de marți ratată (sau întârziată peste miercuri) apare tot ca „stale", de joi. Versiunile 1 rămân ca istoric
 -- (registrul e imutabil); analizele publicate își păstrează versiunea din instantaneu.
 -- `source_status` și `source_freshness` iau maximul toleranței pe sursă din registru, deci se aliniază automat.
--- Decizia: docs/decisions.md, Z. Registrul: docs/metrics/registry.md.
+-- Decizia: docs/decisions.md, AA. Registrul: docs/metrics/registry.md.
 
 insert into public.metric_definitions
   (metric_key, version, name_ro, formula_ro, unit, primary_source, aggregation, multiplier, weight_basis,

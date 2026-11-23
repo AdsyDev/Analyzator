@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
-import { collectPlanable, MENTIONS_SKIPPED, MENTIONS_WITHOUT_LINK, zonedDayBounds } from './collect-core.ts'
-import { builtMentionIdentity, builtMentionNativeId, coveredFrom, hasNoLink, MentionsSchema, mentionFieldShape, mentionNativeId, mentionRow, mentionSkipReasons, pageMetrics, platformOf } from './normalize.ts'
+import { ATTRIBUTION, collectPlanable, MENTIONS_SKIPPED, MENTIONS_WITHOUT_LINK, zonedDayBounds } from './collect-core.ts'
+import { builtMentionIdentity, builtMentionNativeId, coveredFrom, hasNoLink, keywordOwners, profileOwners, MentionsSchema, mentionFieldShape, mentionNativeId, mentionRow, mentionSkipReasons, pageMetrics, platformOf } from './normalize.ts'
 import { FakeDb, fakeFetch, noSleep, type FakeResponse } from '../shared/test-helpers.ts'
 
 // Răspunsurile sunt construite după schema OpenAPI publică (api.planable.io/api/v1/openapi.json, 2026-10-12):
@@ -598,5 +598,71 @@ describe('Planable Competitors (deciziile Y)', () => {
     assert.deepEqual(zonedDayBounds('2026-10-07', 'Europe/Bucharest'), { start: '2026-10-06T21:00:00.000Z', end: '2026-10-07T20:59:59.999Z' })
     assert.deepEqual(zonedDayBounds('2026-10-25', 'Europe/Bucharest'), { start: '2026-10-24T21:00:00.000Z', end: '2026-10-25T21:59:59.999Z' })
     assert.deepEqual(zonedDayBounds('2026-01-15', 'UTC'), { start: '2026-01-15T00:00:00.000Z', end: '2026-01-15T23:59:59.999Z' })
+  })
+})
+
+describe('raportul de atribuire pe competitori (deciziile Y)', () => {
+  const SET = '40000000-0000-0000-0000-000000000011'
+  const tables = {
+    brands: [{ id: B1, tenant_id: T1, name: 'Urinal' }],
+    competitor_sets: [
+      { id: '40000000-0000-0000-0000-000000000010', tenant_id: T1, brand_id: B1, version: 1, effective_from: '2026-09-01' },
+      { id: SET, tenant_id: T1, brand_id: B1, version: 2, effective_from: '2026-10-01' },
+      { id: '40000000-0000-0000-0000-000000000012', tenant_id: T1, brand_id: B1, version: 3, effective_from: '2026-12-01' },
+    ],
+    competitor_set_members: [
+      { tenant_id: T1, brand_id: B1, competitor_set_id: SET, name: 'Uronova', sort_order: 1, listening_keywords: [], social_handles: [] },
+      { tenant_id: T1, brand_id: B1, competitor_set_id: SET, name: 'Prostamol', sort_order: 0, listening_keywords: [], social_handles: [] },
+    ],
+    competitor_mentions: [], competitor_trackers: [], competitor_social_daily: [],
+  }
+
+  test('cuvintele: atribuit după nume, neatribuit și competitorul fără cuvânt, cu setul în vigoare azi', async () => {
+    const { db } = setup({ tables })
+    const out = await collectPlanable({
+      db,
+      fetch: routes({
+        '/api/v1/keywords': (url) => (url.searchParams.get('type') === 'competitor'
+          ? json({ data: [{ keywordId: 'c1', text: 'prostamol', type: 'competitor' }, { keywordId: 'c2', text: 'Alt brand', type: 'competitor' }] })
+          : json({ data: [{ keywordId: 'k1', text: 'Urinal', type: 'brand' }] })),
+        '/api/v1/keywords/c1/mentions': json({ data: [], pagination: { nextCursor: null, total: 0 } }),
+        '/api/v1/keywords/c2/mentions': json({ data: [], pagination: { nextCursor: null, total: 0 } }),
+      }).fetch,
+      sleep: noSleep().sleep,
+      now: () => NOW,
+    })
+    const notes = out.find((o) => o.source === 'planable_listening_competitors')!.errors.filter((e) => e.dimension === ATTRIBUTION).map((e) => e.message)
+    assert.deepEqual(notes, [
+      'Urinal, set v2: cuvântul „prostamol” → C1 Prostamol',
+      'Urinal, set v2: cuvântul „Alt brand” nu corespunde niciunui competitor din set; nu apare în Concurență',
+      'Urinal, set v2: C2 Uronova nu are niciun cuvânt urmărit; apare N/A',
+    ])
+  })
+
+  test('profilurile: după numele afișat; fără set, nota spune că datele nu apar', async () => {
+    const tracked = json({ data: [{ trackedCompetitorId: 't1', scrapedPageId: 'sp1', handle: 'prostamol.ro', displayName: 'Prostamol', platform: 'instagram', profileImageUrl: null, syncStatus: 'complete', lastSyncedAt: null }] })
+    const empty = json({ data: [] })
+    const f = routes({ '/api/v1/pages/pg-ig/competitors': tracked, '/api/v1/pages/pg-ig/competitors/metrics': empty, '/api/v1/pages/pg-ig/competitors/comparison': empty })
+    const withSet = setup({ tables })
+    const out = await collectPlanable({ db: withSet.db, fetch: f.fetch, sleep: noSleep().sleep, now: () => NOW })
+    assert.deepEqual(out.find((o) => o.source === 'planable_competitors')!.errors.filter((e) => e.dimension === ATTRIBUTION).map((e) => e.message), [
+      'Urinal, set v2: profilul „Prostamol (@prostamol.ro)” → C1 Prostamol',
+      'Urinal, set v2: C2 Uronova nu are niciun profil urmărit; apare N/A',
+    ])
+    const noSet = setup({ tables: { brands: [{ id: B1, tenant_id: T1, name: 'Urinal' }], competitor_social_daily: [], competitor_trackers: [] } })
+    const out2 = await collectPlanable({ db: noSet.db, fetch: routes({ '/api/v1/pages/pg-ig/competitors': tracked, '/api/v1/pages/pg-ig/competitors/metrics': empty, '/api/v1/pages/pg-ig/competitors/comparison': empty }).fetch, sleep: noSleep().sleep, now: () => NOW })
+    assert.match(out2.find((o) => o.source === 'planable_competitors')!.errors.find((e) => e.dimension === ATTRIBUTION)!.message, /nu are un set de competitori în vigoare/)
+  })
+
+  test('regulile de potrivire sunt cele din SQL', () => {
+    const m = [
+      { label: 'C1', name: 'Minimarțieni', listening_keywords: [], social_handles: [] },
+      { label: 'C2', name: 'Uronova', listening_keywords: ['uronova forte'], social_handles: ['uronova.ro'] },
+    ]
+    assert.deepEqual(keywordOwners(m, ' MINIMARȚIENI ').map((x) => x.label), ['C1'])
+    assert.deepEqual(keywordOwners(m, 'Uronova').map((x) => x.label), [], 'cu listă proprie, numele singur nu mai e cuvântul lui')
+    assert.deepEqual(profileOwners(m, 'minimartieni_ro', 'Minimartieni').map((x) => x.label), ['C1'], 'fără diacritice, spații și majuscule')
+    assert.deepEqual(profileOwners(m, '@Uronova.RO', 'Altceva').map((x) => x.label), ['C2'])
+    assert.deepEqual(profileOwners(m, 'uronova', 'Uronova').map((x) => x.label), [], 'cu handle-uri în set, numele nu mai ajunge')
   })
 })

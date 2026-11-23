@@ -1,6 +1,9 @@
 import type { AiEngine, AnswerOutcome } from '../contracts'
 import type { ChipTone } from '../components/ui/Chip'
 
+/** Ritmul colectării AI (SEOmonitor, săptămânal; decizia D-15). Seriile zilnice au valoare doar în ziua colectării. */
+export const AI_CADENCE_DAYS = 7
+
 export const AI_ENGINE_LABELS: Record<AiEngine, string> = {
   chatgpt: 'ChatGPT',
   gemini: 'Gemini',

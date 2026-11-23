@@ -48,7 +48,11 @@ import {
   TrackedCompetitorsSchema,
   competitorMentionRow,
   coveredFrom,
+  attributionNotes,
+  keywordOwners,
+  profileOwners,
   platformOf,
+  type SetMember,
   type TrackedCompetitor,
   hasNoLink,
   mentionRow,
@@ -103,6 +107,32 @@ function statusOf(errors: SyncRunError[], rows: number, fatal: boolean): SyncRun
 
 /** Tipurile de cuvinte Listening care nu sunt ale brandului; restul (inclusiv un tip necunoscut) rămân la brand, ca înainte. */
 const NON_BRAND_KEYWORD_TYPES = ['competitor', 'topic']
+
+/** Dimensiunea notelor de atribuire pe competitori (deciziile Y); `collect.ts` le scrie în jurnalul rulării. */
+export const ATTRIBUTION = 'attribution'
+
+/** Numele brandului și setul de competitori în vigoare azi (Europe/Bucharest), pentru raportul de atribuire. */
+async function currentSet(db: Db, scope: { tenant_id: string; brand_id: string }, now: () => Date): Promise<{ brand: string; version: number | null; members: SetMember[] }> {
+  const today = calendarDateIn(now(), 'Europe/Bucharest')
+  const brand = (await db.select<{ name: string }>('brands', `select=name&id=eq.${scope.brand_id}&tenant_id=eq.${scope.tenant_id}`))[0]?.name ?? scope.brand_id
+  const sets = await db.select<{ id: string; version: number; effective_from: string }>(
+    'competitor_sets',
+    `select=id,version,effective_from&tenant_id=eq.${scope.tenant_id}&brand_id=eq.${scope.brand_id}&effective_from=lte.${today}`,
+  )
+  const set = [...sets].sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0]
+  if (!set) return { brand, version: null, members: [] }
+  assertUuid(set.id, 'competitor_set_id')
+  const rows = await db.select<{ name: string; sort_order: number; listening_keywords: string[] | null; social_handles: string[] | null }>(
+    'competitor_set_members',
+    `select=name,sort_order,listening_keywords,social_handles&tenant_id=eq.${scope.tenant_id}&brand_id=eq.${scope.brand_id}&competitor_set_id=eq.${set.id}`,
+  )
+  const members = [...rows]
+    .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name))
+    .map((m, i) => ({ label: `C${i + 1}`, name: m.name, listening_keywords: m.listening_keywords ?? [], social_handles: m.social_handles ?? [] }))
+  return { brand, version: set.version, members }
+}
+
+const attributionNote = (message: string): SyncRunError => ({ code: 'parser_note', status: null, dimension: ATTRIBUTION, message })
 
 /** Dimensiunea notelor despre mențiuni sărite; `collect.ts` le scrie în jurnalul rulării. */
 export const MENTIONS_SKIPPED = 'mentions_skipped'
@@ -580,6 +610,9 @@ async function runCompetitorListening(deps: PlanableDeps, client: PlanableClient
       })
     }
     errors.push(...skippedMentionNotes(skipped))
+    const set = await currentSet(db, scope, now)
+    const labels = trackers.map((t) => t.label as string)
+    errors.push(...attributionNotes({ ...set, kind: 'cuvântul', items: labels.map((text) => ({ text, owners: keywordOwners(set.members, text) })) }).map(attributionNote))
     // Întâi mențiunile, apoi ce s-a citit: un cuvânt apare acoperit doar după ce mențiunile lui sunt scrise.
     rows += await upsertScoped(db, 'competitor_mentions', KEYS.competitor_mentions, mentions, scope)
     rows += await upsertScoped(db, 'competitor_trackers', KEYS.competitor_trackers, trackers, scope)
@@ -753,6 +786,12 @@ async function runCompetitorProfiles(deps: PlanableDeps, client: PlanableClient,
     const payloadHash = createHash('sha256').update(hashes.join('|')).digest('hex')
     const daily = [...byKey.values()].map((r) => ({ ...r, payload_hash: payloadHash }))
     for (const n of notes) errors.push({ code: 'parser_note', status: null, message: n })
+    const set = await currentSet(db, scope, now)
+    const profiles = new Map(trackers.map((t) => [t.external_id as string, { handle: t.label as string, name: (t.display_name as string | null) ?? '' }]))
+    errors.push(...attributionNotes({
+      ...set, kind: 'profilul',
+      items: [...profiles.values()].map((p) => ({ text: p.name && p.name !== p.handle ? `${p.name} (@${p.handle.replace(/^@/, '')})` : `@${p.handle.replace(/^@/, '')}`, owners: profileOwners(set.members, p.handle, p.name) })),
+    }).map(attributionNote))
     // Întâi seria, apoi profilurile: un profil apare acoperit doar după ce zilele lui sunt scrise.
     rows += await upsertScoped(db, 'competitor_social_daily', KEYS.competitor_social_daily, daily, scope)
     rows += await upsertScoped(db, 'competitor_trackers', KEYS.competitor_trackers, trackers, scope)
