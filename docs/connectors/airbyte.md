@@ -9,15 +9,17 @@ Funcțiile server Supabase se conectează doar criptat și verifică certificatu
 1. **Un nume de domeniu** pentru server, de exemplu `airbyte-db.adsymphony.ro`. Un IP nu merge, pentru că certificatul se verifică pe nume.
 2. **TLS activ în Postgres, cu un certificat valid pentru acel nume.** Două variante:
    - **Certificat public (recomandat):** Let's Encrypt (certbot) pentru `airbyte-db.adsymphony.ro`, apoi în `postgresql.conf`: `ssl = on`, `ssl_cert_file = '.../fullchain.pem'`, `ssl_key_file = '.../privkey.pem'` (cheia citibilă doar de utilizatorul `postgres`). Repornește sau reîncarcă Postgres. Certificatul se reînnoiește la 90 de zile; reîncarcă Postgres după reînnoire.
-   - **Autoritate proprie (CA):** creezi un CA și un certificat de server semnat de el, cu numele în `subjectAltName`. La pasul 3 atașezi certificatul CA (doar partea publică). Comenzi orientative:
+   - **Autoritate proprie (CA):** creezi un CA și un certificat de server semnat de el, cu numele în `subjectAltName`. La pasul 3 atașezi certificatul CA (doar partea publică). Comenzi orientative (merg pe OpenSSL 1.1.1 și 3.x):
      ```bash
-     openssl req -new -x509 -days 3650 -nodes -subj "/CN=AdSymphony Airbyte CA" -keyout ca.key -out ca.crt \
-       -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign"
-     openssl req -new -nodes -subj "/CN=airbyte-db.adsymphony.ro" -keyout server.key -out server.csr
-     printf "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:airbyte-db.adsymphony.ro\n" > server.ext
+     printf "[req]\ndistinguished_name=dn\nx509_extensions=v3_ca\nprompt=no\n[dn]\nCN=AdSymphony Airbyte CA\n[v3_ca]\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign\nsubjectKeyIdentifier=hash\n" > ca.cnf
+     openssl req -new -x509 -days 3650 -nodes -newkey rsa:2048 -config ca.cnf -keyout ca.key -out ca.crt
+     openssl req -new -nodes -newkey rsa:2048 -subj "/CN=airbyte-db.adsymphony.ro" -keyout server.key -out server.csr
+     printf "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:airbyte-db.adsymphony.ro\nauthorityKeyIdentifier=keyid\n" > server.ext
      openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 825 -out server.crt -extfile server.ext
+     openssl verify -CAfile ca.crt -verify_hostname airbyte-db.adsymphony.ro server.crt   # trebuie: server.crt: OK
      ```
      `server.crt` și `server.key` merg în Postgres. `ca.crt` se lipește în aplicație. `ca.key` rămâne offline.
+     **Nu folosi `-addext` la CA pe OpenSSL 1.1.1** (Ubuntu 20.04): extensia se adaugă a doua oară peste cea din configurația implicită, CA-ul devine invalid, iar verificarea dă `unable to verify the first certificate` / `tls_failed`. Fișierul `ca.cnf` de mai sus evită configurația implicită.
    - **Nu merge:** un certificat self-signed simplu (`openssl req -x509` pentru server, fără CA separat) și nici serverul fără TLS.
 3. **Portul deschis din internet** (de obicei 5432) și o regulă în `pg_hba.conf` pentru utilizatorul read-only, cu `hostssl` (doar conexiuni criptate) și `scram-sha-256`. Funcțiile server Supabase nu au IP-uri de ieșire fixe garantate, deci regula e pe utilizator, parolă și TLS, nu pe IP: `hostssl airbyte analyzator_ro 0.0.0.0/0 scram-sha-256` (și `::/0` pentru IPv6).
 
