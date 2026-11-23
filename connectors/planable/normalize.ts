@@ -62,6 +62,26 @@ export const MentionSchema = z
     author: z.object({ name: z.string().nullable().optional(), username: z.string().nullable().optional() }).passthrough().nullable().optional(),
   })
   .passthrough()
+// Planable Competitors (specificația din 23 nov. 2026): profilurile urmărite pe o pagină proprie, seria zilnică și comparația.
+export const TrackedCompetitorSchema = z
+  .object({ trackedCompetitorId: z.string(), scrapedPageId: z.string().nullable(), handle: z.string(), displayName: z.string(), platform: z.string(), syncStatus: z.string().nullish(), lastSyncedAt: z.string().nullish() })
+  .passthrough()
+export const TrackedCompetitorsSchema = z.object({ data: z.array(TrackedCompetitorSchema) }).passthrough()
+const nullableNum = z.number().finite().nullable()
+export const CompetitorSeriesSchema = z
+  .object({
+    data: z.array(
+      z.object({ id: z.string(), isOwn: z.boolean(), handle: z.string().nullish(), displayName: z.string().nullish(), platform: z.string(), points: z.array(z.object({ date: z.string(), followers: nullableNum, engagement: nullableNum.optional() }).passthrough()) }).passthrough(),
+    ),
+  })
+  .passthrough()
+export const CompetitorComparisonSchema = z
+  .object({
+    data: z.array(z.object({ id: z.string(), isOwn: z.boolean(), handle: z.string().nullish(), displayName: z.string().nullish(), platform: z.string(), posts: nullableNum, totalEngagement: nullableNum }).passthrough()),
+  })
+  .passthrough()
+export type TrackedCompetitor = z.infer<typeof TrackedCompetitorSchema>
+
 export const MentionsSchema = z.object({ data: z.array(MentionSchema), pagination: z.object({ nextCursor: z.number().nullable() }).passthrough() }).passthrough()
 
 export type Page = z.infer<typeof PageSchema>
@@ -330,4 +350,41 @@ export function mentionRow(m: Mention, p: Provenance, own: OwnAccounts | null = 
     language: null,
     country: null,
   }
+}
+
+/**
+ * Rândul din `competitor_mentions` (deciziile Y): mențiunea unui cuvânt de tip „competitor”. Se păstrează doar rețeaua, linkul,
+ * momentul publicării și sentimentul furnizorului; textul și autorul nu (nu sunt despre client și nu servesc unei numărători).
+ * `builtKey` = cheia construită pentru o mențiune fără link, ca la mențiunile brandului.
+ */
+export function competitorMentionRow(m: Mention, keywordId: string, p: Omit<Provenance, 'source_timezone'>, builtKey: string | null = null) {
+  const s = (m.sentiment ?? '').toLowerCase()
+  const platform = m.platform.trim()
+  return {
+    tenant_id: p.tenant_id,
+    brand_id: p.brand_id,
+    keyword_id: keywordId,
+    native_id: builtKey ?? mentionNativeId(m.url),
+    platform: platform ? platform.slice(0, 256) : null,
+    url: builtKey ? null : m.url.slice(0, 2048),
+    published_at: m.publishedAt,
+    sentiment: (SENTIMENTS as readonly string[]).includes(s) ? s : 'unknown',
+    source_id: p.source_id,
+    sync_run_id: p.sync_run_id,
+    collected_at: p.collected_at,
+    payload_hash: p.payload_hash,
+    schema_version: PLANABLE_SCHEMA_VERSION,
+  }
+}
+
+/**
+ * Prima zi acoperită a unui cuvânt sau advertiser după o rulare: rămâne cea veche când ferestrele se ating sau se suprapun,
+ * altfel (o pauză mai lungă decât fereastra) reîncepe de la fereastra curentă. Zilele din pauză nu sunt colectate.
+ */
+export function coveredFrom(previous: { covered_from: string | null; covered_to: string } | undefined, windowStart: string): string {
+  if (!previous || previous.covered_from === null) return windowStart
+  const dayAfter = new Date(`${previous.covered_to}T00:00:00Z`)
+  dayAfter.setUTCDate(dayAfter.getUTCDate() + 1)
+  const continuous = dayAfter.toISOString().slice(0, 10) >= windowStart
+  return continuous && previous.covered_from < windowStart ? previous.covered_from : windowStart
 }

@@ -104,13 +104,14 @@ select is_empty(
 -- O funcție nouă în public trebuie adăugată explicit în lista de mai jos, după revizuire.
 -- E10 (23 oct 2026): find_user_for_invite, grant_invited_access, tenant_people_for, doar service_role (funcția server `users`).
 -- E-5 (23 oct 2026): tenant_people_for și grant_invited_access înlocuite (temporary_password, auditul user_created); aceleași nume.
+-- Y (23 nov 2026): brand_competitor_ads și brand_social_competitors, aceeași poartă E8 (SECURITY INVOKER, has_brand_access în corp prin ai_check).
 -- M (12 nov 2026): brand_ai_settings, aceeași poartă E8.
 -- L (11 nov 2026): brand_index_status, aceeași poartă E8.
 -- J (11 nov 2026): brand_ai_referrals, brand_tracking_quality, brand_paid_budget, aceeași poartă E8 (SECURITY INVOKER, has_brand_access în corp).
 -- G-4 (10 nov 2026): brand_metric_evidence, aceeași poartă ca brand_metrics (E8): SECURITY INVOKER, has_brand_access în corp.
 create temporary table allowed_public_functions (name text primary key) on commit drop;
 insert into allowed_public_functions values
-  ('brand_ai_answer'), ('brand_ai_answers'), ('brand_ai_cited_sources'), ('brand_ai_engines'), ('brand_ai_referrals'), ('brand_ai_settings'), ('brand_ai_topic_matrix'), ('brand_ai_trends'), ('brand_clarity_devices'), ('brand_competition'), ('brand_competition_gaps'), ('brand_document_search'), ('brand_index_status'), ('brand_insights'), ('brand_landing_pages'), ('brand_mention_sentiment'), ('brand_mentions'), ('brand_metric_evidence'), ('brand_metric_trends'), ('brand_metrics'), ('brand_paid'), ('brand_paid_budget'), ('brand_search_keywords'), ('brand_social'), ('brand_tracking_quality'), ('brand_traffic_channels'), ('create_competitor_set_version'), ('find_user_for_invite'), ('get_source_token'), ('grant_invited_access'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token'), ('tenant_people_for');
+  ('brand_ai_answer'), ('brand_ai_answers'), ('brand_ai_cited_sources'), ('brand_ai_engines'), ('brand_ai_referrals'), ('brand_ai_settings'), ('brand_ai_topic_matrix'), ('brand_ai_trends'), ('brand_clarity_devices'), ('brand_competition'), ('brand_competition_gaps'), ('brand_competitor_ads'), ('brand_document_search'), ('brand_index_status'), ('brand_insights'), ('brand_landing_pages'), ('brand_mention_sentiment'), ('brand_mentions'), ('brand_metric_evidence'), ('brand_metric_trends'), ('brand_metrics'), ('brand_paid'), ('brand_paid_budget'), ('brand_search_keywords'), ('brand_social'), ('brand_social_competitors'), ('brand_tracking_quality'), ('brand_traffic_channels'), ('create_competitor_set_version'), ('find_user_for_invite'), ('get_source_token'), ('grant_invited_access'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token'), ('tenant_people_for');
 
 select is_empty(
   $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -133,7 +134,7 @@ select is_empty(
 select results_eq(
   $$ select p.proname::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public' and has_function_privilege('service_role', p.oid, 'execute') order by 1 $$,
-  $$ values ('brand_ai_answer'::text collate "C"), ('brand_ai_answers'), ('brand_ai_cited_sources'), ('brand_ai_engines'), ('brand_ai_referrals'), ('brand_ai_settings'), ('brand_ai_topic_matrix'), ('brand_ai_trends'), ('brand_clarity_devices'), ('brand_competition'), ('brand_competition_gaps'), ('brand_document_search'), ('brand_index_status'), ('brand_insights'), ('brand_landing_pages'), ('brand_mention_sentiment'), ('brand_mentions'), ('brand_metric_evidence'), ('brand_metric_trends'), ('brand_metrics'), ('brand_paid'), ('brand_paid_budget'), ('brand_search_keywords'), ('brand_social'), ('brand_tracking_quality'), ('brand_traffic_channels'), ('create_competitor_set_version'), ('find_user_for_invite'), ('get_source_token'), ('grant_invited_access'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token'), ('tenant_people_for') $$,
+  $$ values ('brand_ai_answer'::text collate "C"), ('brand_ai_answers'), ('brand_ai_cited_sources'), ('brand_ai_engines'), ('brand_ai_referrals'), ('brand_ai_settings'), ('brand_ai_topic_matrix'), ('brand_ai_trends'), ('brand_clarity_devices'), ('brand_competition'), ('brand_competition_gaps'), ('brand_competitor_ads'), ('brand_document_search'), ('brand_index_status'), ('brand_insights'), ('brand_landing_pages'), ('brand_mention_sentiment'), ('brand_mentions'), ('brand_metric_evidence'), ('brand_metric_trends'), ('brand_metrics'), ('brand_paid'), ('brand_paid_budget'), ('brand_search_keywords'), ('brand_social'), ('brand_social_competitors'), ('brand_tracking_quality'), ('brand_traffic_channels'), ('create_competitor_set_version'), ('find_user_for_invite'), ('get_source_token'), ('grant_invited_access'), ('record_source_validation'), ('rotate_source_token'), ('set_source_token'), ('tenant_people_for') $$,
   'A10: funcțiile aprobate sunt executabile de service_role'
 );
 select is_empty(
@@ -169,18 +170,19 @@ select is_empty(
 -- brandului/tenantului și răspund pentru auth.uid(); brand_source_* (E8) întorc boolean și răspund false fără acces;
 -- compute_metric_snapshot, metric_observations și utilitarele AI ai_* (E8) sunt SECURITY INVOKER: citesc prin RLS-ul apelantului.
 -- H-2 (10 nov 2026): ai_assistant_scope = ai_scope fără Google AI Overviews, tot INVOKER, pentru matricea de Concurență.
+-- Y (23 nov 2026): competitor_social = social public pe competitor, INVOKER (citește prin RLS), pentru matrice și ecranul Social.
 select results_eq(
   $$ select p.proname::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'private' and has_function_privilege('authenticated', p.oid, 'execute')
      order by 1 $$,
   $$ values ('accessible_brand_ids'::text collate "C"), ('ai_assistant_scope'), ('ai_check'), ('ai_engine_db'), ('ai_engine_ui'), ('ai_outcome'), ('ai_scope'),
-            ('brand_source_connected'), ('brand_source_query_ok'), ('can_see_tenant'), ('competition_registry_cell'), ('compute_metric_snapshot'),
+            ('brand_source_connected'), ('brand_source_query_ok'), ('can_see_tenant'), ('competition_registry_cell'), ('competitor_social'), ('compute_metric_snapshot'),
             ('has_brand_access'), ('has_brand_role'), ('has_role'), ('metric_observations') $$,
   'A10: doar funcțiile aprobate (autorizare + E8) sunt executabile de authenticated'
 );
 select is_empty(
   $$ select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname = 'private' and p.proname in ('compute_metric_snapshot', 'metric_observations', 'competition_registry_cell', 'ai_check', 'ai_scope', 'ai_engine_db', 'ai_engine_ui', 'ai_outcome') and p.prosecdef $$,
+     where n.nspname = 'private' and p.proname in ('compute_metric_snapshot', 'metric_observations', 'competition_registry_cell', 'competitor_social', 'ai_check', 'ai_scope', 'ai_engine_db', 'ai_engine_ui', 'ai_outcome') and p.prosecdef $$,
   'A10/E8: calculul și observațiile rulează cu drepturile apelantului (SECURITY INVOKER)'
 );
 

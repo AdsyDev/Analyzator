@@ -15,7 +15,13 @@ export const PROVIDER_LABELS: Record<SourceProviderId, { name: string; mono: str
 }
 
 /** `primary_source` din registru care nu e un card de conexiune: Planable scrie separat Analytics și Listening. */
-const REGISTRY_SOURCE_NAMES: Record<string, string> = { planable_listening: 'Planable Listening', planable_analytics: 'Planable Analytics' }
+const REGISTRY_SOURCE_NAMES: Record<string, string> = {
+  planable_listening: 'Planable Listening',
+  planable_analytics: 'Planable Analytics',
+  planable_listening_competitors: 'Planable Listening (competitori)',
+  planable_competitors: 'Planable Competitors',
+  ads_transparency: 'Google Ads Transparency',
+}
 
 /** Numele afișat pentru o cheie de sursă; o cheie necunoscută se afișează ca atare, nu se ghicește. */
 export function sourceName(key: string): string {
@@ -39,6 +45,15 @@ export const PROVIDER_DESCRIPTIONS: Record<SourceProviderId, string> = {
 
 /** Sursele din `sync_runs` care aparțin fiecărui card (Planable scrie separat Analytics și Listening). */
 const RUN_SOURCES: Partial<Record<SourceProviderId, readonly string[]>> = {
-  planable: ['planable', 'planable_analytics', 'planable_listening'],
+  planable: ['planable', 'planable_analytics', 'planable_listening', 'planable_listening_competitors', 'planable_competitors'],
 }
 export const runSourcesFor = (provider: SourceProviderId): readonly string[] => RUN_SOURCES[provider] ?? [provider]
+
+/**
+ * O rulare aparține cardului conexiunii care a produs-o: Airbyte scrie rulări cu sursa platformei (meta_ads, google_ads,
+ * tiktok_ads), dar ele sunt ale cardului Airbyte, nu ale conectorului API. Fără conexiune cunoscută, după sursă.
+ */
+export function runBelongsTo(provider: SourceProviderId, source: string, connectionId: string | null | undefined, providerOf: ReadonlyMap<string, string>): boolean {
+  const owner = connectionId ? providerOf.get(connectionId) : undefined
+  return owner !== undefined ? owner === provider : runSourcesFor(provider).includes(source)
+}

@@ -156,7 +156,7 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
           note: v.note,
           created_at: instantDaysAgo(v.effective_from_days_ago + 2),
           current: v.version === effective,
-          members: v.members.map((m, i) => ({ ...m, label: `C${i + 1}` })),
+          members: v.members.map((m, i) => ({ ...m, label: `C${i + 1}`, listening_keywords: [], social_handles: [], ads_advertiser_ids: [] })),
         })),
       )
     },

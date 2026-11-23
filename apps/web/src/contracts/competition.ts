@@ -1,4 +1,5 @@
 import type { IsoDate } from './common'
+import type { Page } from './mention'
 import type { MetricDirection, MetricStatus, MetricUnit } from './metric'
 
 /**
@@ -7,7 +8,7 @@ import type { MetricDirection, MetricStatus, MetricUnit } from './metric'
  * intervale pentru brand și competitori; ce sursa nu oferă rămâne N/A, nu zero. C1-C3 sunt sloturi până
  * când numele, domeniile și advertiserii sunt confirmați.
  */
-export type CompetitionDimension = 'ai' | 'seo' | 'social' | 'listening'
+export type CompetitionDimension = 'ai' | 'seo' | 'social' | 'listening' | 'ads'
 
 export interface CompetitionEntity {
   id: string
@@ -56,9 +57,42 @@ export interface CompetitionMatrix {
 /** „Unde apare concurența și noi lipsim": subiecte în care un competitor e prezent, iar brandul lipsește sau e mai slab. */
 export interface CompetitionGap {
   id: string
-  dimension: Exclude<CompetitionDimension, 'social' | 'listening'>
+  dimension: Exclude<CompetitionDimension, 'social' | 'listening' | 'ads'>
   subject: string
   competitors: Array<{ label: string; name: string; detail: string }>
   /** Situația brandului pe același subiect, în text (de ex. „Fără rank pe mobil"). */
   brand: string
+}
+
+/**
+ * O reclamă a unui competitor din Google Ads Transparency Center (deciziile Y): ce Google declară despre afișarea ei în
+ * România. Nu conține cost, clickuri sau performanță și nu se folosește pentru a le estima (spec cap. 08).
+ */
+export interface CompetitorAd {
+  id: string
+  competitor_id: string
+  competitor_name: string
+  /** C1, C2, C3, ca în matrice. */
+  competitor_label: string
+  advertiser_id: string
+  /** Numele declarat de advertiser; `null` când Google nu îl dă. */
+  advertiser_name: string | null
+  ad_id: string
+  format: 'text' | 'image' | 'video' | 'unknown'
+  region: string
+  /** Prima și ultima zi de afișare în regiune, declarate de Google; `null` = nedeclarat. */
+  first_shown: IsoDate | null
+  last_shown: IsoDate | null
+  /** Prima afișare cade în perioada aleasă. */
+  new_in_period: boolean
+  /** Numărul de afișări, ca interval publicat de Google; `null` când nu e publicat. */
+  times_shown_lower: number | null
+  times_shown_upper: number | null
+  /** Pagina reclamei în Ads Transparency Center (acolo se vede creația). */
+  source_url: string | null
+}
+
+export interface CompetitorAdsPage extends Page<CompetitorAd> {
+  /** Ziua până la care Google a fost interogat (cea mai veche dintre advertiserii setului). */
+  data_as_of: IsoDate | null
 }

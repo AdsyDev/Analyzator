@@ -1,7 +1,7 @@
 import type { AiAnswerDetail, AiAnswerSummary, AiCitedSource, AiEngineStat, AiEngineTrend, AiFilters, AiTopicMatrix } from './ai'
 import type { AiPolicyInput, AiPreferenceInput, AiDraftResult, AiReply, BrandDocument, NewBrandDocument, AiServerStatus, AiSettings } from './assistant'
 import type { Brand, CompetitorSet } from './brand'
-import type { CompetitionGap, CompetitionMatrix } from './competition'
+import type { CompetitionGap, CompetitionMatrix, CompetitorAdsPage } from './competition'
 import type { BrandId, ProviderResult, TenantId } from './common'
 import type { ActionTransition, Insight, InsightDraft, InsightTransition, NewAction, NewRecommendation, ClientResponseKind } from './insight'
 import type { MentionPage, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnapshot, SentimentDistribution } from './mention'
@@ -171,6 +171,8 @@ export interface SocialProvider {
 export interface CompetitionProvider {
   matrix(ctx: QueryContext): Promise<ProviderResult<CompetitionMatrix>>
   gaps(ctx: QueryContext): Promise<ProviderResult<CompetitionGap[]>>
+  /** Reclamele competitorilor afișate în România în perioadă (Google Ads Transparency), paginate pe server. */
+  ads(ctx: QueryContext, page: { page: number; page_size: number }): Promise<ProviderResult<CompetitorAdsPage>>
 }
 
 /** AdSy AI (Etapa 4): controalele și chatul pe dovezi. Modelul e chemat doar de funcția server `adsy-ai`. */

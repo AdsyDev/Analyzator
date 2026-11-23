@@ -191,7 +191,8 @@ export interface AirbyteTable {
 export interface AirbyteAccount extends DiscoveredAccount {
   platform: AirbytePlatform
   account_id: string
-  rows: number
+  /** `null` = contul apare doar în catalogul de nume, fără rapoarte citite (nu zero rânduri). */
+  rows: number | null
   first_date: IsoDate | null
   last_date: IsoDate | null
   last_synced_at: IsoDateTime | null

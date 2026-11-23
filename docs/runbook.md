@@ -233,9 +233,19 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 - Configurare și reguli: `docs/contracts/planable.md`; pași pentru agenție: `docs/connectors/planable.md`.
 - Conexiuni: `planable_account` per client (tokenul, din pagina oricărui site al clientului → cardul Planable → pasul 1, cu test) și `planable` per brand (workspace-ul).
 - Rulare: `.github/workflows/planable-weekly.yml`, marți 04:00 UTC, activ când `CONNECTOR_PLANABLE_ENABLED = true`; manual: Actions → planable-weekly → Run workflow, sau local `npm run collect:planable`.
-- Verificare: `sync_runs` (`source` = `planable_analytics` / `planable_listening`: `status`, `errors`, `coverage`), `provider_api_calls` (apelul `/workspaces` e pe conexiunea clientului, restul pe conexiunea brandului).
+- Verificare: `sync_runs` (`source` = `planable_analytics` / `planable_listening` / `planable_listening_competitors` / `planable_competitors`: `status`, `errors`, `coverage`), `provider_api_calls` (apelul `/workspaces` e pe conexiunea clientului, restul pe conexiunea brandului).
 - Mesaje: `access_denied` la `/workspaces` = token refuzat (marcat `invalid`; token nou din Planable). `workspace_not_found` = ID greșit sau token fără acces la workspace. `parser_note` = câmp invalid sau postare fără metrici; nu schimbă statusul. La Listening, „N mențiuni sărite din <rețea>: <motiv>” (`dimension = mentions_skipped`) spune câte mențiuni nu au putut fi scrise și de ce, iar „câmpurile lor (<rețea>): …” arată ce câmpuri aveau (doar numele); apar în jurnalul rulării, sub rândul brandului.
 - Planable nu e încă în orchestratorul `weekly-refresh` (rulează pe workflow propriu, la aceeași oră).
+- Competitorii (Y): cuvintele de tip „competitor” din Planable Listening → `competitor_mentions` și `competitor_trackers` (`source = planable_listening`); atribuirea pe competitor se face în SQL, după `competitor_set_members.listening_keywords` (lista goală = numele competitorului). Un competitor N/A la „Mențiuni” = niciun cuvânt urmărit nu corespunde.
+- Planable Competitors (Y-13): profilurile urmărite pe paginile brandului → `competitor_social_daily` și `competitor_trackers` (`source = planable_competitors`), rularea `planable_competitors`; atribuirea după `competitor_set_members.social_handles` (lista goală = numele competitorului). `access_denied` = add-on-ul Analytics inactiv.
+
+## Colectare săptămânală Google Ads Transparency (Y)
+
+- Configurare și reguli: `docs/contracts/ads-transparency.md`; pași pentru agenție: `docs/connectors/ads-transparency.md`.
+- Ce colectează: advertiserii din `competitor_set_members.ads_advertiser_ids` (versiunea în vigoare și cele viitoare), o interogare BigQuery per client, plătită de proiectul service account-ului `google_service_account` (rolul BigQuery Job User, API-ul BigQuery activ).
+- Rulare: `.github/workflows/ads-transparency-weekly.yml`, marți 05:00 UTC, activ când `CONNECTOR_ADS_TRANSPARENCY_ENABLED = true`; manual: Actions → ads-transparency-weekly → Run workflow, sau local `npm run collect:ads-transparency`. Opțional: `ADS_TRANSPARENCY_MAX_GB` (plafonul de bytes facturați, implicit 100), `ADS_TRANSPARENCY_BILLING_PROJECT`.
+- Verificare: `sync_runs` (`source = ads_transparency`; nota `bytes_billed` = GB facturați), `competitor_ads`, `competitor_trackers` (`source = google_ads_transparency`).
+- Mesaje: `bytesBilledLimitExceeded` = interogarea ar trece de plafon (nimic facturat); `accessDenied` = rolul sau API-ul lipsesc; `schema_changed` = un câmp obligatoriu lipsește din `creative_stats` (mesajul listează câmpurile găsite); nota `schema` = câmpuri opționale absente, lăsate NULL; `truncated` = peste 50.000 de rânduri, rulare parțială.
 
 ## Colectare săptămânală Meta Ads
 
@@ -262,4 +272,8 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 - Funcția server `airbyte` (`inspect`): fără secrete proprii; folosește `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY` și `ANALYZATOR_APP_ORIGIN`. Se publică odată cu celelalte (`supabase functions deploy`); la primul apel descarcă `postgres.js` din npm.
 - Verificare: `audit_events` (`action = airbyte_inspected`, cu rezultatul), `provider_api_calls` (`purpose = discover`, 30/zi per conexiune), `source_connections.credential_status` și `last_validation_error` (codul rezultatului).
 - Diagnostic: rezultatele și remedierile sunt în tabelul din ghid. `tls_failed` înseamnă aproape mereu certificat fără numele serverului sau TLS oprit; `unreachable` înseamnă firewall sau `listen_addresses`.
-- Etapa 2 (colectorul în `paid_daily`) nu există încă: sursa `airbyte` rămâne „Neconectat” cu motivul afișat.
+- **Colectarea (E-8):** `.github/workflows/airbyte-daily.yml`, zilnic la 05:20 UTC, activ când `CONNECTOR_AIRBYTE_ENABLED = true` (Variables); manual din Actions sau `npm run collect:airbyte`. Secrete: doar `SUPABASE_URL` și `SUPABASE_SERVICE_ROLE_KEY`; connection string-ul e în Vault. Runner-ul GitHub trebuie să ajungă la portul Postgres al serverului Airbyte (TLS cu nume, ca la inspecție).
+- Verificare: `sync_runs` cu `source` = `meta_ads` / `google_ads` / `tiktok_ads` și `source_connection_id` = conexiunea `airbyte`; `paid_daily` cu `schema_version` care începe cu `airbyte-postgres-v1`. Codurile de eroare sunt în contract (tabelul de la „Colectarea”).
+- Un cont legat și la conectorul API al platformei e sărit (`not_connected`), ca să nu se dubleze costul.
+- **Istoric:** Actions → `airbyte-daily` → Run workflow cu `from` (YYYY-MM-DD, cel mult 730 de zile) și opțional `brand`; local `npm run collect:airbyte -- --from … [--brand …]`.
+- `airbyte_stale` în rulare = Airbyte nu mai are date noi pentru cont (mesajul dă ultima zi). Verifică întâi conexiunea în Airbyte (sincronizări eșuate, token Meta/Google/TikTok expirat), nu Analyzator.
