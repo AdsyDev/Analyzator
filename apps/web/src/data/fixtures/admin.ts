@@ -156,7 +156,7 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
         note: v.note,
         created_at: instantDaysAgo(v.effective_from_days_ago + 2),
         current: false,
-        members: v.members.map((m, i) => ({ ...m, label: `C${i + 1}` })),
+        members: v.members.map((m, i) => ({ ...m, label: `C${i + 1}`, listening_keywords: [], social_handles: [], ads_advertiser_ids: [] })),
       })),
     ].sort((a, b) => b.version - a.version)
     // În vigoare = cea mai mare dată de început ≤ azi (ca în providerul real).
@@ -192,7 +192,15 @@ export function createAdminFixtures({ now, getRole, getUserId, allowed }: Option
           note: input.note?.trim() || null,
           created_at: now().toISOString(),
           current: false,
-          members: input.members.map((m, i) => ({ id: `preview-${version}-${i}`, name: m.name.trim(), domain: m.domain?.trim().toLowerCase() || null, label: `C${i + 1}` })),
+          members: input.members.map((m, i) => ({
+            id: `preview-${version}-${i}`,
+            name: m.name.trim(),
+            domain: m.domain?.trim().toLowerCase() || null,
+            label: `C${i + 1}`,
+            listening_keywords: m.listening_keywords.map((k) => k.trim()),
+            social_handles: m.social_handles.map((h) => h.trim().replace(/^@/, '').toLowerCase()),
+            ads_advertiser_ids: m.ads_advertiser_ids.map((x) => x.trim().toUpperCase()),
+          })),
         },
         ...(created[brandId] ?? []),
       ]

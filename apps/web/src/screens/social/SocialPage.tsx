@@ -41,7 +41,7 @@ function SocialContent({ brand, ctx, canImport }: { brand: Brand; ctx: QueryCont
   const posts = useAsync(() => providers.social.posts(ctx, f), [providers, key])
   const groups = useAsync(() => providers.social.groups(ctx, f), [providers, key])
   const calendar = useAsync(() => providers.social.calendar(ctx, f), [providers, key])
-  const competitors = useAsync(() => providers.social.competitors(ctx), [providers, brand.id])
+  const competitors = useAsync(() => providers.social.competitors(ctx), [providers, key])
 
   if (summary.state.status === 'loading') return <div role="status" aria-label="Se încarcă Social" className="h-64 rounded-xl bg-skeleton" />
   if (summary.state.status === 'failed') return <ProviderProblem result={{ kind: 'error', message: summary.state.message }} onRetry={summary.reload} />

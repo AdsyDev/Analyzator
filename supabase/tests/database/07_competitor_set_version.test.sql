@@ -110,7 +110,7 @@ select throws_ok(
   '22023', 'Data de la care se aplică versiunea este obligatorie', 'F3: effective_from null respins');
 reset role;
 
--- F3b. Prima versiune a unui brand poate începe în trecut (migrația 20261123090000) --------
+-- F3b. Prima versiune a unui brand poate începe în trecut (migrația 20261123180000, Z-1) --
 insert into public.brands (id, tenant_id, slug, name, domain) values
   ('20000000-0000-0000-0000-000000000013', '10000000-0000-0000-0000-000000000001', 'brand-1c', 'Brand 1C', 'brand1c.test');
 select tests.authenticate_as('30000000-0000-0000-0000-000000000001');

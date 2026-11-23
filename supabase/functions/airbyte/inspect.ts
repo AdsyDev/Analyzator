@@ -77,7 +77,8 @@ export type AccountSummary = {
   platform: Platform
   account_id: string
   name: string | null
-  rows: number
+  /** `null` = contul apare doar în catalog (sau rapoartele lui n-au fost citite), nu 0 rânduri. */
+  rows: number | null
   first_date: string | null
   last_date: string | null
   last_synced_at: string | null
@@ -90,7 +91,7 @@ export type Inspection = {
   truncated: boolean
 }
 
-type Column = { schema: string; table: string; column: string; data_type: string }
+export type Column = { schema: string; table: string; column: string; data_type: string }
 
 type Signature = {
   platform: Platform
@@ -113,7 +114,7 @@ type Signature = {
 
 export const PLATFORM_LABEL: Record<Platform, string> = { meta_ads: 'Meta Ads', google_ads: 'Google Ads', tiktok_ads: 'TikTok Ads' }
 
-const META_DIMENSIONS = new Set(['age', 'gender', 'country', 'region', 'dma', 'publisher_platform', 'platform_position', 'device_platform', 'impression_device', 'action_type', 'product_id', 'hourly_stats_aggregated_by_advertiser_time_zone'])
+export const META_DIMENSIONS = new Set(['age', 'gender', 'country', 'region', 'dma', 'publisher_platform', 'platform_position', 'device_platform', 'impression_device', 'action_type', 'product_id', 'hourly_stats_aggregated_by_advertiser_time_zone'])
 
 export const SIGNATURES: Signature[] = [
   {
@@ -136,26 +137,48 @@ export const SIGNATURES: Signature[] = [
 ]
 
 /** Coloanele tehnice Airbyte (V2 și mai vechi), care nu sunt nici metrici, nici defalcări. */
-const AIRBYTE_COLUMNS = new Set(['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id', '_airbyte_ab_id', '_airbyte_emitted_at', '_airbyte_normalized_at'])
-const SYNCED_AT = ['_airbyte_extracted_at', '_airbyte_emitted_at']
+export const AIRBYTE_COLUMNS = new Set(['_airbyte_raw_id', '_airbyte_extracted_at', '_airbyte_meta', '_airbyte_generation_id', '_airbyte_ab_id', '_airbyte_emitted_at', '_airbyte_normalized_at'])
+export const SYNCED_AT = ['_airbyte_extracted_at', '_airbyte_emitted_at']
 const NUMERIC = new Set(['numeric', 'bigint', 'integer', 'smallint', 'double precision', 'real', 'decimal'])
-const SKIPPED_SCHEMAS = ['pg_catalog', 'information_schema', 'pg_toast', 'airbyte_internal']
+export const SKIPPED_SCHEMAS = ['pg_catalog', 'information_schema', 'pg_toast', 'airbyte_internal']
 
-/** Plafoane: o inspecție nu citește mai mult de atâtea tabele și conturi; peste ele, `truncated`. */
+/**
+ * Plafoane: o inspecție nu citește mai mult de atâtea rapoarte și conturi; peste ele, `truncated`. Cataloagele
+ * (numele conturilor, tabele mici) se citesc toate, înaintea rapoartelor: din ele vine lista completă de conturi.
+ */
 export const MAX_TABLES = 40
 export const MAX_ACCOUNTS_PER_TABLE = 200
 const KEYS_SAMPLE_ROWS = 500
 
 /** Numele de coloană normalizat (Airbyte poate păstra `customer.id`), legat de numele real pentru citare. */
-const norm = (c: string) => c.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+export const norm = (c: string) => c.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+
+/**
+ * Numele tabelului pentru potrivire: normalizat și fără sufixul hash pe care Airbyte îl pune când două fluxuri ar avea
+ * același nume (`publicadvertisersf8016549…` → `publicadvertisers`).
+ */
+export const tableName = (t: string) => norm(t).replace(/_?[0-9a-f]{32}$/, '')
+
+/** Fluxurile principale ale fiecărei platforme: cele pe care le colectează și colectorul (connectors/airbyte). */
+export const PRIMARY_STREAMS: Record<Platform, string[]> = {
+  meta_ads: ['ads_insights'],
+  google_ads: ['campaign', 'account_performance_report'],
+  tiktok_ads: ['campaigns_reports_daily', 'ads_reports_daily', 'advertisers_reports_daily'],
+}
+
+/** Tabelul e fluxul dat (cu prefixul conexiunii sau sufixul hash acceptate). */
+export const isStream = (table: string, stream: string) => {
+  const n = tableName(table)
+  return n === stream || n.endsWith(`_${stream}`)
+}
 
 export function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`
 }
 
-type TableInfo = { schema: string; table: string; columns: Map<string, { name: string; type: string }> }
+export type TableInfo = { schema: string; table: string; columns: Map<string, { name: string; type: string }> }
 
-function groupTables(rows: Column[]): TableInfo[] {
+export function groupTables(rows: Column[]): TableInfo[] {
   const byKey = new Map<string, TableInfo>()
   for (const r of rows) {
     const key = `${r.schema}\u0000${r.table}`
@@ -166,7 +189,7 @@ function groupTables(rows: Column[]): TableInfo[] {
   return [...byKey.values()]
 }
 
-type Match = { sig: Signature; info: TableInfo; role: 'report' | 'catalog' }
+export type Match = { sig: Signature; info: TableInfo; role: 'report' | 'catalog' }
 
 export function classify(tables: TableInfo[]): Match[] {
   const out: Match[] = []
@@ -179,7 +202,7 @@ export function classify(tables: TableInfo[]): Match[] {
         break
       }
       // Catalogul poate avea și dată (fluxul `customer` din Google Ads are segments.date), dar nu are metrici.
-      if (norm(info.table).endsWith(sig.catalog.suffix) && sig.catalog.names.some(has)) {
+      if (tableName(info.table).endsWith(sig.catalog.suffix) && sig.catalog.names.some(has)) {
         out.push({ sig, info, role: 'catalog' })
         break
       }
@@ -290,20 +313,31 @@ function tableError(err: unknown): TableSummary['error'] {
   return 'failed'
 }
 
-/**
- * Inspecția completă. Erorile pe un tabel (timeout, drept lipsă) rămân pe tabel și nu opresc restul.
- * `deadline` (ms epoch): după el, tabelele rămase apar ca `skipped`, iar rezultatul e `truncated`.
- */
-export async function inspect(session: PgSession, deadline: number, now: () => number = Date.now): Promise<Inspection> {
-  const columns = await session.query<Column>(
+/** Coloanele tabelelor la care utilizatorul are drept (information_schema arată doar ce poate citi). */
+export function readColumns(session: PgSession): Promise<Column[]> {
+  return session.query<Column>(
     `select table_schema::text as "schema", table_name::text as "table", column_name::text as "column", data_type::text as data_type ` +
       `from information_schema.columns ` +
       `where table_schema not in (${SKIPPED_SCHEMAS.map((s) => `'${s}'`).join(', ')}) and table_schema not like 'pg\\_%' ` +
       `order by table_schema, table_name, ordinal_position`,
   )
-  const matches = classify(groupTables(columns))
-  let truncated = matches.length > MAX_TABLES
-  const selected = matches.slice(0, MAX_TABLES)
+}
+
+/**
+ * Inspecția completă. Erorile pe un tabel (timeout, drept lipsă) rămân pe tabel și nu opresc restul.
+ * `deadline` (ms epoch): după el, tabelele rămase apar ca `skipped`, iar rezultatul e `truncated`.
+ */
+export async function inspect(session: PgSession, deadline: number, now: () => number = Date.now): Promise<Inspection> {
+  const matches = classify(groupTables(await readColumns(session)))
+  const catalogs = matches.filter((m) => m.role === 'catalog')
+  // Rapoartele mici întâi (estimarea din pg_class): conturile apar din tabelele pe cont sau campanie, iar tabelele
+  // mari pe reclamă și defalcare rămân la coadă, unde le poate opri termenul. Fără estimare, ordinea din catalog.
+  // Fluxurile principale întâi (din ele se colectează, deci conturile lor trebuie să apară), apoi restul după mărime.
+  const all = matches.filter((m) => m.role === 'report')
+  const primary = all.filter((m) => PRIMARY_STREAMS[m.sig.platform].some((st) => isStream(m.info.table, st)))
+  const reports = [...primary, ...(await bySize(session, all.filter((m) => !primary.includes(m))))]
+  let truncated = reports.length > MAX_TABLES
+  const selected = [...catalogs, ...reports.slice(0, MAX_TABLES)]
 
   const tables = new Map<Platform, TableSummary[]>()
   const push = (p: Platform, t: TableSummary) => tables.set(p, [...(tables.get(p) ?? []), t])
@@ -311,7 +345,7 @@ export async function inspect(session: PgSession, deadline: number, now: () => n
   const names = new Map<string, string>()
 
   // Cataloagele întâi (mici), apoi rapoartele.
-  for (const m of [...selected.filter((x) => x.role === 'catalog'), ...selected.filter((x) => x.role === 'report')]) {
+  for (const m of selected) {
     if (now() > deadline) {
       push(m.sig.platform, emptySummary(m, 'skipped'))
       truncated = true
@@ -337,7 +371,7 @@ export async function inspect(session: PgSession, deadline: number, now: () => n
         }
         // Același cont în mai multe tabele (defalcări): perioada cea mai largă, rândurile din tabelul cel mai mare.
         prev.name ??= a.name
-        prev.rows = Math.max(prev.rows, rows)
+        prev.rows = Math.max(prev.rows ?? 0, rows)
         prev.first_date = minDate(prev.first_date, a.first_date)
         prev.last_date = maxDate(prev.last_date, a.last_date)
         prev.last_synced_at = maxDate(prev.last_synced_at, a.last_synced_at)
@@ -352,12 +386,40 @@ export async function inspect(session: PgSession, deadline: number, now: () => n
     const n = names.get(key)
     if (n) a.name = n
   }
+  // Conturile care apar doar în catalog (fără rapoarte citite): se pot lega de site, dar fără date văzute.
+  for (const [key, n] of names) {
+    if (accounts.has(key)) continue
+    const sep = key.indexOf(':')
+    accounts.set(key, { platform: key.slice(0, sep) as Platform, account_id: key.slice(sep + 1), name: n, rows: null, first_date: null, last_date: null, last_synced_at: null, tables: 0 })
+  }
 
   return {
     platforms: SIGNATURES.filter((s) => tables.has(s.platform)).map((s) => ({ platform: s.platform, label: s.label, tables: tables.get(s.platform)! })),
     accounts: [...accounts.values()].sort((a, b) => a.platform.localeCompare(b.platform) || (a.name ?? a.account_id).localeCompare(b.name ?? b.account_id, 'ro')),
     truncated,
   }
+}
+
+/** Rapoartele ordonate după numărul estimat de rânduri (`pg_class.reltuples`); necunoscutele la coadă, în ordinea inițială. */
+async function bySize(session: PgSession, reports: Match[]): Promise<Match[]> {
+  if (reports.length <= 1) return reports
+  let rows: Array<{ schema: string; table: string; est: string | number | null }> = []
+  try {
+    rows = await session.query(
+      `select n.nspname::text as "schema", c.relname::text as "table", c.reltuples::bigint as est ` +
+        `from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace ` +
+        `where c.relkind in ('r', 'p', 'm') and n.nspname not in (${SKIPPED_SCHEMAS.map((s) => `'${s}'`).join(', ')})`,
+    )
+  } catch (err) {
+    if (err instanceof PgError && (err.kind === 'unreachable' || err.kind === 'auth')) throw err
+    return reports
+  }
+  const est = new Map(rows.map((r) => [`${r.schema}\u0000${r.table}`, r.est === null ? -1 : Number(r.est)]))
+  const size = (m: Match) => {
+    const v = est.get(`${m.info.schema}\u0000${m.info.table}`)
+    return v === undefined || !Number.isFinite(v) || v < 0 ? Number.POSITIVE_INFINITY : v
+  }
+  return reports.map((m, i) => ({ m, i })).sort((a, b) => size(a.m) - size(b.m) || a.i - b.i).map((x) => x.m)
 }
 
 const minDate = (a: string | null, b: string | null) => (a === null ? b : b === null ? a : a < b ? a : b)

@@ -66,8 +66,23 @@ describe('Administrare → Configurare (fixtures de previzualizare)', () => {
     expect(within(dialog).getByLabelText('Domeniul competitorului 1')).toHaveValue('digestil.example')
     expect(within(dialog).getByLabelText('Numele competitorului 2')).toHaveValue('Enzimax')
     expect(within(dialog).getByLabelText('Domeniul competitorului 2')).toHaveValue('')
-    // Același profil pe altă rețea nu se adaugă de două ori.
+    // Profilul Instagram vine cu competitorul; profilul de Facebook al aceluiași competitor se leagă de C1.
     expect(within(dialog).queryByRole('button', { name: 'Adaugă Digestil' })).toBeNull()
+    await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Leagă Digestil România de un competitor ales' }), 'C1 · Digestil')
+    const c1 = within(dialog).getByRole('list', { name: 'Profilurile Planable ale competitorului 1' })
+    expect(c1).toHaveTextContent('@digestil.ro')
+    expect(c1).toHaveTextContent('@digestil')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Scoate profilul @digestil de la competitorul 1' }))
+    expect(within(c1).queryByText('@digestil')).toBeNull()
+    await userEvent.selectOptions(within(dialog).getByRole('combobox', { name: 'Leagă Digestil România de un competitor ales' }), 'C1 · Digestil')
+    // Identificatorii pentru Listening și Ads Transparency (Y-3); un ID greșit oprește trimiterea.
+    await userEvent.type(within(dialog).getByLabelText('Cuvintele Listening ale competitorului 1'), 'Digestil, Digestil Forte')
+    const ads = within(dialog).getByLabelText('ID-urile de advertiser Google ale competitorului 1')
+    await userEvent.type(ads, 'XX1')
+    expect(dialog).toHaveTextContent('nu e un ID de advertiser Google')
+    expect(within(dialog).getByRole('button', { name: 'Creează versiunea' })).toBeDisabled()
+    await userEvent.clear(ads)
+    await userEvent.type(ads, 'ar12345678')
 
     await userEvent.click(within(dialog).getByRole('button', { name: 'Creează versiunea' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -77,6 +92,9 @@ describe('Administrare → Configurare (fixtures de previzualizare)', () => {
     expect(within(rows[0]!).getByText('v1')).toBeInTheDocument()
     expect(within(rows[0]!).getByText('În vigoare')).toBeInTheDocument()
     expect(rows[0]).toHaveTextContent('Digestil · digestil.example')
+    expect(rows[0]).toHaveTextContent('Planable Listening: Digestil, Digestil Forte')
+    expect(rows[0]).toHaveTextContent('Planable Competitors: @digestil.ro, @digestil')
+    expect(rows[0]).toHaveTextContent('Ads Transparency: AR12345678')
     expect(rows[0]).toHaveTextContent('Enzimax')
   })
 

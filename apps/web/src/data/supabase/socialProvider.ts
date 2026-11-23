@@ -1,4 +1,4 @@
-import { failed, notConnected, ready, SOCIAL_PLATFORMS, type ProviderResult, type QueryContext, type SocialFilters, type SocialKpi, type SocialKpiKey, type SocialPlatform, type SocialPost, type SocialProvider } from '../../contracts'
+import { failed, notConnected, ready, SOCIAL_PLATFORMS, type ProviderResult, type QueryContext, type SocialCompetitor, type SocialFilters, type SocialKpi, type SocialKpiKey, type SocialPlatform, type SocialPost, type SocialProvider } from '../../contracts'
 import { METRIC_STATUSES } from '../../contracts'
 import { serverPeriodKind } from '../../lib/period'
 import type { DataClient } from './dataClient'
@@ -6,7 +6,9 @@ import type { DataClient } from './dataClient'
 const NO_SOURCE = 'Nu există date sociale pentru acest brand: Planable nu a rulat încă și nu există niciun import.'
 const CONTRACT = 'Răspunsul serverului nu respectă contractul așteptat. Reîncearcă sau anunță echipa tehnică.'
 const NO_FORMAT_TOPIC = 'Planable nu trimite formatul și subiectul postărilor, deci gruparea pe format și pe subiect nu se poate calcula.'
-const NO_COMPETITORS = 'Conturile sociale ale competitorilor nu se colectează încă; comparația apare după ce sunt adăugate.'
+const NO_COMPETITORS = 'Profilurile competitorilor nu au fost încă colectate din Planable Competitors. Apar după ce paginile brandului urmăresc competitori în Planable și rulează colectarea.'
+const NO_SET = 'Brandul nu are încă un set de competitori în vigoare; concurența publică apare după configurarea lui.'
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Textele cardurilor (descrieri, nu formule: valorile vin din SQL). */
 const KPI_TEXT: Record<SocialKpiKey, { label: string; definition: string; note: string | null }> = {
@@ -108,6 +110,21 @@ export function createSupabaseSocial(client: DataClient): SocialProvider {
       )
     },
     groups: async () => notConnected(NO_FORMAT_TOPIC),
-    competitors: async () => notConnected(NO_COMPETITORS),
+    // Planable Competitors (deciziile Y): aceleași valori ca rândurile „Social public” din matricea de Concurență.
+    async competitors(ctx) {
+      const { data, error } = await client.rpc('brand_social_competitors', { p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to })
+      if (error) return failed(error.code === '42501' ? 'Nu ai acces la acest spațiu de brand.' : CONTRACT)
+      const d = data as { has_set?: boolean; connected?: boolean; items?: Array<Record<string, unknown>> } | null
+      if (!d || typeof d.has_set !== 'boolean') return failed(CONTRACT)
+      if (!d.has_set) return notConnected(NO_SET)
+      if (d.connected === false) return notConnected(NO_COMPETITORS)
+      if (!Array.isArray(d.items)) return failed(CONTRACT)
+      const out: SocialCompetitor[] = []
+      for (const i of d.items) {
+        if (typeof i.label !== 'string' || typeof i.name !== 'string' || !(i.as_of === null || (typeof i.as_of === 'string' && ISO_DATE.test(i.as_of)))) return failed(CONTRACT)
+        out.push({ label: i.label, name: i.name, posts_per_week: num(i.posts_per_week), followers: num(i.followers), public_interactions_per_post: num(i.public_interactions_per_post), as_of: (i.as_of as string | null) ?? null })
+      }
+      return ready(out)
+    },
   }
 }

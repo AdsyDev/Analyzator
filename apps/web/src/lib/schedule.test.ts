@@ -14,6 +14,7 @@ const WORKFLOW = {
   meta_ads: 'meta-weekly.yml',
   tiktok_ads: 'tiktok-weekly.yml',
   clarity: 'clarity-daily.yml',
+  airbyte: 'airbyte-daily.yml',
 } as const
 
 const cron = (s: Schedule) => (s.kind === 'weekly' ? `${s.minute} ${s.hour} * * ${s.weekday}` : `${s.minute} ${s.hour} * * *`)

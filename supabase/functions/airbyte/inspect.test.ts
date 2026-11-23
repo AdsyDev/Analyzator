@@ -121,6 +121,57 @@ describe('detectarea tabelelor', () => {
   })
 })
 
+describe('lista de conturi pentru mapare', () => {
+  test('conturile doar din catalog apar, cu rânduri null (nu 0)', async () => {
+    const f = fakeSession([...META, ...META_CATALOG], {
+      'from "meta"."ad_account"': [{ account_id: '111', name: 'Aflamin RO' }, { account_id: '333', name: 'Proenzi RO' }],
+      'from "meta"."ads_insights"': [account('111', null, 50, '2026-09-01', '2026-10-25')],
+    })
+    const r = await inspect(f.session, Date.now() + 60_000)
+    assert.deepEqual(r.accounts.map((a) => [a.account_id, a.name, a.rows, a.tables]), [['111', 'Aflamin RO', 50, 1], ['333', 'Proenzi RO', null, 0]])
+  })
+
+  test('rapoartele mici se citesc întâi; cataloagele nu intră în plafon', async () => {
+    const reports = Array.from({ length: 41 }, (_, i) => table('meta', `r${i}`, [['account_id', 'text'], ['date_start', 'date'], ['spend', 'numeric']])).flat()
+    const f = fakeSession([...reports, ...META_CATALOG], {
+      'pg_catalog.pg_class': Array.from({ length: 41 }, (_, i) => ({ schema: 'meta', table: `r${i}`, est: i === 0 ? 1_000_000 : i })),
+    })
+    const r = await inspect(f.session, Date.now() + 60_000)
+    const read = f.sql.filter((q) => q.includes('group by 1')).map((q) => /from "meta"\."([^"]+)"/.exec(q)![1])
+    assert.equal(read[0], 'ad_account', 'catalogul întâi')
+    assert.equal(read[1], 'r1')
+    assert.equal(read.includes('r0'), false, 'cel mai mare raport rămâne peste plafon')
+    assert.equal(read.length, 41)
+    assert.equal(r.truncated, true)
+  })
+})
+
+describe('fluxurile principale și numele cu hash', () => {
+  test('ads_insights (mare) se citește înaintea defalcărilor mici, chiar peste plafon', async () => {
+    const small = Array.from({ length: 41 }, (_, i) => table('public', `ads_insights_b${i}`, [['account_id', 'text'], ['date_start', 'date'], ['spend', 'numeric'], ['age', 'text']])).flat()
+    const main = table('public', 'ads_insights', [['account_id', 'text'], ['date_start', 'date'], ['spend', 'numeric']])
+    const f = fakeSession([...small, ...main], {
+      'pg_catalog.pg_class': [{ schema: 'public', table: 'ads_insights', est: 5_000_000 }, ...Array.from({ length: 41 }, (_, i) => ({ schema: 'public', table: `ads_insights_b${i}`, est: 10 }))],
+      'from "public"."ads_insights" group': [account('1785081552387770', 'Proenzi', 464, '2026-04-01', '2026-09-18')],
+    })
+    const r = await inspect(f.session, Date.now() + 60_000)
+    const read = f.sql.filter((q) => q.includes('group by 1')).map((q) => /from "public"\."([^"]+)"/.exec(q)![1])
+    assert.equal(read[0], 'ads_insights')
+    assert.deepEqual(r.accounts.map((a) => a.account_id), ['1785081552387770'])
+  })
+
+  test('cataloagele cu sufix hash (Airbyte, nume suprapuse) sunt recunoscute', async () => {
+    const tt = table('public', 'advertisers_reports_daily', [['advertiser_id', 'bigint'], ['stat_time_day', 'timestamp without time zone'], ['metrics', 'jsonb']])
+    const cat = table('public', 'publicadvertisersf8016549b50792b4de6a2aca54e29704', [['advertiser_id', 'bigint'], ['name', 'character varying']])
+    const f = fakeSession([...tt, ...cat], {
+      'from "public"."publicadvertisersf8016549b50792b4de6a2aca54e29704"': [{ account_id: '7117232550942097410', name: 'Proenzi TikTok' }],
+      'from "public"."advertisers_reports_daily"': [account('7117232550942097410', null, 30, '2026-10-01', '2026-11-20')],
+    })
+    const r = await inspect(f.session, Date.now() + 60_000)
+    assert.deepEqual(r.accounts.map((a) => [a.account_id, a.name]), [['7117232550942097410', 'Proenzi TikTok']])
+  })
+})
+
 describe('erori și limite', () => {
   test('un tabel cu timeout rămâne marcat, celelalte se citesc', async () => {
     const f = fakeSession([...META, ...TIKTOK], {

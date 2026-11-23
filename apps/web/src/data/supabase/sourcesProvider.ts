@@ -43,7 +43,7 @@ export function parseInspection(data: unknown): AirbyteInspection {
   }
   const accountOk = (a: unknown) => {
     const v = a as Record<string, unknown> | null
-    return isAccount(a) && PLATFORMS.includes(v!.platform as string) && typeof v!.account_id === 'string' && typeof v!.rows === 'number' && isDate(v!.first_date) && isDate(v!.last_date) &&
+    return isAccount(a) && PLATFORMS.includes(v!.platform as string) && typeof v!.account_id === 'string' && isCount(v!.rows) && isDate(v!.first_date) && isDate(v!.last_date) &&
       isInstant(v!.last_synced_at) && typeof v!.tables === 'number'
   }
   if (

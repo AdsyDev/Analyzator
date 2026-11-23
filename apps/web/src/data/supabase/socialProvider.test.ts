@@ -36,12 +36,29 @@ describe('createSupabaseSocial', () => {
     expect((await createSupabaseSocial(client).summary(ctx, { platform: null, format: null })).kind).toBe('not_connected')
   })
 
-  it('formatul, subiectul și concurența nu se inventează', async () => {
+  it('formatul și subiectul nu se inventează', async () => {
     const { client, rpcs } = fakeDataClient()
     const p = createSupabaseSocial(client)
     expect((await p.groups(ctx, { platform: null, format: null })).kind).toBe('not_connected')
-    expect((await p.competitors(ctx)).kind).toBe('not_connected')
     expect(rpcs).toHaveLength(0)
+  })
+
+  it('concurența publică vine din Planable Competitors (SQL); fără colectare, „Sursă neconectată”, nu zero', async () => {
+    const items = [
+      { label: 'C1', name: 'Prostamol', posts_per_week: 1.05, followers: 1010, public_interactions_per_post: 30, as_of: '2026-10-06', status: 'ok', reason: null },
+      { label: 'C2', name: 'Uronova', posts_per_week: null, followers: null, public_interactions_per_post: null, as_of: null, status: 'unavailable', reason: 'Niciun profil' },
+    ]
+    const ok = fakeDataClient({ rpc: () => ({ data: { has_set: true, connected: true, items } }) })
+    const r = await createSupabaseSocial(ok.client).competitors(ctx)
+    expect(ok.rpcs.at(-1)).toMatchObject({ fn: 'brand_social_competitors', args: { p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to } })
+    expect(r).toEqual({ kind: 'ready', data: [
+      { label: 'C1', name: 'Prostamol', posts_per_week: 1.05, followers: 1010, public_interactions_per_post: 30, as_of: '2026-10-06' },
+      { label: 'C2', name: 'Uronova', posts_per_week: null, followers: null, public_interactions_per_post: null, as_of: null },
+    ] })
+    const off = fakeDataClient({ rpc: () => ({ data: { has_set: true, connected: false } }) })
+    expect((await createSupabaseSocial(off.client).competitors(ctx)).kind).toBe('not_connected')
+    const noSet = fakeDataClient({ rpc: () => ({ data: { has_set: false } }) })
+    expect((await createSupabaseSocial(noSet.client).competitors(ctx)).kind).toBe('not_connected')
   })
 
   it('o platformă necunoscută în postări încalcă contractul', async () => {
