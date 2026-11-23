@@ -77,6 +77,10 @@ export interface CompetitorMember {
   domain: string | null
   /** C1, C2, C3 în ordinea setului. */
   label: string
+  /** Cuvintele de tip „competitor” din Planable Listening atribuite competitorului; lista goală = se caută numele lui. */
+  listening_keywords: string[]
+  /** ID-urile de advertiser din Google Ads Transparency Center; lista goală = reclamele lui nu se colectează. */
+  ads_advertiser_ids: string[]
 }
 
 /** O versiune imutabilă a setului de competitori. Versiunea efectivă la data D = cea mai mare `effective_from <= D`. */

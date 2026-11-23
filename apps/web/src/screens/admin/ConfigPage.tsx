@@ -33,6 +33,10 @@ const versionColumns: Column<CompetitorSetVersion>[] = [
           <li key={m.id}>
             <span className="font-mono text-[11px] text-text-3">{m.label}</span> {m.name}
             {m.domain && <span className="text-text-2"> · {m.domain}</span>}
+            <span className="block pl-6 text-[12px] text-text-2">
+              Planable Listening: {m.listening_keywords.length ? m.listening_keywords.join(', ') : <span className="text-text-3">numele competitorului</span>}
+              {' · '}Ads Transparency: {m.ads_advertiser_ids.length ? <span className="font-mono text-[11.5px]">{m.ads_advertiser_ids.join(', ')}</span> : <span className="text-text-3">fără advertiser</span>}
+            </span>
           </li>
         ))}
         {v.members.length === 0 && <li className="text-text-3">Fără competitori</li>}
@@ -62,7 +66,7 @@ function BrandConfig({ brand }: { brand: Brand }) {
       <Section
         id="competitors"
         title="Competitori"
-        description={`Setul pentru ${brand.name}. Versiunile sunt imutabile: o schimbare creează o versiune nouă, cu dată efectivă, iar istoricul rămâne. Modificarea se face la cererea echipei, nu din aplicație.`}
+        description={`Setul pentru ${brand.name}. Versiunile sunt imutabile: o schimbare creează o versiune nouă, cu dată efectivă, iar istoricul rămâne. Modificarea se face la cererea echipei, nu din aplicație. Pe fiecare competitor: cuvintele Planable Listening de tip „competitor” atribuite lui și ID-urile de advertiser din Google Ads Transparency.`}
       >
         <Resolved state={versions.state} onRetry={versions.reload} loadingLabel="Se încarcă competitorii" skeletonClass="h-40">
           {(list) =>

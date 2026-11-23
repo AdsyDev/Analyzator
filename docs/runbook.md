@@ -233,9 +233,18 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 - Configurare și reguli: `docs/contracts/planable.md`; pași pentru agenție: `docs/connectors/planable.md`.
 - Conexiuni: `planable_account` per client (tokenul, din pagina oricărui site al clientului → cardul Planable → pasul 1, cu test) și `planable` per brand (workspace-ul).
 - Rulare: `.github/workflows/planable-weekly.yml`, marți 04:00 UTC, activ când `CONNECTOR_PLANABLE_ENABLED = true`; manual: Actions → planable-weekly → Run workflow, sau local `npm run collect:planable`.
-- Verificare: `sync_runs` (`source` = `planable_analytics` / `planable_listening`: `status`, `errors`, `coverage`), `provider_api_calls` (apelul `/workspaces` e pe conexiunea clientului, restul pe conexiunea brandului).
+- Verificare: `sync_runs` (`source` = `planable_analytics` / `planable_listening` / `planable_competitors`: `status`, `errors`, `coverage`), `provider_api_calls` (apelul `/workspaces` e pe conexiunea clientului, restul pe conexiunea brandului).
 - Mesaje: `access_denied` la `/workspaces` = token refuzat (marcat `invalid`; token nou din Planable). `workspace_not_found` = ID greșit sau token fără acces la workspace. `parser_note` = câmp invalid sau postare fără metrici; nu schimbă statusul. La Listening, „N mențiuni sărite din <rețea>: <motiv>” (`dimension = mentions_skipped`) spune câte mențiuni nu au putut fi scrise și de ce, iar „câmpurile lor (<rețea>): …” arată ce câmpuri aveau (doar numele); apar în jurnalul rulării, sub rândul brandului.
 - Planable nu e încă în orchestratorul `weekly-refresh` (rulează pe workflow propriu, la aceeași oră).
+- Competitorii (Y): cuvintele de tip „competitor” din Planable Listening → `competitor_mentions` și `competitor_trackers` (`source = planable_listening`); atribuirea pe competitor se face în SQL, după `competitor_set_members.listening_keywords` (lista goală = numele competitorului). Un competitor N/A la „Mențiuni” = niciun cuvânt urmărit nu corespunde.
+
+## Colectare săptămânală Google Ads Transparency (Y)
+
+- Configurare și reguli: `docs/contracts/ads-transparency.md`; pași pentru agenție: `docs/connectors/ads-transparency.md`.
+- Ce colectează: advertiserii din `competitor_set_members.ads_advertiser_ids` (versiunea în vigoare și cele viitoare), o interogare BigQuery per client, plătită de proiectul service account-ului `google_service_account` (rolul BigQuery Job User, API-ul BigQuery activ).
+- Rulare: `.github/workflows/ads-transparency-weekly.yml`, marți 05:00 UTC, activ când `CONNECTOR_ADS_TRANSPARENCY_ENABLED = true`; manual: Actions → ads-transparency-weekly → Run workflow, sau local `npm run collect:ads-transparency`. Opțional: `ADS_TRANSPARENCY_MAX_GB` (plafonul de bytes facturați, implicit 100), `ADS_TRANSPARENCY_BILLING_PROJECT`.
+- Verificare: `sync_runs` (`source = ads_transparency`; nota `bytes_billed` = GB facturați), `competitor_ads`, `competitor_trackers` (`source = google_ads_transparency`).
+- Mesaje: `bytesBilledLimitExceeded` = interogarea ar trece de plafon (nimic facturat); `accessDenied` = rolul sau API-ul lipsesc; `invalidQuery` „Unrecognized name” = o coloană presupusă nu există (numele sunt neconfirmate până la prima rulare reală); `truncated` = peste 50.000 de rânduri, rulare parțială.
 
 ## Colectare săptămânală Meta Ads
 

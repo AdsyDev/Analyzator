@@ -22,7 +22,9 @@ import {
   PLANABLE_PAGE_SIZE,
   PLANABLE_PROVIDER,
   SOURCE_ANALYTICS,
+  SOURCE_COMPETITORS,
   SOURCE_LISTENING,
+  TRACKER_SOURCE_LISTENING,
 } from './config.ts'
 import {
   KeywordsSchema,
@@ -36,6 +38,8 @@ import {
   mentionFieldShape,
   builtMentionIdentity,
   builtMentionNativeId,
+  competitorMentionRow,
+  coveredFrom,
   hasNoLink,
   mentionRow,
   mentionSkipReasons,
@@ -49,7 +53,7 @@ import {
   type Post,
 } from './normalize.ts'
 
-export type PlanableSource = typeof SOURCE_ANALYTICS | typeof SOURCE_LISTENING
+export type PlanableSource = typeof SOURCE_ANALYTICS | typeof SOURCE_LISTENING | typeof SOURCE_COMPETITORS
 
 export type PlanableDeps = { db: Db; fetch?: FetchLike; sleep?: Sleep; now?: () => Date }
 
@@ -69,6 +73,8 @@ export const KEYS = {
   social_daily: ['tenant_id', 'brand_id', 'platform', 'account_id', 'date'],
   social_posts: ['tenant_id', 'brand_id', 'platform', 'account_id', 'post_id', 'snapshot_date', 'metrics_scope'],
   mentions: ['tenant_id', 'brand_id', 'native_id'],
+  competitor_mentions: ['tenant_id', 'brand_id', 'keyword_id', 'native_id'],
+  competitor_trackers: ['tenant_id', 'brand_id', 'source', 'external_id'],
 } as const
 
 type BrandConnection = { id: string; tenant_id: string; brand_id: string | null; provider: string; external_account_id: string; status: string }
@@ -83,6 +89,9 @@ function statusOf(errors: SyncRunError[], rows: number, fatal: boolean): SyncRun
   if (real.length > 0) return rows > 0 ? 'partial' : 'failed'
   return 'succeeded'
 }
+
+/** Tipurile de cuvinte Listening care nu sunt ale brandului; restul (inclusiv un tip necunoscut) rămân la brand, ca înainte. */
+const NON_BRAND_KEYWORD_TYPES = ['competitor', 'topic']
 
 /** Dimensiunea notelor despre mențiuni sărite; `collect.ts` le scrie în jurnalul rulării. */
 export const MENTIONS_SKIPPED = 'mentions_skipped'
@@ -155,7 +164,7 @@ export async function collectPlanable(deps: PlanableDeps): Promise<PlanableOutco
   const byTenant = new Map<string, Array<BrandConnection & { brand_id: string }>>()
   const outcomes: PlanableOutcome[] = []
   const notConnected = (c: BrandConnection, reason: string) => {
-    for (const source of [SOURCE_ANALYTICS, SOURCE_LISTENING] as const) {
+    for (const source of [SOURCE_ANALYTICS, SOURCE_LISTENING, SOURCE_COMPETITORS] as const) {
       outcomes.push({ tenant_id: c.tenant_id, brand_id: c.brand_id, connection_id: c.id, source, status: 'not_connected', sync_run_id: null, rows_written: 0, errors: [], reason })
     }
   }
@@ -209,6 +218,7 @@ async function collectTenant(deps: PlanableDeps, credentialId: string, list: Arr
       const tz = timezone && isValidTimeZone(timezone) ? timezone : 'Europe/Bucharest'
       out.push(await runAnalytics(deps, client, conn, tz, workspaceError, now))
       out.push(await runListening(deps, client, conn, tz, workspaceError, now))
+      out.push(await runCompetitorListening(deps, client, conn, tz, workspaceError, now))
     } finally {
       const calls = client.budget.used - before
       await recordProviderCalls(db, { tenant_id: conn.tenant_id, brand_id: conn.brand_id, source_connection_id: conn.id, call_date_utc: utcDay(now()), purpose: 'collect', calls })
@@ -338,7 +348,11 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
   const scope = scopeOf(conn)
   // Cuvintele urmărite se citesc înaintea rulării: un workspace fără Listening configurat nu e o rulare eșuată.
   const kw = workspaceError ? null : await client.get('/keywords', { workspaceId: conn.external_account_id, type: 'brand' })
-  const keywords = kw?.ok ? KeywordsSchema.safeParse(kw.payload) : null
+  const parsedKeywords = kw?.ok ? KeywordsSchema.safeParse(kw.payload) : null
+  // Dacă API-ul ignoră parametrul `type`, cuvintele de tip „competitor” și „topic” nu devin mențiuni ale brandului (deciziile Y).
+  const keywords = parsedKeywords?.success
+    ? { success: true as const, data: { ...parsedKeywords.data, data: parsedKeywords.data.data.filter((k) => !NON_BRAND_KEYWORD_TYPES.includes(k.type.toLowerCase())) } }
+    : parsedKeywords
   if (keywords?.success && keywords.data.data.length === 0) {
     return { tenant_id: conn.tenant_id, brand_id: conn.brand_id, connection_id: conn.id, source: SOURCE_LISTENING, status: 'not_connected', sync_run_id: null, rows_written: 0, errors: [], reason: 'niciun cuvânt de tip „brand” urmărit în Planable Listening' }
   }
@@ -443,5 +457,123 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
   } catch (err) {
     errors.push({ code: 'exception', status: null, message: (err as Error).message })
     return await finish(deps, handle, conn, SOURCE_LISTENING, errors, rows, true, now)
+  }
+}
+
+/**
+ * Mențiunile cuvintelor de tip „competitor” (deciziile Y) → `competitor_mentions`, pe cuvânt, și `competitor_trackers` (ce cuvinte
+ * s-au citit și ce zile acoperă). Atribuirea la competitori se face în SQL, după setul în vigoare: aici nu se ghicește nimic.
+ * Un workspace fără cuvinte de tip „competitor” nu e o rulare eșuată: `not_connected`, fără sync_run.
+ */
+async function runCompetitorListening(deps: PlanableDeps, client: PlanableClient, conn: BrandConnection & { brand_id: string }, tz: string, workspaceError: SyncRunError | null, now: () => Date): Promise<PlanableOutcome> {
+  const { db } = deps
+  const window = lookbackWindow(now(), tz, PLANABLE_LOOKBACK_DAYS)
+  const scope = scopeOf(conn)
+  const kw = workspaceError ? null : await client.get('/keywords', { workspaceId: conn.external_account_id, type: 'competitor' })
+  const parsed = kw?.ok ? KeywordsSchema.safeParse(kw.payload) : null
+  // Filtrul pe tip se repetă local: dacă API-ul ignoră parametrul, cuvintele brandului nu ajung la competitori.
+  const keywords = parsed?.success ? parsed.data.data.filter((k) => k.type.toLowerCase() === 'competitor') : null
+  if (keywords && keywords.length === 0) {
+    return { tenant_id: conn.tenant_id, brand_id: conn.brand_id, connection_id: conn.id, source: SOURCE_COMPETITORS, status: 'not_connected', sync_run_id: null, rows_written: 0, errors: [], reason: 'niciun cuvânt de tip „competitor” urmărit în Planable Listening' }
+  }
+  const handle = await startSyncRun(db, { ...scope, source: SOURCE_COMPETITORS, source_connection_id: conn.id, period_start: window.start, period_end: window.end }, now)
+  const errors: SyncRunError[] = []
+  let rows = 0
+  try {
+    if (workspaceError) return await finish(deps, handle, conn, SOURCE_COMPETITORS, [workspaceError], 0, true, now)
+    if (kw && !kw.ok) return await finish(deps, handle, conn, SOURCE_COMPETITORS, [httpError(kw, 'keywords:competitor')], 0, true, now)
+    if (!keywords) return await finish(deps, handle, conn, SOURCE_COMPETITORS, [{ code: 'invalid_payload', status: null, dimension: 'keywords:competitor', message: 'Forma răspunsului /keywords s-a schimbat.' }], 0, true, now)
+
+    const collectedAt = now().toISOString()
+    const provenance = { ...scope, source_id: conn.id, sync_run_id: handle.id, collected_at: collectedAt }
+    const previous = new Map(
+      (await db.select<{ external_id: string; covered_from: string | null; covered_to: string }>(
+        'competitor_trackers',
+        `select=external_id,covered_from,covered_to&tenant_id=eq.${scope.tenant_id}&brand_id=eq.${scope.brand_id}&source=eq.${TRACKER_SOURCE_LISTENING}`,
+      )).map((t) => [t.external_id, t]),
+    )
+    const mentions: Row[] = []
+    const trackers: Row[] = []
+    const skipped = new Map<string, SkippedGroup>()
+    for (const k of keywords) {
+      const label = k.text.trim()
+      if (label === '' || label.length > 200) {
+        errors.push({ code: 'parser_note', status: null, dimension: `keywords:${k.keywordId}`, message: 'cuvânt de tip „competitor” fără text sau mai lung de 200 de caractere; sărit' })
+        continue
+      }
+      let complete = true
+      // Mențiunile fără link, pe identitate, în cuvântul curent: identicele primesc numere de ordine (ca la brand, deciziile R).
+      const withoutLink = new Map<string, Array<{ m: Mention; payloadHash: string }>>()
+      let cursor: number | undefined
+      let page = 0
+      for (; page < PLANABLE_MAX_PAGES; page++) {
+        const r = await client.get(`/keywords/${encodeURIComponent(k.keywordId)}/mentions`, {
+          workspaceId: conn.external_account_id, startDate: `${window.start}T00:00:00.000Z`, endDate: `${window.end}T23:59:59.999Z`, sortBy: 'recency', limit: PLANABLE_MENTIONS_PAGE_SIZE, cursor,
+        })
+        if (!r.ok) {
+          errors.push(httpError(r, `mentions:${k.keywordId}`))
+          complete = false
+          break
+        }
+        const p = MentionsSchema.safeParse(r.payload)
+        if (!p.success) {
+          errors.push({ code: 'invalid_payload', status: null, dimension: `mentions:${k.keywordId}`, message: 'Forma răspunsului de mențiuni s-a schimbat.' })
+          complete = false
+          break
+        }
+        for (const m of p.data.data as Mention[]) {
+          const reasons = mentionSkipReasons(m)
+          if (reasons.length > 0) {
+            const platform = m.platform.trim().toLowerCase().replace(/[^\p{L}\p{N}_ .-]+/gu, '_').slice(0, 64)
+            const key = `${platform || 'rețea necunoscută'}|${reasons.join('+')}`
+            const group = skipped.get(key) ?? { count: 0, filled: new Map(), empty: new Map(), links: new Map() }
+            group.count++
+            const shape = mentionFieldShape(m as Record<string, unknown>)
+            for (const kind of ['filled', 'empty', 'links'] as const) for (const name of new Set(shape[kind])) group[kind].set(name, (group[kind].get(name) ?? 0) + 1)
+            skipped.set(key, group)
+            continue
+          }
+          if (hasNoLink(m)) {
+            const identity = builtMentionIdentity(m)
+            const same = withoutLink.get(identity) ?? []
+            same.push({ m, payloadHash: r.payloadHash })
+            withoutLink.set(identity, same)
+            continue
+          }
+          mentions.push(competitorMentionRow(m, k.keywordId, { ...provenance, payload_hash: r.payloadHash }))
+        }
+        const next = p.data.pagination.nextCursor
+        if (next === null || next === cursor || p.data.data.length === 0) break
+        cursor = next
+      }
+      if (page === PLANABLE_MAX_PAGES) {
+        errors.push({ code: 'pagination_stalled', status: null, dimension: `mentions:${k.keywordId}`, message: `Paginarea nu s-a terminat după ${PLANABLE_MAX_PAGES} pagini.` })
+        complete = false
+      }
+      for (const [identity, same] of withoutLink) {
+        const ordered = [...same].sort((a, b) => (a.m.sentiment ?? '').localeCompare(b.m.sentiment ?? ''))
+        ordered.forEach(({ m, payloadHash }, i) => mentions.push(competitorMentionRow(m, k.keywordId, { ...provenance, payload_hash: payloadHash }, builtMentionNativeId(identity, i + 1))))
+      }
+      trackers.push({
+        ...scope,
+        source: TRACKER_SOURCE_LISTENING,
+        external_id: k.keywordId,
+        label,
+        covered_from: coveredFrom(previous.get(k.keywordId), window.start),
+        covered_to: window.end,
+        complete,
+        last_seen_at: collectedAt,
+        source_id: conn.id,
+        sync_run_id: handle.id,
+      })
+    }
+    errors.push(...skippedMentionNotes(skipped))
+    // Întâi mențiunile, apoi ce s-a citit: un cuvânt apare acoperit doar după ce mențiunile lui sunt scrise.
+    rows += await upsertScoped(db, 'competitor_mentions', KEYS.competitor_mentions, mentions, scope)
+    rows += await upsertScoped(db, 'competitor_trackers', KEYS.competitor_trackers, trackers, scope)
+    return await finish(deps, handle, conn, SOURCE_COMPETITORS, errors, rows, false, now)
+  } catch (err) {
+    errors.push({ code: 'exception', status: null, message: (err as Error).message })
+    return await finish(deps, handle, conn, SOURCE_COMPETITORS, errors, rows, true, now)
   }
 }

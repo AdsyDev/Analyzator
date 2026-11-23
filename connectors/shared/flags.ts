@@ -2,7 +2,7 @@
 // În GitHub se setează ca Variables (Settings → Secrets and variables → Actions → Variables); workflow-urile le pasează ca
 // variabile de mediu. Doar valoarea „true” (fără diferență de majuscule) activează; orice altceva = dezactivat.
 
-export type ConnectorSource = 'seomonitor' | 'ga4' | 'gsc' | 'clarity' | 'planable' | 'meta_ads' | 'google_ads' | 'tiktok_ads'
+export type ConnectorSource = 'seomonitor' | 'ga4' | 'gsc' | 'clarity' | 'planable' | 'meta_ads' | 'google_ads' | 'tiktok_ads' | 'ads_transparency'
 
 /** ga4 și gsc împart un singur flag (B5): aceeași conexiune de service account, același workflow. */
 export const CONNECTOR_FLAGS: Record<ConnectorSource, string> = {
@@ -14,6 +14,8 @@ export const CONNECTOR_FLAGS: Record<ConnectorSource, string> = {
   meta_ads: 'CONNECTOR_META_ENABLED',
   google_ads: 'CONNECTOR_GOOGLE_ADS_ENABLED',
   tiktok_ads: 'CONNECTOR_TIKTOK_ENABLED',
+  // Reclamele competitorilor (deciziile Y): workflow-ul ads-transparency-weekly citește variabila direct, ca planable-weekly.
+  ads_transparency: 'CONNECTOR_ADS_TRANSPARENCY_ENABLED',
 }
 
 export const REFRESH_FLAG = 'REFRESH_ENABLED'

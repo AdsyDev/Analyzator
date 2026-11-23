@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { collectPlanable, MENTIONS_SKIPPED, MENTIONS_WITHOUT_LINK } from './collect-core.ts'
-import { builtMentionIdentity, builtMentionNativeId, hasNoLink, MentionsSchema, mentionFieldShape, mentionNativeId, mentionRow, mentionSkipReasons, pageMetrics, platformOf } from './normalize.ts'
+import { builtMentionIdentity, builtMentionNativeId, coveredFrom, hasNoLink, MentionsSchema, mentionFieldShape, mentionNativeId, mentionRow, mentionSkipReasons, pageMetrics, platformOf } from './normalize.ts'
 import { FakeDb, fakeFetch, noSleep, type FakeResponse } from '../shared/test-helpers.ts'
 
 // Răspunsurile sunt construite după schema OpenAPI publică (api.planable.io/api/v1/openapi.json, 2026-10-12):
@@ -157,7 +157,7 @@ describe('collectPlanable', () => {
     const { db } = setup({ credential: null })
     const f = routes()
     const out = await collectPlanable({ db, fetch: f.fetch, sleep: noSleep().sleep, now: () => NOW })
-    assert.deepEqual(out.map((o) => [o.source, o.status]), [['planable_analytics', 'not_connected'], ['planable_listening', 'not_connected']])
+    assert.deepEqual(out.map((o) => [o.source, o.status]), [['planable_analytics', 'not_connected'], ['planable_listening', 'not_connected'], ['planable_competitors', 'not_connected']])
     assert.equal(db.tables.sync_runs!.length, 0)
     assert.equal(f.calls.length, 0)
   })
@@ -173,7 +173,7 @@ describe('collectPlanable', () => {
     const { db, validations } = setup()
     const f = routes()
     const out = await collectPlanable({ db, fetch: f.fetch, sleep: noSleep().sleep, now: () => NOW })
-    assert.deepEqual(out.map((o) => [o.source, o.status]), [['planable_analytics', 'succeeded'], ['planable_listening', 'succeeded']])
+    assert.deepEqual(out.map((o) => [o.source, o.status]), [['planable_analytics', 'succeeded'], ['planable_listening', 'succeeded'], ['planable_competitors', 'not_connected']])
 
     const daily = db.tables.social_daily!
     assert.deepEqual(daily.map((r) => [r.date, r.followers]).sort(), [['2026-10-06', 5010], ['2026-10-07', 5020]])
@@ -371,7 +371,7 @@ describe('collectPlanable', () => {
   test('401 la /workspaces: tokenul se marchează invalid, ambele rulări eșuează', async () => {
     const { db, validations } = setup()
     const out = await collectPlanable({ db, fetch: routes({ '/api/v1/workspaces': json({ error: { code: 'UNAUTHORIZED', message: 'x' } }, 401) }).fetch, sleep: noSleep().sleep, now: () => NOW })
-    assert.deepEqual(out.map((o) => [o.source, o.status, o.errors[0]?.code]), [['planable_analytics', 'failed', 'access_denied'], ['planable_listening', 'failed', 'access_denied']])
+    assert.deepEqual(out.map((o) => [o.source, o.status, o.errors[0]?.code]), [['planable_analytics', 'failed', 'access_denied'], ['planable_listening', 'failed', 'access_denied'], ['planable_competitors', 'failed', 'access_denied']])
     assert.deepEqual(validations.map((v) => v.p_ok), [false])
   })
 
@@ -416,5 +416,100 @@ describe('collectPlanable', () => {
     const t2 = out.filter((o) => o.tenant_id === T2)
     assert.ok(t2.every((o) => o.status === 'not_connected'))
     assert.ok(db.tables.social_daily!.every((r) => r.tenant_id === T1))
+  })
+})
+
+describe('Planable: mențiunile competitorilor (deciziile Y)', () => {
+  const kwByType = (url: URL) =>
+    url.searchParams.get('type') === 'competitor'
+      ? json({ data: [{ keywordId: 'c1', text: ' Prostamol ', type: 'competitor' }, { keywordId: 'c2', text: 'Alt competitor', type: 'competitor' }] })
+      : json({ data: [{ keywordId: 'k1', text: 'Urinal', type: 'brand' }] })
+  const web = (publishedAt: string, sentiment = 'neutral') => ({ platform: 'web', publishedAt, url: '', engagement: 1, sentiment, author: { name: 'Site', username: null } })
+
+  test('cuvintele de tip „competitor” → competitor_mentions pe cuvânt și competitor_trackers, fără text și fără autor', async () => {
+    const { db } = setup({ tables: { competitor_mentions: [], competitor_trackers: [] } })
+    const out = await collectPlanable({
+      db,
+      fetch: routes({
+        '/api/v1/keywords': kwByType,
+        '/api/v1/keywords/c1/mentions': json({
+          data: [mention('https://x.com/p/1'), mention('https://x.com/p/2', 'NEGATIVE'), web('2026-10-04T10:00:00Z'), web('2026-10-04T10:00:00Z'), { ...mention('ftp://x'), url: 'ftp://x' }],
+          pagination: { nextCursor: null, total: 5 },
+        }),
+        '/api/v1/keywords/c2/mentions': json({ error: { code: 'INTERNAL', message: 'x' } }, 500),
+      }).fetch,
+      sleep: noSleep().sleep,
+      now: () => NOW,
+    })
+    const c = out.find((o) => o.source === 'planable_competitors')!
+    assert.equal(c.status, 'partial', 'un cuvânt citit, unul cu eroare')
+    const rows = db.tables.competitor_mentions!
+    assert.equal(rows.length, 4, 'două cu link, două identice fără link (numerotate), cea cu ftp sărită')
+    assert.ok(rows.every((r) => r.keyword_id === 'c1' && r.tenant_id === T1 && r.brand_id === B1 && r.source_id === CONN && r.sync_run_id === c.sync_run_id))
+    assert.ok(rows.every((r) => !('text' in r) && !('author_is_owned' in r)), 'fără text și fără autor')
+    assert.deepEqual(rows.filter((r) => r.url === null).map((r) => String(r.native_id).slice(0, 2)), ['s:', 's:'])
+    assert.equal(new Set(rows.map((r) => r.native_id)).size, 4)
+    assert.equal(rows.find((r) => r.url === 'https://x.com/p/2')!.sentiment, 'negative')
+    assert.equal(rows.find((r) => r.url === 'https://x.com/p/1')!.native_id, mentionNativeId('https://x.com/p/1'), 'aceeași cheie ca la mențiunile brandului')
+    assert.ok(c.errors.some((e) => e.dimension === MENTIONS_SKIPPED && /1 mențiune sărită din instagram/.test(e.message)))
+
+    const t = db.tables.competitor_trackers!
+    assert.deepEqual(t.map((r) => [r.external_id, r.label, r.covered_from, r.covered_to, r.complete, r.source]).sort(), [
+      ['c1', 'Prostamol', '2026-09-03', '2026-10-07', true, 'planable_listening'],
+      ['c2', 'Alt competitor', '2026-09-03', '2026-10-07', false, 'planable_listening'],
+    ])
+    assert.equal(db.tables.mentions!.length, 2, 'mențiunile brandului rămân doar ale cuvântului de tip „brand”')
+    const run = db.tables.sync_runs!.find((r) => r.source === 'planable_competitors')!
+    assert.equal(run.period_start, '2026-09-03')
+  })
+
+  test('a doua rulare păstrează prima zi acoperită când ferestrele se suprapun', async () => {
+    const { db } = setup({
+      tables: {
+        competitor_mentions: [],
+        competitor_trackers: [{ tenant_id: T1, brand_id: B1, source: 'planable_listening', external_id: 'c1', covered_from: '2026-08-20', covered_to: '2026-09-30' }],
+      },
+    })
+    await collectPlanable({
+      db,
+      fetch: routes({
+        '/api/v1/keywords': (url) => (url.searchParams.get('type') === 'competitor' ? json({ data: [{ keywordId: 'c1', text: 'Prostamol', type: 'competitor' }] }) : json({ data: [] })),
+        '/api/v1/keywords/c1/mentions': json({ data: [], pagination: { nextCursor: null, total: 0 } }),
+      }).fetch,
+      sleep: noSleep().sleep,
+      now: () => NOW,
+    })
+    const t = db.tables.competitor_trackers!.find((r) => r.external_id === 'c1')!
+    assert.deepEqual([t.covered_from, t.covered_to, t.complete], ['2026-08-20', '2026-10-07', true], 'zero mențiuni, dar cuvânt citit complet')
+  })
+
+  test('API-ul ignoră parametrul `type`: brandul nu primește cuvintele competitorilor și invers', async () => {
+    const { db } = setup({ tables: { competitor_mentions: [], competitor_trackers: [] } })
+    const all = json({ data: [{ keywordId: 'k1', text: 'Urinal', type: 'brand' }, { keywordId: 'c1', text: 'Prostamol', type: 'COMPETITOR' }, { keywordId: 't1', text: 'prostată', type: 'topic' }] })
+    const f = routes({
+      '/api/v1/keywords': all,
+      '/api/v1/keywords/c1/mentions': json({ data: [mention('https://x.com/c/1')], pagination: { nextCursor: null, total: 1 } }),
+    })
+    await collectPlanable({ db, fetch: f.fetch, sleep: noSleep().sleep, now: () => NOW })
+    assert.ok(!f.calls.some((c) => c.url.includes('/keywords/t1/')), 'cuvintele de tip topic nu se citesc')
+    assert.deepEqual(db.tables.mentions!.map((m) => m.url).sort(), ['https://x.com/a/1', 'https://x.com/b/1'])
+    assert.deepEqual(db.tables.competitor_mentions!.map((m) => [m.keyword_id, m.url]), [['c1', 'https://x.com/c/1']])
+  })
+
+  test('workspace fără cuvinte de tip „competitor”: not_connected, fără sync_run', async () => {
+    const { db } = setup()
+    const out = await collectPlanable({ db, fetch: routes().fetch, sleep: noSleep().sleep, now: () => NOW })
+    const c = out.find((o) => o.source === 'planable_competitors')!
+    assert.equal(c.status, 'not_connected')
+    assert.match(c.reason ?? '', /competitor/)
+    assert.equal(db.tables.sync_runs!.filter((r) => r.source === 'planable_competitors').length, 0)
+  })
+
+  test('coveredFrom: continuitate, pauză, prima rulare', () => {
+    assert.equal(coveredFrom(undefined, '2026-09-03'), '2026-09-03')
+    assert.equal(coveredFrom({ covered_from: '2026-08-01', covered_to: '2026-09-02' }, '2026-09-03'), '2026-08-01', 'ferestre lipite')
+    assert.equal(coveredFrom({ covered_from: '2026-08-01', covered_to: '2026-09-01' }, '2026-09-03'), '2026-09-03', 'o zi lipsă = pauză')
+    assert.equal(coveredFrom({ covered_from: '2026-09-10', covered_to: '2026-10-01' }, '2026-09-03'), '2026-09-03', 'fereastra nouă începe mai devreme')
+    assert.equal(coveredFrom({ covered_from: null, covered_to: '2026-10-01' }, '2026-09-03'), '2026-09-03')
   })
 })

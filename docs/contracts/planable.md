@@ -32,8 +32,17 @@ Sursa: specificația OpenAPI 3.1 publică, `https://api.planable.io/api/v1/opena
 | `GET /posts/{id}/metrics` | ultimul snapshot al postării (cumulat) → `social_posts` |
 | `GET /keywords?workspaceId&type=brand` | cuvintele urmărite pentru brand (Listening) |
 | `GET /keywords/{id}/mentions?workspaceId&startDate&endDate&sortBy=recency` | mențiunile → `mentions` |
+| `GET /keywords?workspaceId&type=competitor` | cuvintele urmărite pentru competitori (deciziile Y) |
+| `GET /keywords/{id}/mentions?…` (aceiași parametri) | mențiunile lor → `competitor_mentions` |
 
-Cuvintele de tip `topic` și `competitor` nu se colectează la pilot: mențiunile din `mentions` sunt ale brandului.
+Cuvintele de tip `topic` nu se colectează. Cele de tip `competitor` au rularea lor (`planable_competitors`); mențiunile din `mentions` sunt doar ale brandului. Tipul se verifică și local (fără diferență de majuscule): dacă API-ul ar ignora parametrul `type`, un cuvânt de tip `competitor` sau `topic` nu ajunge la brand, iar unul de tip `brand` nu ajunge la competitori.
+
+## Competitorii în Listening (deciziile Y, 23 nov. 2026)
+
+- **`competitor_mentions`**, cheia (tenant, brand, `keyword_id`, `native_id`): aceeași mențiune găsită de două cuvinte are câte un rând pe cuvânt; atribuirea la competitor și deduplicarea pe competitor se fac în SQL. `native_id` ca la brand (`h:` din URL, `s:` construit pentru mențiunile fără link, numerotate în cadrul cuvântului). Se păstrează `platform`, `url`, `published_at` și sentimentul Planable; **nu** textul și autorul (minimizare: nu sunt despre client și nu servesc unei numărători).
+- **`competitor_trackers`** (`source = planable_listening`): fiecare cuvânt citit, cu `label` = textul lui, `covered_from` / `covered_to` (zilele colectate: prima zi se păstrează cât timp ferestrele de 35 de zile se ating; după o pauză reîncepe) și `complete` (toate paginile citite fără eroare). Se scriu după mențiuni.
+- **Atribuirea:** un cuvânt aparține competitorului din setul în vigoare a cărui listă `listening_keywords` îl conține (fără diferență de majuscule); lista goală înseamnă numele competitorului. Validarea din `create_competitor_set_version` nu permite același cuvânt la doi competitori.
+- **Rularea:** a treia `sync_run` per brand, `planable_competitors`, aceeași fereastră de 35 de zile. Fără cuvinte de tip `competitor`: `not_connected`, fără `sync_run`.
 
 ## Tabele și reguli
 
@@ -77,7 +86,7 @@ Fiecare grup are și o a doua notă, cu **numele câmpurilor** pe care le aveau 
 - `.github/workflows/planable-weekly.yml`, marți 04:00 UTC, **dezactivat** până la `CONNECTOR_PLANABLE_ENABLED = true`; `workflow_dispatch` activ oricând. Local: `npm run collect:planable`.
 - Fereastra: ultimele **35 de zile până ieri** (Europe/Bucharest), ca la ceilalți conectori.
 - Ritm: cel mult 4 cereri pe secundă; retry la 429/5xx după 5 s, 30 s și 2 min (Retry-After are prioritate); fără retry pe 401/403. Plafon de siguranță: 5.000 de cereri pe rulare.
-- Două `sync_runs` per brand: `planable_analytics` (social, cu acoperire = zile cu `social_daily` / 35) și `planable_listening` (mențiuni, fără acoperire pe zile). O rulare cu orice eroare nu e niciodată `succeeded`.
+- Trei `sync_runs` per brand: `planable_analytics` (social, cu acoperire = zile cu `social_daily` / 35), `planable_listening` (mențiuni, fără acoperire pe zile) și `planable_competitors` (doar cu cuvinte de tip `competitor`). O rulare cu orice eroare nu e niciodată `succeeded`.
 
 ## De confirmat la prima rulare reală
 
@@ -85,3 +94,4 @@ Fiecare grup are și o a doua notă, cu **numele câmpurilor** pe care le aveau 
 2. `totalFollowers` față de `followers` la Facebook; `views` față de `impressions` la Facebook și Threads.
 3. Dimensiunea maximă a paginii la `GET /pages` și `GET /posts` (folosim 50).
 4. Limitele reale de apeluri.
+5. Că `GET /keywords` respectă `type=competitor` și că valoarea câmpului `type` e `competitor` (citit din specificația din 12 oct.; nereverificat la 23 nov., documentația nu a putut fi citită).

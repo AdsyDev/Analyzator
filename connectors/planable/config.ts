@@ -11,6 +11,10 @@ export const PLANABLE_PROVIDER = 'planable'
 /** Sursele din sync_runs și source_status, aceleași ca la importul CSV. */
 export const SOURCE_ANALYTICS = 'planable_analytics'
 export const SOURCE_LISTENING = 'planable_listening'
+/** Mențiunile cuvintelor de tip „competitor” (deciziile Y): sync_run separat, scrise în competitor_mentions. */
+export const SOURCE_COMPETITORS = 'planable_competitors'
+/** Sursa din competitor_trackers pentru cuvintele Planable de tip „competitor”. */
+export const TRACKER_SOURCE_LISTENING = 'planable_listening'
 
 /** Limitele nu sunt documentate (doar 429): ritm conservator, cel mult 4 cereri pe secundă. */
 export const PLANABLE_MIN_INTERVAL_MS = 250

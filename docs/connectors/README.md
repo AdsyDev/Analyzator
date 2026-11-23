@@ -7,7 +7,8 @@ Ghiduri pas cu pas pentru agenție (rolul `agency_admin`): de unde obții cheia,
 | Microsoft Clarity | [clarity.md](clarity.md) | comportament pe site (sesiuni, rage clicks, scroll) | Complet din aplicație, cu buton de test |
 | SEOmonitor | [seomonitor.md](seomonitor.md) | rankuri, visibility, AI Search, AI Overview | Contul din aplicație; maparea grupurilor pe branduri încă din SQL |
 | Google Analytics 4 și Search Console | [google.md](google.md) | sesiuni, key events, clicks și impresii din căutare | Din aplicație: cheia clientului (fișier JSON) și proprietățile pe brand |
-| Planable | [planable.md](planable.md) | social propriu (pagini, postări) și Listening | Din aplicație: tokenul clientului, cu test, și workspace-ul pe brand |
+| Planable | [planable.md](planable.md) | social propriu (pagini, postări), Listening pe brand și pe competitori | Din aplicație: tokenul clientului, cu test, și workspace-ul pe brand |
+| Google Ads Transparency | [ads-transparency.md](ads-transparency.md) | reclamele competitorilor afișate în România | Proiectul Google Cloud o dată, apoi ID-urile de advertiser în setul de competitori |
 | Meta Ads | [meta-ads.md](meta-ads.md) | cost, afișări, clickuri pe zi și reclamă | Din aplicație: tokenul system user, cu test, și contul de ads pe brand |
 | Google Ads | [google-ads.md](google-ads.md) | cost, afișări, clickuri, conversii pe zi și campanie | „Conectează cu Google” (OAuth), apoi customer ID-ul pe brand |
 | TikTok Ads | [tiktok-ads.md](tiktok-ads.md) | cost, afișări, clickuri, conversii pe zi și campanie | „Conectează cu TikTok” (OAuth), apoi advertiser ID-ul pe brand |
@@ -21,7 +22,7 @@ Ghiduri pas cu pas pentru agenție (rolul `agency_admin`): de unde obții cheia,
 3. **Aplicația are voie să vorbească cu funcțiile server.** Salvarea tokenului din aplicație trece prin funcția `source-credentials`, care acceptă doar domeniul aplicației. În Supabase → Edge Functions → Secrets trebuie setat `ANALYZATOR_APP_ORIGIN` = adresa exactă a aplicației (de ex. `https://analyzator.exemplu.ro`, fără `/` la final). Fără ea, butonul „Salvează tokenul” dă eroare de rețea.
 4. **Colectarea automată e pornită.** Conectorii rulează din GitHub Actions. În repo → Settings → Secrets and variables → Actions:
    - **Secrets** (environment `staging`): `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`;
-   - **Variables:** `CONNECTOR_CLARITY_ENABLED`, `CONNECTOR_SEOMONITOR_ENABLED`, `CONNECTOR_GOOGLE_ENABLED`, `CONNECTOR_PLANABLE_ENABLED`, `CONNECTOR_META_ENABLED`, `CONNECTOR_GOOGLE_ADS_ENABLED`, `CONNECTOR_TIKTOK_ENABLED`, `REFRESH_ENABLED` = `true` pentru sursele pe care le folosești.
+   - **Variables:** `CONNECTOR_CLARITY_ENABLED`, `CONNECTOR_SEOMONITOR_ENABLED`, `CONNECTOR_GOOGLE_ENABLED`, `CONNECTOR_PLANABLE_ENABLED`, `CONNECTOR_ADS_TRANSPARENCY_ENABLED`, `CONNECTOR_META_ENABLED`, `CONNECTOR_GOOGLE_ADS_ENABLED`, `CONNECTOR_TIKTOK_ENABLED`, `REFRESH_ENABLED` = `true` pentru sursele pe care le folosești.
 
    Fără variabile, programarea pornește, dar jobul e sărit. Rularea manuală (Actions → workflow → Run workflow) merge oricând.
 
