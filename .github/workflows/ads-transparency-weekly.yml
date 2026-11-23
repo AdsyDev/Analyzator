@@ -1,0 +1,77 @@
+# Colectarea săptămânală Google Ads Transparency: reclamele advertiserilor din seturile de competitori (deciziile Y).
+#
+# Programare: marți la 05:00 UTC, după Planable (04:00). Citește setul public BigQuery
+# `bigquery-public-data.google_ads_transparency_center.creative_stats`, plătit de proiectul service account-ului Google al
+# fiecărui client (același JSON ca la GA4 și Search Console). Plafon de bytes facturați: ADS_TRANSPARENCY_MAX_GB (implicit 100).
+#
+# Rularea programată e DEZACTIVATĂ până când variabila CONNECTOR_ADS_TRANSPARENCY_ENABLED = "true"
+# (Settings → Secrets and variables → Actions → Variables). workflow_dispatch funcționează oricând.
+#
+# Secrete în environment-ul GitHub ales (implicit „staging"): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+# Service account-ul NU e aici: stă în Supabase Vault și se citește la rulare prin get_source_token.
+
+name: ads-transparency-weekly
+
+on:
+  schedule:
+    - cron: '0 5 * * 2'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment GitHub cu secretele Supabase'
+        type: choice
+        options: [staging]
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ads-transparency-weekly
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    if: github.event_name == 'workflow_dispatch' || vars.CONNECTOR_ADS_TRANSPARENCY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dependențe
+        run: npm ci
+
+      - name: Teste conector (fără rețea)
+        run: node --experimental-strip-types --test 'connectors/ads-transparency/**/*.test.ts' 'connectors/shared/**/*.test.ts'
+
+      - name: Colectare Ads Transparency
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ADS_TRANSPARENCY_MAX_GB: ${{ vars.ADS_TRANSPARENCY_MAX_GB }}
+          ADS_TRANSPARENCY_BILLING_PROJECT: ${{ vars.ADS_TRANSPARENCY_BILLING_PROJECT }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Lipsesc secretele SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY în environment-ul ${{ inputs.environment || 'staging' }}."
+            exit 1
+          fi
+          node --experimental-strip-types connectors/ads-transparency/collect.ts | tee collect.log
+
+      - name: Rezumat
+        if: always()
+        run: |
+          {
+            echo "### Ads Transparency: $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo
+            echo '```'
+            [ -f collect.log ] && cat collect.log || echo "fără output"
+            echo '```'
+            echo
+            echo "Detalii: sync_runs (source = ads_transparency), competitor_trackers, provider_api_calls."
+          } >> "$GITHUB_STEP_SUMMARY"
