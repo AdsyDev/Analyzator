@@ -327,7 +327,7 @@ describe('pagina site-ului: sursele, fiecare conectată pe site (fixtures de pre
     expect(within(form).getByLabelText('Nume afișat (opțional)')).toHaveValue('Urinal RO')
     await userEvent.click(within(form).getByRole('button', { name: 'Adaugă conexiunea' }))
     const conn = await within(card).findByRole('article', { name: 'Conexiune Airbyte (Paid Ads) · Urinal RO' })
-    expect(within(conn).getByText('Colectare neactivă')).toBeInTheDocument()
+    expect(within(conn).getByText('Neverificat')).toBeInTheDocument()
     expect(within(card).getByRole('form', { name: 'Adaugă conexiunea Airbyte (Paid Ads)' })).toBeInTheDocument()
 
     // Manual: doar formatul platformă:ID.
@@ -339,6 +339,34 @@ describe('pagina site-ului: sursele, fiecare conectată pe site (fixtures de pre
     await userEvent.clear(manual)
     await userEvent.type(manual, 'google_ads:1112223333')
     expect(within(again).getByRole('button', { name: 'Adaugă conexiunea' })).toBeEnabled()
+  })
+
+  it('Airbyte: conturile propuse pe toate site-urile clientului, legate deodată după confirmare', async () => {
+    renderApp({ route: site('brand-urinal') })
+    await pageReady('Site și surse')
+    const card = await open('Airbyte (Paid Ads)')
+    const key = within(card).getByRole('article', { name: 'Destinația Airbyte a clientului' })
+    await userEvent.type(within(key).getByLabelText('Numele destinației'), 'Airbyte AdSymphony')
+    await userEvent.type(within(key).getByLabelText('Connection string'), 'postgresql://ro:p@airbyte-db.exemplu.ro:5432/airbyte?sslmode=require')
+    await userEvent.click(within(key).getByRole('button', { name: 'Salvează' }))
+    await within(card).findByText(/Folosește cheia clientului/)
+
+    const bulk = within(card).getByRole('region', { name: 'Maparea conturilor Airbyte pe site-uri' })
+    await userEvent.click(within(bulk).getByRole('button', { name: 'Propune conturile pentru toate site-urile' }))
+    const list = await within(bulk).findByRole('list', { name: 'Conturile nelegate' })
+    const urinal = within(list).getByLabelText('Site-ul contului Urinal RO (Meta Ads)') as HTMLSelectElement
+    expect(urinal.value).toBe('brand-urinal')
+    const proposed = within(list).getAllByRole('combobox').filter((s) => (s as HTMLSelectElement).value !== '')
+    expect(proposed.length).toBeGreaterThan(1)
+
+    // Un cont scos din propunere („—”) nu se leagă.
+    const other = proposed.find((s) => s !== urinal)!
+    await userEvent.selectOptions(other, '')
+    await userEvent.click(within(bulk).getByRole('button', { name: new RegExp(`^Leagă (contul ales|cele ${proposed.length - 1} conturi alese)$`) }))
+    expect(await within(list).findByText('Legat de Urinal')).toBeInTheDocument()
+    expect(within(list).getAllByText(/^Legat de /)).toHaveLength(proposed.length - 1)
+    expect(other).toBeInTheDocument()
+    expect(await within(card).findByRole('article', { name: 'Conexiune Airbyte (Paid Ads) · Urinal RO' })).toBeInTheDocument()
   })
 
   it('OAuth Google Ads: MCC obligatoriu; în previzualizare conectarea e simulată', async () => {

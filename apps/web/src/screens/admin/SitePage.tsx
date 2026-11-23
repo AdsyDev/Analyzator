@@ -13,11 +13,12 @@ import { useAsync } from '../../data/useAsync'
 import { formatDate, formatDateTime } from '../../lib/format'
 import { adminPath, sitePath } from '../../lib/navigation'
 import { normalizeDomain } from '../../lib/slug'
-import { PROVIDER_DESCRIPTIONS, PROVIDER_LABELS, runSourcesFor, sourceName } from '../../lib/sources'
+import { PROVIDER_DESCRIPTIONS, PROVIDER_LABELS, runBelongsTo, sourceName } from '../../lib/sources'
 import { useLayout } from '../../routing/AppLayout'
 import { Resolved } from '../shared/Resolved'
 import { Section } from '../shared/Section'
 import { AddConnection } from './AddConnection'
+import { AirbyteBulkMapping } from './AirbyteBulkMapping'
 import { AirbyteInspect } from './AirbyteKeyCard'
 import { SeomonitorCampaigns } from './SeomonitorCampaigns'
 import { ConnectionCard } from './ConnectionCard'
@@ -234,7 +235,7 @@ function SiteContent({ client, space, onChanged }: { client: Client; space: Clie
                       client={client}
                       status={statusList.find((s) => s.provider === src.provider) ?? null}
                       connections={connList.filter((c) => c.provider === src.provider)}
-                      runs={runList.filter((r) => runSourcesFor(src.provider).includes(r.provider))}
+                      runs={runList.filter((r) => runBelongsTo(src.provider, r.provider, r.connection_id, new Map(connList.map((c) => [c.id, c.provider]))))}
                       tenantConnection={src.tenant ? (tenantList.find((t) => t.provider === src.tenant) ?? null) : null}
                       onChanged={refresh}
                     />
@@ -288,7 +289,7 @@ function SiteSourceCard({ source, space, client, status, connections, runs, tena
     setParams(next, { replace: true })
   }
 
-  const steps = (source.tenant ? 1 : 0) + (source.brand || provider === 'seomonitor' ? 1 : 0)
+  const steps = (source.tenant ? 1 : 0) + (source.brand || provider === 'seomonitor' ? 1 : 0) + (provider === 'airbyte' ? 1 : 0)
   let n = 0
 
   return (
@@ -367,6 +368,16 @@ function SiteSourceCard({ source, space, client, status, connections, runs, tena
                   />
                 )}
               </div>
+            </Step>
+          )}
+
+          {provider === 'airbyte' && (
+            <Step n={++n} total={steps} title={`Conturile tuturor site-urilor ${client.name}`} done={false}>
+              {keySaved ? (
+                <AirbyteBulkMapping client={client} connection={tenantConnection} onChanged={onChanged} />
+              ) : (
+                <p className="text-[12.5px] leading-snug text-text-2">După ce salvezi destinația la pasul 1, conturile din Airbyte se pot propune aici pe toate site-urile clientului deodată.</p>
+              )}
             </Step>
           )}
 

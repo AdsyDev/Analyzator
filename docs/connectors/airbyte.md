@@ -1,6 +1,6 @@
 # Ghid: Airbyte (Paid Ads din destinația Postgres)
 
-Pentru agenție (`agency_admin`). Airbyte-ul AdSymphony sincronizează deja conturile Meta, Google Ads și TikTok într-o bază Postgres. Analyzator se conectează la ea cu un utilizator **doar de citire**, arată ce tabele, conturi și metrici găsește, iar tu legi conturile de site-uri. Colectarea datelor în Paid Media e etapa 2 (încă nefăcută, decizia E-6). Detalii tehnice: `docs/contracts/airbyte.md`.
+Pentru agenție (`agency_admin`). Airbyte-ul AdSymphony sincronizează deja conturile Meta, Google Ads și TikTok într-o bază Postgres. Analyzator se conectează la ea cu un utilizator **doar de citire**, arată ce tabele, conturi și metrici găsește, iar tu legi conturile de site-uri (toate deodată sau unul câte unul). Apoi colectorul zilnic aduce costul, afișările, clickurile și conversiile în Paid Media (deciziile E-6 și E-8). Detalii tehnice: `docs/contracts/airbyte.md`.
 
 ## 1. Pe serverul Postgres (o singură dată)
 
@@ -49,10 +49,11 @@ alter default privileges for role airbyte_user in schema meta, google_ads, tikto
    `postgresql://analyzator_ro:<parolă>@airbyte-db.adsymphony.ro:5432/airbyte?sslmode=require`
    Parola trebuie codată în URL dacă are caractere speciale (`@` → `%40`, `:` → `%3A`, `/` → `%2F`). Câmpul se golește după salvare, iar connection string-ul nu se mai poate citi din aplicație.
 3. **Inspectează datele:** vezi tabelele găsite pe platforme (raport sau catalog de nume), conturile, perioada, ultima sincronizare Airbyte și metricile. Ai 30 de inspecții pe zi per client.
-4. **Pasul 2, conturile site-ului:** alegi contul din listă (propus după numele site-ului) → **Adaugă conexiunea**. Formularul rămâne pentru următorul cont (de exemplu Meta și Google Ads pe același site). Manual: `meta_ads:<ID>`, `google_ads:<ID fără cratime>`, `tiktok_ads:<ID>`.
-5. Celelalte site-uri ale clientului refolosesc destinația. La ele faci doar pasul 2.
+4. **Pasul 3, conturile tuturor site-urilor (recomandat):** **Propune conturile pentru toate site-urile**. Fiecare cont nelegat primește site-ul potrivit după nume și domeniu (de ex. „Proenzi RO (EUR)” → Proenzi), pe Meta, Google Ads și TikTok. Verifică lista: schimbi site-ul din meniu, „—” înseamnă că nu se leagă, iar „Ambiguu” cere să alegi tu. Apoi **Leagă conturile alese**. Conturile deja legate nu se mai propun. Consumă o inspecție.
+5. **Pasul 2, un singur cont pe site:** alegi contul din listă (propus după numele site-ului) → **Adaugă conexiunea**. Manual: `meta_ads:<ID>`, `google_ads:<ID fără cratime>`, `tiktok_ads:<ID>`.
+6. **Colectarea:** zilnic la 05:20 UTC (`airbyte-daily`, după ce administratorul activează `CONNECTOR_AIRBYTE_ENABLED`), sau imediat din GitHub Actions → `airbyte-daily` → Run workflow. După prima rulare, conexiunea contului arată „Acces confirmat” și numărul de rânduri, iar datele apar în Paid Media.
 
-Conexiunea contului apare cu „Colectare neactivă” până la etapa 2.
+**Un cont, o singură metodă:** dacă un cont e legat și la cardul Meta Ads / Google Ads / TikTok Ads (API), colectarea din Airbyte îl sare (motivul apare în rulare). Scoate una dintre conexiuni.
 
 ## Când ceva nu merge
 
@@ -67,3 +68,6 @@ Conexiunea contului apare cu „Colectare neactivă” până la etapa 2.
 | Utilizatorul nu vede niciun tabel… (`ok` fără tabele) | Lipsesc `grant usage` / `grant select` pe schemele Airbyte. |
 | Tabelul nu a răspuns la timp | Tabelul e foarte mare (de obicei rapoartele pe anunț). Restul se citește; conturile apar din celelalte tabele. |
 | Limita de 30 de inspecții (`budget_exhausted`) | Revino mâine (ziua UTC). |
+| Colectarea: `stream_not_found` | Utilizatorul read-only nu vede fluxul standard al platformei (`ads_insights`, `campaign` / `account_performance_report`, `*_reports_daily`). Activează fluxul în conexiunea Airbyte sau dă `GRANT SELECT`. |
+| Colectarea: `currency_missing` | Moneda contului nu e în raport și nici în catalog (`ad_account`, `customer`, `advertisers`). Activează fluxul-catalog în Airbyte. |
+| Colectarea: „colectat deja prin conectorul API” | Contul e legat și la cardul API al platformei. Păstrează o singură conexiune. |

@@ -1,7 +1,7 @@
 import type { CredentialStatus, IsoDate, IsoDateTime, SourceConnection, SourceProviderId, SourceState, SourceStatusInfo, SyncRun, SyncRunStatus } from '../../contracts'
 import { SOURCE_PROVIDERS } from '../../contracts'
 import { runErrorCodes, runReason } from '../../lib/runReason'
-import { PROVIDER_DESCRIPTIONS, runSourcesFor } from '../../lib/sources'
+import { PROVIDER_DESCRIPTIONS, runBelongsTo } from '../../lib/sources'
 
 /** Bugetul zilnic de apeluri la pilot (spec: 10 per token). */
 export const DAILY_CALL_BUDGET = 10
@@ -111,10 +111,6 @@ function withReason(head: string, run: SyncRunRow, tail: string): string {
 const CLIENT_LEVEL: readonly SourceProviderId[] = ['seomonitor']
 /** Sursele cu token pe conexiunea site-ului; celelalte folosesc cheia clientului. */
 const OWN_TOKEN: readonly SourceProviderId[] = ['clarity']
-/** Sursele cu conexiuni, dar încă fără colector (E-6: Airbyte, etapa 2). */
-const NO_COLLECTOR_YET: Partial<Record<SourceProviderId, string>> = {
-  airbyte: 'Conturile sunt legate de site; colectarea din Airbyte în Paid Media nu e încă activă.',
-}
 
 /**
  * Starea unei surse din conexiuni, sincronizări și importuri. Regulile sunt clasificări, nu metrici:
@@ -123,6 +119,7 @@ const NO_COLLECTOR_YET: Partial<Record<SourceProviderId, string>> = {
  */
 export function deriveStatuses(connections: ConnectionRow[], runs: SyncRunRow[], batches: ImportBatchRow[]): SourceStatusInfo[] {
   // Toate sursele, inclusiv Ads: fără ele, cardurile Meta, Google Ads și TikTok Ads rămâneau „Neconectat” și după colectări reușite.
+  const providerOf = new Map(connections.map((c) => [c.id, c.provider]))
   return SOURCE_PROVIDERS.map((provider) => {
     const base = { provider, description: PROVIDER_DESCRIPTIONS[provider] }
     if (provider === 'csv_import') {
@@ -132,8 +129,7 @@ export function deriveStatuses(connections: ConnectionRow[], runs: SyncRunRow[],
         : { ...base, state: 'not_connected' as SourceState, data_as_of: null, imported_at: null, note: 'Niciun import încheiat pentru acest spațiu.' }
     }
     const conns = connections.filter((c) => c.provider === provider)
-    const sources = runSourcesFor(provider)
-    const own = runs.filter((r) => sources.includes(r.source)).sort((a, b) => b.created_at.localeCompare(a.created_at))
+    const own = runs.filter((r) => runBelongsTo(provider, r.source, r.source_connection_id, providerOf)).sort((a, b) => b.created_at.localeCompare(a.created_at))
     if (conns.length === 0 && !(CLIENT_LEVEL.includes(provider) && own.length > 0)) return { ...base, state: 'not_connected' as SourceState, data_as_of: null, imported_at: null, note: NO_CONNECTION }
     if (conns.some((c) => c.credential_status === 'invalid')) {
       return { ...base, state: 'error' as SourceState, data_as_of: null, imported_at: null, note: 'Tokenul a fost refuzat de furnizor. Setează un token nou.' }
@@ -143,7 +139,7 @@ export function deriveStatuses(connections: ConnectionRow[], runs: SyncRunRow[],
     const data_as_of: IsoDate | null = lastWithData?.period_end ?? null
     const imported_at: IsoDateTime | null = lastWithData?.finished_at ?? null
     if (!latest || !lastWithData) {
-      const tokenNote = OWN_TOKEN.includes(provider) && conns.every((c) => c.credential_status === 'missing') ? 'Token neconfigurat.' : (NO_COLLECTOR_YET[provider] ?? 'Fără nicio sincronizare încheiată cu date.')
+      const tokenNote = OWN_TOKEN.includes(provider) && conns.every((c) => c.credential_status === 'missing') ? 'Token neconfigurat.' : 'Fără nicio sincronizare încheiată cu date.'
       if (latest?.status === 'failed') return { ...base, state: 'error' as SourceState, data_as_of, imported_at, note: withReason('Ultima sincronizare a eșuat', latest, '.') }
       return { ...base, state: 'not_connected' as SourceState, data_as_of, imported_at, note: tokenNote }
     }
