@@ -148,6 +148,13 @@ export function reportQuery(platform: Platform, t: TableInfo): string {
   )
 }
 
+/** Ultima zi cu date a fiecărui cont, în tot tabelul (diagnostic când fereastra e goală). Parametru: $1 = ID-urile conturilor. */
+export function lastDateQuery(platform: Platform, t: TableInfo): string {
+  const spec = SPECS[platform]
+  const acct = `${col(t, spec.account)}::text`
+  return `select ${acct} as account_id, max(left(${col(t, spec.date)}::text, 10)) as last_date from ${rel(t)} where ${acct} = any(string_to_array($1, ',')) group by 1`
+}
+
 /** Moneda și fusul orar din catalog, pe cont. Parametru: $1 = ID-urile conturilor, separate prin virgulă. */
 export function catalogQuery(platform: Platform, t: TableInfo): string {
   const spec = SPECS[platform]
