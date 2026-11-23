@@ -11,13 +11,13 @@
 
 import { checkResolved, parseCredential } from '../../supabase/functions/airbyte/dsn.ts'
 import { groupTables, PgError, readColumns, type PgErrorKind, type PgSession, type PgTarget, type Platform } from '../../supabase/functions/airbyte/inspect.ts'
-import { isValidTimeZone, lookbackWindow } from '../google/dates.ts'
+import { addDaysIso, calendarDateIn, isIsoDate, isValidTimeZone, lookbackWindow } from '../google/dates.ts'
 import { PAID_KEY } from '../meta/collect-core.ts'
 import { getSourceToken, loadActiveConnections } from '../shared/connections.ts'
 import { finishSyncRun, startSyncRun, type SyncRunError, type SyncRunHandle } from '../shared/sync-runs.ts'
 import { assertUuid, type Db } from '../shared/supabase-rest.ts'
 import { upsertScoped } from '../shared/upsert.ts'
-import { catalogQuery, pickCatalog, pickReport, reportQuery, SPECS, toPaidRows, type ReportRow } from './streams.ts'
+import { catalogQuery, lastDateQuery, pickCatalog, pickReport, reportQuery, SPECS, toPaidRows, type ReportRow } from './streams.ts'
 
 export const AIRBYTE_CREDENTIAL_PROVIDER = 'airbyte_postgres'
 export const AIRBYTE_PROVIDER = 'airbyte'
@@ -30,6 +30,26 @@ export type AirbyteDeps = {
   now?: () => Date
   resolve: (host: string) => Promise<string[]>
   connect: <T>(target: PgTarget, run: (session: PgSession) => Promise<T>) => Promise<T>
+  /** Reimportul istoricului: prima zi (ISO), în loc de ultimele 35 de zile. Cel mult `AIRBYTE_MAX_HISTORY_DAYS` în urmă. */
+  from?: string
+  /** Doar conexiunile acestui site (reimport țintit). */
+  brandId?: string
+}
+
+/** Cât de departe merge un reimport: datele sunt deja în baza Airbyte, deci fără limite de API, dar interogarea rămâne mărginită. */
+export const AIRBYTE_MAX_HISTORY_DAYS = 730
+
+type Window = { start: string; end: string }
+
+/** Fereastra rulării: ultimele 35 de zile până ieri, sau de la `from` până ieri (Europe/Bucharest). */
+export function collectionWindow(now: Date, from?: string): Window {
+  const base = lookbackWindow(now, WINDOW_TZ, AIRBYTE_LOOKBACK_DAYS)
+  if (from === undefined) return base
+  if (!isIsoDate(from)) throw new Error(`--from invalid: ${from} (forma YYYY-MM-DD).`)
+  const today = calendarDateIn(now, WINDOW_TZ)
+  if (from > base.end) throw new Error(`--from ${from} e după ieri (${base.end}).`)
+  if (from < addDaysIso(today, -AIRBYTE_MAX_HISTORY_DAYS)) throw new Error(`--from ${from} e mai vechi de ${AIRBYTE_MAX_HISTORY_DAYS} de zile.`)
+  return { start: from, end: base.end }
 }
 
 export type AirbyteOutcome = {
@@ -67,6 +87,8 @@ const PG_MESSAGE: Record<PgErrorKind, string> = {
 export async function collectAirbyte(deps: AirbyteDeps): Promise<AirbyteOutcome[]> {
   const { db } = deps
   const now = deps.now ?? (() => new Date())
+  const window = collectionWindow(now(), deps.from)
+  if (deps.brandId !== undefined) assertUuid(deps.brandId, 'brand_id')
   const credentials = await loadActiveConnections(db, AIRBYTE_CREDENTIAL_PROVIDER, { requireBrand: false })
   const credentialByTenant = new Map(credentials.connections.filter((c) => c.brand_id === null).map((c) => [c.tenant_id, c]))
   const skippedReason = new Map<string, string>()
@@ -84,7 +106,7 @@ export async function collectAirbyte(deps: AirbyteDeps): Promise<AirbyteOutcome[
 
   const outcomes: AirbyteOutcome[] = []
   const byTenant = new Map<string, Linked[]>()
-  for (const c of connections) {
+  for (const c of connections.filter((x) => deps.brandId === undefined || x.brand_id === deps.brandId)) {
     if (c.provider !== AIRBYTE_PROVIDER || c.status !== 'active') throw new Error(`Conexiunea ${c.id} nu corespunde filtrului; opresc rularea.`)
     const m = EXTERNAL.exec(c.external_account_id.trim())
     const nc = (reason: string, platform: Platform | null = null) =>
@@ -103,27 +125,26 @@ export async function collectAirbyte(deps: AirbyteDeps): Promise<AirbyteOutcome[
   for (const [tenantId, list] of byTenant) {
     assertUuid(tenantId, 'tenant_id')
     try {
-      outcomes.push(...(await collectTenant(deps, credentialByTenant.get(tenantId)!.id, list, now)))
+      outcomes.push(...(await collectTenant(deps, credentialByTenant.get(tenantId)!.id, list, now, window)))
     } catch (err) {
       // Izolare per client: o eroare neașteptată nu îi oprește pe ceilalți.
-      for (const c of list) outcomes.push(await failedRun(db, c, now, 'exception', (err as Error).message))
+      for (const c of list) outcomes.push(await failedRun(db, c, now, window, 'exception', (err as Error).message))
     }
   }
   return outcomes
 }
 
-async function failedRun(db: Db, c: Linked, now: () => Date, code: string, message: string): Promise<AirbyteOutcome> {
-  const w = lookbackWindow(now(), WINDOW_TZ, AIRBYTE_LOOKBACK_DAYS)
+async function failedRun(db: Db, c: Linked, now: () => Date, w: Window, code: string, message: string): Promise<AirbyteOutcome> {
   const h = await startSyncRun(db, { tenant_id: c.tenant_id, brand_id: c.brand_id, source: c.platform, source_connection_id: c.id, period_start: w.start, period_end: w.end }, now)
   const errors = [{ code, status: null, message }]
   await finishSyncRun(db, h, { status: 'failed', rows_written: 0, attempt_count: 1, errors }, now)
   return { tenant_id: c.tenant_id, brand_id: c.brand_id, connection_id: c.id, platform: c.platform, status: 'failed', sync_run_id: h.id, rows_written: 0, errors }
 }
 
-async function collectTenant(deps: AirbyteDeps, credentialId: string, list: Linked[], now: () => Date): Promise<AirbyteOutcome[]> {
+async function collectTenant(deps: AirbyteDeps, credentialId: string, list: Linked[], now: () => Date, window: Window): Promise<AirbyteOutcome[]> {
   const { db } = deps
   const validation = (ok: boolean, error?: string) => db.rpc('record_source_validation', { p_connection_id: credentialId, p_ok: ok, ...(error ? { p_error: error } : {}) }).catch(() => undefined)
-  const failAll = async (code: string, message: string) => Promise.all(list.map((c) => failedRun(db, c, now, code, message)))
+  const failAll = async (code: string, message: string) => Promise.all(list.map((c) => failedRun(db, c, now, window, code, message)))
 
   const parsed = parseCredential(await getSourceToken(db, credentialId))
   if (!parsed.ok) {
@@ -147,7 +168,6 @@ async function collectTenant(deps: AirbyteDeps, credentialId: string, list: Link
     return failAll(`airbyte_${blocked.reason}`, blocked.message)
   }
 
-  const window = lookbackWindow(now(), WINDOW_TZ, AIRBYTE_LOOKBACK_DAYS)
   const outcomes: AirbyteOutcome[] = []
   const pending = new Set(list)
   try {
@@ -162,7 +182,7 @@ async function collectTenant(deps: AirbyteDeps, credentialId: string, list: Link
           if (!report) {
             for (const c of conns) {
               pending.delete(c)
-              outcomes.push(await failedRun(db, c, now, 'stream_not_found', `Niciun tabel ${SPECS[platform].streams.join(' / ')} citibil în destinația Airbyte (verifică fluxul și GRANT SELECT).`))
+              outcomes.push(await failedRun(db, c, now, window, 'stream_not_found', `Niciun tabel ${SPECS[platform].streams.join(' / ')} citibil în destinația Airbyte (verifică fluxul și GRANT SELECT).`))
             }
             continue
           }
@@ -179,13 +199,27 @@ async function collectTenant(deps: AirbyteDeps, credentialId: string, list: Link
             const kind = err instanceof PgError ? err.kind : 'other'
             for (const c of conns) {
               pending.delete(c)
-              outcomes.push(await failedRun(db, c, now, `airbyte_${kind}`, `${report.schema}.${report.table}: ${PG_MESSAGE[kind]}`))
+              outcomes.push(await failedRun(db, c, now, window, `airbyte_${kind}`, `${report.schema}.${report.table}: ${PG_MESSAGE[kind]}`))
             }
             continue
           }
+          // Conturile fără date în fereastră: ultima zi din tabel spune dacă sincronizarea Airbyte s-a oprit.
+          const empty = accounts.split(',').filter((a) => !rows.some((r) => r.account_id === a))
+          const lastDates = new Map<string, string | null>()
+          if (empty.length) {
+            try {
+              for (const r of await session.query<{ account_id: string; last_date: string | null }>(lastDateQuery(platform, report), [empty.join(',')])) lastDates.set(r.account_id, r.last_date)
+            } catch (err) {
+              if (err instanceof PgError && (err.kind === 'unreachable' || err.kind === 'auth')) throw err
+            }
+          }
           for (const c of conns) {
             pending.delete(c)
-            outcomes.push(await writeAccount(db, c, rows.filter((r) => r.account_id === c.account), catalogRows.find((r) => r.account_id === c.account) ?? null, `${report.schema}.${report.table}`, window, now))
+            const own = rows.filter((r) => r.account_id === c.account)
+            const table = `${report.schema}.${report.table}`
+            outcomes.push(own.length
+              ? await writeAccount(db, c, own, catalogRows.find((r) => r.account_id === c.account) ?? null, table, window, now)
+              : await emptyAccount(db, c, table, lastDates.get(c.account) ?? null, window, now))
           }
         }
       },
@@ -194,9 +228,23 @@ async function collectTenant(deps: AirbyteDeps, credentialId: string, list: Link
   } catch (err) {
     const kind: PgErrorKind = err instanceof PgError ? err.kind : 'other'
     if (INVALIDATING.includes(kind)) await validation(false, kind)
-    for (const c of pending) outcomes.push(await failedRun(db, c, now, `airbyte_${kind}`, PG_MESSAGE[kind]))
+    for (const c of pending) outcomes.push(await failedRun(db, c, now, window, `airbyte_${kind}`, PG_MESSAGE[kind]))
   }
   return outcomes
+}
+
+/**
+ * Contul nu are niciun rând în fereastră. Nu e o eroare a colectării, dar nici date confirmate: rularea e `partial`, cu
+ * ultima zi găsită în Airbyte (sincronizare oprită) sau cu faptul că tabelul nu are deloc contul.
+ */
+async function emptyAccount(db: Db, c: Linked, table: string, lastDate: string | null, window: Window, now: () => Date): Promise<AirbyteOutcome> {
+  const scope = { tenant_id: c.tenant_id, brand_id: c.brand_id }
+  const h = await startSyncRun(db, { ...scope, source: c.platform, source_connection_id: c.id, period_start: window.start, period_end: window.end }, now)
+  const errors: SyncRunError[] = [lastDate
+    ? { code: 'airbyte_stale', status: null, dimension: table, message: `Airbyte nu are date pentru cont între ${window.start} și ${window.end}; ultima zi sincronizată e ${lastDate}. Verifică sincronizarea conexiunii în Airbyte; pentru istoric, reimportă cu --from.` }
+    : { code: 'airbyte_account_absent', status: null, dimension: table, message: `Contul nu apare în ${table}. Verifică dacă e inclus în conexiunea Airbyte.` }]
+  await finishSyncRun(db, h, { status: 'partial', rows_written: 0, attempt_count: 1, errors }, now)
+  return { ...scope, connection_id: c.id, platform: c.platform, status: 'partial', sync_run_id: h.id, rows_written: 0, errors }
 }
 
 async function writeAccount(
@@ -220,7 +268,6 @@ async function writeAccount(
   try {
     const currency = (rows.find((r) => r.currency)?.currency ?? catalog?.currency ?? '').trim().toUpperCase()
     if (!/^[A-Z]{3}$/.test(currency)) {
-      if (rows.length === 0) return await done('succeeded', 0)
       errors.push({ code: 'currency_missing', status: null, dimension: table, message: 'Moneda contului nu apare nici în raport, nici în catalogul Airbyte; rândurile nu se scriu.' })
       return await done('failed', 0)
     }
