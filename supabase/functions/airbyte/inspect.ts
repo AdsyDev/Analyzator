@@ -153,6 +153,25 @@ const KEYS_SAMPLE_ROWS = 500
 /** Numele de coloană normalizat (Airbyte poate păstra `customer.id`), legat de numele real pentru citare. */
 export const norm = (c: string) => c.toLowerCase().replace(/[^a-z0-9]+/g, '_')
 
+/**
+ * Numele tabelului pentru potrivire: normalizat și fără sufixul hash pe care Airbyte îl pune când două fluxuri ar avea
+ * același nume (`publicadvertisersf8016549…` → `publicadvertisers`).
+ */
+export const tableName = (t: string) => norm(t).replace(/_?[0-9a-f]{32}$/, '')
+
+/** Fluxurile principale ale fiecărei platforme: cele pe care le colectează și colectorul (connectors/airbyte). */
+export const PRIMARY_STREAMS: Record<Platform, string[]> = {
+  meta_ads: ['ads_insights'],
+  google_ads: ['campaign', 'account_performance_report'],
+  tiktok_ads: ['campaigns_reports_daily', 'ads_reports_daily', 'advertisers_reports_daily'],
+}
+
+/** Tabelul e fluxul dat (cu prefixul conexiunii sau sufixul hash acceptate). */
+export const isStream = (table: string, stream: string) => {
+  const n = tableName(table)
+  return n === stream || n.endsWith(`_${stream}`)
+}
+
 export function quoteIdent(name: string): string {
   return `"${name.replace(/"/g, '""')}"`
 }
@@ -183,7 +202,7 @@ export function classify(tables: TableInfo[]): Match[] {
         break
       }
       // Catalogul poate avea și dată (fluxul `customer` din Google Ads are segments.date), dar nu are metrici.
-      if (norm(info.table).endsWith(sig.catalog.suffix) && sig.catalog.names.some(has)) {
+      if (tableName(info.table).endsWith(sig.catalog.suffix) && sig.catalog.names.some(has)) {
         out.push({ sig, info, role: 'catalog' })
         break
       }
@@ -313,7 +332,10 @@ export async function inspect(session: PgSession, deadline: number, now: () => n
   const catalogs = matches.filter((m) => m.role === 'catalog')
   // Rapoartele mici întâi (estimarea din pg_class): conturile apar din tabelele pe cont sau campanie, iar tabelele
   // mari pe reclamă și defalcare rămân la coadă, unde le poate opri termenul. Fără estimare, ordinea din catalog.
-  const reports = await bySize(session, matches.filter((m) => m.role === 'report'))
+  // Fluxurile principale întâi (din ele se colectează, deci conturile lor trebuie să apară), apoi restul după mărime.
+  const all = matches.filter((m) => m.role === 'report')
+  const primary = all.filter((m) => PRIMARY_STREAMS[m.sig.platform].some((st) => isStream(m.info.table, st)))
+  const reports = [...primary, ...(await bySize(session, all.filter((m) => !primary.includes(m))))]
   let truncated = reports.length > MAX_TABLES
   const selected = [...catalogs, ...reports.slice(0, MAX_TABLES)]
 

@@ -12,7 +12,7 @@
 // apoi segmentele (oră, rețea, dispozitiv la Google Ads) se adună pe cont × campanie × grup × anunț × zi.
 
 import { createHash } from 'node:crypto'
-import { META_DIMENSIONS, norm, quoteIdent, SYNCED_AT, type Platform, type TableInfo } from '../../supabase/functions/airbyte/inspect.ts'
+import { isStream, META_DIMENSIONS, PRIMARY_STREAMS, quoteIdent, SYNCED_AT, tableName, type Platform, type TableInfo } from '../../supabase/functions/airbyte/inspect.ts'
 
 export const AIRBYTE_SCHEMA_VERSION = 'airbyte-postgres-v1'
 
@@ -40,7 +40,7 @@ type Field = 'campaign_id' | 'campaign_name' | 'ad_group_id' | 'ad_group_name' |
 
 export const SPECS: Record<Platform, Spec> = {
   meta_ads: {
-    platform: 'meta_ads', streams: ['ads_insights'], account: 'account_id', date: 'date_start', ids: ['ad_id', 'adset_id', 'campaign_id'],
+    platform: 'meta_ads', streams: PRIMARY_STREAMS.meta_ads, account: 'account_id', date: 'date_start', ids: ['ad_id', 'adset_id', 'campaign_id'],
     segment: (c) => META_DIMENSIONS.has(c), json: [], micros: false, clickType: 'all',
     fields: {
       campaign_id: ['campaign_id'], campaign_name: ['campaign_name'], ad_group_id: ['adset_id'], ad_group_name: ['adset_name'], ad_id: ['ad_id'], ad_name: ['ad_name'],
@@ -51,7 +51,7 @@ export const SPECS: Record<Platform, Spec> = {
     catalog: { suffix: 'ad_account', currency: ['currency'], timezone: ['timezone_name'] },
   },
   google_ads: {
-    platform: 'google_ads', streams: ['campaign', 'account_performance_report'], account: 'customer_id', date: 'segments_date',
+    platform: 'google_ads', streams: PRIMARY_STREAMS.google_ads, account: 'customer_id', date: 'segments_date',
     ids: ['ad_group_ad_ad_id', 'ad_group_id', 'campaign_id'], segment: (c) => c.startsWith('segments_') && c !== 'segments_date', json: [], micros: true, clickType: 'all',
     fields: {
       campaign_id: ['campaign_id'], campaign_name: ['campaign_name'], ad_group_id: ['ad_group_id'], ad_group_name: ['ad_group_name'], ad_id: ['ad_group_ad_ad_id'],
@@ -61,7 +61,7 @@ export const SPECS: Record<Platform, Spec> = {
     catalog: { suffix: 'customer', currency: ['customer_currency_code'], timezone: ['customer_time_zone'] },
   },
   tiktok_ads: {
-    platform: 'tiktok_ads', streams: ['campaigns_reports_daily', 'ads_reports_daily', 'advertisers_reports_daily'], account: 'advertiser_id', date: 'stat_time_day',
+    platform: 'tiktok_ads', streams: PRIMARY_STREAMS.tiktok_ads, account: 'advertiser_id', date: 'stat_time_day',
     ids: ['ad_id', 'adgroup_id', 'campaign_id'], segment: () => false, json: ['metrics', 'dimensions'], micros: false, clickType: 'all',
     fields: {
       campaign_id: ['campaign_id'], campaign_name: ['campaign_name'], ad_group_id: ['adgroup_id'], ad_group_name: ['adgroup_name'], ad_id: ['ad_id'], ad_name: ['ad_name'],
@@ -71,10 +71,7 @@ export const SPECS: Record<Platform, Spec> = {
   },
 }
 
-const nameMatches = (table: string, stream: string) => {
-  const t = norm(table)
-  return t === stream || t.endsWith(`_${stream}`)
-}
+const nameMatches = isStream
 
 /** Tabelul de raport ales pentru platformă: primul flux preferat care are cont, zi și cost sau afișări. */
 export function pickReport(platform: Platform, tables: TableInfo[]): TableInfo | null {
@@ -94,7 +91,7 @@ export function pickReport(platform: Platform, tables: TableInfo[]): TableInfo |
 /** Tabelul-catalog al platformei (moneda și fusul orar ale contului), dacă există. */
 export function pickCatalog(platform: Platform, tables: TableInfo[]): TableInfo | null {
   const spec = SPECS[platform]
-  return tables.find((t) => norm(t.table).endsWith(spec.catalog.suffix) && t.columns.has(spec.account) && spec.catalog.currency.some((c) => t.columns.has(c))) ?? null
+  return tables.find((t) => tableName(t.table).endsWith(spec.catalog.suffix) && t.columns.has(spec.account) && spec.catalog.currency.some((c) => t.columns.has(c))) ?? null
 }
 
 const col = (t: TableInfo, c: string) => quoteIdent(t.columns.get(c)!.name)
