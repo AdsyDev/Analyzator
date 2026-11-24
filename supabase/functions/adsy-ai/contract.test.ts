@@ -44,6 +44,26 @@ describe('buildContext', () => {
     assert.ok(!JSON.stringify(c.data).includes('secret'), 'o ciornă nu ajunge la model')
     assert.ok((c.data.insights as Array<{ summary: string }>)[0]!.summary.length <= 1200)
   })
+  test('AB: intervalul efectiv al comparației apare pe metrică doar când diferă de cel al cererii', () => {
+    const build = (m: MetricRow[]) => buildContext({
+      brandName: 'Brand de test',
+      period: { start: '2026-10-26', end: '2026-11-22' },
+      comparisonPeriod: { start: '2026-09-28', end: '2026-10-25' },
+      metrics: m,
+      definitions: [{ metric_key: 'gsc_clicks', name_ro: 'Clicks (Search Console)' }, { metric_key: 'ga4_sessions', name_ro: 'Sesiuni' }],
+      insights: [],
+    }).data.metrics as Array<Record<string, unknown>>
+    const rows = build([
+      metric('gsc_clicks', { status: 'partial', evidence_query: { comparison_period: { start: '2026-09-28', end: '2026-10-17' } } }),
+      metric('ga4_sessions', { evidence_query: { comparison_period: { start: '2026-09-28', end: '2026-10-25' } } }),
+    ])
+    assert.deepEqual(rows.find((r) => r.evidence_id === 'metric:gsc_clicks')!.comparison_period, { start: '2026-09-28', end: '2026-10-17' })
+    assert.equal('comparison_period' in rows.find((r) => r.evidence_id === 'metric:ga4_sessions')!, false)
+    // Fără evidence_query sau cu date invalide, nu se trimite nimic în plus.
+    const bad = build([metric('gsc_clicks', { evidence_query: { comparison_period: { start: 'ieri', end: '2026-10-17' } } }), metric('ga4_sessions')])
+    assert.ok(bad.every((r) => !('comparison_period' in r)))
+  })
+
   test('aceleași date dau aceeași amprentă; o cifră schimbată o schimbă', async () => {
     const a = await sha256Hex(JSON.stringify(ctx().data))
     assert.equal(a, await sha256Hex(JSON.stringify(ctx().data)))

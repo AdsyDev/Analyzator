@@ -36,13 +36,19 @@ export function createSupabaseMentions(client: DataClient): MentionsProvider {
       const { data, error } = await client.rpc('brand_mentions', {
         p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to,
         p_sentiment: q.sentiment, p_source: q.source, p_page: q.page, p_page_size: q.page_size, p_author: q.author ?? 'all',
+        // Implicit serverul arată doar româna (deciziile AC); „toate limbile” se cere explicit.
+        ...(q.language === 'all' ? { p_language: 'all' } : {}),
       })
       if (error) return failed(rpcError(error))
-      const d = data as (Page<Mention> & { without_content?: unknown }) | null
+      const d = data as (Page<Mention> & { without_content?: unknown; other_language?: unknown }) | null
       if (!d || !Array.isArray(d.items) || typeof d.total !== 'number') return failed(CONTRACT)
-      // Un server mai vechi nu trimite câmpul: atunci nu există mențiuni fără conținut de raportat.
-      const page: MentionPage = { items: d.items, total: d.total, page: d.page, page_size: d.page_size, without_content: typeof d.without_content === 'number' ? d.without_content : 0 }
-      if (d.total === 0 && q.page === 1 && !q.sentiment && !q.source && !q.author) {
+      // Un server mai vechi nu trimite câmpurile: atunci nu există mențiuni fără conținut sau în altă limbă de raportat.
+      const page: MentionPage = {
+        items: d.items, total: d.total, page: d.page, page_size: d.page_size,
+        without_content: typeof d.without_content === 'number' ? d.without_content : 0,
+        other_language: typeof d.other_language === 'number' ? d.other_language : 0,
+      }
+      if (d.total === 0 && q.page === 1 && !q.sentiment && !q.source && !q.author && !q.language) {
         const s = await this.sentiment(ctx)
         if (s.kind === 'not_connected') return s
       }
@@ -56,7 +62,11 @@ export function createSupabaseMentions(client: DataClient): MentionsProvider {
       if (!d || typeof d.total !== 'number' || typeof d.owned_excluded !== 'number') return failed(CONTRACT)
       if (d.connected === false) return notConnected(NO_LISTENING)
       const { connected: _c, ...dist } = d
-      return ready({ ...dist, without_content: typeof dist.without_content === 'number' ? dist.without_content : 0 } as SentimentDistribution)
+      return ready({
+        ...dist,
+        without_content: typeof dist.without_content === 'number' ? dist.without_content : 0,
+        other_language: typeof dist.other_language === 'number' ? dist.other_language : 0,
+      } as SentimentDistribution)
     },
 
     async sources(brandId) {

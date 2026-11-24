@@ -151,6 +151,19 @@ describe('motive din avertismente', () => {
     expect(notesFor(m)).toEqual(['Date parțiale.', 'Perioadă incompletă.'])
   })
 
+  it('AB: la date parțiale, motivul spune că variația compară aceleași zile din fiecare perioadă', () => {
+    const matched = warning('comparison_matched', { severity: 'info', detail: { days: 20, comparison_period: { start: '2026-09-28', end: '2026-10-17' } } })
+    const m = metric({ status: 'partial', coverage: 0.7143, warnings: [matched] })
+    expect(reasonFor(m)).toBe('Date disponibile pentru 71% din zilele intervalului. Variația compară primele 20 de zile din fiecare perioadă.')
+    expect(notesFor(m)).toEqual([])
+    expect(metricView(m).caveat).toBe(reasonFor(m))
+    // Cu alt status principal (de exemplu întârziere), apare ca notă.
+    expect(notesFor(metric({ status: 'stale', warnings: [warning('stale'), matched] }))).toEqual(['Variația compară primele 20 de zile din fiecare perioadă.'])
+    expect(notesFor(metric({ warnings: [warning('comparison_matched', { detail: { days: 1 } })] }))).toEqual(['Variația compară prima zi din fiecare perioadă.'])
+    // Fără numărul de zile nu inventăm textul.
+    expect(notesFor(metric({ warnings: [warning('comparison_matched', { detail: null })] }))).toEqual([])
+  })
+
   it('definiția draft apare cu nota ei', () => {
     expect(notesFor(metric({ warnings: [warning('definition_draft', { severity: 'info', detail: 'Unitatea se confirmă.' })] }))).toEqual(['Definiție provizorie: Unitatea se confirmă.'])
   })

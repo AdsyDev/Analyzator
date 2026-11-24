@@ -39,7 +39,7 @@ function TrafficContent({ brand, ctx, canManageSources }: { brand: Brand; ctx: Q
   const key = ctxKey(ctx)
 
   const metrics = useMetrics(ctx, TRAFFIC_KPI_KEYS)
-  const { byKey } = useDefinitions(TRAFFIC_KPI_KEYS)
+  const { byKey, loaded: registryLoaded } = useDefinitions(TRAFFIC_KPI_KEYS)
   const sparks = useTrends(ctx, TRAFFIC_KPI_KEYS)
   const channels = useAsync(() => providers.traffic.channels(ctx, device), [providers, key])
   const referrals = useAsync(() => providers.traffic.aiReferrals(ctx), [providers, key])
@@ -48,7 +48,7 @@ function TrafficContent({ brand, ctx, canManageSources }: { brand: Brand; ctx: Q
 
   return (
     <div className="flex flex-col gap-5">
-      <KpiGrid slots={TRAFFIC_KPI_SLOTS} page="Trafic și conversii" metrics={metrics.state} definitions={byKey} trends={sparks.state} onRetry={metrics.reload} onOpen={setTarget} />
+      <KpiGrid slots={TRAFFIC_KPI_SLOTS} page="Trafic și conversii" metrics={metrics.state} definitions={byKey} registryLoaded={registryLoaded} trends={sparks.state} onRetry={metrics.reload} onOpen={setTarget} />
       <ChannelsSection state={channels.state} onRetry={channels.reload} deviceLabel={deviceLabel} />
       <AiReferralsSection state={referrals.state} onRetry={referrals.reload} />
       <TrackingSection state={tracking.state} onRetry={tracking.reload} />

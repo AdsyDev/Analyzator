@@ -52,10 +52,14 @@ export type SentimentFilter = Sentiment | 'unreviewed'
 /** Filtrul de autor: doar autorii externi (inclusiv necunoscuți), doar conturile proprii, sau `null` = toți. */
 export type AuthorFilter = 'external' | 'owned'
 
+/** Limba mențiunilor: `all` = toate limbile (doar agenția, pentru farmacovigilență); `null` = implicit, doar română. */
+export type LanguageFilter = 'all'
+
 export interface MentionQuery {
   sentiment: SentimentFilter | null
   source: string | null
   author: AuthorFilter | null
+  language?: LanguageFilter | null
   page: number
   page_size: number
 }
@@ -71,9 +75,11 @@ export interface Page<T> {
  * O pagină din feed-ul de mențiuni. `items` și `total` cuprind doar mențiunile cu conținut (link sau text);
  * `without_content` numără, pe aceeași perioadă, sursă și autor, mențiunile pe care sursa le-a trimis fără niciunul
  * (mențiunile web din Planable). Acestea nu au ce afișa și nu pot fi revizuite, dar sunt numărate la „Mențiuni”.
+ * `other_language` numără mențiunile cu conținut lăsate deoparte pentru că sunt în altă limbă decât româna (deciziile AC).
  */
 export interface MentionPage extends Page<Mention> {
   without_content: number
+  other_language: number
 }
 
 /**
@@ -92,6 +98,8 @@ export interface SentimentDistribution {
   without_content: number
   /** Postări din conturile proprii, excluse din distribuție (D-22). */
   owned_excluded: number
+  /** Mențiuni externe cu conținut în altă limbă decât româna, excluse din Listening (deciziile AC). */
+  other_language: number
   /** Procente din `total`; `null` când `total` e 0. */
   shares: { positive: number | null; neutral: number | null; negative: number | null }
 }

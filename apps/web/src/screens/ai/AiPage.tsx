@@ -40,7 +40,7 @@ function AiContent({ brand, ctx, canManageSources, onFilters }: { brand: Brand; 
   const key = ctxKey(ctx)
 
   const metrics = useMetrics(ctx, AI_KPI_KEYS)
-  const { byKey } = useDefinitions(AI_KPI_KEYS)
+  const { byKey, loaded: registryLoaded } = useDefinitions(AI_KPI_KEYS)
   const sparks = useTrends(ctx, AI_KPI_KEYS)
   const engines = useAsync(() => providers.ai.engines(ctx, f), [providers, key])
   const trends = useAsync(() => providers.ai.trends(ctx, f), [providers, key])
@@ -49,7 +49,7 @@ function AiContent({ brand, ctx, canManageSources, onFilters }: { brand: Brand; 
 
   return (
     <div className="flex flex-col gap-5">
-      <KpiGrid slots={AI_KPI_SLOTS} page="AI Visibility" metrics={metrics.state} definitions={byKey} trends={sparks.state} onRetry={metrics.reload} onOpen={setTarget} />
+      <KpiGrid slots={AI_KPI_SLOTS} page="AI Visibility" metrics={metrics.state} definitions={byKey} registryLoaded={registryLoaded} trends={sparks.state} onRetry={metrics.reload} onOpen={setTarget} />
       <EngineCards state={engines.state} onRetry={engines.reload} selected={f.engine} onSelect={onFilters} />
       <EngineTrend state={trends.state} onRetry={trends.reload} />
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
