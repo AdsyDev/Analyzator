@@ -46,7 +46,7 @@ export function withoutContentNote(n: number): string {
 
 /** Câte mențiuni au fost lăsate deoparte pentru limbă (deciziile AC): Listening arată doar mențiunile în română. */
 export function otherLanguageNote(n: number, admin = false): string {
-  const base = `${formatInteger(n)} ${n === 1 ? 'mențiune din perioadă e' : 'mențiuni din perioadă sunt'} în altă limbă decât româna și nu ${n === 1 ? 'e afișată' : 'sunt afișate'}. Limba se stabilește din text; mențiunile prea scurte ca să se poată stabili rămân în listă.`
+  const base = `${formatInteger(n)} ${n === 1 ? 'mențiune din perioadă e' : 'mențiuni din perioadă sunt'} în altă limbă decât româna și nu ${n === 1 ? 'e afișată' : 'sunt afișate'}. Limba se stabilește din text; mențiunile prea scurte ca să se poată stabili rămân în listă. Mențiunile în altă limbă nu se numără nici la „Mențiuni”.`
   return admin ? `${base} Pentru verificarea de farmacovigilență, alege „Limbă: Toate limbile”.` : base
 }
 

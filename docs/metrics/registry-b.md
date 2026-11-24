@@ -28,7 +28,8 @@ Surse: import CSV asistat (paid, social, listening), cu aceleași tabele și con
 | `tiktok_ads_conversions` | 1 | Conversii TikTok Ads | TikTok Ads | count | sum | — | 14 | active |
 | `tiktok_ads_cpc` | 1 | CPC TikTok Ads | TikTok Ads | count | ratio | — | 14 | draft (înlocuită de v2) |
 | `tiktok_ads_cpa` | 1 | CPA TikTok Ads | TikTok Ads | count | ratio | — | 14 | draft (înlocuită de v2) |
-| `mentions_count` | 1 | Mențiuni (Planable Listening) | Planable Listening | count | sum | — | 14 | active |
+| `mentions_count` | 1 | Mențiuni (Planable Listening) | Planable Listening | count | sum | — | 14 | active (înlocuită de v2) |
+| `mentions_count` | 2 | Mențiuni (Planable Listening) | Planable Listening | count | sum | — | 14 | active |
 | `google_ads_spend` | 2 | Cost Google Ads | Google Ads | currency | sum | — | 14 | active |
 | `google_ads_cpc` | 2 | CPC Google Ads | Google Ads | currency | ratio | — | 14 | active |
 | `google_ads_cpa` | 2 | CPA Google Ads | Google Ads | currency | ratio | — | 14 | active |
@@ -157,6 +158,8 @@ Cost / conversii pe totalurile perioadei (TikTok Ads), pentru aceeași acțiune 
 _Observații: view-urile `paid_metric_observations` / `mentions_metric_observations`; vezi `docs/contracts/csv-*.md`._
 
 Numărul de mențiuni distincte publicate în interval; importul nu schimbă data publicării.
+
+**Versiunea 2 (24 nov. 2026, deciziile AD, migrația `20261124150000_mentions_count_romanian.sql`, `valid_from = 2026-11-24`).** Nu mai numără mențiunile clar în altă limbă decât româna, cu aceeași regulă ca feed-ul din Listening (`metrics.mention_other_language`: limba declarată de sursă, altfel `metrics.text_language_v1` pe text). Mențiunile cu limba nedeterminată (text prea scurt) și cele fără text (web, din Planable) rămân numărate: limba lor nu se poate stabili, iar regula 8 nu permite să le presupunem străine. Unitatea, agregarea, direcția și toleranța nu se schimbă. Calculul se aplică pe toate perioadele (ca la H-2), deci comparația cu o perioadă anterioară e pe aceeași bază; analizele publicate își păstrează instantaneul cu versiunea 1. **În matricea de Concurență**, celula brandului numără toate limbile, pentru că limba mențiunilor competitorilor nu se cunoaște (Y-5); celula o spune.
 
 **Acoperire (11 nov. 2026, deciziile R).** De la prima colectare după această dată, numără și mențiunile pe care Planable le trimite fără link (cele de pe web), scrise cu o cheie construită. Formula nu s-a schimbat; valoarea crește mult la brandurile cu mențiuni web, iar comparația cu o perioadă dinainte reflectă și schimbarea de acoperire.
 
