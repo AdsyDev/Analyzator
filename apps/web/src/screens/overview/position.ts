@@ -13,7 +13,7 @@ export interface PositionRow {
 }
 
 /**
- * Alege câte un rând pe dimensiune din matricea de Concurență și stabilește locul brandului în set. Nu calculează
+ * Alege câte un rând pe dimensiune din matricea de Competiție și stabilește locul brandului în set. Nu calculează
  * metrici: ordonează valorile venite de la server, după direcția din registru. Valorile lipsă nu intră în clasament
  * (nu sunt zero), iar o egalitate dă același loc.
  */

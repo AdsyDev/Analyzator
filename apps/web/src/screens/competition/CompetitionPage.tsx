@@ -33,7 +33,7 @@ const gapColumns: Column<CompetitionGap>[] = [
   { key: 'subject', header: 'Subiect', cardTitle: true, sortValue: (g) => g.subject, render: (g) => <span className="font-medium">{g.subject}</span> },
   {
     key: 'competitors',
-    header: 'Unde apare concurența',
+    header: 'Unde apare competiția',
     render: (g) => (
       <ul className="flex flex-col gap-0.5">
         {g.competitors.map((c) => (
@@ -61,15 +61,15 @@ function Matrix({ state, onRetry }: { state: AsyncState<ProviderResult<Competiti
 }
 
 function Gaps({ state, onRetry }: { state: AsyncState<ProviderResult<CompetitionGap[]>>; onRetry: () => void }) {
-  const exportName = useExportName('diferente concurenta')
+  const exportName = useExportName('diferente competitie')
   return (
-    <Section id="gaps" title="Unde apare concurența și noi lipsim" description="Căutări și subiecte în care un competitor e prezent, iar brandul lipsește sau e mai slab. Sunt puncte de plecare pentru discuție, nu concluzii.">
+    <Section id="gaps" title="Unde apare competiția și noi lipsim" description="Căutări și subiecte în care un competitor e prezent, iar brandul lipsește sau e mai slab. Sunt puncte de plecare pentru discuție, nu concluzii.">
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă diferențele" skeletonClass="h-48">
         {(gaps) =>
           gaps.length === 0 ? (
             <EmptyState compact title="Nicio diferență găsită" text="Nu am găsit subiecte în care un competitor apare și brandul lipsește." />
           ) : (
-            <SortableTable caption="Unde apare concurența și noi lipsim" exportFileName={exportName} columns={gapColumns} rows={gaps} rowKey={(g) => g.id} pageSize={8} emptyText="Nicio diferență." />
+            <SortableTable caption="Unde apare competiția și noi lipsim" exportFileName={exportName} columns={gapColumns} rows={gaps} rowKey={(g) => g.id} pageSize={8} emptyText="Nicio diferență." />
           )
         }
       </Resolved>
@@ -149,7 +149,7 @@ function Ads({ state, page, onPage, onRetry }: { state: AsyncState<ProviderResul
   )
 }
 
-/** Concurență (spec cap. 20): matricea comparativă, „Unde apare concurența și noi lipsim" și reclamele competitorilor. Fiecare secțiune are stările ei. */
+/** Competiție (spec cap. 20; „Concurență” până la 24 nov. 2026): matricea comparativă, „Unde apare concurența și noi lipsim" și reclamele competitorilor. Fiecare secțiune are stările ei. */
 export function CompetitionPage() {
   const { brand, ctx } = useLayout()
   if (!brand || !ctx) return null

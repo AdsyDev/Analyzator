@@ -57,7 +57,7 @@ Rutele au apărut în specificația publică după 12 oct. (recitită la 23 nov.
 - **Atribuirea:** profilul aparține competitorului din setul în vigoare a cărui listă `social_handles` conține handle-ul (fără @, fără majuscule); lista goală înseamnă profilurile al căror nume afișat sau handle are aceeași cheie ca numele competitorului (fără diacritice, majuscule, spații și semne).
 - **Raportul de atribuire:** ambele rulări de competitori citesc setul în vigoare azi și scriu note `parser_note` cu `dimension = attribution` (și în jurnalul rulării): fiecare cuvânt sau profil → competitorul lui, cele neatribuite și competitorii fără nimic. Doar nume de branduri, cuvinte și handle-uri; nu schimbă statusul.
 - **Rularea:** `sync_run` `planable_competitors`, fereastra de 35 de zile; ~37 de cereri pe pagină cu competitori (lista, seria, 35 de comparații zilnice).
-- **În aplicație:** rândurile „Social public” din Concurență (postări pe săptămână, urmăritori, interacțiuni pe postare) și secțiunea „Concurență publică” din Social (`brand_social_competitors`).
+- **În aplicație:** rândurile „Social public” din Competiție (postări pe săptămână, urmăritori, interacțiuni pe postare) și secțiunea „Concurență publică” din Social (`brand_social_competitors`).
 
 ## Tabele și reguli
 

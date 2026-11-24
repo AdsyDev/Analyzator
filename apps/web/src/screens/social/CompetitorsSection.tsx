@@ -8,15 +8,15 @@ import { Section } from '../shared/Section'
 
 const dash = <span className="text-text-3">Fără date</span>
 
-/** Concurența publică: doar date publice (cadence, followers, interacțiuni); fără reach privat al competitorului. */
+/** Competiția publică: doar date publice (cadence, followers, interacțiuni); fără reach privat al competitorului. */
 export function CompetitorsSection({ state, onRetry }: { state: AsyncState<ProviderResult<SocialCompetitor[]>>; onRetry: () => void }) {
   const phone = useIsPhone()
   return (
-    <Section id="competitors" title="Concurență publică" description="Date publice ale competitorilor: ritm de publicare, followers și interacțiuni pe postare. Reach-ul competitorilor nu e public și nu se estimează.">
-      <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă concurența" skeletonClass="h-36">
+    <Section id="competitors" title="Competiție publică" description="Date publice ale competitorilor: ritm de publicare, followers și interacțiuni pe postare. Reach-ul competitorilor nu e public și nu se estimează.">
+      <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă competiția" skeletonClass="h-36">
         {(rows) =>
           phone ? (
-            <DataCardList label="Concurența publică pe social">
+            <DataCardList label="Competiția publică pe social">
               {rows.map((c) => (
                 <DataCard
                   key={c.label}
@@ -37,7 +37,7 @@ export function CompetitorsSection({ state, onRetry }: { state: AsyncState<Provi
           ) : (
             <div className="scroll-x relative rounded-xl border border-border">
               <table className="w-full border-collapse text-[13px]">
-                <caption className="sr-only">Concurența publică pe social</caption>
+                <caption className="sr-only">Competiția publică pe social</caption>
                 <thead>
                   <tr className="bg-surface-2 text-left text-text-2">
                     <th scope="col" className="px-4 py-2.5 text-[12px] font-semibold">Competitor</th>

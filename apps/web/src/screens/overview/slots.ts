@@ -4,7 +4,7 @@
  *
  * Patru carduri sunt metrici din registru. Două nu sunt și o spun:
  * - „Sentiment” arată ponderea pozitivă din mențiunile revizuite de om (`brand_mention_sentiment`), cu numărul lor;
- * - „Poziție competitivă” arată locul brandului în setul de competitori pe AI, din matricea de Concurență.
+ * - „Poziție competitivă” arată locul brandului în setul de competitori pe AI, din matricea de Competiție.
  * Macheta mai arată „Scor SEO” și „Mențiuni AI”; aplicația nu are un scor SEO compus și nici un număr de mențiuni AI în
  * registru, deci în locul lor stau Visibility SEOmonitor și AI Mention Rate, cu numele lor adevărat.
  */
@@ -52,5 +52,5 @@ export const AI_TREND_KEY = 'ai_sov'
 export const ORGANIC_TREND_KEY = 'gsc_clicks'
 export const TREND_KEYS: readonly string[] = [...new Set([...KPI_KEYS, AI_TREND_KEY, ORGANIC_TREND_KEY])]
 
-/** Rândul din matricea de Concurență folosit pentru „Poziție competitivă” și pentru cardul „Competitori”. */
+/** Rândul din matricea de Competiție folosit pentru „Poziție competitivă” și pentru cardul „Competitori”. */
 export const POSITION_DIMENSIONS = ['ai', 'seo', 'listening'] as const

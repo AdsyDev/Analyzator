@@ -214,7 +214,7 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
     sources: ['planable'],
     // Fără filtru de format: Planable nu trimite formatul postărilor (D-23).
     filters: [SOCIAL_PLATFORM_FILTER],
-    disconnected: (b) => `Datele despre postările ${b} vin din Planable, care nu e încă conectat. Pentru comparația publică cu competitorii, vezi Concurență.`,
+    disconnected: (b) => `Datele despre postările ${b} vin din Planable, care nu e încă conectat. Pentru comparația publică cu competitorii, vezi Competiție.`,
   },
   listening: { segment: 'listening', title: 'Listening', subtitle: () => 'Mențiunile publice despre brand, cu sentiment revizuit de echipa AdSymphony.', sources: [], filters: [SENTIMENT_FILTER, AUTHOR_FILTER], adminFilters: [LANGUAGE_FILTER], dynamicFilter: MENTION_SOURCES },
   pharmacovigilance: {
@@ -224,7 +224,7 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
     sources: [],
     filters: [PV_STATUS_FILTER, PV_ITEM_FILTER],
   },
-  competition: { segment: 'competition', title: 'Concurență', subtitle: () => 'Brandul față de setul de competitori, pe aceleași surse și aceeași perioadă.', sources: [], filters: [] },
+  competition: { segment: 'competition', title: 'Competiție', subtitle: () => 'Brandul față de setul de competitori, pe aceleași surse și aceeași perioadă.', sources: [], filters: [] },
   insights: { segment: 'insights', title: 'Analize și acțiuni', subtitle: () => 'Interpretările echipei AdSymphony și acțiunile care decurg din ele.', sources: [], filters: [] },
   assistant: { segment: 'assistant', title: 'AdSy AI', subtitle: () => 'Întrebări despre datele brandului, cu răspunsuri verificate față de dovezi. Un răspuns e o ipoteză pentru echipă, nu o analiză validată.', sources: [], filters: [] },
   reports: { segment: 'reports', title: 'Rapoarte', subtitle: () => 'Raportul perioadei alese: indicatorii și analizele publicate, gata de tipărit, de salvat ca PDF sau de exportat în CSV.', sources: ['seomonitor', 'gsc', 'ga4', 'planable'], filters: [] },

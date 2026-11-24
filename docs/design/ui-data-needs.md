@@ -87,7 +87,7 @@ Nu sunt în UI (nu au contract): „Observații" (modificări de campanie notate
 
 Filtrele ecranului în URL: `platform` (`facebook`, `instagram`, `linkedin`) și `format` (`image`, `video`, `carousel`, `story`). La Paid: `platform` (`google_ads`, `meta_ads`).
 
-## Listening și Concurență (UI-5)
+## Listening și Competiție (UI-5)
 
 ### Listening — `MentionsProvider`
 
@@ -101,7 +101,7 @@ Filtrele ecranului în URL: `platform` (`facebook`, `instagram`, `linkedin`) și
 
 KPI-urile `listening_mentions`, `listening_sov`, `listening_negative_share` nu sunt în registru: carduri `not_connected`, fără definiție.
 
-### Concurență — `CompetitionProvider`
+### Competiție — `CompetitionProvider`
 
 | Metodă | Răspuns | Cerință |
 |---|---|---|
