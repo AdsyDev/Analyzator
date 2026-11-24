@@ -44,6 +44,37 @@ describe('Paid Media fără import', () => {
   })
 })
 
+describe('Paid Media: sursa s-a oprit înaintea perioadei', () => {
+  const stale = (b: Parameters<NonNullable<Parameters<typeof renderApp>[0]['wrap']>>[0]) => ({
+    ...b,
+    paid: {
+      ...b.paid,
+      summary: async (c: Parameters<typeof b.paid.summary>[0], f: Parameters<typeof b.paid.summary>[1]) => {
+        const r = await b.paid.summary(c, f)
+        return r.kind === 'ready' ? { ...r, data: { ...r.data, data_as_of: '2026-09-18' } } : r
+      },
+    },
+  })
+
+  it('mesaj cu ultima zi înregistrată; butonul mută perioada (aceeași lungime) pe ultimele date', async () => {
+    renderApp({ route: `${MINI}?period=custom&from=2026-10-01&to=2026-10-28`, wrap: stale })
+    await open()
+    const box = await screen.findByRole('region', { name: 'Fără date în perioada aleasă' })
+    expect(within(box).getByText('Nu avem date Paid Media în perioada aleasă')).toBeInTheDocument()
+    expect(box).toHaveTextContent(/Ultima zi înregistrată este 18 sept?\.? 2026/i)
+    await userEvent.click(within(box).getByRole('button', { name: /^Vezi ultimele date înregistrate/ }))
+    await waitFor(() => expect(where()).toBe(`${MINI}?period=custom&from=2026-08-22&to=2026-09-18`))
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Fără date în perioada aleasă' })).toBeNull())
+  })
+
+  it('cu date în perioadă: fără mesaj', async () => {
+    renderApp({ route: MINI })
+    await open()
+    await screen.findByTestId('paid-kpis')
+    expect(screen.queryByRole('region', { name: 'Fără date în perioada aleasă' })).toBeNull()
+  })
+})
+
 describe('Paid Media cu import', () => {
   it('bara de context: date până la, import, monedă și fus orar', async () => {
     renderApp({ route: MINI })

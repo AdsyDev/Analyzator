@@ -4,7 +4,9 @@ import { TrendChart } from '../../components/TrendChart'
 import { useProviders } from '../../data/DataProvidersContext'
 import { ctxKey } from '../../data/hooks'
 import { useAsync } from '../../data/useAsync'
-import { formatDate, formatDateTime, formatDayMonth } from '../../lib/format'
+import { EmptyState } from '../../components/EmptyState'
+import { formatDate, formatDateTime, formatDayMonth, formatRange } from '../../lib/format'
+import { periodEndingAt } from '../../lib/period'
 import { useLayout } from '../../routing/AppLayout'
 import { BRAND_MODULES } from '../../routing/modules'
 import { ProviderProblem } from '../../routing/pages'
@@ -25,13 +27,13 @@ export function paidFiltersFrom(ctx: QueryContext): PaidFilters {
  * „Importă CSV"; cu import, KPI, buget și pacing, evoluție și tabelul pe zi/platformă/cont/campanie.
  */
 export function PaidPage() {
-  const { brand, ctx, user } = useLayout()
+  const { brand, ctx, user, changeFilters } = useLayout()
   if (!brand || !ctx) return null
   // Bugetul îl scrie echipa agenției (RLS verifică rolul și accesul la brand); clientul doar îl vede.
-  return <PaidContent brand={brand} ctx={ctx} canImport={user.role === 'agency_admin'} canEditBudget={user.role !== 'client_viewer'} />
+  return <PaidContent brand={brand} ctx={ctx} canImport={user.role === 'agency_admin'} canEditBudget={user.role !== 'client_viewer'} onPeriod={(period) => changeFilters({ period })} />
 }
 
-function PaidContent({ brand, ctx, canImport, canEditBudget }: { brand: Brand; ctx: QueryContext; canImport: boolean; canEditBudget: boolean }) {
+function PaidContent({ brand, ctx, canImport, canEditBudget, onPeriod }: { brand: Brand; ctx: QueryContext; canImport: boolean; canEditBudget: boolean; onPeriod: (period: ReturnType<typeof periodEndingAt>) => void }) {
   const providers = useProviders()
   const f = paidFiltersFrom(ctx)
   const key = ctxKey(ctx)
@@ -56,6 +58,9 @@ function PaidContent({ brand, ctx, canImport, canEditBudget }: { brand: Brand; c
         <span>Monedă <strong className="font-semibold text-text">{s.currency}</strong></span>
         <span>Fus orar al exportului <strong className="font-semibold text-text">{s.source_timezone}</strong></span>
       </p>
+      {/^\d{4}-\d{2}-\d{2}$/.test(s.data_as_of) && s.data_as_of < ctx.period.from && (
+        <NoDataInPeriod lastDay={s.data_as_of} ctx={ctx} onShow={() => onPeriod(periodEndingAt(s.data_as_of, ctx.period))} />
+      )}
       <PaidKpis kpis={s.kpis} ctx={ctx} />
       <BudgetSection
         state={budget.state}
@@ -94,5 +99,22 @@ function PaidContent({ brand, ctx, canImport, canEditBudget }: { brand: Brand; c
       </Section>
       <PaidTable state={rows.state} currency={s.currency} onRetry={rows.reload} />
     </div>
+  )
+}
+
+/**
+ * Sursa e conectată, dar ultima zi cu date e înaintea perioadei alese (de ex. sincronizarea s-a oprit): spunem asta
+ * explicit și oferim perioada de aceeași lungime care se termină în ultima zi înregistrată. Nu ascunde KPI-urile.
+ */
+function NoDataInPeriod({ lastDay, ctx, onShow }: { lastDay: string; ctx: QueryContext; onShow: () => void }) {
+  const target = periodEndingAt(lastDay, ctx.period)
+  return (
+    <section aria-label="Fără date în perioada aleasă">
+      <EmptyState
+        title="Nu avem date Paid Media în perioada aleasă"
+        text={`Pentru ${formatRange(ctx.period.from, ctx.period.to)} nu există nicio zi importată. Ultima zi înregistrată este ${formatDate(lastDay)}: sursa nu a adus date mai noi.`}
+        action={{ label: `Vezi ultimele date înregistrate (${formatRange(target.from, target.to)})`, onClick: onShow }}
+      />
+    </section>
   )
 }

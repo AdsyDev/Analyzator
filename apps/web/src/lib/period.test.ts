@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, comparisonRange, serverPeriodKind, daysBetween, isValidIsoDate, lastCompleteDay, parseQueryContext, resolvePeriod, sharedSearch, todayBucharest, writeQueryContext, type FilterDef } from './period'
+import { addDays, comparisonRange, serverPeriodKind, daysBetween, isValidIsoDate, lastCompleteDay, parseQueryContext, periodEndingAt, resolvePeriod, sharedSearch, todayBucharest, writeQueryContext, type FilterDef } from './period'
 
 // 6 oct. 2026, 10:00 în București (UTC+3 vara) -> azi = 2026-10-06, ultima zi completă = 2026-10-05.
 const NOW = new Date('2026-10-06T07:00:00Z')
@@ -129,5 +129,12 @@ describe('URL ↔ context', () => {
   it('sharedSearch păstrează perioada și comparația, nu filtrele modulului', () => {
     expect(sharedSearch(new URLSearchParams('period=7d&compare=year_ago&device=mobile'))).toBe('?period=7d&compare=year_ago')
     expect(sharedSearch(new URLSearchParams('device=mobile'))).toBe('')
+  })
+})
+
+describe('periodEndingAt', () => {
+  it('aceeași lungime, terminată în ultima zi cu date', () => {
+    expect(periodEndingAt('2026-09-18', { from: '2026-10-27', to: '2026-11-23' })).toEqual({ preset: 'custom', from: '2026-08-22', to: '2026-09-18' })
+    expect(periodEndingAt('2026-09-18', { from: '2026-11-23', to: '2026-11-23' })).toEqual({ preset: 'custom', from: '2026-09-18', to: '2026-09-18' })
   })
 })
