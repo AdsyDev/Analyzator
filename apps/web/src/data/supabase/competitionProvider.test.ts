@@ -52,7 +52,10 @@ describe('createSupabaseCompetition', () => {
       const { client } = fakeDataClient({ rpc: () => ({ data: { has_set: true, connected: false } }) })
       const r = await createSupabaseCompetition(client).ads(ctx, { page: 1, page_size: 20 })
       expect(r.kind).toBe('not_connected')
-      if (r.kind === 'not_connected') expect(r.reason).toMatch(/Google Ads Transparency/)
+      if (r.kind === 'not_connected') {
+        expect(r.reason).toMatch(/nu au fost încă colectate/)
+        expect(r.reason).not.toMatch(/Transparency/)
+      }
     })
 
     it('un link în afara Ads Transparency Center nu se afișează; un format necunoscut încalcă contractul', async () => {

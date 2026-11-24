@@ -185,7 +185,7 @@ export function createCompetitionFixtures({ allowed, ai, search, social, mention
     // Reclamele competitorilor nu au fixtures: previzualizarea arată starea fără sursă, ca la un brand fără colectare.
     ads: async (ctx) => {
       if (!allowed.has(ctx.brandId)) return denied
-      return notConnected('Reclamele competitorilor (Google Ads Transparency) nu fac parte din datele de previzualizare.')
+      return notConnected('Reclamele competitorilor nu fac parte din datele de previzualizare.')
     },
   }
 }

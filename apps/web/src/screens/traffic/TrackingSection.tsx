@@ -1,6 +1,7 @@
 import { CheckCircleIcon, QuestionIcon, WarningCircleIcon, WarningIcon } from '@phosphor-icons/react'
 import type { ProviderResult, TrackingQuality, TrackingStatus } from '../../contracts'
 import { StatusChip, type ChipTone } from '../../components/ui/Chip'
+import { useShowSources } from '../../components/SourceVisibility'
 import type { AsyncState } from '../../data/useAsync'
 import { formatDateTime } from '../../lib/format'
 import { Resolved } from '../shared/Resolved'
@@ -15,8 +16,9 @@ const STATUS: Record<TrackingStatus, { label: string; tone: ChipTone; icon: type
 
 /** Tracking quality: listă de verificări. Sensul stă în text și icon, nu doar în culoare. */
 export function TrackingSection({ state, onRetry }: { state: AsyncState<ProviderResult<TrackingQuality>>; onRetry: () => void }) {
+  const showSources = useShowSources()
   return (
-    <Section id="tracking" title="Tracking quality" description="Verificări calculate din datele GA4 colectate, pe perioada aleasă. Cifrele de mai sus sunt la fel de bune ca măsurarea din spatele lor.">
+    <Section id="tracking" title="Tracking quality" description={showSources ? 'Verificări calculate din datele GA4 colectate, pe perioada aleasă. Cifrele de mai sus sunt la fel de bune ca măsurarea din spatele lor.' : 'Verificări calculate din datele de analytics colectate, pe perioada aleasă. Cifrele de mai sus sunt la fel de bune ca măsurarea din spatele lor.'}>
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă verificările" skeletonClass="h-40">
         {(q) => (
           <div className="flex flex-col gap-2">

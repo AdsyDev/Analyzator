@@ -12,7 +12,7 @@ const checks = trafficFile.checks as unknown as Record<string, Check[]>
 const factors = trafficFile.clarity_device_factors as Record<string, Record<Device, number>>
 const deviceShare = trafficFile.device_share as Record<Device, number>
 
-const NO_SESSIONS = 'Sursa Google Analytics 4 nu este conectată pentru acest brand. Nu afișăm valori estimate până la conectare.'
+const NO_SESSIONS = 'Sursa de trafic nu este conectată pentru acest brand. Nu afișăm valori estimate până la conectare.'
 
 export function createTrafficFixtures({ allowed, now }: { allowed: Set<string>; now: () => Date }): TrafficProvider {
   const denied = failed<never>('Acces refuzat la acest spațiu de brand.')
@@ -61,7 +61,7 @@ export function createTrafficFixtures({ allowed, now }: { allowed: Set<string>; 
       if (!allowed.has(ctx.brandId)) return denied
       const keys = Object.keys(factors)
       const { items } = fixtureMetrics(ctx, keys, now())
-      if (items.every((i) => i.status === 'not_connected')) return notConnected('Sursa Microsoft Clarity nu este conectată pentru acest brand. Nu afișăm valori estimate până la conectare.')
+      if (items.every((i) => i.status === 'not_connected')) return notConnected('Sursa de comportament nu este conectată pentru acest brand. Nu afișăm valori estimate până la conectare.')
       const rows = items.map<ClarityDeviceRow>((i) => ({
         metric_key: i.metric_key,
         cells: Object.fromEntries(

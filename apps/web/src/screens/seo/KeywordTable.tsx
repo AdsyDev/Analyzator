@@ -1,6 +1,7 @@
 import { ArrowDownIcon, ArrowUpIcon, MinusIcon } from '@phosphor-icons/react'
 import type { ProviderResult, SearchKeyword } from '../../contracts'
 import { StatusChip } from '../../components/ui/Chip'
+import { useShowSources } from '../../components/SourceVisibility'
 import { SortableTable, type Column } from '../../components/ui/SortableTable'
 import type { AsyncState } from '../../data/useAsync'
 import { cn } from '../../lib/cn'
@@ -70,9 +71,10 @@ const columns: Column<SearchKeyword>[] = [
 ]
 
 export function KeywordTable({ state, onRetry }: { state: AsyncState<ProviderResult<SearchKeyword[]>>; onRetry: () => void }) {
+  const showSources = useShowSources()
   const exportName = useExportName('keywords')
   return (
-    <Section id="keywords" title="Keywords urmărite" description="Rank din SEOmonitor, la ultima observație din perioadă. Trend: poziții câștigate sau pierdute pe mobil. Keywords fără rank apar ultimele la sortare.">
+    <Section id="keywords" title="Keywords urmărite" description={showSources ? 'Rank din SEOmonitor, la ultima observație din perioadă. Trend: poziții câștigate sau pierdute pe mobil. Keywords fără rank apar ultimele la sortare.' : 'Rank la ultima observație din perioadă. Trend: poziții câștigate sau pierdute pe mobil. Keywords fără rank apar ultimele la sortare.'}>
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă keywords" skeletonClass="h-72">
         {(rows) => <SortableTable caption="Keywords urmărite" exportFileName={exportName} columns={columns} rows={rows} rowKey={(k) => k.id} pageSize={8} emptyText="Niciun keyword pentru filtrele alese." />}
       </Resolved>

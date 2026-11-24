@@ -1,5 +1,6 @@
 import type { LandingPage, ProviderResult } from '../../contracts'
 import { StatusChip } from '../../components/ui/Chip'
+import { useShowSources } from '../../components/SourceVisibility'
 import { SortableTable, type Column } from '../../components/ui/SortableTable'
 import type { AsyncState } from '../../data/useAsync'
 import { formatInteger, formatMetricValue } from '../../lib/format'
@@ -30,14 +31,15 @@ const columns: Column<LandingPage>[] = [
     header: 'Key events',
     align: 'right',
     sortValue: (p) => p.key_events,
-    render: (p) => (p.key_events === null ? <span className="text-text-3" title="Maparea GA4 nu e validată pentru această pagină">Nemapat</span> : formatInteger(p.key_events)),
+    render: (p) => (p.key_events === null ? <span className="text-text-3" title="Maparea paginii pentru key events nu e validată">Nemapat</span> : formatInteger(p.key_events)),
   },
 ]
 
 export function LandingPages({ state, onRetry }: { state: AsyncState<ProviderResult<LandingPage[]>>; onRetry: () => void }) {
+  const showSources = useShowSources()
   const exportName = useExportName('landing pages')
   return (
-    <Section id="landing" title="Landing pages din search" description="Rezultatele din Search Console pe pagină. Key events GA4 apar doar când maparea paginii e validată; altfel „Nemapat”, nu zero.">
+    <Section id="landing" title="Landing pages din search" description={showSources ? 'Rezultatele din Search Console pe pagină. Key events GA4 apar doar când maparea paginii e validată; altfel „Nemapat”, nu zero.' : 'Rezultatele din search pe pagină. Key events apar doar când maparea paginii e validată; altfel „Nemapat”, nu zero.'}>
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă paginile" skeletonClass="h-48">
         {(rows) => <SortableTable caption="Landing pages din search" exportFileName={exportName} columns={columns} rows={rows} rowKey={(p) => p.url} pageSize={8} emptyText="Nicio pagină cu date în perioada aleasă." />}
       </Resolved>

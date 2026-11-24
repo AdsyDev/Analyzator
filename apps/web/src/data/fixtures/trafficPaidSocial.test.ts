@@ -57,7 +57,7 @@ describe('fixtures Trafic', () => {
   it('Clarity neconectat (Proenzi): not_connected cu motiv, fără valori pe device', async () => {
     const r = await make().traffic.clarityDevices(ctx('brand-proenzi'))
     expect(r.kind).toBe('not_connected')
-    if (r.kind === 'not_connected') expect(r.reason).toMatch(/Microsoft Clarity nu este conectată/)
+    if (r.kind === 'not_connected') expect(r.reason).toMatch(/Sursa de comportament nu este conectată/)
   })
 
   it('metrica Clarity fără valoare în registru nu primește valoare pe device (null, nu zero)', async () => {

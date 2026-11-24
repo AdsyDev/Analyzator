@@ -7,7 +7,7 @@ const CONTRACT = 'Răspunsul serverului nu respectă contractul așteptat. Reîn
 const NO_SET = 'Brandul nu are încă un set de competitori în vigoare; comparațiile apar după configurarea lui.'
 const DIMENSIONS = ['ai', 'seo', 'social', 'listening', 'ads']
 const AD_FORMATS = ['text', 'image', 'video', 'unknown']
-const NO_ADS = 'Reclamele competitorilor nu au fost încă colectate din Google Ads Transparency Center. Apar după prima colectare, pentru competitorii cu ID de advertiser configurat.'
+const NO_ADS = 'Reclamele competitorilor nu au fost încă colectate. Apar după prima colectare, pentru competitorii cu ID de advertiser configurat.'
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 const dateOrNull = (v: unknown) => v === null || (typeof v === 'string' && ISO_DATE.test(v))
 const countOrNull = (v: unknown) => v === null || (typeof v === 'number' && Number.isFinite(v) && v >= 0)
@@ -43,7 +43,7 @@ export function createSupabaseCompetition(client: DataClient): CompetitionProvid
       const d = data as { has_set?: boolean; connected?: boolean; gaps?: CompetitionGap[] } | null
       if (!d || typeof d.has_set !== 'boolean') return failed(CONTRACT)
       if (!d.has_set) return notConnected(NO_SET)
-      if (d.connected === false) return notConnected('Răspunsurile AI (SEOmonitor) nu sunt conectate pentru acest brand.')
+      if (d.connected === false) return notConnected('Răspunsurile AI nu sunt conectate pentru acest brand.')
       if (!Array.isArray(d.gaps)) return failed(CONTRACT)
       return ready(d.gaps)
     },

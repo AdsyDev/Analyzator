@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import type { Brand, Device, QueryContext } from '../../contracts'
 import { DEVICES } from '../../contracts'
+import { useShowSources } from '../../components/SourceVisibility'
 import { useProviders } from '../../data/DataProvidersContext'
 import { ctxKey, useDefinitions, useMetrics, useTrends } from '../../data/hooks'
 import { useAsync } from '../../data/useAsync'
@@ -32,6 +33,7 @@ export function TrafficPage() {
 }
 
 function TrafficContent({ brand, ctx, canManageSources }: { brand: Brand; ctx: QueryContext; canManageSources: boolean }) {
+  const showSources = useShowSources()
   const providers = useProviders()
   const [params] = useSearchParams()
   const [target, setTarget] = useState<EvidenceTarget | null>(null)
@@ -53,7 +55,7 @@ function TrafficContent({ brand, ctx, canManageSources }: { brand: Brand; ctx: Q
       <AiReferralsSection state={referrals.state} onRetry={referrals.reload} />
       <TrackingSection state={tracking.state} onRetry={tracking.reload} />
       <p className="text-[12.5px] text-text-2">
-        Comportamentul vizitatorilor pe site (rage clicks, dead clicks, quick backs, scroll), din Microsoft Clarity, e în{' '}
+        Comportamentul vizitatorilor pe site (rage clicks, dead clicks, quick backs, scroll){showSources ? ', din Microsoft Clarity,' : ''} e în{' '}
         <Link to={{ pathname: brandPath(brand.id, 'ux'), search: sharedSearch(params) }} className="font-medium text-accent-text underline-offset-2 hover:underline">
           User experience
         </Link>

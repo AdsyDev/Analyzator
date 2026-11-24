@@ -172,7 +172,7 @@ export function AppLayout() {
   }, [sourcesState, freshness])
 
   const title = module?.title ?? adminModule?.title ?? (siteMatch ? 'Site și surse' : isPortfolio ? 'Portofoliu' : 'Analyzator')
-  const subtitle = module?.subtitle(shellBrand?.name ?? '') ?? adminModule?.subtitle(shellBrand?.name ?? null) ?? (siteMatch ? 'Detaliile site-ului, sursele lui de date și istoricul sincronizărilor.' : isPortfolio ? 'Toate brandurile la care ai acces, pe aceeași perioadă, cu indicatorii din Overview.' : undefined)
+  const subtitle = module?.subtitle(shellBrand?.name ?? '', isAdmin) ?? adminModule?.subtitle(shellBrand?.name ?? null) ?? (siteMatch ? 'Detaliile site-ului, sursele lui de date și istoricul sincronizărilor.' : isPortfolio ? 'Toate brandurile la care ai acces, pe aceeași perioadă, cu indicatorii din Overview.' : undefined)
   useEffect(() => {
     document.title = [title, shellBrand?.name, 'Analyzator'].filter(Boolean).join(' · ')
   }, [title, shellBrand?.name])

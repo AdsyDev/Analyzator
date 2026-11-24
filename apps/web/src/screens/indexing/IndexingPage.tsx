@@ -1,6 +1,7 @@
 import { useId, useState, type FormEvent } from 'react'
 import type { Brand, IndexState, IndexStatus, IndexedUrl } from '../../contracts'
 import { EmptyState } from '../../components/EmptyState'
+import { useShowSources } from '../../components/SourceVisibility'
 import { Button } from '../../components/ui/Button'
 import { StatusChip, type ChipTone } from '../../components/ui/Chip'
 import { SortableTable, type Column } from '../../components/ui/SortableTable'
@@ -57,6 +58,7 @@ function done(r: { kind: 'ready' } | { kind: 'error'; message: string } | { kind
 }
 
 function Summary({ status: d }: { status: IndexStatus }) {
+  const showSources = useShowSources()
   const tiles: Array<{ label: string; value: number; hint: string }> = [
     { label: 'URL-uri inspectate', value: d.summary.total, hint: 'Lista agenției și paginile cu cele mai multe clickuri.' },
     { label: 'În index', value: d.summary.indexed, hint: 'Google le poate arăta în rezultate.' },
@@ -67,7 +69,7 @@ function Summary({ status: d }: { status: IndexStatus }) {
   return (
     <Section id="index-summary" title="Starea indexării" description={d.inspected_on ? `După inspecția din ${formatDate(d.inspected_on)}. Numerele sunt din lista inspectată, nu din tot site-ul.` : 'Numerele sunt din lista inspectată, nu din tot site-ul.'}>
       {d.summary.total === 0 ? (
-        <EmptyState compact title="Nicio inspecție încă" text="Inspecția rulează săptămânal, marțea, pentru URL-urile prioritare și pentru paginile cu cele mai multe clickuri din Search Console." />
+        <EmptyState compact title="Nicio inspecție încă" text={`Inspecția rulează săptămânal, marțea, pentru URL-urile prioritare și pentru paginile cu cele mai multe clickuri din ${showSources ? 'Search Console' : 'search'}.`} />
       ) : (
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
           {tiles.map((t) => (
@@ -132,6 +134,7 @@ function UrlTable({ status: d, brandName }: { status: IndexStatus; brandName: st
 }
 
 function PriorityList({ status: d, canEdit, onAdd, onRemove }: { status: IndexStatus; canEdit: boolean; onAdd: (url: string) => Promise<string | null>; onRemove: (id: string) => Promise<string | null> }) {
+  const showSources = useShowSources()
   const id = useId()
   const [url, setUrl] = useState('')
   const [busy, setBusy] = useState(false)
@@ -176,7 +179,7 @@ function PriorityList({ status: d, canEdit, onAdd, onRemove }: { status: IndexSt
             <input id={`${id}-url`} type="url" inputMode="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://" maxLength={2048} className="w-full rounded-lg border border-border-strong bg-surface px-3 py-2 text-[13.5px] text-text outline-none focus-visible:border-accent" />
           </div>
           <Button variant="primary" type="submit" loading={busy}>Adaugă</Button>
-          <p className="basis-full text-[12px] leading-snug text-text-2">Cel mult 150 de URL-uri pe brand. Adresa trebuie să țină de proprietatea Search Console a site-ului.</p>
+          <p className="basis-full text-[12px] leading-snug text-text-2">Cel mult 150 de URL-uri pe brand. {showSources ? 'Adresa trebuie să țină de proprietatea Search Console a site-ului.' : 'Adresa trebuie să țină de site-ul brandului.'}</p>
         </form>
       )}
       {error && <p role="alert" className="rounded-lg bg-neg-soft px-3 py-2 text-[12.5px] leading-snug text-neg-text">{error}</p>}

@@ -223,9 +223,12 @@ describe('SEO și Search: izolarea secțiunilor și providerul real', () => {
     expect(calls).toEqual({ kw: 1, pages: 1, gaps: 1 })
   })
 
-  it('rolul client vede aceleași date de search (nu există diferențe pe rol aici)', async () => {
+  it('rolul client vede aceleași date de search, fără furnizor în descrierile secțiunilor', async () => {
     renderApp({ route: ROUTE, role: 'client_viewer' })
     await open()
     expect(kwRows()).toHaveLength(8)
+    expect(screen.getByText(/^Rank la ultima observație din perioadă/)).toBeInTheDocument()
+    expect(screen.getByText(/^Rezultatele din search pe pagină/)).toBeInTheDocument()
+    expect(screen.queryByText(/Rank din SEOmonitor|Rezultatele din Search Console/)).toBeNull()
   })
 })

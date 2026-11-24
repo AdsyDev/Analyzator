@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import type { ClarityDevices, Device, MetricDefinition, MetricItem, ProviderResult, SourceStatusInfo } from '../../contracts'
 import { DEVICES } from '../../contracts'
 import { CoverageBadge } from '../../components/CoverageBadge'
+import { useShowSources } from '../../components/SourceVisibility'
 import { Button } from '../../components/ui/Button'
 import { StatusChip } from '../../components/ui/Chip'
 import { DataCard, DataCardList } from '../../components/ui/DataCard'
@@ -46,14 +47,15 @@ export function BehaviorSection({ devices, items, definitions, source, canManage
   const { brand } = useLayout()
   const phone = useIsPhone()
   const problem = source && (source.state === 'error' || source.state === 'stale')
+  const showSources = useShowSources()
 
   return (
-    <Section id="behavior" title="Comportament" description="Microsoft Clarity, pe device. Valorile din registru sunt pe toate device-urile; defalcarea pe device vine din sursă.">
+    <Section id="behavior" title="Comportament" description={showSources ? 'Microsoft Clarity, pe device. Valorile din registru sunt pe toate device-urile; defalcarea pe device vine din sursă.' : 'Pe device. Valorile din registru sunt pe toate device-urile; defalcarea pe device vine din sursă.'}>
       {problem && (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg bg-warn-soft px-4 py-3 text-[13px] text-warn-text">
           <WarningIcon size={16} className="flex-none" aria-hidden="true" />
           <p className="flex-1 leading-snug">
-            Sincronizarea Clarity are probleme{source?.note ? `: ${source.note}` : ''}
+            Sincronizarea {showSources ? 'Clarity ' : ''}are probleme{source?.note ? `: ${source.note}` : ''}
             {source?.data_as_of ? ` Date până la ${formatDate(source.data_as_of)}.` : ''} Afișăm ultimele date importate.
           </p>
           {canManageSources && brand && (
@@ -95,7 +97,7 @@ export function BehaviorSection({ devices, items, definitions, source, canManage
             <div className="flex flex-col gap-2">
               {phone ? (
                 // Telefon: un card pe indicator, cu toate device-urile și apoi fiecare device.
-                <DataCardList label="Comportament pe device (Microsoft Clarity)">
+                <DataCardList label={showSources ? 'Comportament pe device (Microsoft Clarity)' : 'Comportament pe device'}>
                   {rows.map((r) => (
                     <DataCard
                       key={r.key}
@@ -108,7 +110,7 @@ export function BehaviorSection({ devices, items, definitions, source, canManage
               ) : (
                 <div className="scroll-x relative rounded-xl border border-border">
                   <table className="w-full border-collapse text-[13px]">
-                    <caption className="sr-only">Comportament pe device (Microsoft Clarity)</caption>
+                    <caption className="sr-only">{showSources ? 'Comportament pe device (Microsoft Clarity)' : 'Comportament pe device'}</caption>
                     <thead>
                       <tr className="bg-surface-2 text-left text-text-2">
                         <th scope="col" className="px-4 py-2.5 text-[12px] font-semibold">Indicator</th>

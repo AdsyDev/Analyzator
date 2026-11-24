@@ -8,7 +8,7 @@ const CONTRACT = 'Răspunsul serverului nu respectă contractul așteptat. Reîn
 const rpcError = (e: { code?: string } | null) => (e?.code === '42501' ? 'Nu ai acces la acest spațiu de brand.' : QUERY_FAILED)
 const num = (v: unknown): number | null => (v === null || v === undefined ? null : Number.isFinite(Number(v)) ? Number(v) : null)
 
-const GA4_OFF = 'Google Analytics 4 nu este conectat pentru acest brand.'
+const GA4_OFF = 'Sursa de trafic nu este conectată pentru acest brand.'
 const TRACKING_STATUSES: readonly TrackingStatus[] = ['ok', 'warning', 'problem', 'unknown']
 const pct = (v: unknown) => formatMetricValue(num(v), 'percent') ?? 'necunoscut'
 const days = (n: number) => (n === 1 ? '1 zi' : `${n} ${n % 100 === 0 || n % 100 >= 20 ? 'de ' : ''}zile`)
@@ -26,25 +26,25 @@ function trackingCheck(c: Record<string, unknown>): TrackingCheck {
       const n = num(c.event_names) ?? 0
       return {
         id, status, title: 'Evenimente cheie (key events)',
-        note: n > 0 ? `${n === 1 ? 'Un eveniment cheie a' : `${n} evenimente cheie au`} înregistrat date în perioadă.` : 'Niciun eveniment cheie cu date în perioadă: conversiile din GA4 nu pot fi măsurate până sunt definite key events în proprietate.',
+        note: n > 0 ? `${n === 1 ? 'Un eveniment cheie a' : `${n} evenimente cheie au`} înregistrat date în perioadă.` : 'Niciun eveniment cheie cu date în perioadă: conversiile nu pot fi măsurate până sunt definite key events.',
       }
     }
     case 'daily_coverage': {
       const covered = num(c.covered_days) ?? 0
       const expected = num(c.expected_days) ?? 0
       const note =
-        status === 'unknown' ? 'Perioada aleasă nu are încă zile colectate din GA4.'
+        status === 'unknown' ? 'Perioada aleasă nu are încă zile colectate.'
         : status === 'ok' ? `Toate cele ${days(expected)} colectate au sesiuni.`
-        : `${days(expected - covered)} din ${expected} fără nicio sesiune: fie nu a existat trafic, fie tagul GA4 nu a trimis date în acele zile.`
+        : `${days(expected - covered)} din ${expected} fără nicio sesiune: fie nu a existat trafic, fie tagul de măsurare nu a trimis date în acele zile.`
       return { id, status, title: 'Zile cu sesiuni înregistrate', note }
     }
     case 'reconciliation': {
       const range = typeof c.period_start === 'string' && typeof c.period_end === 'string' ? ` (${formatDate(c.period_start)} - ${formatDate(c.period_end)})` : ''
       const note =
         status === 'unknown' ? 'Nu există o reconciliere a sesiunilor pentru perioada aleasă.'
-        : status === 'ok' ? `Totalul nostru de sesiuni se potrivește cu cel raportat de GA4${range}, în toleranța de ${pct(c.tolerance_pct)}.`
-        : `Totalul nostru de sesiuni diferă cu ${pct(Math.abs(num(c.difference_pct) ?? 0))} de cel raportat de GA4${range}, peste toleranța de ${pct(c.tolerance_pct)}.`
-      return { id, status, title: 'Reconciliere cu totalul GA4', note }
+        : status === 'ok' ? `Totalul nostru de sesiuni se potrivește cu cel raportat de platforma de analytics${range}, în toleranța de ${pct(c.tolerance_pct)}.`
+        : `Totalul nostru de sesiuni diferă cu ${pct(Math.abs(num(c.difference_pct) ?? 0))} de cel raportat de platforma de analytics${range}, peste toleranța de ${pct(c.tolerance_pct)}.`
+      return { id, status, title: 'Reconciliere cu totalul platformei de analytics', note }
     }
     case 'unassigned':
       return {
@@ -54,7 +54,7 @@ function trackingCheck(c: Record<string, unknown>): TrackingCheck {
     case 'landing_not_set':
       return {
         id, status, title: 'Sesiuni fără landing page',
-        note: status === 'unknown' ? 'Fără sesiuni în perioadă.' : `${pct(c.share_pct)} din sesiuni nu au landing page (prag de avertizare: ${pct(c.threshold_pct)}). Apar când GA4 primește evenimente fără nicio afișare de pagină.`,
+        note: status === 'unknown' ? 'Fără sesiuni în perioadă.' : `${pct(c.share_pct)} din sesiuni nu au landing page (prag de avertizare: ${pct(c.threshold_pct)}). Apar când măsurarea primește evenimente fără nicio afișare de pagină.`,
       }
     default:
       throw new Error(CONTRACT)
@@ -66,7 +66,7 @@ export function createSupabaseTraffic(client: DataClient): TrafficProvider {
   return {
     async channels(ctx, device) {
       // GA4 nu e colectat pe device: nu arătăm canale nefiltrate sub un filtru de device.
-      if (device) return notConnected('Defalcarea pe device nu e colectată din GA4; canalele sunt disponibile doar pentru toate device-urile.')
+      if (device) return notConnected('Defalcarea pe device nu e colectată pentru canale; canalele sunt disponibile doar pentru toate device-urile.')
       const { data, error } = await client.rpc('brand_traffic_channels', { p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to, p_kind: serverPeriodKind(ctx.period.preset, ctx.comparison) })
       if (error) return failed(rpcError(error))
       const d = data as { connected?: boolean; channels?: Array<Record<string, unknown>>; data_as_of?: string | null } | null
@@ -105,7 +105,7 @@ export function createSupabaseTraffic(client: DataClient): TrafficProvider {
       if (error) return failed(rpcError(error))
       const d = data as { connected?: boolean; rows?: Array<{ metric_key: string; cells: Record<string, { value: unknown; status: unknown }> }>; data_as_of?: string | null } | null
       if (!d || typeof d.connected !== 'boolean') return failed(CONTRACT)
-      if (!d.connected) return notConnected('Microsoft Clarity nu este conectat pentru acest brand.')
+      if (!d.connected) return notConnected('Sursa de comportament nu este conectată pentru acest brand.')
       try {
         const out: ClarityDevices = {
           data_as_of: d.data_as_of ?? null,
@@ -133,7 +133,7 @@ export function createSupabaseTraffic(client: DataClient): TrafficProvider {
       const d = data as { connected?: boolean; checked_at?: string | null; checks?: Array<Record<string, unknown>> } | null
       if (!d || typeof d.connected !== 'boolean') return failed(CONTRACT)
       if (!d.connected) return notConnected(GA4_OFF)
-      if (!d.checked_at || !Array.isArray(d.checks) || d.checks.length === 0) return notConnected('Google Analytics 4 e conectat, dar nu are încă nicio colectare: verificările apar după prima sincronizare.')
+      if (!d.checked_at || !Array.isArray(d.checks) || d.checks.length === 0) return notConnected('Sursa de trafic e conectată, dar nu are încă nicio colectare: verificările apar după prima sincronizare.')
       try {
         const out: TrackingQuality = { checks: d.checks.map(trackingCheck), checked_at: d.checked_at }
         return ready(out)
@@ -160,7 +160,7 @@ export function createSupabaseSearch(client: DataClient): SearchProvider {
       if (error) return failed(rpcError(error))
       const d = data as { connected?: boolean; keywords?: Array<Record<string, unknown>> } | null
       if (!d || typeof d.connected !== 'boolean') return failed(CONTRACT)
-      if (!d.connected) return notConnected('SEOmonitor nu este conectat (sau grupurile nu sunt mapate) pentru acest brand.')
+      if (!d.connected) return notConnected('Sursa de SEO nu este conectată (sau grupurile nu sunt mapate) pentru acest brand.')
       return ready(
         (d.keywords ?? []).map<SearchKeyword>((k) => ({
           id: String(k.id), keyword: String(k.keyword), url: String(k.url ?? ''), volume: num(k.volume),
@@ -176,7 +176,7 @@ export function createSupabaseSearch(client: DataClient): SearchProvider {
       if (error) return failed(rpcError(error))
       const d = data as { connected?: boolean; pages?: Array<Record<string, unknown>> } | null
       if (!d || typeof d.connected !== 'boolean') return failed(CONTRACT)
-      if (!d.connected) return notConnected('Search Console nu este conectat pentru acest brand.')
+      if (!d.connected) return notConnected('Sursa de search nu este conectată pentru acest brand.')
       return ready(
         (d.pages ?? []).map<LandingPage>((p) => ({
           url: String(p.url), clicks: num(p.clicks), impressions: num(p.impressions), ctr: num(p.ctr), position: num(p.position), key_events: num(p.key_events), shared: p.shared === true,
@@ -193,7 +193,7 @@ export function createSupabaseSearch(client: DataClient): SearchProvider {
       if (error) return failed(rpcError(error))
       const d = data as { connected?: boolean; inspected_on?: string | null; summary?: Record<string, unknown>; urls?: Array<Record<string, unknown>>; priority_urls?: Array<Record<string, unknown>> } | null
       if (!d || typeof d.connected !== 'boolean') return failed(CONTRACT)
-      if (!d.connected) return notConnected('Search Console nu este conectat pentru acest brand.')
+      if (!d.connected) return notConnected('Sursa de search nu este conectată pentru acest brand.')
       const s = d.summary
       if (!s || !Array.isArray(d.urls) || !Array.isArray(d.priority_urls)) return failed(CONTRACT)
       const count = (k: string) => num(s[k])

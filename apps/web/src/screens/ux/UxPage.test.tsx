@@ -52,6 +52,15 @@ describe('User experience: comportament (Clarity), mutat din Trafic', () => {
     expect(within(alert).queryByRole('button')).toBeNull()
   })
 
+  it.each(['strategist', 'client_viewer'] as const)('%s: nicio mențiune a furnizorului (subtitlu, secțiune, banner, tabel)', async (role) => {
+    renderApp({ route: ROUTE, role })
+    await open()
+    const alert = await within(section('Comportament')).findByRole('alert')
+    expect(alert).toHaveTextContent('Sincronizarea are probleme: Tokenul API a expirat.')
+    expect(screen.getByText(/Cum folosesc vizitatorii site-ul: rage clicks/)).toBeInTheDocument()
+    expect(document.body).not.toHaveTextContent(/Clarity/)
+  })
+
   it('tabelul: patru metrici din registru, coloanele Toate + device, definiții provizorii marcate, stare Învechit', async () => {
     renderApp({ route: ROUTE })
     await open()
@@ -72,7 +81,7 @@ describe('User experience: comportament (Clarity), mutat din Trafic', () => {
   it('valorile pe device nu sunt zero când lipsesc: Proenzi nu are Clarity conectat', async () => {
     renderApp({ route: '/brands/brand-proenzi/ux' })
     await open()
-    expect(await within(section('Comportament')).findByText(/Sursa Microsoft Clarity nu este conectată pentru acest brand/)).toBeInTheDocument()
+    expect(await within(section('Comportament')).findByText(/Sursa de comportament nu este conectată pentru acest brand/)).toBeInTheDocument()
     expect(within(section('Comportament')).queryByRole('alert')).toBeNull()
   })
 

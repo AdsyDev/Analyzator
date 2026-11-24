@@ -153,7 +153,7 @@ const NO_SOCIAL_IMPORT = 'Nu există date sociale importate pentru acest brand.'
 const traffic: TrafficProvider = {
   channels: async () => notConnected(TRAFFIC_UNAVAILABLE),
   aiReferrals: async () => notConnected(TRAFFIC_UNAVAILABLE),
-  clarityDevices: async () => notConnected('Datele Microsoft Clarity pe device nu sunt încă disponibile pentru acest brand.'),
+  clarityDevices: async () => notConnected('Datele de comportament pe device nu sunt încă disponibile pentru acest brand.'),
   trackingQuality: async () => notConnected('Verificările de tracking nu sunt încă disponibile pentru acest brand.'),
 }
 

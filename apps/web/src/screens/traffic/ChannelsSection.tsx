@@ -1,6 +1,7 @@
 import { ArrowDownIcon, ArrowUpIcon, MinusIcon } from '@phosphor-icons/react'
 import type { ProviderResult, TrafficChannel, TrafficChannels } from '../../contracts'
 import { SortableTable, type Column } from '../../components/ui/SortableTable'
+import { useShowSources } from '../../components/SourceVisibility'
 import type { AsyncState } from '../../data/useAsync'
 import { cn } from '../../lib/cn'
 import { changeDirection, formatInteger, formatMetricValue, formatRelativeChange } from '../../lib/format'
@@ -39,12 +40,13 @@ interface Props {
 }
 
 export function ChannelsSection({ state, onRetry, deviceLabel }: Props) {
+  const showSources = useShowSources()
   const exportName = useExportName('canale')
   return (
     <Section
       id="channels"
       title="Canale"
-      description={deviceLabel ? `Filtrat pe device: ${deviceLabel}. Indicatorii de sus rămân pe toate device-urile.` : 'Sesiunile pe grupurile de canale GA4, cu pondere și variație față de comparație.'}
+      description={deviceLabel ? `Filtrat pe device: ${deviceLabel}. Indicatorii de sus rămân pe toate device-urile.` : showSources ? 'Sesiunile pe grupurile de canale GA4, cu pondere și variație față de comparație.' : 'Sesiunile pe grupurile de canale, cu pondere și variație față de comparație.'}
     >
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă canalele" skeletonClass="h-64">
         {(d) => <SortableTable caption="Canale" exportFileName={exportName} columns={columns} rows={d.channels} rowKey={(c) => c.channel} pageSize={10} emptyText="Niciun canal cu date în perioada aleasă." />}

@@ -3,20 +3,20 @@ import { METRIC_STATUSES } from '../../contracts'
 import { serverPeriodKind } from '../../lib/period'
 import type { DataClient } from './dataClient'
 
-const NO_SOURCE = 'Nu există date sociale pentru acest brand: Planable nu a rulat încă și nu există niciun import.'
+const NO_SOURCE = 'Nu există date sociale pentru acest brand: sursa nu a rulat încă și nu există niciun import.'
 const CONTRACT = 'Răspunsul serverului nu respectă contractul așteptat. Reîncearcă sau anunță echipa tehnică.'
-const NO_FORMAT_TOPIC = 'Planable nu trimite formatul și subiectul postărilor, deci gruparea pe format și pe subiect nu se poate calcula.'
-const NO_COMPETITORS = 'Profilurile competitorilor nu au fost încă colectate din Planable Competitors. Apar după ce paginile brandului urmăresc competitori în Planable și rulează colectarea.'
+const NO_FORMAT_TOPIC = 'Sursa nu trimite formatul și subiectul postărilor, deci gruparea pe format și pe subiect nu se poate calcula.'
+const NO_COMPETITORS = 'Profilurile competitorilor nu au fost încă colectate. Apar după ce paginile brandului urmăresc competitori și rulează colectarea.'
 const NO_SET = 'Brandul nu are încă un set de competitori în vigoare; competiția publică apare după configurarea lui.'
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Textele cardurilor (descrieri, nu formule: valorile vin din SQL). */
 const KPI_TEXT: Record<SocialKpiKey, { label: string; definition: string; note: string | null }> = {
-  posts: { label: 'Postări', definition: 'Postările publicate în perioadă pe conturile brandului din Planable.', note: null },
+  posts: { label: 'Postări', definition: 'Postările publicate în perioadă pe conturile brandului.', note: null },
   followers: { label: 'Urmăritori', definition: 'Suma urmăritorilor conturilor, la ultima observație din perioadă.', note: null },
   net_growth: { label: 'Creștere netă', definition: 'Pe fiecare cont: ultima minus prima observație de urmăritori din perioadă, însumat. Lipsește dacă un cont are o singură observație.', note: null },
-  interactions: { label: 'Interacțiuni', definition: 'Interacțiunile zilnice raportate de Planable, însumate pe perioadă.', note: null },
-  reach: { label: 'Reach', definition: 'Persoane unice care au văzut conținutul.', note: 'Reach-ul zilnic nu se poate aduna între zile, iar Planable nu dă un total pe perioadă.' },
+  interactions: { label: 'Interacțiuni', definition: 'Interacțiunile zilnice raportate de platforme, însumate pe perioadă.', note: null },
+  reach: { label: 'Reach', definition: 'Persoane unice care au văzut conținutul.', note: 'Reach-ul zilnic nu se poate aduna între zile, iar sursa nu dă un total pe perioadă.' },
 }
 
 type Report = {

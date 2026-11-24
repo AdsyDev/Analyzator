@@ -15,7 +15,8 @@ export interface DynamicFilter {
 export interface BrandModule {
   segment: string
   title: string
-  subtitle: (brandName: string) => string
+  /** `showSources`: furnizorii de date se numesc doar pentru administratorul agenției (vezi `SourceVisibility`). */
+  subtitle: (brandName: string, showSources: boolean) => string
   /** Sursele de care depinde modulul; când toate lipsesc, modulul afișează „Sursă neconectată". */
   sources: readonly SourceProviderId[]
   filters: readonly FilterDef[]
@@ -26,7 +27,7 @@ export interface BrandModule {
   adminFilters?: readonly FilterDef[]
   dynamicFilter?: DynamicFilter
   /** Textul pentru modulul fără sursă conectată, din design. */
-  disconnected?: (brandName: string) => string
+  disconnected?: (brandName: string, showSources: boolean) => string
   /** Sursa pe care o conectează acțiunea „Conectează …" (doar agency_admin). */
   connectLabel?: string
   /** Modulul arată ultima stare cunoscută, nu o perioadă: bara de perioadă și comparație nu apare. */
@@ -196,16 +197,16 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
   ai: { segment: 'ai', title: 'AI Visibility', subtitle: () => 'Cum apare brandul în răspunsurile asistenților AI, pe aceleași întrebări rulate zilnic.', sources: ['seomonitor'], filters: [ENGINE_FILTER], dynamicFilter: AI_GROUPS },
   seo: { segment: 'seo', title: 'SEO și Search', subtitle: () => 'Prezența în Google: clicks, poziții și subiectele pe care competitorii le acoperă înaintea ta.', sources: ['seomonitor', 'gsc'], filters: [KEYWORD_TYPE_FILTER] },
   // Fără `sources`: fâșia „Starea datelor” ar arăta actualitatea Search Analytics, nu ziua inspecției (pe care pagina o spune singură).
-  indexing: { segment: 'indexing', title: 'Indexare', subtitle: () => 'Care pagini sunt în indexul Google și care nu, după ultima inspecție Search Console.', sources: [], filters: [], noPeriod: true },
+  indexing: { segment: 'indexing', title: 'Indexare', subtitle: (_, src) => `Care pagini sunt în indexul Google și care nu, după ultima inspecție${src ? ' Search Console' : ''}.`, sources: [], filters: [], noPeriod: true },
   traffic: { segment: 'traffic', title: 'Trafic și conversii', subtitle: () => 'Ce se întâmplă după click: vizite, acțiuni importante și calitatea măsurării.', sources: ['ga4'], filters: [DEVICE_FILTER] },
-  ux: { segment: 'ux', title: 'User experience', subtitle: () => 'Cum folosesc vizitatorii site-ul, din Microsoft Clarity: rage clicks, dead clicks, quick backs și scroll, pe device.', sources: ['clarity'], filters: [] },
+  ux: { segment: 'ux', title: 'User experience', subtitle: (_, src) => `Cum folosesc vizitatorii site-ul${src ? ', din Microsoft Clarity' : ''}: rage clicks, dead clicks, quick backs și scroll, pe device.`, sources: ['clarity'], filters: [] },
   paid: {
     segment: 'paid',
     title: 'Paid Media',
     subtitle: () => '',
     sources: ['google_ads', 'meta_ads'],
     filters: [PAID_PLATFORM_FILTER],
-    disconnected: (b) => `Google Ads, Meta Ads și TikTok Ads nu sunt conectate pentru ${b}. Până la conectare nu afișăm cifre, nici estimate.`,
+    disconnected: (b, src) => `${src ? 'Google Ads, Meta Ads și TikTok Ads nu sunt conectate' : 'Conturile de ads nu sunt conectate'} pentru ${b}. Până la conectare nu afișăm cifre, nici estimate.`,
   },
   social: {
     segment: 'social',
@@ -214,7 +215,7 @@ export const BRAND_MODULES: Record<string, BrandModule> = {
     sources: ['planable'],
     // Fără filtru de format: Planable nu trimite formatul postărilor (D-23).
     filters: [SOCIAL_PLATFORM_FILTER],
-    disconnected: (b) => `Datele despre postările ${b} vin din Planable, care nu e încă conectat. Pentru comparația publică cu competitorii, vezi Competiție.`,
+    disconnected: (b, src) => `Datele despre postările ${b} ${src ? 'vin din Planable, care nu e încă conectat' : 'nu sunt încă conectate'}. Pentru comparația publică cu competitorii, vezi Competiție.`,
   },
   listening: { segment: 'listening', title: 'Listening', subtitle: () => 'Mențiunile publice despre brand, cu sentiment revizuit de echipa AdSymphony.', sources: [], filters: [SENTIMENT_FILTER, AUTHOR_FILTER], adminFilters: [LANGUAGE_FILTER], dynamicFilter: MENTION_SOURCES },
   pharmacovigilance: {

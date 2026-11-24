@@ -19,7 +19,7 @@ import type { DataClient } from './dataClient'
 import { QUERY_FAILED } from './dataClient'
 
 const CONTRACT = 'Răspunsul serverului nu respectă contractul așteptat. Reîncearcă sau anunță echipa tehnică.'
-const NO_SOURCE = 'Răspunsurile AI (SEOmonitor) nu sunt conectate pentru acest brand.'
+const NO_SOURCE = 'Răspunsurile AI nu sunt conectate pentru acest brand.'
 const OUTCOMES = ['recommended', 'mentioned', 'not_mentioned', 'refused', 'error', 'not_collected']
 const isEngine = (v: unknown) => (AI_ENGINES as readonly string[]).includes(String(v))
 const isStatus = (v: unknown) => (METRIC_STATUSES as readonly string[]).includes(String(v))

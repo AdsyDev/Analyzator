@@ -1,6 +1,7 @@
 import type { Brand, PaidFilters, PaidPlatform, QueryContext } from '../../contracts'
 import { PAID_PLATFORMS } from '../../contracts'
 import { TrendChart } from '../../components/TrendChart'
+import { useShowSources } from '../../components/SourceVisibility'
 import { useProviders } from '../../data/DataProvidersContext'
 import { ctxKey } from '../../data/hooks'
 import { useAsync } from '../../data/useAsync'
@@ -35,6 +36,7 @@ export function PaidPage() {
 
 function PaidContent({ brand, ctx, canImport, canEditBudget, onPeriod }: { brand: Brand; ctx: QueryContext; canImport: boolean; canEditBudget: boolean; onPeriod: (period: ReturnType<typeof periodEndingAt>) => void }) {
   const providers = useProviders()
+  const showSources = useShowSources()
   const f = paidFiltersFrom(ctx)
   const key = ctxKey(ctx)
   const summary = useAsync(() => providers.paid.summary(ctx, f), [providers, key])
@@ -46,7 +48,7 @@ function PaidContent({ brand, ctx, canImport, canEditBudget, onPeriod }: { brand
   if (summary.state.status === 'loading') return <div role="status" aria-label="Se încarcă Paid Media" className="h-64 rounded-xl bg-skeleton" />
   if (summary.state.status === 'failed') return <ProviderProblem result={{ kind: 'error', message: summary.state.message }} onRetry={summary.reload} />
   const result = summary.state.value
-  if (result.kind === 'not_connected') return <ImportGate text={BRAND_MODULES.paid?.disconnected?.(brand.name) ?? result.reason} canImport={canImport} />
+  if (result.kind === 'not_connected') return <ImportGate text={BRAND_MODULES.paid?.disconnected?.(brand.name, showSources) ?? result.reason} canImport={canImport} />
   if (result.kind === 'error') return <ProviderProblem result={result} onRetry={summary.reload} />
   const s = result.data
 

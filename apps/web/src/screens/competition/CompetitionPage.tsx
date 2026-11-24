@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Brand, CompetitionGap, CompetitionMatrix, CompetitorAd, CompetitorAdsPage, ProviderResult, QueryContext } from '../../contracts'
 import { ComparisonTable, type ComparisonColumn, type ComparisonGroup } from '../../components/ComparisonTable'
 import { EmptyState } from '../../components/EmptyState'
+import { useShowSources } from '../../components/SourceVisibility'
 import { StatusChip } from '../../components/ui/Chip'
 import { Pager } from '../../components/ui/Pager'
 import { SortableTable, type Column } from '../../components/ui/SortableTable'
@@ -115,22 +116,29 @@ const adColumns: Column<CompetitorAd>[] = [
     header: 'Reclama',
     render: (a) =>
       a.source_url ? (
-        <a href={a.source_url} target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">
-          Vezi în Ads Transparency
-        </a>
+        <AdLink url={a.source_url} />
       ) : (
         <span className="text-text-3">Fără link</span>
       ),
   },
 ]
 
+function AdLink({ url }: { url: string }) {
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline">
+      {useShowSources() ? 'Vezi în Ads Transparency' : 'Vezi reclama'}
+    </a>
+  )
+}
+
 // Fără export CSV: lista e paginată pe server, iar exportul ar conține doar pagina curentă.
 function Ads({ state, page, onPage, onRetry }: { state: AsyncState<ProviderResult<CompetitorAdsPage>>; page: number; onPage: (p: number) => void; onRetry: () => void }) {
+  const showSources = useShowSources()
   return (
     <Section
       id="ads"
       title="Reclamele competitorilor"
-      description="Reclamele advertiserilor configurați pentru fiecare competitor, pe care Google Ads Transparency Center le declară afișate în România în perioadă. Arată activitatea observată, nu bugetul, reach-ul sau eficiența; creația se vede pe pagina reclamei."
+      description={`Reclamele advertiserilor configurați pentru fiecare competitor, pe care ${showSources ? 'Google Ads Transparency Center le declară' : 'platforma le declară'} afișate în România în perioadă. Arată activitatea observată, nu bugetul, reach-ul sau eficiența; creația se vede pe pagina reclamei.`}
     >
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă reclamele" skeletonClass="h-48">
         {(p) =>

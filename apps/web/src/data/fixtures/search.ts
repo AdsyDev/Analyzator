@@ -96,7 +96,7 @@ export function createSearchFixtures(allowed: Set<string>): SearchProvider {
     indexStatus: async (brandId) => {
       if (!allowed.has(brandId)) return denied
       const pages = data[brandId]?.pages
-      if (!pages) return notConnected('Search Console nu este conectat pentru acest brand.')
+      if (!pages) return notConnected('Sursa de search nu este conectată pentru acest brand.')
       const day = addDays(lastCompleteDay(), -1)
       const list = priorityOf(brandId)
       const urls = pages.map<IndexedUrl>((p) => {
