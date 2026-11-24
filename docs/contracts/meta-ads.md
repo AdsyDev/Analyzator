@@ -50,7 +50,7 @@ Limitele sunt pe utilizare (`X-Business-Use-Case-Usage`), nu un număr fix. Ritm
 
 ## Rulare
 
-`.github/workflows/meta-weekly.yml`, marți 04:00 UTC, dezactivat până la `CONNECTOR_META_ENABLED = true`. Local: `npm run collect:meta`. Un `sync_run` per brand, cu `source = meta_ads`. Statusul sursei și metricile (cost, CPC) folosesc aceleași view-uri ca importul CSV (D-4).
+`.github/workflows/meta-daily.yml`, zilnic la 03:17 UTC, dezactivat până la `CONNECTOR_META_ENABLED = true`. Local: `npm run collect:meta`. Un `sync_run` per brand, cu `source = meta_ads`. Statusul sursei și metricile (cost, CPC) folosesc aceleași view-uri ca importul CSV (D-4).
 
 ## De confirmat la prima rulare reală
 

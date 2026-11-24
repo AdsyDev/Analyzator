@@ -30,7 +30,7 @@ Brandul ales sus → **„Adaugă conexiune”** → **Google Ads** → **Custom
 
 ## Rulare și verificare
 
-GitHub → Actions → **google-ads-weekly** → Run workflow; automat marțea, după `CONNECTOR_GOOGLE_ADS_ENABLED = true`. În „Istoricul sincronizărilor” apare o rulare Google Ads per brand.
+GitHub → Actions → **google-ads-daily** → Run workflow; automat zilnic la 03:17 UTC, după `CONNECTOR_GOOGLE_ADS_ENABLED = true`. În „Istoricul sincronizărilor” apare o rulare Google Ads per brand.
 
 ## Probleme frecvente
 

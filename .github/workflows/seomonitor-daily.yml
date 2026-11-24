@@ -1,7 +1,9 @@
-# Colectarea săptămânală SEOmonitor (API 3.0) pentru toate conexiunile active din source_connections.
+# Colectarea zilnică SEOmonitor (API 3.0) pentru toate conexiunile active din source_connections.
 #
-# Programare: marți la 04:00 UTC = 06:00 ora României vara (EEST), 05:00 iarna (EET). Cron-ul GitHub e în UTC și nu
-# urmează ora de vară: vezi nota DST din docs/runbook.md. Reimportă ultimele 35 de zile (până ieri, Europe/Bucharest).
+# Programare: zilnic la 03:17 UTC = 06:17 ora României vara (EEST), 05:17 iarna (EET). Minutul nu e fix la oră:
+# GitHub amână mult rulările programate la începutul orei (marțea, cele de la 04:00 UTC porneau după 12:00 UTC).
+# Cron-ul GitHub e în UTC și nu urmează ora de vară: vezi nota DST din docs/runbook.md. Decizia: docs/decisions.md, AF.
+# Reimportă ultimele 35 de zile (până ieri, Europe/Bucharest).
 #
 # Rularea programată e DEZACTIVATĂ până când variabila CONNECTOR_SEOMONITOR_ENABLED = "true"
 # (Settings → Secrets and variables → Actions → Variables). workflow_dispatch funcționează oricând.
@@ -9,11 +11,11 @@
 # Secrete în environment-ul GitHub ales (implicit „staging"): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
 # Tokenurile SEOmonitor NU sunt aici: stau în Supabase Vault și se citesc la rulare prin get_source_token.
 
-name: seomonitor-weekly
+name: seomonitor-daily
 
 on:
   schedule:
-    - cron: '0 4 * * 2'
+    - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
       environment:
@@ -27,7 +29,7 @@ permissions:
 
 concurrency:
   # O singură colectare odată: bugetul SEOmonitor (10.000 cereri/zi, 10/secundă) e comun per cont.
-  group: seomonitor-weekly
+  group: seomonitor-daily
   cancel-in-progress: false
 
 jobs:

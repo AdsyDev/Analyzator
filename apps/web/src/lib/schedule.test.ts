@@ -6,13 +6,13 @@ import { COLLECTION_SCHEDULE, nextScheduledRun, nextScheduledRunFor, type Schedu
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 const WORKFLOW = {
-  seomonitor: 'seomonitor-weekly.yml',
-  ga4: 'google-weekly.yml',
-  gsc: 'google-weekly.yml',
-  planable: 'planable-weekly.yml',
-  google_ads: 'google-ads-weekly.yml',
-  meta_ads: 'meta-weekly.yml',
-  tiktok_ads: 'tiktok-weekly.yml',
+  seomonitor: 'seomonitor-daily.yml',
+  ga4: 'google-daily.yml',
+  gsc: 'google-daily.yml',
+  planable: 'planable-daily.yml',
+  google_ads: 'google-ads-daily.yml',
+  meta_ads: 'meta-daily.yml',
+  tiktok_ads: 'tiktok-daily.yml',
   clarity: 'clarity-daily.yml',
   airbyte: 'airbyte-daily.yml',
 } as const
@@ -29,10 +29,23 @@ describe('programarea colectării', () => {
     }
   })
 
-  it('săptămânal: următoarea marți la 04:00 UTC; în ziua rulării, după oră, trece la săptămâna următoare', () => {
-    expect(nextScheduledRun('ga4', new Date('2026-11-10T03:59:00Z'))?.toISOString()).toBe('2026-11-10T04:00:00.000Z')
-    expect(nextScheduledRun('ga4', new Date('2026-11-10T04:00:00Z'))?.toISOString()).toBe('2026-11-17T04:00:00.000Z')
-    expect(nextScheduledRun('seomonitor', new Date('2026-11-13T12:00:00Z'))?.toISOString()).toBe('2026-11-17T04:00:00.000Z')
+  it('conectorii API rulează zilnic la 03:17 UTC (AF), în orice zi a săptămânii, nu doar marțea', () => {
+    expect(nextScheduledRun('ga4', new Date('2026-11-10T03:16:00Z'))?.toISOString()).toBe('2026-11-10T03:17:00.000Z')
+    expect(nextScheduledRun('ga4', new Date('2026-11-10T03:17:00Z'))?.toISOString()).toBe('2026-11-11T03:17:00.000Z')
+    expect(nextScheduledRun('seomonitor', new Date('2026-11-13T12:00:00Z'))?.toISOString()).toBe('2026-11-14T03:17:00.000Z')
+    expect(nextScheduledRun('planable', new Date('2026-11-15T23:00:00Z'))?.toISOString()).toBe('2026-11-16T03:17:00.000Z')
+  })
+
+  it('săptămânal: următoarea zi programată; în ziua rulării, după oră, trece la săptămâna următoare', () => {
+    const weekly: Schedule = { kind: 'weekly', weekday: 2, hour: 4, minute: 0 }
+    const saved = COLLECTION_SCHEDULE.ga4
+    COLLECTION_SCHEDULE.ga4 = weekly
+    try {
+      expect(nextScheduledRun('ga4', new Date('2026-11-10T03:59:00Z'))?.toISOString()).toBe('2026-11-10T04:00:00.000Z')
+      expect(nextScheduledRun('ga4', new Date('2026-11-10T04:00:00Z'))?.toISOString()).toBe('2026-11-17T04:00:00.000Z')
+    } finally {
+      COLLECTION_SCHEDULE.ga4 = saved
+    }
   })
 
   it('zilnic (Clarity): azi la 22:05 UTC sau mâine', () => {
@@ -44,5 +57,6 @@ describe('programarea colectării', () => {
     expect(nextScheduledRun('csv_import', new Date('2026-11-10T12:00:00Z'))).toBeNull()
     expect(nextScheduledRunFor(['csv_import'], new Date('2026-11-10T12:00:00Z'))).toBeNull()
     expect(nextScheduledRunFor(['ga4', 'clarity'], new Date('2026-11-10T12:00:00Z'))?.toISOString()).toBe('2026-11-10T22:05:00.000Z')
+    expect(nextScheduledRunFor(['ga4', 'clarity'], new Date('2026-11-10T23:00:00Z'))?.toISOString()).toBe('2026-11-11T03:17:00.000Z')
   })
 })

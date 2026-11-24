@@ -25,8 +25,8 @@ describe('ModuleFreshness', () => {
 
   it('următoarea actualizare estimată vine din programarea surselor care au date; „Sincronizat la" apare doar când e dat', () => {
     const { rerender } = render(<ModuleFreshness sources={['ga4', 'gsc']} freshness={rows} now={NOW} />)
-    // Marți 17 nov. 2026, 04:00 UTC = 06:00 în Europe/Bucharest.
-    expect(screen.getByText(/Următoarea actualizare estimată/)).toHaveTextContent('17 nov. 2026, 06:00')
+    // Colectare zilnică (AF): miercuri 11 nov. 2026, 03:17 UTC = 05:17 în Europe/Bucharest.
+    expect(screen.getByText(/Următoarea actualizare estimată/)).toHaveTextContent('11 nov. 2026, 05:17')
     expect(screen.queryByText(/Sincronizat la/)).not.toBeInTheDocument()
     rerender(<ModuleFreshness sources={['ga4', 'gsc']} freshness={rows} syncedAt="2026-11-10T04:12:00Z" now={NOW} />)
     expect(screen.getByText(/Sincronizat la/)).toHaveTextContent('10 nov. 2026, 06:12')

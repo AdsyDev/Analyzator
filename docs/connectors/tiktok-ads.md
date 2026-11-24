@@ -26,7 +26,7 @@
 
 ## Rulare și verificare
 
-GitHub → Actions → **tiktok-weekly** → Run workflow; automat marțea, după `CONNECTOR_TIKTOK_ENABLED = true`. Tokenul TikTok expiră zilnic și se reînnoiește automat la fiecare rulare. După un an, TikTok cere o nouă conectare.
+GitHub → Actions → **tiktok-daily** → Run workflow; automat zilnic la 03:17 UTC, după `CONNECTOR_TIKTOK_ENABLED = true`. Tokenul TikTok expiră zilnic și se reînnoiește automat la fiecare rulare. După un an, TikTok cere o nouă conectare.
 
 ## Probleme frecvente
 

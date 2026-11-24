@@ -100,7 +100,7 @@ Fiecare grup are și o a doua notă, cu **numele câmpurilor** pe care le aveau 
 
 ## Rulare
 
-- `.github/workflows/planable-weekly.yml`, marți 04:00 UTC, **dezactivat** până la `CONNECTOR_PLANABLE_ENABLED = true`; `workflow_dispatch` activ oricând. Local: `npm run collect:planable`.
+- `.github/workflows/planable-daily.yml`, zilnic la 03:17 UTC, **dezactivat** până la `CONNECTOR_PLANABLE_ENABLED = true`; `workflow_dispatch` activ oricând. Local: `npm run collect:planable`.
 - Fereastra: ultimele **35 de zile până ieri** (Europe/Bucharest), ca la ceilalți conectori.
 - Ritm: cel mult 4 cereri pe secundă; retry la 429/5xx după 5 s, 30 s și 2 min (Retry-After are prioritate); fără retry pe 401/403. Plafon de siguranță: 5.000 de cereri pe rulare.
 - Până la patru `sync_runs` per brand: `planable_analytics` (social, cu acoperire = zile cu `social_daily` / 35), `planable_listening` (mențiuni, fără acoperire pe zile), `planable_listening_competitors` (doar cu cuvinte de tip `competitor`) și `planable_competitors` (doar cu profiluri urmărite în Planable Competitors). O rulare cu orice eroare nu e niciodată `succeeded`.

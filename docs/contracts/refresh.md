@@ -4,7 +4,7 @@ Surse: brief cap. 4 (sincronizare marți 06:00 Europe/Bucharest), spec cap. 9 ș
 
 ## Orchestratorul (`connectors/orchestrator`)
 
-`npm run refresh:weekly [-- --only seomonitor,ga4,gsc]` · workflow `weekly-refresh.yml` (marți 04:00 UTC, dezactivat prin `REFRESH_ENABLED`, `workflow_dispatch` activ).
+`npm run refresh:weekly [-- --only seomonitor,ga4,gsc]` · workflow `weekly-refresh.yml` (marți 04:00 UTC, dezactivat prin `REFRESH_ENABLED`, `workflow_dispatch` activ). **Nefolosit:** colectarea programată rulează zilnic, prin workflow-urile per sursă (`*-daily.yml`, decizia AF); activat, refresh-ul ar dubla rulările de marți.
 
 - **Ordinea:** `seomonitor → ga4 → gsc`. Clarity are colectare zilnică proprie (`clarity-daily.yml`, buget de 10 apeluri/zi) și nu intră în refresh-ul săptămânal.
 - **Flag-uri:** `CONNECTOR_SEOMONITOR_ENABLED`, `CONNECTOR_GOOGLE_ENABLED` (ga4 și gsc), `CONNECTOR_CLARITY_ENABLED`; citite **doar** din `connectors/shared/flags.ts`. Un conector dezactivat e sărit (fără sync_run); doar valoarea `true` activează.
@@ -34,7 +34,7 @@ Fără funcții noi în `public` (garda A10/A11): statusul se citește din view-
 | `stale` | `data_as_of` mai vechi decât ieri − toleranța sursei |
 | `ok` | altfel |
 
-Prioritatea e cea din tabel (de sus în jos). Toleranța (`grace_days`) vine din registrul de metrici: maximul `freshness_grace_days` al metricilor sursei (GA4 8, GSC 10, Clarity 1, SEOmonitor 7; GA4 și GSC potrivite cu colectarea săptămânală, decizia AA), implicit 14 pentru sursele CSV.
+Prioritatea e cea din tabel (de sus în jos). Toleranța (`grace_days`) vine din registrul de metrici: maximul `freshness_grace_days` al versiunilor curente ale metricilor sursei (`metric_definitions_current`, decizia AF; înainte, maximul tuturor versiunilor): GA4 2, GSC 5, Clarity 1, SEOmonitor 7, potrivite cu colectarea zilnică; implicit 14 pentru sursele CSV.
 
 ### `data_as_of` și `coverage` (forma din `MetricResponse.meta`)
 

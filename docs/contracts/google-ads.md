@@ -32,7 +32,7 @@ Datele sunt la **nivel de campanie**, pentru că așa intră și campaniile Perf
 
 ## Rulare
 
-`.github/workflows/google-ads-weekly.yml`, marți 04:00 UTC, activ când `CONNECTOR_GOOGLE_ADS_ENABLED = true`. Local: `npm run collect:google-ads`.
+`.github/workflows/google-ads-daily.yml`, zilnic la 03:17 UTC, activ când `CONNECTOR_GOOGLE_ADS_ENABLED = true`. Local: `npm run collect:google-ads`.
 
 ## De confirmat la prima rulare
 

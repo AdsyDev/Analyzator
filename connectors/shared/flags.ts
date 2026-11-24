@@ -15,7 +15,7 @@ export const CONNECTOR_FLAGS: Record<ConnectorSource, string> = {
   google_ads: 'CONNECTOR_GOOGLE_ADS_ENABLED',
   tiktok_ads: 'CONNECTOR_TIKTOK_ENABLED',
   airbyte: 'CONNECTOR_AIRBYTE_ENABLED',
-  // Reclamele competitorilor (deciziile Y): workflow-ul ads-transparency-weekly citește variabila direct, ca planable-weekly.
+  // Reclamele competitorilor (deciziile Y): workflow-ul ads-transparency-weekly citește variabila direct, ca planable-daily.
   ads_transparency: 'CONNECTOR_ADS_TRANSPARENCY_ENABLED',
 }
 

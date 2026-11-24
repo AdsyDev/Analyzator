@@ -91,17 +91,39 @@ reset role;
 update public.source_connections set credential_status = 'valid' where id = '50000000-0000-0000-0000-0000000000e1';
 delete from public.sync_runs where id in ('a0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001');
 
--- stale: date vechi (peste toleranța GA4 de 8 zile, decizia AA: ieri − 8 = azi − 9)
+-- stale: date vechi (peste toleranța GA4 de 2 zile, decizia AF: ieri − 2 = azi − 3)
 delete from public.web_daily where brand_id = '20000000-0000-0000-0000-000000000011';
 insert into public.web_daily (tenant_id, brand_id, date, channel_group, source_medium, landing_page, landing_page_md5, sessions, source_id, collected_at, payload_hash, source_timezone, schema_version) values
   ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', (now() at time zone 'Europe/Bucharest')::date - 10, 'Direct', 'd', '/', md5('/'), 5,
    '50000000-0000-0000-0000-000000000011', now(), repeat('a', 64), 'Europe/Bucharest', 'test');
 select tests.authenticate_as('30000000-0000-0000-0000-000000000001');
 select is(pg_temp.st('20000000-0000-0000-0000-000000000011', 'ga4', 'state'), 'stale', 'C5: date mai vechi decât toleranța → stale');
-select is((select grace_days from public.source_status where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'ga4'), 8,
-  'C5: toleranța sursei = cea a versiunii curente a metricilor GA4 (decizia AA)');
-select is((select grace_days from public.source_status where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'gsc'), 10,
-  'C5: toleranța Search Console = 10 zile (decizia AA)');
+select is((select grace_days from public.source_status where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'ga4'), 2,
+  'C5: toleranța sursei = cea a versiunii curente a metricilor GA4 (decizia AF), nu maximul versiunilor vechi');
+select is((select grace_days from public.source_status where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'gsc'), 5,
+  'C5: toleranța Search Console = 5 zile (decizia AF)');
+select is((select grace_days from public.source_freshness where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'ga4'), 2,
+  'C5: source_freshness folosește aceeași toleranță (versiunea curentă)');
+reset role;
+
+-- AF: date până azi − 4 (ieri − 3): peste toleranța curentă de 2 zile, sub cea a versiunii 2 (8 zile) → stale / delayed.
+delete from public.web_daily where brand_id = '20000000-0000-0000-0000-000000000011';
+insert into public.web_daily (tenant_id, brand_id, date, channel_group, source_medium, landing_page, landing_page_md5, sessions, source_id, collected_at, payload_hash, source_timezone, schema_version) values
+  ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', (now() at time zone 'Europe/Bucharest')::date - 4, 'Direct', 'd', '/', md5('/'), 5,
+   '50000000-0000-0000-0000-000000000011', now(), repeat('a', 64), 'Europe/Bucharest', 'test');
+select tests.authenticate_as('30000000-0000-0000-0000-000000000001');
+select is(pg_temp.st('20000000-0000-0000-0000-000000000011', 'ga4', 'state'), 'stale', 'AF: GA4 cu două zile de colectare ratate → stale');
+select is((select freshness from public.source_freshness where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'ga4'), 'delayed',
+  'AF: același caz, pentru client → delayed');
+reset role;
+-- o zi ratată (date până azi − 3) nu e încă întârziere
+delete from public.web_daily where brand_id = '20000000-0000-0000-0000-000000000011';
+insert into public.web_daily (tenant_id, brand_id, date, channel_group, source_medium, landing_page, landing_page_md5, sessions, source_id, collected_at, payload_hash, source_timezone, schema_version) values
+  ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', (now() at time zone 'Europe/Bucharest')::date - 3, 'Direct', 'd', '/', md5('/'), 5,
+   '50000000-0000-0000-0000-000000000011', now(), repeat('a', 64), 'Europe/Bucharest', 'test');
+select tests.authenticate_as('30000000-0000-0000-0000-000000000001');
+select is((select freshness from public.source_freshness where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'ga4'), 'current',
+  'AF: GA4 cu o singură zi de colectare ratată → încă current');
 reset role;
 
 delete from public.web_daily where brand_id = '20000000-0000-0000-0000-000000000011';

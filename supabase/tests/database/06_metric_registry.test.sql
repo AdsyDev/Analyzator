@@ -393,12 +393,16 @@ create function pg_temp.weekly(p_def jsonb, p_as_of date, p_data_as_of date) ret
         'data_as_of', p_data_as_of)))
 $$;
 
+-- Versiunea 2 (AA), explicit: versiunea curentă e 3 (AF, colectare zilnică).
+create function pg_temp.v2(p_key text) returns jsonb language sql as $$
+  select to_jsonb(d) from public.metric_definitions d where d.metric_key = p_key and d.version = 2
+$$;
 select results_eq(
-  $$ select metric_key::text collate "C", version, freshness_grace_days from public.metric_definitions_current
-     where primary_source in ('ga4', 'gsc') order by 1 $$,
-  $$ values ('ga4_active_users'::text collate "C", 2, 8), ('ga4_engaged_sessions', 2, 8), ('ga4_key_events', 2, 8), ('ga4_sessions', 2, 8),
-            ('gsc_average_position', 2, 10), ('gsc_clicks', 2, 10), ('gsc_ctr', 2, 10), ('gsc_impressions', 2, 10) $$,
-  'AA1: versiunea curentă GA4 și GSC e 2, cu toleranța 8, respectiv 10 zile'
+  $$ select metric_key::text collate "C", freshness_grace_days from public.metric_definitions
+     where primary_source in ('ga4', 'gsc') and version = 2 order by 1 $$,
+  $$ values ('ga4_active_users'::text collate "C", 8), ('ga4_engaged_sessions', 8), ('ga4_key_events', 8), ('ga4_sessions', 8),
+            ('gsc_average_position', 10), ('gsc_clicks', 10), ('gsc_ctr', 10), ('gsc_impressions', 10) $$,
+  'AA1: versiunea 2 GA4 și GSC are toleranța 8, respectiv 10 zile'
 );
 select is_empty(
   $$ select v2.metric_key from public.metric_definitions v1
@@ -410,21 +414,52 @@ select is_empty(
 );
 select is(pg_temp.status(pg_temp.weekly(pg_temp.def('gsc_clicks'), '2026-11-23', '2026-11-14')), 'stale',
   'AA2: cazul din 23 nov: cu versiunea 1, GSC adus marți apare stale luni');
-select is(pg_temp.has_warning(pg_temp.weekly(pg_temp.cur('gsc_clicks'), '2026-11-23', '2026-11-14'), 'stale'), false,
+select is(pg_temp.has_warning(pg_temp.weekly(pg_temp.v2('gsc_clicks'), '2026-11-23', '2026-11-14'), 'stale'), false,
   'AA2: cu versiunea 2, același caz nu mai e stale');
-select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('gsc_clicks'), '2026-11-23', '2026-11-14')), 'partial',
+select is(pg_temp.status(pg_temp.weekly(pg_temp.v2('gsc_clicks'), '2026-11-23', '2026-11-14')), 'partial',
   'AA2: zilele încă neaduse rămân vizibile: partial (20 din 28 de zile), nu ok');
-select is(pg_temp.has_warning(pg_temp.weekly(pg_temp.cur('gsc_clicks'), '2026-11-24', '2026-11-14'), 'stale'), false,
+select is(pg_temp.has_warning(pg_temp.weekly(pg_temp.v2('gsc_clicks'), '2026-11-24', '2026-11-14'), 'stale'), false,
   'AA3: GSC marți, înainte de rulare → nu e stale');
-select is(pg_temp.has_warning(pg_temp.weekly(pg_temp.cur('gsc_clicks'), '2026-11-25', '2026-11-14'), 'stale'), false,
+select is(pg_temp.has_warning(pg_temp.weekly(pg_temp.v2('gsc_clicks'), '2026-11-25', '2026-11-14'), 'stale'), false,
   'AA3: GSC miercuri, rularea de marți întârziată o zi → nu e stale');
-select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('gsc_clicks'), '2026-11-26', '2026-11-14')), 'stale',
+
+-- AF (24 nov 2026): versiunea 3, colectare zilnică la 03:17 UTC. GA4 aduce până ieri; GSC până azi − 4 (ieri în Pacific − 2).
+select results_eq(
+  $$ select metric_key::text collate "C", version, freshness_grace_days from public.metric_definitions_current
+     where primary_source in ('ga4', 'gsc') order by 1 $$,
+  $$ values ('ga4_active_users'::text collate "C", 3, 2), ('ga4_engaged_sessions', 3, 2), ('ga4_key_events', 3, 2), ('ga4_sessions', 3, 2),
+            ('gsc_average_position', 3, 5), ('gsc_clicks', 3, 5), ('gsc_ctr', 3, 5), ('gsc_impressions', 3, 5) $$,
+  'AF1: versiunea curentă GA4 și GSC e 3, cu toleranța 2, respectiv 5 zile'
+);
+select is_empty(
+  $$ select v3.metric_key from public.metric_definitions v2
+     join public.metric_definitions v3 on v3.metric_key = v2.metric_key and v3.version = 3 and v2.version = 2
+     where v2.primary_source in ('ga4', 'gsc')
+       and ((to_jsonb(v2) - '{version,freshness_grace_days,valid_from,created_at}'::text[])
+            <> (to_jsonb(v3) - '{version,freshness_grace_days,valid_from,created_at}'::text[])) $$,
+  'AF1: versiunea 3 schimbă doar toleranța (formula, unitatea, agregarea și direcția rămân)'
+);
+select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('ga4_sessions'), '2026-11-25', '2026-11-23')), 'partial',
+  'AF2: GA4 miercuri, înainte de rularea zilei: date până alaltăieri → partial, nu stale');
+select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('ga4_sessions'), '2026-11-26', '2026-11-23')), 'partial',
+  'AF2: GA4, o zi de rulare ratată → încă nu e stale');
+select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('ga4_sessions'), '2026-11-27', '2026-11-23')), 'stale',
+  'AF2: GA4, două zile de rulare ratate → stale');
+select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('gsc_clicks'), '2026-11-25', '2026-11-20')), 'partial',
+  'AF3: GSC miercuri, înainte de rularea zilei: date până azi − 5 → nu e stale');
+select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('gsc_clicks'), '2026-11-26', '2026-11-20')), 'partial',
+  'AF3: GSC, o zi de rulare ratată → încă nu e stale');
+select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('gsc_clicks'), '2026-11-27', '2026-11-20')), 'stale',
+  'AF3: GSC, două zile de rulare ratate → stale');
+select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('gsc_clicks'), '2026-11-23', '2026-11-14')), 'stale',
+  'AF3: cazul din 23 nov (rularea săptămânală) ar fi acum stale: o colectare zilnică oprită se vede');
+select is(pg_temp.status(pg_temp.weekly(pg_temp.v2('gsc_clicks'), '2026-11-26', '2026-11-14')), 'stale',
   'AA3: GSC joi, fără rularea de marți → stale');
-select is(pg_temp.has_warning(pg_temp.weekly(pg_temp.cur('ga4_sessions'), '2026-11-25', '2026-11-16'), 'stale'), false,
+select is(pg_temp.has_warning(pg_temp.weekly(pg_temp.v2('ga4_sessions'), '2026-11-25', '2026-11-16'), 'stale'), false,
   'AA4: GA4 miercuri, rularea de marți întârziată o zi → nu e stale');
-select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('ga4_sessions'), '2026-11-26', '2026-11-16')), 'stale',
+select is(pg_temp.status(pg_temp.weekly(pg_temp.v2('ga4_sessions'), '2026-11-26', '2026-11-16')), 'stale',
   'AA4: GA4 joi, fără rularea de marți → stale');
-select is(pg_temp.status(pg_temp.weekly(pg_temp.cur('ga4_sessions'), '2026-11-18', '2026-11-16')), 'partial',
+select is(pg_temp.status(pg_temp.weekly(pg_temp.v2('ga4_sessions'), '2026-11-18', '2026-11-16')), 'partial',
   'AA4: GA4 a doua zi după rulare: doar ieri lipsește → partial, nu stale');
 
 -- AB (24 nov 2026): zile lipsă la sfârșitul perioadei → comparația pe aceeași porțiune din perioada de referință -----------
@@ -453,7 +488,7 @@ select is(metrics.matched_comparison_period('2026-10-26', '2026-11-22', 'custom'
 -- metrics.compute: 20 de zile × 77 clicks față de 28 de zile × 65 (cazul real, rotunjit).
 create function pg_temp.ab(p_cmp_period jsonb) returns jsonb language sql as $$
   select metrics.compute(jsonb_build_object(
-    'definition', pg_temp.cur('gsc_clicks'),
+    'definition', pg_temp.v2('gsc_clicks'),
     'brand_id', '20000000-0000-0000-0000-000000000011',
     'as_of_date', '2026-11-23',
     'period', '{"start": "2026-10-26", "end": "2026-11-22", "kind": "custom"}'::jsonb,
@@ -610,6 +645,7 @@ select is(
 
 select is((select count(*)::int from public.metric_definitions where primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') and metric_key not like 'ai\_%' and version = 1), 16, 'D1: 16 definiții de nivel A (nivelul B, import CSV, are propriile teste în 08)');
 select is((select count(*)::int from public.metric_definitions where primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') and metric_key not like 'ai\_%' and version = 2), 8, 'D1: 8 au versiunea 2 (GA4 și GSC, decizia AA)');
+select is((select count(*)::int from public.metric_definitions where primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') and metric_key not like 'ai\_%' and version = 3), 8, 'D1: 8 au versiunea 3 (GA4 și GSC, decizia AF)');
 select is((select count(*)::int from public.metric_definitions_current where primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') and metric_key not like 'ai\_%'), 16, 'D1: câte o versiune curentă per metrică (nivel A)');
 select is_empty(
   $$ select metric_key from public.metric_definitions where primary_source = 'clarity' and lifecycle <> 'draft' $$,
@@ -618,8 +654,8 @@ select is_empty(
 select results_eq(
   $$ select primary_source::text collate "C", min(freshness_grace_days), max(freshness_grace_days)
      from public.metric_definitions_current where primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') group by 1 order by 1 $$,
-  $$ values ('clarity'::text collate "C", 1, 1), ('ga4', 8, 8), ('gsc', 10, 10), ('seomonitor', 7, 7) $$,
-  'D1: toleranța stale per sursă (versiunile curente): GA4 8, GSC 10, SEOmonitor 7, Clarity 1'
+  $$ values ('clarity'::text collate "C", 1, 1), ('ga4', 2, 2), ('gsc', 5, 5), ('seomonitor', 7, 7) $$,
+  'D1: toleranța stale per sursă (versiunile curente): GA4 2, GSC 5, SEOmonitor 7, Clarity 1'
 );
 select is_empty($$ select metric_key from public.metric_definitions where min_sample is not null and primary_source in ('ga4', 'gsc', 'seomonitor', 'clarity') and metric_key not like 'ai\_%' $$,
   'D1: nivelul A (fără AI) nu are prag de eșantion');

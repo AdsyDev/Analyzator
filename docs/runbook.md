@@ -1,7 +1,7 @@
 # Runbook operațional
 
 ## Refresh săptămânal
-_De completat._ Sincronizare marți la 06:00 Europe/Bucharest pentru săptămâna anterioară (luni-duminică); reimport al ultimelor 35 de zile pentru sursele mutabile.
+**Colectare zilnică** (decizia AF, 24 nov. 2026; până atunci, marțea): fiecare conector API rulează zilnic la 03:17 UTC prin workflow-ul lui (`seomonitor-daily`, `google-daily`, `planable-daily`, `google-ads-daily`, `meta-daily`, `tiktok-daily`), indexarea la 04:47 UTC (`gsc-index-daily`), Clarity la 22:05 UTC, Airbyte la 05:20 UTC. Fiecare rulare reimportă ultimele 35 de zile, până ieri. Excepție: Google Ads Transparency rămâne marțea (`ads-transparency-weekly`), până se vede costul BigQuery al primei rulări reale. GitHub pornește rulările programate cu întârziere (marțea, cele de la 04:00 UTC porneau după 12:00 UTC), deci datele de ieri apar în cursul dimineții sau la prânz. Workflow-ul `weekly-refresh` (mai jos) e o alternativă dezactivată, care nu se folosește.
 
 ## Colectare zilnică Clarity
 
@@ -59,7 +59,7 @@ Administrare → Utilizatori (doar `agency_admin`): numele și emailul fiecărei
 - **Cont creat direct, cu parolă temporară (E-5).** În „Adaugă o persoană”, varianta „Creează contul cu parolă temporară” creează contul activ, fără email (merge și fără SMTP). Administratorul alege parola sau apasă „Generează”; parola apare o singură dată, în fereastra de confirmare, și se transmite pe un canal sigur. La prima intrare, persoana e oprită pe „Schimbă parola temporară” până alege o parolă nouă, diferită de cea temporară; până atunci, în tabel apare „Parolă temporară”. Doar pentru adrese fără cont: pentru un cont existent se folosește invitația, care acordă doar accesul. Crearea lasă în `audit_events` evenimentul `user_created`, cu cine a creat contul.
 - **Parola temporară pierdută:** persoana folosește „Am uitat parola” (cere SMTP) sau un administrator șterge contul din Supabase → Authentication → Users și îl creează din nou din aplicație. Contul nu se poate recrea cât timp există.
 
-## Colectare săptămânală SEOmonitor
+## Colectare zilnică SEOmonitor
 
 - Conexiunea: `source_connections` cu `provider = 'seomonitor'`, **la nivel de client** (`brand_id` gol), `external_account_id` = company_id SEOmonitor. Tokenul se setează ca la Clarity: `npm run set-source-token -- --connection <uuid> --email <admin>`. Vezi `docs/contracts/seomonitor.md`.
 - **Maparea grupurilor** (obligatorie înainte de prima rulare): `seomonitor_group_mappings`, creată de `agency_admin`. Fiecare grup SEOmonitor primește una din trei variante:
@@ -69,9 +69,9 @@ Administrare → Utilizatori (doar `agency_admin`): numele și emailul fiecărei
 
   Schimbarea înseamnă o **versiune nouă** cu `effective_from`, fără editare.
 - **Coada de verificare** (`seomonitor_mapping_queue`): grupuri nemapate, multi-brand sau dispărute. Se rezolvă prin mapare; până atunci, datele lor nu intră în niciun brand.
-- **Programare:** `.github/workflows/seomonitor-weekly.yml`, marți la **04:00 UTC**.
+- **Programare:** `.github/workflows/seomonitor-daily.yml`, **zilnic la 03:17 UTC** (decizia AF; până pe 24 nov. 2026, marțea la 04:00 UTC).
   - **Nota DST:** cron-ul GitHub e în UTC și nu urmează ora de vară. Rularea pică la **06:00** ora României vara (EEST, UTC+3) și la **05:00** iarna (EET, UTC+2), de la ultima duminică din octombrie (25 oct 2026) până la ultima duminică din martie. Pentru 06:00 tot anul, cron-ul trebuie schimbat de două ori pe an în `0 3 * * 2` (iarna) și înapoi. Pentru pilot păstrăm 04:00 UTC: datele sunt până ieri, deci ora exactă nu schimbă rezultatul.
-  - Activare: `CONNECTOR_SEOMONITOR_ENABLED = true` în GitHub Variables. Secrete în environment-ul `staging`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Rulare manuală: Actions → seomonitor-weekly → Run workflow.
+  - Activare: `CONNECTOR_SEOMONITOR_ENABLED = true` în GitHub Variables. Secrete în environment-ul `staging`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`. Rulare manuală: Actions → seomonitor-daily → Run workflow.
 - Rulare locală: `npm run collect:seomonitor`. Reimportă ultimele 35 de zile; nu pornește sub 50 de apeluri rămase azi (UTC; cota documentată e de 10.000 pe zi).
 - **Prima rulare reală:** verifică punctele din „De confirmat" din contract (unitatea visibility, rankul pentru „nu se clasează" etc.) pe `*_original`, `rank_status = 'at_tracking_limit'` și notele `parser_unknown_field` din `sync_runs.errors`.
 - Diagnostic:
@@ -97,15 +97,15 @@ _De completat._
 ## GA4 și Search Console
 
 - Configurare și reguli: `docs/contracts/google.md`. Service account-ul (un JSON per tenant) se setează cu `npm run set-source-token -- --connection <uuid-conexiune-google_service_account> --email <admin>`; conexiunile `ga4` și `gsc` (per brand) conțin doar property ID / site_url.
-- Rulare: marți 04:00 UTC prin `.github/workflows/google-weekly.yml` (dezactivat până la `CONNECTOR_GOOGLE_ENABLED = true`), sau manual: `npm run collect:google [-- --only ga4|gsc]`.
+- Rulare: zilnic la 03:17 UTC prin `.github/workflows/google-daily.yml` (decizia AF) (dezactivat până la `CONNECTOR_GOOGLE_ENABLED = true`), sau manual: `npm run collect:google [-- --only ga4|gsc]`.
 - Verificare după rulare: `sync_runs` (source `ga4` / `gsc`: `status`, `errors`, `coverage`), `source_reconciliations` (`mismatch` = diferență peste toleranță; `incomparable` = interval, fus sau proprietate diferite).
 - `not_connected` în log = lipsește credentialul Google al tenantului, sau a fost marcat invalid. Nu e o eroare a rulării.
 - `access_denied` pe un brand = service account-ul nu are acces la proprietatea respectivă (adaugă-l în GA4 / Search Console).
 - **AdSy AI (M):** pornirea are patru pași, în această ordine. (1) Secretul funcției, în Supabase → Edge Functions → Secrets: `GEMINI_API_KEY` (cheia Gemini API, pe un cont de billing separat). Fără el, AdSy AI arată „neconfigurat”. Modelul implicit e `gemini-3.5-flash-lite` (decizia O-9); secretul opțional `ADSY_AI_MODEL` îl înlocuiește fără o nouă publicare. Cheia nu se scrie în repo, în documente sau în chat; dacă a fost trimisă pe un canal nesigur, se regenerează în Google AI Studio și se pune cea nouă. (2) Validarea termenilor de procesare ai furnizorului pentru datele care pleacă (numele brandului, indicatori agregați, analize publicate, întrebarea). (3) Opțional, documentele aprobate ale brandului, din aceeași pagină: se lipesc ca text, fără date personale, și se aprobă de strategist sau administrator. (4) Politica brandului, din pagina AdSy AI a brandului, ca `agency_admin`: chat, generare, afișare și plafonul lunar de tokeni. Verificare: tabelul `ai_requests` (status, tokeni, `rejection_reason`). Oprire imediată: politica brandului, sau ștergerea secretului `GEMINI_API_KEY`. Verificare pe live, cap la cap: workflow-ul `adsy-ai-live-check` (manual; creează un cont temporar, pornește politica brandului pe durata verificării și curăță tot la final; deciziile T). Dacă o rulare e întreruptă, se rulează din nou cu „cleanup_only”. Înainte de a schimba modelul sau promptul: `GEMINI_API_KEY=… npm run eval:ai -- --model <id>` trebuie să iasă cu zero cazuri nesigure și cel puțin 85 % reușite (deciziile Q).
-- **Indexare (L):** Actions → `gsc-index-weekly` → Run workflow (opțional `brand` = ID-ul site-ului). Inspectează URL-urile prioritare ale brandului și paginile lui cu cele mai multe clickuri, cel mult 200. Verificare: `sync_runs` cu `source = gsc_index` și tabelul `index_inspections`. `access_denied` = service account-ul nu are acces la proprietate; `rate_limited` = cota zilnică de inspecții; `url_outside_property` = un URL prioritar nu ține de proprietatea site-ului (se scoate din listă, din ecranul Indexare).
-- **Istoric GA4 pentru perioade lungi și comparația pe an (H-3):** Actions → `google-weekly` → Run workflow cu `only = ga4`, `brand` = ID-ul site-ului și `from` = prima zi (cel mult 16 luni în urmă). Rulează ferestre de 35 de zile, de la cea mai veche. Înainte, verifică spațiul din bază: un rând pe zi, canal, sursă și landing page. Se face pe fiecare site, o dată.
+- **Indexare (L):** Actions → `gsc-index-daily` → Run workflow (opțional `brand` = ID-ul site-ului). Inspectează URL-urile prioritare ale brandului și paginile lui cu cele mai multe clickuri, cel mult 200. Verificare: `sync_runs` cu `source = gsc_index` și tabelul `index_inspections`. `access_denied` = service account-ul nu are acces la proprietate; `rate_limited` = cota zilnică de inspecții; `url_outside_property` = un URL prioritar nu ține de proprietatea site-ului (se scoate din listă, din ecranul Indexare).
+- **Istoric GA4 pentru perioade lungi și comparația pe an (H-3):** Actions → `google-daily` → Run workflow cu `only = ga4`, `brand` = ID-ul site-ului și `from` = prima zi (cel mult 16 luni în urmă). Rulează ferestre de 35 de zile, de la cea mai veche. Înainte, verifică spațiul din bază: un rând pe zi, canal, sursă și landing page. Se face pe fiecare site, o dată.
 - `ga4_incompatible_*` = combinație de dimensiuni și metrici respinsă de `checkCompatibility`; metrica rămâne NULL, nu 0.
-- Un singur site: `--brand <uuid>` (sau `brand` în `google-weekly` → Run workflow). Reimportul istoricului Search Console: `--only gsc --brand <uuid> --from YYYY-MM-DD` (mai jos).
+- Un singur site: `--brand <uuid>` (sau `brand` în `google-daily` → Run workflow). Reimportul istoricului Search Console: `--only gsc --brand <uuid> --from YYYY-MM-DD` (mai jos).
 
 ### Search Console: trecerea pe Domain property și reimportul istoricului (D-27)
 
@@ -124,7 +124,7 @@ Datele nu se dublează nici înainte, nici după: site-ul are o singură proprie
 
 `no_domain_access` înseamnă că service account-ul nu e adăugat pe Domain property: clientul îl adaugă (Search Console → Settings → Users and permissions), apoi reia pasul 1.
 
-**Manual, pentru un singur site (SQL Editor + `google-weekly`):**
+**Manual, pentru un singur site (SQL Editor + `google-daily`):**
 
 1. **ID-ul site-ului:** pagina site-ului (Administrare → Clienți și site-uri → „Editează și surse”) are adresa `/admin/clients/<id>`.
 2. **Schimbă proprietatea** (Supabase → SQL Editor, proiectul în care rulează colectarea). O singură instrucțiune, deci atomică: arhivează conexiunea veche (istoricul ei rămâne) și adaugă conexiunea nouă, cu același fus. Înlocuiește ID-ul site-ului, adresa veche (exact, cu `/` la final) și domeniul:
@@ -145,7 +145,7 @@ Datele nu se dublează nici înainte, nici după: site-ul are o singură proprie
    ```
 
    Trebuie să întoarcă **un rând**. Zero rânduri = nimic schimbat (ID-ul site-ului sau adresa veche nu se potrivesc). Eroarea `23505` = proprietatea nouă există deja pe client, arhivată (de ex. după o revenire), iar instrucțiunea nu a schimbat nimic: folosește instrucțiunea de la pasul 5 cu adresele inversate, care o reactivează.
-3. **Reimportă istoricul:** GitHub → Actions → `google-weekly` → Run workflow: `only` = `gsc`, `brand` = ID-ul site-ului, `from` = data de azi minus 16 luni (Search Console nu are mai mult; o dată prea veche e refuzată, iar mesajul spune ziua permisă). Log-ul are câte un rând pe fereastră de 35 de zile, de la cea mai veche; ultima e fereastra obișnuită. Câteva minute. Reluarea e sigură (upsert pe aceleași chei).
+3. **Reimportă istoricul:** GitHub → Actions → `google-daily` → Run workflow: `only` = `gsc`, `brand` = ID-ul site-ului, `from` = data de azi minus 16 luni (Search Console nu are mai mult; o dată prea veche e refuzată, iar mesajul spune ziua permisă). Log-ul are câte un rând pe fereastră de 35 de zile, de la cea mai veche; ultima e fereastra obișnuită. Câteva minute. Reluarea e sigură (upsert pe aceleași chei).
 4. **Verifică:** cardul Search Console din pagina site-ului arată `sc-domain:…` și „Acces confirmat”; în istoric, câte o rulare „Search Console” pe fereastră. Rânduri rămase de la proprietatea veche (trebuie 0):
 
    ```sql
@@ -228,11 +228,11 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 **Activare** (prima dată): Variables `REFRESH_ENABLED`, `CONNECTOR_SEOMONITOR_ENABLED`, `CONNECTOR_GOOGLE_ENABLED`; secrete `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, opțional `RESEND_API_KEY`, `OPS_FROM_EMAIL`; contacte în `alert_contacts` (agency_admin). Cron-ul GitHub nu urmează ora de vară: la trecerea la EET (25 oct) rularea se mută la 05:00 ora României; ajustează cron-ul dacă ora fixă contează.
 
 
-## Colectare săptămânală Planable
+## Colectare zilnică Planable
 
 - Configurare și reguli: `docs/contracts/planable.md`; pași pentru agenție: `docs/connectors/planable.md`.
 - Conexiuni: `planable_account` per client (tokenul, din pagina oricărui site al clientului → cardul Planable → pasul 1, cu test) și `planable` per brand (workspace-ul).
-- Rulare: `.github/workflows/planable-weekly.yml`, marți 04:00 UTC, activ când `CONNECTOR_PLANABLE_ENABLED = true`; manual: Actions → planable-weekly → Run workflow, sau local `npm run collect:planable`.
+- Rulare: `.github/workflows/planable-daily.yml`, zilnic la 03:17 UTC, activ când `CONNECTOR_PLANABLE_ENABLED = true`; manual: Actions → planable-daily → Run workflow, sau local `npm run collect:planable`.
 - Verificare: `sync_runs` (`source` = `planable_analytics` / `planable_listening` / `planable_listening_competitors` / `planable_competitors`: `status`, `errors`, `coverage`), `provider_api_calls` (apelul `/workspaces` e pe conexiunea clientului, restul pe conexiunea brandului).
 - Mesaje: `access_denied` la `/workspaces` = token refuzat (marcat `invalid`; token nou din Planable). `workspace_not_found` = ID greșit sau token fără acces la workspace. `parser_note` = câmp invalid sau postare fără metrici; nu schimbă statusul. La Listening, „N mențiuni sărite din <rețea>: <motiv>” (`dimension = mentions_skipped`) spune câte mențiuni nu au putut fi scrise și de ce, iar „câmpurile lor (<rețea>): …” arată ce câmpuri aveau (doar numele); apar în jurnalul rulării, sub rândul brandului.
 - Planable nu e încă în orchestratorul `weekly-refresh` (rulează pe workflow propriu, la aceeași oră).
@@ -253,11 +253,11 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 - Verificare: `sync_runs` (`source = ads_transparency`; nota `bytes_billed` = GB facturați), `competitor_ads`, `competitor_trackers` (`source = google_ads_transparency`).
 - Mesaje: `bytesBilledLimitExceeded` = interogarea ar trece de plafon (nimic facturat); `accessDenied` = rolul sau API-ul lipsesc; `schema_changed` = un câmp obligatoriu lipsește din `creative_stats` (mesajul listează câmpurile găsite); nota `schema` = câmpuri opționale absente, lăsate NULL; `truncated` = peste 50.000 de rânduri, rulare parțială.
 
-## Colectare săptămânală Meta Ads
+## Colectare zilnică Meta Ads
 
 - Configurare și reguli: `docs/contracts/meta-ads.md`; pași pentru agenție: `docs/connectors/meta-ads.md`.
 - Conexiuni: `meta_account` per client (tokenul system user, din cardul Meta Ads al oricărui site al clientului → pasul 1, cu test) și `meta_ads` per brand (`act_…`).
-- Rulare: `.github/workflows/meta-weekly.yml`, marți 04:00 UTC, activ când `CONNECTOR_META_ENABLED = true`; manual din Actions sau `npm run collect:meta`.
+- Rulare: `.github/workflows/meta-daily.yml`, zilnic la 03:17 UTC, activ când `CONNECTOR_META_ENABLED = true`; manual din Actions sau `npm run collect:meta`.
 - Verificare: `sync_runs` (`source = meta_ads`), `paid_daily` (`collection_method = api`), `provider_api_calls`.
 - Mesaje: `access_denied` = token refuzat (marcat `invalid`, celelalte conturi ale clientului sărite); `permission_denied` = contul nu e atribuit system user-ului; `rate_limited` = limita de utilizare Meta (retry automat 10 s / 60 s / 5 min).
 - Meta nu e încă în orchestratorul `weekly-refresh` (workflow propriu, la aceeași oră).
@@ -267,7 +267,7 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 - Conectare: `docs/contracts/oauth.md`; pași: `docs/connectors/google-ads.md`, `docs/connectors/tiktok-ads.md`.
 - Secrete Supabase (funcția `oauth`): `APP_BASE_URL`, `ANALYZATOR_APP_ORIGIN`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `TIKTOK_APP_ID`, `TIKTOK_APP_SECRET`. Funcția se publică cu `verify_jwt = false` (din `supabase/config.toml`).
 - Secrete GitHub (`staging`): aceleași ID și secrete OAuth, plus `GOOGLE_ADS_DEVELOPER_TOKEN`.
-- Rulare: `google-ads-weekly.yml` (`CONNECTOR_GOOGLE_ADS_ENABLED`), `tiktok-weekly.yml` (`CONNECTOR_TIKTOK_ENABLED`); local `npm run collect:google-ads`, `npm run collect:tiktok`.
+- Rulare: `google-ads-daily.yml` (`CONNECTOR_GOOGLE_ADS_ENABLED`), `tiktok-daily.yml` (`CONNECTOR_TIKTOK_ENABLED`); local `npm run collect:google-ads`, `npm run collect:tiktok`.
 - Diagnostic: întoarcerea OAuth are `reason` în adresă (`state_invalid`, `exchange_failed`, `no_refresh_token`…); `oauth_states` (service role) arată pornirile și `used_at`. Reînnoirile TikTok apar în `audit_events` ca `credential_refreshed` (`actor_type = worker`).
 - `not_connected` cu „Reconectează” = refresh token refuzat; conectarea se face din nou din aplicație.
 

@@ -1,7 +1,9 @@
-# Colectarea săptămânală GA4 (Data API) și Search Console (Search Analytics) pentru toate conexiunile active.
+# Colectarea zilnică GA4 (Data API) și Search Console (Search Analytics) pentru toate conexiunile active.
 #
-# Programare: marți la 04:00 UTC = 06:00 ora României vara (EEST), 05:00 iarna (EET). Cron-ul GitHub e în UTC și nu
-# urmează ora de vară: vezi nota DST din docs/runbook.md. Reimportă ultimele 35 de zile (până ieri).
+# Programare: zilnic la 03:17 UTC = 06:17 ora României vara (EEST), 05:17 iarna (EET). Minutul nu e fix la oră:
+# GitHub amână mult rulările programate la începutul orei (marțea, cele de la 04:00 UTC porneau după 12:00 UTC).
+# Cron-ul GitHub e în UTC și nu urmează ora de vară: vezi nota DST din docs/runbook.md. Decizia: docs/decisions.md, AF.
+# Reimportă ultimele 35 de zile (până ieri).
 #
 # Rularea programată e DEZACTIVATĂ până când variabila CONNECTOR_GOOGLE_ENABLED = "true"
 # (Settings → Secrets and variables → Actions → Variables). workflow_dispatch funcționează oricând.
@@ -13,11 +15,11 @@
 # Service account-ul Google NU e aici: stă în Supabase Vault (source_connections, provider google_service_account)
 # și se citește la rulare prin get_source_token.
 
-name: google-weekly
+name: google-daily
 
 on:
   schedule:
-    - cron: '0 4 * * 2'
+    - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
       environment:
@@ -43,7 +45,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: google-weekly
+  group: google-daily
   cancel-in-progress: false
 
 jobs:

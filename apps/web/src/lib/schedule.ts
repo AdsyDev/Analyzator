@@ -7,16 +7,17 @@ import type { SourceProviderId } from '../contracts'
  */
 export type Schedule = { kind: 'weekly'; weekday: number; hour: number; minute: number } | { kind: 'daily'; hour: number; minute: number }
 
-const WEEKLY: Schedule = { kind: 'weekly', weekday: 2, hour: 4, minute: 0 }
+/** Colectarea zilnică a conectorilor API (decizia AF): 03:17 UTC, pe un minut care nu e la început de oră. */
+const DAILY: Schedule = { kind: 'daily', hour: 3, minute: 17 }
 
 export const COLLECTION_SCHEDULE: Partial<Record<SourceProviderId, Schedule>> = {
-  seomonitor: WEEKLY,
-  ga4: WEEKLY,
-  gsc: WEEKLY,
-  planable: WEEKLY,
-  google_ads: WEEKLY,
-  meta_ads: WEEKLY,
-  tiktok_ads: WEEKLY,
+  seomonitor: DAILY,
+  ga4: DAILY,
+  gsc: DAILY,
+  planable: DAILY,
+  google_ads: DAILY,
+  meta_ads: DAILY,
+  tiktok_ads: DAILY,
   clarity: { kind: 'daily', hour: 22, minute: 5 },
   airbyte: { kind: 'daily', hour: 5, minute: 20 },
 }

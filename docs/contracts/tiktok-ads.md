@@ -30,7 +30,7 @@ După SDK-ul oficial, access token-ul e valabil 24 de ore, iar refresh token-ul 
 
 ## Rulare
 
-`.github/workflows/tiktok-weekly.yml`, marți 04:00 UTC, activ când `CONNECTOR_TIKTOK_ENABLED = true`. Local: `npm run collect:tiktok`.
+`.github/workflows/tiktok-daily.yml`, zilnic la 03:17 UTC, activ când `CONNECTOR_TIKTOK_ENABLED = true`. Local: `npm run collect:tiktok`.
 
 ## De confirmat la prima rulare
 

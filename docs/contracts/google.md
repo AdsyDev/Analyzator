@@ -33,7 +33,7 @@ Fixtures: `tests/fixtures/google/docs-derived/` (**derivate din documentație, n
 | utilizatori activi | (niciuna; **fără `date`**), câte unul per interval | `activeUsers` | `web_active_users_interval` |
 
 - Fereastra: ultimele **35 de zile până ieri**, în fusul proprietății (reimport al sursei mutabile, spec cap. 9). Search Console: aceleași 35 de zile, dar terminate cu **2 zile înainte de ieri** (PT, `GSC_FINAL_LAG_DAYS`), pentru că datele `final` apar cu 2–3 zile întârziere (D-25). Zilele sărite intră la rularea următoare.
-- Prospețimea: colectarea rulează marțea, deci între două rulări ultima zi cu date ajunge la 8 zile în urma lui „ieri” la GA4 și la 9 zile la Search Console. Toleranța stale din registru e 8 zile (GA4) și 10 zile (GSC), de la versiunea 2 a metricilor (decizia AA). O rulare de marți ratată apare ca `stale` de joi. Dacă programul se schimbă (de ex. zilnic), toleranța se revede printr-o versiune nouă a definițiilor.
+- Prospețimea: colectarea rulează zilnic la 03:17 UTC (decizia AF). GA4 aduce date până ieri; Search Console până la azi − 4 (ieri în fusul Pacific, minus 2 zile până la datele finale). Toleranța stale din registru e 2 zile (GA4) și 5 zile (GSC), de la versiunea 3 a metricilor: o zi de rulare ratată nu face metricile `stale`, două zile la rând da. Versiunea 2 (AA: 8 și 10 zile) era pentru colectarea de marți. Dacă programul se schimbă, toleranța se revede printr-o versiune nouă a definițiilor.
 - Paginare: `limit` 100.000, `offset` până la `rowCount`; peste 20 de pagini, `ga4_too_many_pages`.
 - **`checkCompatibility` rulează înainte de fiecare `runReport`** (o dată per combinație). Metrici incompatibile: se elimină din cerere și rămân NULL (`ga4_incompatible_metrics`). Dimensiune incompatibilă: raportul se sare (`ga4_incompatible_dimensions`). Ambele în `sync_runs.errors`; run-ul nu e `succeeded`.
 - Din `metadata` se raportează: `dataLossFromOtherRow` (`ga4_data_loss_other_row`), `samplingMetadatas` (`ga4_sampled`), `subjectToThresholding` (`ga4_thresholding`), `timeZone` diferit de conexiune (`timezone_mismatch`).
@@ -56,7 +56,7 @@ Fixtures: `tests/fixtures/google/docs-derived/` (**derivate din documentație, n
 
 ## Reimportul istoricului (Search Console și GA4)
 
-`npm run collect:google -- --only gsc --brand <uuid> --from YYYY-MM-DD` (sau `google-weekly` → Run workflow cu `only`, `brand`, `from`). Folosit când se schimbă proprietatea unui site, ca toată seria să vină din aceeași proprietate (D-27).
+`npm run collect:google -- --only gsc --brand <uuid> --from YYYY-MM-DD` (sau `google-daily` → Run workflow cu `only`, `brand`, `from`). Folosit când se schimbă proprietatea unui site, ca toată seria să vină din aceeași proprietate (D-27).
 
 - O singură sursă și un singur brand: altfel conectorul refuză înainte de orice citire. `from` nu poate fi mai vechi de 16 luni (`GSC_HISTORY_MONTHS`): mesajul spune cea mai veche zi permisă.
 - Intervalul de la `from` până la sfârșitul ferestrei obișnuite se împarte în ferestre de 35 de zile, rulate **de la cea mai veche**; ultima e chiar fereastra obișnuită. Fiecare fereastră are `sync_run`-ul ei, reconcilierea ei și acoperirea raportată la zilele ei (prima poate fi mai scurtă). Ultima rulare rămâne astfel cea de zi cu zi, iar starea sursei (`source_status`, după ultima rulare) nu arată o fereastră veche.
@@ -104,11 +104,11 @@ Citire pentru oricine are acces la brand (inclusiv client), cu excepția `source
 
 ## Rulare
 
-`.github/workflows/google-weekly.yml`: marți 04:00 UTC, **dezactivat** până la `CONNECTOR_GOOGLE_ENABLED = true`; `workflow_dispatch` activ oricând (`only`: `ga4` sau `gsc`). Local: `npm run collect:google [-- --only ga4|gsc]`.
+`.github/workflows/google-daily.yml`: zilnic la 03:17 UTC (decizia AF), **dezactivat** până la `CONNECTOR_GOOGLE_ENABLED = true`; `workflow_dispatch` activ oricând (`only`: `ga4` sau `gsc`). Local: `npm run collect:google [-- --only ga4|gsc]`.
 
 ## Indexare (URL Inspection)
 
-Etapa 3 (deciziile L din `docs/decisions.md`). Conector: `connectors/google/index-core.ts`; rulare: `.github/workflows/gsc-index-weekly.yml` (marți 05:30 UTC, după `google-weekly`; activ cu `CONNECTOR_GOOGLE_ENABLED = true`; `workflow_dispatch` oricând, opțional pe un brand) sau local `npm run collect:index [-- --brand <uuid>]`. **Forma răspunsului e derivată din documentația API-ului, neconfirmată pe un cont real.**
+Etapa 3 (deciziile L din `docs/decisions.md`). Conector: `connectors/google/index-core.ts`; rulare: `.github/workflows/gsc-index-daily.yml` (zilnic la 04:47 UTC, după `google-daily`; activ cu `CONNECTOR_GOOGLE_ENABLED = true`; `workflow_dispatch` oricând, opțional pe un brand) sau local `npm run collect:index [-- --brand <uuid>]`. **Forma răspunsului e derivată din documentația API-ului, neconfirmată pe un cont real.**
 
 - **Apel:** `urlInspection.index.inspect` cu `siteUrl` = proprietatea Search Console a brandului (conexiunea `gsc`), `inspectionUrl` și `languageCode = ro`. Același scope de citire (`webmasters.readonly`) și același service account ca Search Analytics.
 - **Ce se inspectează,** cel mult 200 de URL-uri pe brand și rulare: întâi lista agenției (`index_urls`, cel mult 150), apoi cele mai bune 50 de pagini după clickuri (la egalitate sau fără clickuri, după afișări) din ultimele 28 de zile (`search_queries`), fără dubluri. Prima rulare reală (11 nov. 2026) a arătat că un site mic poate să nu aibă niciun click pe rândurile query × pagină. Cota Google e de 2.000 de inspecții pe zi și 600 pe minut, pe proprietate; între apeluri e o pauză de 150 ms.

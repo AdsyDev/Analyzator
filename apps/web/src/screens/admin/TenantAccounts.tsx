@@ -136,7 +136,7 @@ function GoogleKeyCard({ tenantId, connection, onChanged }: { tenantId: TenantId
         <p className="text-[12px] text-text-3">Fișierul se verifică în browser și pleacă doar spre seiful serverului. Cheia nu se mai afișează; după salvare, șterge fișierul de pe calculator. Ghid: docs/connectors/google.md.</p>
       </form>
       <div aria-live="polite">
-        {savedEmail && <p className="text-[12.5px] text-pos-text">Cheia a fost salvată. Prima rulare Google (manuală sau de marți) confirmă accesul.</p>}
+        {savedEmail && <p className="text-[12.5px] text-pos-text">Cheia a fost salvată. Prima rulare Google (manuală sau cea zilnică, de dimineață) confirmă accesul.</p>}
         {error && <p role="alert" className="text-[12.5px] text-neg-text">{error}</p>}
       </div>
     </article>

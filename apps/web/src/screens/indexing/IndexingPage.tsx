@@ -67,7 +67,7 @@ function Summary({ status: d }: { status: IndexStatus }) {
   return (
     <Section id="index-summary" title="Starea indexării" description={d.inspected_on ? `După inspecția din ${formatDate(d.inspected_on)}. Numerele sunt din lista inspectată, nu din tot site-ul.` : 'Numerele sunt din lista inspectată, nu din tot site-ul.'}>
       {d.summary.total === 0 ? (
-        <EmptyState compact title="Nicio inspecție încă" text="Inspecția rulează săptămânal, marțea, pentru URL-urile prioritare și pentru paginile cu cele mai multe clickuri din Search Console." />
+        <EmptyState compact title="Nicio inspecție încă" text="Inspecția rulează zilnic, dimineața, pentru URL-urile prioritare și pentru paginile cu cele mai multe clickuri din Search Console." />
       ) : (
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
           {tiles.map((t) => (

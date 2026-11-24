@@ -45,8 +45,8 @@ Același token poate servi mai mulți clienți: îl salvezi pe fiecare client.
 
 ## 4. Pornește colectarea
 
-- **Manual:** GitHub → Actions → **meta-weekly** → Run workflow.
-- **Automat:** marțea la 04:00 UTC, după ce `CONNECTOR_META_ENABLED = true`.
+- **Manual:** GitHub → Actions → **meta-daily** → Run workflow.
+- **Automat:** zilnic la 03:17 UTC, după ce `CONNECTOR_META_ENABLED = true`.
 
 Verifici în pagina site-ului → „Istoricul sincronizărilor”: o rulare **Meta Ads** per site. Pe pagina **Paid Media**, cifrele apar când ecranul citește datele (legarea datelor la ecrane e o etapă separată).
 

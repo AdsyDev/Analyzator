@@ -41,8 +41,8 @@ permissions:
   contents: read
 
 concurrency:
-  # Același grup ca google-weekly: trecerea și colectarea Search Console nu rulează în același timp.
-  group: google-weekly
+  # Același grup ca google-daily: trecerea și colectarea Search Console nu rulează în același timp.
+  group: google-daily
   cancel-in-progress: false
 
 jobs:

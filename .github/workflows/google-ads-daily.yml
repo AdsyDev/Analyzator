@@ -1,6 +1,8 @@
-# Colectarea săptămânală Google Ads (API v25): cost, afișări, clickuri și conversii pe zi și campanie.
+# Colectarea zilnică Google Ads (API v25): cost, afișări, clickuri și conversii pe zi și campanie.
 #
-# Programare: marți la 04:00 UTC = 06:00 ora României vara (EEST), 05:00 iarna (EET); vezi nota DST din docs/runbook.md.
+# Programare: zilnic la 03:17 UTC = 06:17 ora României vara (EEST), 05:17 iarna (EET). Minutul nu e fix la oră:
+# GitHub amână mult rulările programate la începutul orei (marțea, cele de la 04:00 UTC porneau după 12:00 UTC).
+# Cron-ul GitHub e în UTC și nu urmează ora de vară: vezi nota DST din docs/runbook.md. Decizia: docs/decisions.md, AF.
 # Reimportă ultimele 35 de zile (până ieri, în fusul contului de ads).
 #
 # Rularea programată e DEZACTIVATĂ până când variabila CONNECTOR_GOOGLE_ADS_ENABLED = "true"
@@ -10,11 +12,11 @@
 # Refresh token-urile (conectate prin OAuth) stau în Supabase Vault. Aplicația OAuth și developer token-ul: GOOGLE_OAUTH_CLIENT_ID,
 # GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_ADS_DEVELOPER_TOKEN, ca secrete în același environment.
 
-name: google-ads-weekly
+name: google-ads-daily
 
 on:
   schedule:
-    - cron: '0 4 * * 2'
+    - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
       environment:
@@ -27,7 +29,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: google-ads-weekly
+  group: google-ads-daily
   cancel-in-progress: false
 
 jobs:

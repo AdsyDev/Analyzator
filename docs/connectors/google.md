@@ -66,11 +66,11 @@ Fusul orar al conexiunii GA4 e implicit `Europe/Bucharest`. Dacă proprietatea G
 
 ## 5. Testează: rulare manuală
 
-GitHub → Actions → **google-weekly** → Run workflow (opțional `only` = `ga4` sau `gsc`). Durează câteva minute.
+GitHub → Actions → **google-daily** → Run workflow (opțional `only` = `ga4` sau `gsc`). Durează câteva minute.
 
 Verifică în pagina site-ului → „Istoricul sincronizărilor”: rulări „Google Analytics 4” și „Search Console”.
 
-Colectarea automată rulează **marțea la 04:00 UTC**, după ce `CONNECTOR_GOOGLE_ENABLED = true`.
+Colectarea automată rulează **zilnic la 03:17 UTC** (05:17 iarna, 06:17 vara, ora României), după ce `CONNECTOR_GOOGLE_ENABLED = true`; indexarea, zilnic la 04:47 UTC.
 
 ## Probleme frecvente
 

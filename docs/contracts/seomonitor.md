@@ -108,7 +108,7 @@ Documentația e contradictorie: `groups/daily-visibility` arată `0.53` (fracți
 
 ## Rulare
 
-- `.github/workflows/seomonitor-weekly.yml`: marți la 04:00 UTC, **dezactivat** până la `CONNECTOR_SEOMONITOR_ENABLED = true`; `workflow_dispatch` activ. Vezi `docs/runbook.md` (inclusiv nota DST).
+- `.github/workflows/seomonitor-daily.yml`: zilnic la 03:17 UTC (decizia AF), **dezactivat** până la `CONNECTOR_SEOMONITOR_ENABLED = true`; `workflow_dispatch` activ. Vezi `docs/runbook.md` (inclusiv nota DST).
 - Reimport: ultimele **35 de zile**, până ieri (Europe/Bucharest).
 - Retry: 1, 5 și 15 minute, cu jitter ±20%; `Retry-After` are prioritate. **Fără retry pe 401/403**: un 401/403 marchează tokenul `invalid` și oprește rularea.
 - Un `sync_run` per brand mapat, cu `coverage` (zile acoperite / 35 pentru rankuri, visibility și răspunsuri AI). **O rulare cu orice eroare nu e niciodată `succeeded`.** Notele de parser despre câmpuri necunoscute nu schimbă statusul.

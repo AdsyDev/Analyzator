@@ -41,11 +41,11 @@ Toate mapările clientului sunt în Administrare → **Configurare** → „Grup
 
 ## 4. Testează: rulare manuală
 
-GitHub → Actions → **seomonitor-weekly** → Run workflow. Durează câteva minute.
+GitHub → Actions → **seomonitor-daily** → Run workflow. Durează câteva minute.
 
 Verifică în pagina fiecărui site mapat → „Istoricul sincronizărilor”: câte o rulare SEOmonitor per brand.
 
-După test, colectarea automată rulează **marțea la 04:00 UTC** (06:00 vara, 05:00 iarna, ora României), după ce `CONNECTOR_SEOMONITOR_ENABLED = true`.
+După test, colectarea automată rulează **zilnic la 03:17 UTC** (06:17 vara, 05:17 iarna, ora României), după ce `CONNECTOR_SEOMONITOR_ENABLED = true`.
 
 ## Prima rulare
 
