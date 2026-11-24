@@ -96,5 +96,32 @@ select tests.authenticate_as('30000000-0000-0000-0000-000000000005');
 select throws_ok($$ select public.brand_paid('20000000-0000-0000-0000-000000000011', current_date - 7, current_date - 1) $$, '42501', null, 'L5: fără acces, refuzat');
 reset role;
 
+-- AB. Zile lipsă la sfârșitul perioadei: variația compară aceleași zile din perioada anterioară ---------------------------
+-- Perioada: ultimele 7 zile; datele curente se opresc acum cu 3 zile în urmă (5 din 7 zile, 4 clickuri pe zi).
+-- Perioada anterioară e completă (7 zile, 6 clickuri pe zi): comparația potrivită ia doar primele ei 5 zile.
+delete from public.paid_daily where brand_id = '20000000-0000-0000-0000-000000000011' and date >= current_date - 2;
+insert into public.paid_daily (tenant_id, brand_id, source, account_id, campaign_id, date, spend, impressions, clicks, currency, collected_at, collection_method, payload_hash, source_timezone, schema_version, source_id, sync_run_id)
+select '10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000011', 'meta_ads', '515', 'c1', d, 10, 100, 6, 'RON', now(), 'api', repeat('f', 64), 'Europe/Bucharest', 't',
+       (select v from ctx where k = 'conn'), (select v from ctx where k = 'run')
+from generate_series(current_date - 14, current_date - 8, interval '1 day') g (ts), lateral (select g.ts::date as d) x;
+select tests.authenticate_as('30000000-0000-0000-0000-000000000004');
+create temporary table ab on commit drop as
+  select public.brand_metrics('20000000-0000-0000-0000-000000000011', array['meta_ads_clicks'], current_date - 7, current_date - 1) -> 'data' -> 0 as m;
+select is((select (m ->> 'value')::numeric from ab), 20::numeric, 'AB1: valoarea curentă rămâne suma zilelor cu date (5 × 4)');
+select is((select m ->> 'status' from ab), 'partial', 'AB1: statusul rămâne partial (5 din 7 zile)');
+select is((select (m ->> 'comparison_value')::numeric from ab), 30::numeric, 'AB1: comparația ia aceleași 5 zile din perioada anterioară (5 × 6), nu toate 7 (42)');
+select is((select round((m ->> 'relative_change')::numeric, 2) from ab), -33.33::numeric, 'AB1: variația e pe zile comparabile');
+select is((select m -> 'evidence_query' -> 'comparison_period' from ab),
+  jsonb_build_object('start', current_date - 14, 'end', current_date - 10), 'AB1: dovada arată intervalul de comparație efectiv');
+select is(
+  (select w -> 'detail' from jsonb_array_elements(public.brand_metrics('20000000-0000-0000-0000-000000000011', array['meta_ads_clicks'], current_date - 7, current_date - 1) -> 'meta' -> 'warnings') w
+   where w ->> 'code' = 'comparison_matched'),
+  jsonb_build_object('days', 5, 'comparison_period', jsonb_build_object('start', current_date - 14, 'end', current_date - 10)),
+  'AB1: avertismentul comparison_matched spune câte zile și ce interval s-au comparat'
+);
+select is((public.brand_metrics('20000000-0000-0000-0000-000000000011', array['meta_ads_clicks'], current_date - 14, current_date - 8) -> 'data' -> 0 -> 'evidence_query' -> 'comparison_period'),
+  jsonb_build_object('start', current_date - 21, 'end', current_date - 15), 'AB1: o perioadă cu date până la final păstrează comparația întreagă');
+reset role;
+
 select * from finish();
 rollback;

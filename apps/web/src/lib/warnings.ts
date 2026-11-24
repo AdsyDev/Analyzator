@@ -1,9 +1,18 @@
 import type { MetricItem, MetricStatus, MetricWarning } from '../contracts'
 import { formatDate } from './format'
+import { count } from './runReason'
 import { sourceName } from './sources'
 
 const has = (m: MetricItem, code: string) => m.warnings.some((w) => w.code === code)
 const pct = (c: number | null) => (c === null ? null : Math.round(c * 100))
+
+/** AB: comparația pe aceeași porțiune din perioada de referință, când perioada curentă nu are date până la final. */
+function matchedText(w: MetricWarning | undefined): string | null {
+  const days = w && w.detail && typeof w.detail === 'object' ? (w.detail as { days?: unknown }).days : null
+  return typeof days === 'number' && Number.isInteger(days) && days > 0
+    ? `Variația compară ${days === 1 ? 'prima zi' : `primele ${count(days, 'zile')}`} din fiecare perioadă.`
+    : null
+}
 
 /**
  * Motivul principal al stării unei metrici, în română. Serverul trimite doar coduri (`warnings`);
@@ -31,7 +40,8 @@ export function reasonFor(m: MetricItem): string | null {
         return `Valoarea 0 nu e confirmată: datele acoperă ${c ?? 0}% din zilele intervalului.`
       }
       const base = c === null ? 'Date parțiale pentru interval.' : `Date disponibile pentru ${c}% din zilele intervalului.`
-      return has(m, 'excluded_rows') ? `${base} Unele rânduri au fost excluse din calcul.` : base
+      const matched = matchedText(m.warnings.find((w) => w.code === 'comparison_matched'))
+      return [base, has(m, 'excluded_rows') ? 'Unele rânduri au fost excluse din calcul.' : null, matched].filter(Boolean).join(' ')
     }
     case 'stale':
       return m.data_as_of ? `Ultimele date sunt din ${formatDate(m.data_as_of)}; sursa nu s-a actualizat la timp.` : 'Sursa nu s-a actualizat la timp.'
@@ -46,6 +56,7 @@ const NOTE_TEXT: Record<string, (w: MetricWarning) => string | null> = {
   incomplete_period: () => 'Perioadă incompletă.',
   comparison_unavailable: () => 'Comparația nu e disponibilă pentru perioada de referință.',
   comparison_partial: () => 'Perioada de comparație are date parțiale.',
+  comparison_matched: (w) => matchedText(w),
   excluded_rows: () => 'Unele rânduri au fost excluse din calcul.',
   definition_draft: (w) => `Definiție provizorie${typeof w.detail === 'string' && w.detail ? `: ${w.detail}` : '.'}`,
   // Condiții secundare: statusul principal e altul, dar condiția rămâne vizibilă.
@@ -63,7 +74,7 @@ export function notesFor(m: MetricItem): string[] {
     if (w.code === m.status) continue
     // Codurile cu rol de motiv principal nu se repetă ca note.
     if (['query_failed', 'duplicate_observations', 'interval_report_missing', 'no_observation', 'no_confirmed_data', 'zero_denominator', 'zero_not_confirmed', 'aggregation_label', 'unavailable', 'cannot_compute'].includes(w.code)) continue
-    if (m.status === 'partial' && w.code === 'excluded_rows') continue
+    if (m.status === 'partial' && (w.code === 'excluded_rows' || w.code === 'comparison_matched')) continue
     const text = NOTE_TEXT[w.code]?.(w)
     if (text && !out.includes(text)) out.push(text)
   }

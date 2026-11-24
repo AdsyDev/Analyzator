@@ -18,14 +18,22 @@ Calculul: `metrics.compute` (SQL). Contractul răspunsului: `docs/contracts/metr
 
 | metric_key | Versiune | Nume | Sursă | Unitate | Agregare | Pondere | Toleranță stale (zile) | Stare |
 |---|---|---|---|---|---|---|---|---|
-| `ga4_sessions` | 1 | Sesiuni | GA4 | count | sum | — | 2 | active |
-| `ga4_active_users` | 1 | Utilizatori activi | GA4 | count | interval_report_only | — | 2 | active |
-| `ga4_engaged_sessions` | 1 | Sesiuni cu implicare | GA4 | count | sum | — | 2 | active |
-| `ga4_key_events` | 1 | Key events | GA4 | count | sum | — | 2 | active |
-| `gsc_clicks` | 1 | Clicks (Search Console) | GSC | count | sum | — | 3 | active |
-| `gsc_impressions` | 1 | Impressions (Search Console) | GSC | count | sum | — | 3 | active |
-| `gsc_ctr` | 1 | CTR (Search Console) | GSC | percent | ratio (×100) | — | 3 | active |
-| `gsc_average_position` | 1 | Poziție medie (Search Console) | GSC | position | weighted_mean | impressions | 3 | active |
+| `ga4_sessions` | 1 | Sesiuni | GA4 | count | sum | — | 2 | active (înlocuită de v2) |
+| `ga4_active_users` | 1 | Utilizatori activi | GA4 | count | interval_report_only | — | 2 | active (înlocuită de v2) |
+| `ga4_engaged_sessions` | 1 | Sesiuni cu implicare | GA4 | count | sum | — | 2 | active (înlocuită de v2) |
+| `ga4_key_events` | 1 | Key events | GA4 | count | sum | — | 2 | active (înlocuită de v2) |
+| `gsc_clicks` | 1 | Clicks (Search Console) | GSC | count | sum | — | 3 | active (înlocuită de v2) |
+| `gsc_impressions` | 1 | Impressions (Search Console) | GSC | count | sum | — | 3 | active (înlocuită de v2) |
+| `gsc_ctr` | 1 | CTR (Search Console) | GSC | percent | ratio (×100) | — | 3 | active (înlocuită de v2) |
+| `gsc_average_position` | 1 | Poziție medie (Search Console) | GSC | position | weighted_mean | impressions | 3 | active (înlocuită de v2) |
+| `ga4_sessions` | 2 | Sesiuni | GA4 | count | sum | — | 8 | active |
+| `ga4_active_users` | 2 | Utilizatori activi | GA4 | count | interval_report_only | — | 8 | active |
+| `ga4_engaged_sessions` | 2 | Sesiuni cu implicare | GA4 | count | sum | — | 8 | active |
+| `ga4_key_events` | 2 | Key events | GA4 | count | sum | — | 8 | active |
+| `gsc_clicks` | 2 | Clicks (Search Console) | GSC | count | sum | — | 10 | active |
+| `gsc_impressions` | 2 | Impressions (Search Console) | GSC | count | sum | — | 10 | active |
+| `gsc_ctr` | 2 | CTR (Search Console) | GSC | percent | ratio (×100) | — | 10 | active |
+| `gsc_average_position` | 2 | Poziție medie (Search Console) | GSC | position | weighted_mean | impressions | 10 | active |
 | `seomonitor_visibility` | 1 | Visibility SEOmonitor (medie în perioadă) | SEOmonitor | score | weighted_mean | zile acoperite | 7 | draft |
 | `seomonitor_visibility_latest` | 1 | Visibility SEOmonitor (ultima observație) | SEOmonitor | score | last_observation | — | 7 | draft |
 | `seomonitor_keywords_top3` | 1 | Keywords în Top 3 | SEOmonitor | count | last_observation | — | 7 | active |
@@ -48,6 +56,8 @@ Calculul: `metrics.compute` (SQL). Contractul răspunsului: `docs/contracts/metr
 Metricile GA4, GSC, SEOmonitor și Clarity au `valid_from = 2026-10-01` și `min_sample = null`. Metricile AI (migrația `20261012230000_ai_metrics.sql`, D-15) au `valid_from = 2026-10-12` și pragul din spec cap. 10: **50 de răspunsuri valide** (`min_sample = 50`, sub prag `insufficient_sample`); acoperirea sub 100% dă `partial`.
 
 **Versiunea 2 a metricilor AI (migrația `20261110120000_stage2_yoy_ai_overviews.sql`, decizia H-2, `valid_from = 2026-11-10`):** `ai_mention_rate`, `ai_owned_citation_rate`, `ai_sov` și `ai_valid_answers` numără doar răspunsurile asistenților AI (`ai_answers.surface = 'ai_search'`: ChatGPT, Gemini, Perplexity). Google AI Overviews e o suprafață de căutare și are metrica lui, `ai_overviews_mention_rate`. Versiunile 1 (toate engine-urile la un loc) rămân în registru ca istoric; analizele publicate înainte își păstrează instantaneul cu versiunea 1.
+
+**Versiunea 2 a metricilor GA4 și Search Console (migrația `20261123150000_google_freshness_grace_weekly.sql`, decizia AA, `valid_from = 2026-11-23`):** aceeași formulă, unitate, agregare și direcție; se schimbă doar toleranța stale, potrivită cu colectarea Google de marți. GA4: 8 zile (7 zile între rulări + 1 zi de rezervă). Search Console: 10 zile (7 + 2 zile până la datele finale + 1 zi de rezervă). Cu toleranțele vechi (2 și 3 zile), metricile apăreau „Date neactualizate” de joi până luni, deși nicio rulare nu lipsea. O rulare de marți ratată apare tot ca `stale`, de joi. Zilele încă neaduse rămân vizibile ca acoperire (`partial`). Versiunile 1 rămân în registru ca istoric; analizele publicate înainte își păstrează instantaneul cu versiunea 1.
 
 ## Metrici de nivel B (import CSV)
 
