@@ -6,6 +6,7 @@ import { niceScale } from '../lib/chartScale'
 import { cn } from '../lib/cn'
 import { formatCompact } from '../lib/format'
 import { Button } from './ui/Button'
+import { MissingData } from './MissingData'
 
 const RO = new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const RO0 = new Intl.NumberFormat('ro-RO', { maximumFractionDigits: 0 })
@@ -75,12 +76,14 @@ export function TrendChart({ title, series, labels, height = 240, format = 'int'
       </div>
     )
   }
+  // Fără sursă: graficul nu se desenează; cutia din jur dispare și pagina o numește (decizia AG).
+  if (unavailableReason && (!hasAnyData || n === 0)) return <MissingData reason={unavailableReason} />
   if (!hasAnyData || n === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-strong px-6 py-10 text-center" style={{ minHeight: height }}>
         <ChartLineIcon size={22} className="text-text-3" aria-hidden="true" />
-        <p className="font-display text-[15px] font-semibold">{unavailableReason ? 'Sursă neconectată' : 'Fără date pentru interval'}</p>
-        <p className="max-w-[46ch] text-[13px] text-text-2">{unavailableReason ?? 'Nu există observații în perioada selectată.'}</p>
+        <p className="font-display text-[15px] font-semibold">Fără date pentru perioada selectată</p>
+        <p className="max-w-[46ch] text-[13px] text-text-2">Nu există observații în perioada selectată.</p>
       </div>
     )
   }

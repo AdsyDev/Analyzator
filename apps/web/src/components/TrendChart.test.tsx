@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { ChartSeries } from '../lib/chartData'
 import { TrendChart } from './TrendChart'
+import { MissingDataProvider } from './MissingData'
 
 const labels = ['1 oct.', '2 oct.', '3 oct.', '4 oct.', '5 oct.']
 const series: ChartSeries[] = [
@@ -22,15 +23,20 @@ describe('TrendChart', () => {
     expect(screen.getByText('Timeout.')).toBeInTheDocument()
   })
 
-  it('fără nicio valoare: „Fără date pentru interval", nu o linie la zero', () => {
+  it('fără nicio valoare: „Fără date pentru perioada selectată", nu o linie la zero', () => {
     render(<TrendChart title="Trafic" labels={labels} series={[{ ...series[0]!, values: [null, null, null, null, null] }]} />)
-    expect(screen.getByText('Fără date pentru interval')).toBeInTheDocument()
+    expect(screen.getByText('Fără date pentru perioada selectată')).toBeInTheDocument()
   })
 
-  it('sursă neconectată: arată motivul', () => {
-    render(<TrendChart title="Trafic" labels={[]} series={[]} unavailableReason="GA4 nu e conectat." />)
-    expect(screen.getByText('Sursă neconectată')).toBeInTheDocument()
-    expect(screen.getByText('GA4 nu e conectat.')).toBeInTheDocument()
+  it('fără sursă (decizia AG): graficul nu se desenează; pagina spune pentru ce nu avem date, motivul în tooltip', () => {
+    render(
+      <MissingDataProvider>
+        <TrendChart title="Trafic" labels={[]} series={[]} unavailableReason="GA4 nu e conectat." />
+      </MissingDataProvider>,
+    )
+    expect(screen.queryByText(/Sursă neconectată/)).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent('Pentru perioada selectată nu avem date pentru această pagină.')
+    expect(screen.getByText('această pagină')).toHaveAttribute('title', 'GA4 nu e conectat.')
   })
 
   it('ready: marchează zilele fără date ca gol, nu ca zero', () => {

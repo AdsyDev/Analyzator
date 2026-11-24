@@ -4,16 +4,17 @@ import { describe, expect, it, vi } from 'vitest'
 import { failed, ready } from '../../contracts'
 import { createSupabaseProviders } from '../../data/supabase/providers'
 import { pageReady, renderApp, where } from '../../test/renderApp'
+import { expectNoSourceDisconnected, missingNotice, missingWith } from '../../test/missing'
 
 const MINI = '/brands/brand-minimartieni/social'
 const open = () => pageReady('Social')
 const section = async (name: string) => (await screen.findByRole('heading', { level: 2, name })).closest('section')!
 
 describe('Social fără import', () => {
-  it('„Sursă neconectată" cu Planable în text și „Importă CSV" pentru agency_admin', async () => {
+  it('fără import (decizia AG): mesajul paginii, Planable în motiv și „Importă CSV" pentru agency_admin', async () => {
     renderApp({ route: '/brands/brand-urinal/social' })
-    expect(await screen.findByRole('heading', { name: 'Sursă neconectată' })).toBeInTheDocument()
-    expect(screen.getByText(/vin din Planable, care nu e încă conectat/)).toBeInTheDocument()
+    expect(await missingWith(/vin din Planable, care nu e încă conectat/)).toHaveTextContent('Social')
+    expectNoSourceDisconnected()
     expect(screen.queryByTestId('social-kpis')).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Importă CSV' }))
     await waitFor(() => expect(where()).toBe('/admin/clients/brand-urinal?source=csv_import'))
@@ -21,13 +22,13 @@ describe('Social fără import', () => {
 
   it('clientul nu primește acțiunea', async () => {
     renderApp({ route: '/brands/brand-urinal/social', role: 'client_viewer' })
-    await screen.findByRole('heading', { name: 'Sursă neconectată' })
+    await missingNotice()
     expect(screen.queryByRole('button', { name: 'Importă CSV' })).toBeNull()
   })
 
   it('cu providerul real: aceeași stare', async () => {
     renderApp({ route: MINI, wrap: (b) => ({ ...b, social: createSupabaseProviders().social }) })
-    expect(await screen.findByRole('heading', { name: 'Sursă neconectată' })).toBeInTheDocument()
+    expect(await missingNotice()).toHaveTextContent('Social')
   })
 })
 

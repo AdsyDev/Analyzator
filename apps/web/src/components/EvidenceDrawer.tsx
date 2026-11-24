@@ -101,7 +101,7 @@ export function EvidenceDrawer({ open, onClose, page, label, metric, definition,
           {evidence?.kind === 'not_connected' && (
             <EmptyState
               compact
-              title="Sursă neconectată"
+              title="Fără date pentru perioada selectată"
               text={`${evidence.reason} Nu afișăm valori estimate până la conectare.`}
               action={connectAction}
             />

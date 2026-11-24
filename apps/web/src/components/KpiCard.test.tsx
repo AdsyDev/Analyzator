@@ -3,10 +3,15 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { metric, warning } from '../test/factories'
 import { KpiCard, type KpiCardProps } from './KpiCard'
+import { MissingDataProvider } from './MissingData'
 
 function setup(over: Partial<KpiCardProps> = {}) {
   const onOpen = vi.fn()
-  const utils = render(<KpiCard label="Sesiuni" definition="Numărul de sesiuni GA4 în perioadă." metric={metric()} onOpen={onOpen} compareLabel="față de perioada anterioară" {...over} />)
+  const utils = render(
+    <MissingDataProvider>
+      <KpiCard label="Sesiuni" definition="Numărul de sesiuni GA4 în perioadă." metric={metric()} onOpen={onOpen} compareLabel="față de perioada anterioară" {...over} />
+    </MissingDataProvider>,
+  )
   return { onOpen, ...utils }
 }
 
@@ -21,8 +26,7 @@ describe('KpiCard, stări', () => {
   })
 
   it('emptyReason înlocuiește doar motivul stării goale; o valoare existentă nu e ascunsă', () => {
-    setup({ metric: metric({ status: 'not_connected', value: null, source: null }), emptyReason: 'Motiv dat de ecran.' })
-    expect(screen.getByText('Sursă neconectată')).toBeInTheDocument()
+    setup({ metric: metric({ status: 'unavailable', value: null, source: null }), emptyReason: 'Motiv dat de ecran.' })
     expect(screen.getByText('Motiv dat de ecran.')).toBeInTheDocument()
     setup({ emptyReason: 'Nu trebuie afișat.' })
     expect(screen.queryByText('Nu trebuie afișat.')).toBeNull()
@@ -87,16 +91,18 @@ describe('KpiCard, stări', () => {
     expect(screen.queryByText('Sursă neconectată')).toBeNull()
   })
 
-  it('not_connected: „Sursă neconectată" cu motivul și numele sursei', () => {
+  it('not_connected (decizia AG): cardul nu se desenează; pagina îl numește, cu motivul în tooltip', () => {
     setup({ metric: metric({ status: 'not_connected', value: null, absolute_change: null, relative_change: null, source: 'planable', data_as_of: null }) })
-    expect(screen.getByText('Sursă neconectată')).toBeInTheDocument()
-    expect(screen.getByText(/Sursa Planable nu este conectată pentru acest brand/)).toBeInTheDocument()
-    expect(screen.getByText('Indisponibil')).toBeInTheDocument()
+    expect(screen.queryByRole('article', { name: 'Sesiuni' })).toBeNull()
+    expect(screen.queryByText(/Sursă neconectată/)).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent('Pentru perioada selectată nu avem date pentru Sesiuni.')
+    expect(screen.getByText('Sesiuni')).toHaveAttribute('title', expect.stringMatching(/Sursa Planable nu este conectată pentru acest brand/))
   })
 
-  it('not_connected cu sursă încă necunoscută: motiv generic, fără nume inventat', () => {
-    setup({ metric: metric({ status: 'not_connected', value: null, absolute_change: null, relative_change: null, source: null, data_as_of: null }) })
-    expect(screen.getByText(/^Sursa nu este conectată pentru acest brand/)).toBeInTheDocument()
+  it('not_connected cu titlu dat de ecran (de ex. indicator nedefinit): cardul rămâne, cu titlul lui', () => {
+    setup({ metric: metric({ status: 'not_connected', value: null, absolute_change: null, relative_change: null, source: null, data_as_of: null }), emptyTitle: 'Indicator nedefinit' })
+    expect(screen.getByText('Indicator nedefinit')).toBeInTheDocument()
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('error: mesaj și „Reîncearcă", diferit de lipsa sursei', async () => {

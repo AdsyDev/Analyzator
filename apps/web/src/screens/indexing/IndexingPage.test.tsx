@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { failed, notConnected, ready, type IndexStatus } from '../../contracts'
 import { pageReady, renderApp } from '../../test/renderApp'
+import { missingWith } from '../../test/missing'
 
 const ROUTE = '/brands/brand-urinal/indexing'
 const open = () => pageReady('Indexare')
@@ -72,10 +73,10 @@ describe('Indexare', () => {
     expect(within(section('URL-uri prioritare')).getByText(/Niciun URL prioritar/)).toBeInTheDocument()
   })
 
-  it('Search Console neconectat: „Sursă neconectată”, fără tabel', async () => {
+  it('Search Console neconectat: secțiunea nu apare, pagina o numește cu motivul; fără tabel', async () => {
     renderApp({ route: ROUTE, wrap: (b) => ({ ...b, search: { ...b.search, indexStatus: async () => notConnected('Search Console nu este conectat pentru acest brand.') } }) })
     await open()
-    expect(await screen.findByText('Search Console nu este conectat pentru acest brand.')).toBeInTheDocument()
+    expect(await missingWith('Search Console nu este conectat pentru acest brand.')).toBeInTheDocument()
     expect(screen.queryByRole('table')).toBeNull()
   })
 

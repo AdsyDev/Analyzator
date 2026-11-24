@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { pageReady, renderApp, where } from '../../test/renderApp'
+import { missingWith } from '../../test/missing'
 
 const section = (name: string) => screen.getByRole('heading', { level: 2, name }).closest('section')!
 const ROUTE = '/brands/brand-urinal/ux'
@@ -72,8 +73,9 @@ describe('User experience: comportament (Clarity), mutat din Trafic', () => {
   it('valorile pe device nu sunt zero când lipsesc: Proenzi nu are Clarity conectat', async () => {
     renderApp({ route: '/brands/brand-proenzi/ux' })
     await open()
-    expect(await within(section('Comportament')).findByText(/Sursa Microsoft Clarity nu este conectată pentru acest brand/)).toBeInTheDocument()
-    expect(within(section('Comportament')).queryByRole('alert')).toBeNull()
+    // Fără sursă (decizia AG): secțiunea nu apare; pagina o numește, cu motivul în tooltip. Nicio valoare zero.
+    expect(await missingWith(/Sursa Microsoft Clarity nu este conectată pentru acest brand/)).toHaveTextContent('Comportament')
+    expect(screen.queryByRole('heading', { level: 2, name: 'Comportament' })).toBeNull()
   })
 
   it('Minimartieni: Clarity sănătos, fără banner', async () => {

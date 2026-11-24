@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { ProviderResult } from '../../contracts'
 import type { AsyncState } from '../../data/useAsync'
+import { ReadyMark } from '../../components/MissingData'
 import { ProviderProblem } from '../../routing/pages'
 
 interface Props<T> {
@@ -14,12 +15,18 @@ interface Props<T> {
 }
 
 /**
- * Stările comune ale unei secțiuni care citește un provider: încărcare (schelet), eroare cu „Reîncearcă",
- * „Sursă neconectată" cu motivul, apoi conținutul. O secțiune lentă sau căzută nu blochează restul paginii.
+ * Stările comune ale unei secțiuni care citește un provider: încărcare (schelet), eroare cu „Reîncearcă", lipsa sursei
+ * (secțiunea dispare și pagina o numește în mesajul „Pentru perioada selectată…”, decizia AG), apoi conținutul.
+ * O secțiune lentă sau căzută nu blochează restul paginii.
  */
 export function Resolved<T>({ state, onRetry, loadingLabel, skeletonClass = 'h-40', children }: Props<T>) {
   if (state.status === 'loading') return <div role="status" aria-label={loadingLabel} className={`${skeletonClass} rounded-xl bg-skeleton`} />
   if (state.status === 'failed') return <ProviderProblem result={{ kind: 'error', message: state.message }} onRetry={onRetry} />
   if (state.value.kind !== 'ready') return <ProviderProblem result={state.value} onRetry={onRetry} />
-  return <>{children(state.value.data)}</>
+  return (
+    <>
+      <ReadyMark />
+      {children(state.value.data)}
+    </>
+  )
 }

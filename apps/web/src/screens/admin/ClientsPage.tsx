@@ -291,7 +291,7 @@ function SetupPanel({ target, onClose, onChanged }: { target: SetupTarget; onClo
         {current === 'Gata' && (
           <div className="flex flex-col gap-3">
             <p className="rounded-lg bg-pos-soft px-3 py-2 text-[13px] text-pos-text">{siteName.trim()} a fost adăugat{target.mode === 'client' && tenant ? ` pentru ${tenant.name}` : ''}.</p>
-            <p className="text-[13px] leading-snug text-text-2">Ce urmează: conectează sursele spațiului și invită persoanele care trebuie să-l vadă. Până la conectare, modulele arată „Sursă neconectată”.</p>
+            <p className="text-[13px] leading-snug text-text-2">Ce urmează: conectează sursele spațiului și invită persoanele care trebuie să-l vadă. Până la conectare, modulele fără sursă nu apar, iar pagina spune pentru ce nu avem date.</p>
             <div className="flex flex-wrap gap-2">
               <Button
                 icon={<PlugsConnectedIcon size={14} />}

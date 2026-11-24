@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { failed } from '../../contracts'
 import { createSupabaseProviders } from '../../data/supabase/providers'
 import { pageReady, renderApp, where } from '../../test/renderApp'
+import { expectNoSourceDisconnected, missingNotice, missingWith } from '../../test/missing'
 
 const section = (name: string) => screen.getByRole('heading', { level: 2, name }).closest('section')!
 const MINI = '/brands/brand-minimartieni/paid'
@@ -11,11 +12,10 @@ const open = () => pageReady('Paid Media')
 const tableRows = () => within(within(section('Performanță pe zi')).getByRole('table')).getAllByRole('row').slice(1)
 
 describe('Paid Media fără import', () => {
-  it('„Sursă neconectată", motivul din design, „Importă CSV" pentru agency_admin; nicio cifră', async () => {
+  it('fără import (decizia AG): mesajul paginii cu motivul din design în tooltip, „Importă CSV" pentru agency_admin; nicio cifră', async () => {
     renderApp({ route: '/brands/brand-urinal/paid' })
-    expect(await screen.findByRole('heading', { name: 'Sursă neconectată' })).toBeInTheDocument()
-    expect(screen.getByText(/Google Ads, Meta Ads și TikTok Ads nu sunt conectate pentru Urinal/)).toBeInTheDocument()
-    expect(screen.getByText(/importă un export CSV/)).toBeInTheDocument()
+    expect(await missingWith(/Google Ads, Meta Ads și TikTok Ads nu sunt conectate pentru Urinal.*vin din importuri/)).toHaveTextContent('Paid Media')
+    expectNoSourceDisconnected()
     expect(screen.queryByTestId('paid-kpis')).toBeNull()
     expect(screen.queryByRole('table')).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Importă CSV' }))
@@ -24,21 +24,20 @@ describe('Paid Media fără import', () => {
 
   it.each(['strategist', 'account', 'client_viewer'] as const)('%s nu primește o acțiune care nu funcționează', async (role) => {
     renderApp({ route: '/brands/brand-urinal/paid', role })
-    await screen.findByRole('heading', { name: 'Sursă neconectată' })
+    await missingNotice()
     expect(screen.queryByRole('button', { name: 'Importă CSV' })).toBeNull()
   })
 
   it('cu providerul real (neconectat) pagina arată aceeași stare', async () => {
     renderApp({ route: MINI, wrap: (b) => ({ ...b, paid: createSupabaseProviders().paid }) })
-    expect(await screen.findByRole('heading', { name: 'Sursă neconectată' })).toBeInTheDocument()
-    expect(screen.getByText(/Google Ads, Meta Ads și TikTok Ads nu sunt conectate pentru Minimartieni/)).toBeInTheDocument()
+    expect(await missingWith(/Google Ads, Meta Ads și TikTok Ads nu sunt conectate pentru Minimartieni/)).toHaveTextContent('Paid Media')
   })
 
-  it('eroare la poartă: mesaj cu „Reîncearcă", nu „Sursă neconectată"', async () => {
+  it('eroare la poartă: mesaj cu „Reîncearcă", nu mesajul de date lipsă', async () => {
     let n = 0
     renderApp({ route: MINI, wrap: (b) => ({ ...b, paid: { ...b.paid, summary: async (c, f) => (++n === 1 ? failed('Timeout.') : b.paid.summary(c, f)) } }) })
     expect(await screen.findByText('Timeout.')).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Sursă neconectată' })).toBeNull()
+    expect(screen.queryByText(/Pentru perioada selectată nu avem date/)).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Reîncearcă' }))
     expect(await screen.findByTestId('paid-kpis')).toBeInTheDocument()
   })

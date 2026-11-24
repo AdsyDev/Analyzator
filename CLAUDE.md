@@ -4,7 +4,7 @@ Platformă de analiză pentru clienții AdSymphony (pilot: trei branduri STADA).
 
 ## Reguli nenegociabile
 
-1. **Fără date demo** în staging și production. Un modul fără sursă afișează „Sursă neconectată" și motivul.
+1. **Fără date demo** în staging și production. O secțiune sau un card fără sursă nu se desenează; pagina spune „Pentru perioada selectată nu avem date pentru …”, cu motivul în tooltip (decizia AG). Nicio valoare estimată în locul lor.
 2. **Fără secrete** în frontend, în prompturi sau în documente. Tokenurile furnizorilor trăiesc doar în worker și în funcțiile server.
 3. **Fără acces cross-tenant.** Orice query din worker cu service role verifică explicit `tenant_id` (și `brand_id` unde e cazul). RLS pe toate tabelele expuse.
 4. **Fără formule de metrici în UI.** Formulele trăiesc în SQL (view-uri, funcții) sau în registrul de metrici (`docs/metrics`).

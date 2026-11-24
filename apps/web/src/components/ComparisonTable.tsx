@@ -34,7 +34,7 @@ interface Resolved {
 }
 
 const DEFAULT_REASON: Partial<Record<MetricStatus, string>> = {
-  not_connected: 'Sursă neconectată.',
+  not_connected: 'Fără date pentru perioada selectată.',
   unavailable: 'Fără date pentru acest interval.',
   cannot_compute: 'Nu se poate calcula.',
 }

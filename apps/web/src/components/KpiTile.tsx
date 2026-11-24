@@ -4,6 +4,7 @@ import type { MetricStatus } from '../contracts'
 import { cn } from '../lib/cn'
 import { Button } from './ui/Button'
 import { InfoTip } from './ui/InfoTip'
+import { useMissingOnPage } from './MissingData'
 
 export interface KpiTileProps {
   icon: Icon
@@ -28,6 +29,8 @@ export interface KpiTileProps {
   error?: string | null
   /** Titlul și motivul stării fără valoare. */
   emptyTitle?: string | null
+  /** Cardul rămâne deși sursa lipsește (de ex. „Indicator nedefinit”: lipsește definiția, nu sursa). */
+  keepWhenMissing?: boolean
   emptyReason?: string | null
   /** Deschide dovezile indicatorului; fără el, cardul nu e apăsabil. */
   onOpen?: () => void
@@ -43,8 +46,12 @@ const DELTA_ICON = { up: ArrowUpRightIcon, down: ArrowDownRightIcon, flat: Minus
  * Aceleași reguli ca la KpiCard: o valoare lipsă e explicată, nu înlocuită cu zero; starea datelor rămâne vizibilă;
  * tot cardul deschide dovezile, iar definiția stă în tooltip.
  */
-export function KpiTile({ icon: Glyph, title, label, definition, valueText, deltaText, deltaDirection, deltaGood = null, sub, caveat, state, status, error, emptyTitle, emptyReason, onOpen, onRetry, detail }: KpiTileProps) {
+export function KpiTile({ icon: Glyph, title, label, definition, valueText, deltaText, deltaDirection, deltaGood = null, sub, caveat, state, status, error, emptyTitle, emptyReason, onOpen, onRetry, detail, keepWhenMissing = false }: KpiTileProps) {
   const DeltaIcon = deltaDirection ? DELTA_ICON[deltaDirection] : null
+  // Fără sursă: cardul nu se desenează, pagina îl numește (decizia AG). Alte stări fără valoare rămân cu titlul lor.
+  const missing = state === 'ready' && status === 'not_connected' && !keepWhenMissing
+  useMissingOnPage(title, missing, emptyReason ?? null)
+  if (missing) return null
   return (
     <article
       aria-label={label}

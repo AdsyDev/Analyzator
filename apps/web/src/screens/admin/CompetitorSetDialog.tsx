@@ -165,7 +165,7 @@ export function CompetitorSetDialog({ brand, versions, onClose, onCreated }: { b
           <input id={ids.date} type="date" value={date} min={first ? MIN_DATE : today} onChange={(e) => setDate(e.target.value)} className={`${field} font-mono sm:w-48`} aria-describedby={ids.hint} />
           <p id={ids.hint} className="text-[12px] leading-snug text-text-3">
             {first
-              ? 'Prima versiune poate începe în trecut: perioadele de dinainte primesc comparația în loc de „Sursă neconectată”.'
+              ? 'Prima versiune poate începe în trecut: perioadele de dinainte primesc și ele comparația.'
               : 'Azi sau mai târziu. Comparațiile pentru perioadele de dinainte rămân cu versiunea veche.'}
           </p>
         </div>
@@ -332,7 +332,7 @@ function Suggestions({
 }
 
 const OUTCOME_TITLE: Record<string, string> = {
-  not_connected: 'Sursă neconectată',
+  not_connected: 'Neconfigurat',
   invalid: 'Token refuzat',
   rate_limited: 'Limită de cereri',
   provider_error: 'Eroare la furnizor',

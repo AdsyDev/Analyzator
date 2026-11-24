@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { failed } from '../../contracts'
 import { createSupabaseProviders } from '../../data/supabase/providers'
 import { pageReady, renderApp, where } from '../../test/renderApp'
+import { missingNotice, missingWith } from '../../test/missing'
 
 const section = (name: string) => screen.getByRole('heading', { level: 2, name }).closest('section')!
 const ROUTE = '/brands/brand-urinal/traffic'
@@ -13,7 +14,9 @@ describe('Trafic și conversii: structura din spec cap. 16', () => {
   it('KPI, canale, AI referrals și tracking quality; comportamentul Clarity e în User experience (E-1)', async () => {
     renderApp({ route: `${ROUTE}?period=7d` })
     await open()
-    expect(within(screen.getByTestId('kpi-grid')).getAllByRole('article')).toHaveLength(5)
+    // „Utilizatori activi” nu are sursă: nu apare, pagina îl numește (decizia AG).
+    expect(within(screen.getByTestId('kpi-grid')).getAllByRole('article')).toHaveLength(4)
+    expect(await missingNotice()).toHaveTextContent('Utilizatori activi')
     for (const h of ['Canale', 'AI referrals', 'Tracking quality']) expect(screen.getByRole('heading', { level: 2, name: h })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { level: 2, name: 'Comportament' })).toBeNull()
     expect(screen.getByText(/Ce se întâmplă după click/)).toBeInTheDocument()
@@ -27,8 +30,9 @@ describe('Trafic și conversii: structura din spec cap. 16', () => {
     expect(screen.getByRole('article', { name: 'Sesiuni' })).toHaveAttribute('data-status', 'ok')
     expect(screen.getByRole('article', { name: 'Sesiuni cu implicare' })).toHaveAttribute('data-status', 'partial')
     expect(screen.getByRole('article', { name: 'Key events' })).toHaveAttribute('data-status', 'stale')
-    const users = screen.getByRole('article', { name: 'Utilizatori activi' })
-    expect(users).toHaveAttribute('data-status', 'not_connected')
+    expect(screen.queryByRole('article', { name: 'Utilizatori activi' })).toBeNull()
+    expect(await missingNotice()).toHaveTextContent('Utilizatori activi')
+    // Fără definiție în registru: cardul rămâne, cu „Indicator nedefinit” (lipsește definiția, nu sursa).
     const rate = screen.getByRole('article', { name: 'Engagement rate' })
     expect(rate).toHaveAttribute('data-status', 'not_connected')
     await userEvent.click(within(rate).getByRole('button', { name: 'Ce înseamnă indicatorul' }))
@@ -129,7 +133,7 @@ describe('Trafic: izolarea secțiunilor și providerul real', () => {
   it('cu providerul real: fiecare secțiune explică lipsa sursei, fără date inventate', async () => {
     renderApp({ route: ROUTE, wrap: (b) => ({ ...b, traffic: createSupabaseProviders().traffic }) })
     await open()
-    await waitFor(() => expect(screen.getAllByText(/nu sunt încă disponibile pentru acest brand/).length).toBeGreaterThanOrEqual(3))
+    expect(await missingWith(/nu sunt încă disponibile pentru acest brand/)).toBeInTheDocument()
     expect(screen.queryByText(/supabase|stack/i)).toBeNull()
   })
 

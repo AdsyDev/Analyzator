@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { WarningCircleIcon } from '@phosphor-icons/react'
 import { Link, Outlet, useLocation, useMatch, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom'
 import { useAuth, useUser } from '../auth/AuthContext'
 import { AppShell } from '../components/AppShell'
+import { EmptyState } from '../components/EmptyState'
 import { ModuleFreshness } from '../components/ModuleFreshness'
 import { FilterBar } from '../components/FilterBar'
 import type { Brand, ProviderResult, QueryContext, SessionUser } from '../contracts'
@@ -186,6 +188,9 @@ export function AppLayout() {
   let content
   if (needsBrand && brandsResult === null) {
     content = <div role="status" aria-label="Se încarcă spațiile de brand" className="h-64 rounded-xl bg-skeleton" />
+  } else if (needsBrand && brandsResult && brandsResult.kind === 'not_connected') {
+    // Lista de branduri e o stare a aplicației, nu a unui modul: rămâne un mesaj vizibil, cu motivul.
+    content = <EmptyState icon={<WarningCircleIcon size={36} weight="thin" />} title="Spațiile de brand nu sunt disponibile" text={brandsResult.reason} />
   } else if (needsBrand && brandsResult && brandsResult.kind !== 'ready') {
     content = <ProviderProblem result={brandsResult} />
   } else if (needsBrand && brands.length === 0) {

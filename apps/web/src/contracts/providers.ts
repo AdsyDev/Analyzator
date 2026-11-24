@@ -145,7 +145,7 @@ export interface TrafficProvider {
 
 /**
  * Paid Media (spec cap. 15), date din exporturi. `summary` este poarta paginii: `not_connected` înseamnă că nu
- * există niciun import pentru brand, iar pagina arată „Sursă neconectată" cu acțiunea „Importă CSV".
+ * există niciun import pentru brand, iar pagina arată starea „fără sursă” (decizia AG) cu acțiunea „Importă CSV".
  */
 export interface PaidProvider {
   summary(ctx: QueryContext, f: PaidFilters): Promise<ProviderResult<PaidSummary>>
