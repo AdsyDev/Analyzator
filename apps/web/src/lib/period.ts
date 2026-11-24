@@ -98,6 +98,15 @@ export function comparisonRange(period: PeriodSelection, mode: ComparisonMode): 
   return { from: addDays(period.from, -len), to: addDays(period.from, -1) }
 }
 
+/**
+ * Aceeași lungime ca perioada curentă, terminată în ultima zi cu date (de ex. „ultimele date înregistrate” când sursa
+ * s-a oprit înaintea perioadei alese). Perioadă `custom`.
+ */
+export function periodEndingAt(lastDay: IsoDate, current: Pick<PeriodSelection, 'from' | 'to'>): PeriodSelection {
+  const len = daysBetween(current.from, current.to) + 1
+  return { preset: 'custom', from: addDays(lastDay, -(len - 1)), to: lastDay }
+}
+
 // URL: `period`, `from`, `to`, `compare` + filtrele modulului. Valorile implicite nu se scriu în URL.
 export const DEFAULT_PRESET: PeriodPreset = '28d'
 export const DEFAULT_COMPARISON: ComparisonMode = 'previous'
