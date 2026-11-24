@@ -5,14 +5,19 @@ import { initials } from './Avatar'
 const SIZES = { sm: 'size-6 text-[10px] rounded-md', md: 'size-8 text-[12px] rounded-lg', lg: 'size-10 text-[14px] rounded-[10px]' } as const
 const DOMAIN = /^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/
 
+/** Mărimea cerută serviciului de favicon. Sub `MIN_ICON` px iconița ar arăta pixelată: rămâne monograma. */
+const ICON_SIZE = 64
+const MIN_ICON = 32
+
 /**
- * Iconițele pe care le încercăm, în ordine, direct de pe site-ul brandului (fără serviciu terț):
- * întâi iconița mare pentru ecrane retina, apoi favicon-ul clasic. Domeniu lipsă sau invalid → nicio sursă.
+ * Iconița site-ului, prin serviciul de favicon Google: citește iconița declarată în pagina site-ului (nu doar
+ * `/favicon.ico`), deci găsește mult mai multe site-uri decât o cerere directă. Pleacă doar domeniul brandului, public.
+ * Domeniu lipsă sau invalid → nicio cerere.
  */
 export function brandIconSources(domain: string | null | undefined): string[] {
   const d = domain?.trim().toLowerCase() ?? ''
   if (!DOMAIN.test(d)) return []
-  return [`https://${d}/apple-touch-icon.png`, `https://${d}/favicon.ico`]
+  return [`https://www.google.com/s2/favicons?domain=${d}&sz=${ICON_SIZE}`]
 }
 
 /**
@@ -40,8 +45,9 @@ export function BrandMark({ name, domain, size = 'md', decorative = false }: { n
           decoding="async"
           referrerPolicy="no-referrer"
           onLoad={(e) => {
-            // Unele site-uri întorc o imagine goală de 1×1 în loc de 404; o tratăm ca lipsă.
-            if (e.currentTarget.naturalWidth < 8) setState({ domain, index: current.index + 1, loaded: false })
+            // Pentru un site fără iconiță, serviciul întoarce globul generic de 16 px (nu o eroare); o iconiță
+            // mică ar arăta pixelată. Ambele cazuri → monograma.
+            if (e.currentTarget.naturalWidth < MIN_ICON) setState({ domain, index: current.index + 1, loaded: false })
             else setState({ domain, index: current.index, loaded: true })
           }}
           onError={() => setState({ domain, index: current.index + 1, loaded: false })}
