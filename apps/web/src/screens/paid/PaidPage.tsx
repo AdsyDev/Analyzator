@@ -23,7 +23,7 @@ export function paidFiltersFrom(ctx: QueryContext): PaidFilters {
 }
 
 /**
- * Paid Media (spec cap. 15). Poarta paginii e `paid.summary`: fără import, „Sursă neconectată" cu acțiunea
+ * Paid Media (spec cap. 15). Poarta paginii e `paid.summary`: fără import, starea „fără sursă” (decizia AG) cu acțiunea
  * „Importă CSV"; cu import, KPI, buget și pacing, evoluție și tabelul pe zi/platformă/cont/campanie.
  */
 export function PaidPage() {
@@ -46,7 +46,7 @@ function PaidContent({ brand, ctx, canImport, canEditBudget, onPeriod }: { brand
   if (summary.state.status === 'loading') return <div role="status" aria-label="Se încarcă Paid Media" className="h-64 rounded-xl bg-skeleton" />
   if (summary.state.status === 'failed') return <ProviderProblem result={{ kind: 'error', message: summary.state.message }} onRetry={summary.reload} />
   const result = summary.state.value
-  if (result.kind === 'not_connected') return <ImportGate text={BRAND_MODULES.paid?.disconnected?.(brand.name) ?? result.reason} canImport={canImport} />
+  if (result.kind === 'not_connected') return <ImportGate label="Paid Media" text={BRAND_MODULES.paid?.disconnected?.(brand.name) ?? result.reason} canImport={canImport} />
   if (result.kind === 'error') return <ProviderProblem result={result} onRetry={summary.reload} />
   const s = result.data
 

@@ -27,6 +27,7 @@ import {
   type Icon,
 } from '@phosphor-icons/react'
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { MissingDataProvider } from './MissingData'
 import { NavLink, useLocation, useSearchParams } from 'react-router-dom'
 import type { Brand, IsoDate, IsoDateTime, ProviderResult, Role, SessionUser } from '../contracts'
 import { ROLES } from '../contracts'
@@ -379,7 +380,7 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, eyebrow,
             {actions}
           </div>
           {filterBar && <div className="print:hidden">{filterBar}</div>}
-          {children}
+          <MissingDataProvider>{children}</MissingDataProvider>
         </main>
       </div>
       {rightPanel && (

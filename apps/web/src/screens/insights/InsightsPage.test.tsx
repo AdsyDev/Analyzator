@@ -6,6 +6,7 @@ import { createFixtureProviders } from '../../data/fixtures/createFixtureProvide
 import { createSupabaseProviders } from '../../data/supabase/providers'
 import { resolvePeriod } from '../../lib/period'
 import { pageReady, renderApp } from '../../test/renderApp'
+import { missingWith } from '../../test/missing'
 
 const URINAL = '/brands/brand-urinal/insights'
 const cards = async () => within((await screen.findByRole('heading', { level: 2, name: 'Analize' })).closest('section')!).findAllByRole('article')
@@ -369,11 +370,10 @@ describe('Analize și acțiuni — răspunsul clientului și discuția', () => {
 })
 
 describe('Analize și acțiuni — stări', () => {
-  it('cu providerul real: „Sursă neconectată" cu motiv', async () => {
+  it('cu providerul real: secțiunea nu apare, pagina o numește cu motivul (decizia AG)', async () => {
     renderApp({ route: URINAL, wrap: (b) => ({ ...b, insights: createSupabaseProviders().insights }) })
     await pageReady('Analize și acțiuni')
-    expect(await screen.findByRole('heading', { name: 'Sursă neconectată' })).toBeInTheDocument()
-    expect(screen.getByText('Analizele nu sunt încă disponibile pentru acest brand.')).toBeInTheDocument()
+    expect(await missingWith('Analizele nu sunt încă disponibile pentru acest brand.')).toBeInTheDocument()
   })
 
   it('listă goală: mesaj diferit pentru agenție și pentru client', async () => {

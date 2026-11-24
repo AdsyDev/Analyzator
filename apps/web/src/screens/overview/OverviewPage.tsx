@@ -23,7 +23,7 @@ const ALL_ENGINES = { engine: null, group: null } as const
  * Overview, în compoziția din macheta propunerii („Imaginea completă a brandului”): șase indicatori, evoluția
  * vizibilității AI și vizibilitatea pe platforme, apoi SEO și trafic, Social listening și Competitori. AdSy AI e un
  * sidebar în dreapta, deschis din comutatorul „AI insights” de lângă titlu; nu e prezent permanent. Dedesubt rămân „Ce s-a schimbat”, prioritățile și interpretarea echipei. Toate datele vin prin provideri;
- * fiecare secțiune are stările ei de încărcare, eroare și „Sursă neconectată”, deci o sursă lentă nu blochează restul.
+ * fiecare secțiune are stările ei de încărcare, eroare și starea „fără sursă” (decizia AG), deci o sursă lentă nu blochează restul.
  * Nu există un scor general de brand și nicio valoare demonstrativă.
  */
 export function OverviewPage() {

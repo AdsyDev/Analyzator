@@ -147,7 +147,7 @@ describe('ComparisonTable', () => {
     expect(within(row).getByText('N/A')).toBeInTheDocument()
     expect(within(row).queryByText('Cea mai bună valoare:')).toBeNull()
     expect(screen.getByText('Date parțiale: Se observă doar keywordurile în care apare.')).toBeInTheDocument()
-    expect(screen.getByText('N/A: Sursă neconectată.')).toBeInTheDocument()
+    expect(screen.getByText('N/A: Fără date pentru perioada selectată.')).toBeInTheDocument()
     expect(within(row).getByRole('button', { name: 'Ce înseamnă Keywords în Top 10' })).toBeInTheDocument()
   })
 })

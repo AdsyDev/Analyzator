@@ -537,3 +537,16 @@ Cererea proprietarului produsului, 24 nov. 2026: „Păstrează și limba menți
 | AF-5 | Ce nu se schimbă | — | Conectorul nu păstrează textul nicăieri altundeva; jurnalul colectării nu îl scrie. Textul trece doar prin cererea HTTPS spre Supabase și prin trigger. **De știut:** dacă jurnalizarea instrucțiunilor SQL ar fi activată pe proiect, textul ar putea apărea în loguri; azi nu e configurată de noi. |
 | AF-6 | Impact | — | Timp: ~3 ore. O migrație (două coloane, un trigger, două schimbări în `brand_competition`), o linie în conector. Cost de rulare: neglijabil. |
 | AF-7 | Verificare | — | `npm run typecheck` și `npm run test` complete. pgTAP pe Postgres 16 local, cu stratul minim pentru Supabase: toate fișierele trec, inclusiv `37_competitor_mentions_language.test.sql` (19 verificări) și M4 actualizat în `36_mentions_count_romanian`, mai puțin `05_source_credentials` V5 (criptarea Vault). `npm run test:security` rulează în `supabase-deploy` înainte de `db push`. |
+
+## AG — Fără „Sursă neconectată”: cutiile fără sursă nu se desenează (2026-11-24)
+
+Cererea proprietarului produsului, 24 nov. 2026: „Nu vreau să mai văd nicăieri în acest app «Sursă neconectată». Pur și simplu nu îmi arăta boxul respectiv și pune-mi un mesaj că pentru perioada selectată…”. Schimbă formularea regulii 1 din CLAUDE.md (nu și fondul: tot nu se arată date demo sau estimate).
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| AG-1 | Ce dispare | (a) doar textul; (b) cutia întreagă | **(b).** O secțiune (`Section`), un card din Overview sau un card KPI fără sursă nu se desenează. O cutie cu și conținut cu date rămâne, cu un rând discret „Pentru perioada selectată nu avem date aici.” în locul părții fără sursă. |
+| AG-2 | Mesajul | — | Un singur mesaj pe pagină, sub titlu și filtre: „Pentru perioada selectată nu avem date pentru A, B și C.” Numele sunt titlurile cutiilor ascunse; motivul tehnic (de ex. „SEOmonitor nu e conectat”) stă în tooltipul numelui, pentru echipă. Un modul întreg fără import (Paid Media, Social) arată doar mesajul și, pentru `agency_admin`, „Importă CSV”. |
+| AG-3 | Ce nu se schimbă | — | Erorile („Nu am putut încărca datele” cu „Reîncearcă”) rămân vizibile: lipsă ≠ eroare (regula 8). „Indicator nedefinit” (lipsește definiția, nu sursa) rămâne. „Fără date pentru interval” (sursă conectată, fără observații) rămâne. În tabele (matricea de Competiție, Rapoarte) celula rămâne, cu „N/A” și „Fără date pentru perioada selectată.” Lista de branduri indisponibilă e o stare a aplicației și are mesajul ei. |
+| AG-4 | Implementare | — | `components/MissingData.tsx`: mesajul paginii în `AppShell`; cutiile sunt `MissingScope`; `ProviderProblem` (stare `not_connected`) și graficul de trend raportează lipsa, `Resolved` raportează conținutul cu date. Ascunderea e cu atributul `hidden`, ca raportarea să nu oscileze. |
+| AG-5 | Impact | — | Timp: aproximativ jumătate de zi (componentele comune, textele, 40 de teste actualizate). Cost extern: niciunul. |
+

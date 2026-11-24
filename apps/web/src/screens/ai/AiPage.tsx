@@ -25,7 +25,7 @@ export function aiFiltersFrom(ctx: QueryContext): AiFilters {
 
 /**
  * AI Visibility (spec cap. 13). Fiecare secțiune citește prin provider și are stările ei; cheile `ai_*` din
- * KPI nu sunt încă în registru, deci cardurile arată „Sursă neconectată" până intră.
+ * KPI nu sunt încă în registru, deci cardurile arată starea „fără sursă” (decizia AG) până intră.
  */
 export function AiPage() {
   const { brand, ctx, changeFilters, user } = useLayout()

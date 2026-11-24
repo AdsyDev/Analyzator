@@ -12,6 +12,7 @@ import { useLayout } from '../../routing/AppLayout'
 import { metricView } from '../../lib/metricView'
 import { trendReason } from '../../lib/warnings'
 import { ProviderProblem } from '../../routing/pages'
+import { MissingData, MissingScope, ReadyMark } from '../../components/MissingData'
 import { positionRows } from './position'
 import { AI_TREND_KEY, ORGANIC_TREND_KEY } from './slots'
 
@@ -21,7 +22,9 @@ import { AI_TREND_KEY, ORGANIC_TREND_KEY } from './slots'
  */
 function Card({ id, title, description, action, children, className }: { id: string; title: string; description?: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section aria-labelledby={id} className={`flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-1 ${className ?? ''}`}>
+    <MissingScope label={title}>
+      {(hidden) => (
+    <section hidden={hidden} aria-labelledby={id} className={`flex min-w-0 flex-col gap-3 rounded-xl border border-border bg-surface p-4 shadow-1 ${className ?? ''}`}>
       <header className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1">
           <h2 id={id} className="font-display text-[15px] font-semibold tracking-[-0.01em]">{title}</h2>
@@ -31,6 +34,8 @@ function Card({ id, title, description, action, children, className }: { id: str
       </header>
       {children}
     </section>
+      )}
+    </MissingScope>
   )
 }
 const more = (to: string, label: string) => (
@@ -161,11 +166,10 @@ export function SeoTrafficCard({ metrics, definitions, trends, onRetry, onRetryT
         skeleton('Se încarcă evoluția clickurilor', 'h-[72px]')
       ) : trends.status === 'failed' ? (
         <ProviderProblem result={{ kind: 'error', message: trends.message }} onRetry={onRetryTrends} />
-      ) : !series || series.points.every((p) => p.value === null) ? (
-        <p className="rounded-lg border border-dashed border-border-strong px-3 py-4 text-center text-[12.5px] leading-snug text-text-2">
-          <strong className="block font-semibold text-text">{series && !trendReason(series.status) ? 'Fără date pentru interval' : 'Sursă neconectată'}</strong>
-          {series ? (trendReason(series.status) ?? 'Nu există observații în perioada selectată.') : 'Seria nu a venit de la server pentru acest interval.'}
-        </p>
+      ) : !series || trendReason(series.status) ? (
+        <MissingData reason={series ? trendReason(series.status) : 'Seria nu a venit de la server pentru acest interval.'} />
+      ) : series.points.every((p) => p.value === null) ? (
+        <p className="text-[13px] leading-snug text-text-3">Pentru perioada selectată nu avem observații.</p>
       ) : (
         <div>
           <Sparkline label={`Evoluție: ${name}`} values={series.points.map((p) => p.value)} />
@@ -181,6 +185,7 @@ export function SeoTrafficCard({ metrics, definitions, trends, onRetry, onRetryT
         <ProviderProblem result={{ kind: 'error', message: metrics.message }} onRetry={onRetry} />
       ) : (
         <dl>
+          {items.some((i) => metricView(i).hasValue) && <ReadyMark />}
           <Row label="Keywords în Top 10" item={item('seomonitor_keywords_top10')} definition={definitions.get('seomonitor_keywords_top10')} />
           <Row label="CTR (Search Console)" item={item('gsc_ctr')} definition={definitions.get('gsc_ctr')} />
           <Row label="Sesiuni" item={item('ga4_sessions')} definition={definitions.get('ga4_sessions')} />

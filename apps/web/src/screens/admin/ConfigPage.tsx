@@ -83,7 +83,7 @@ function BrandConfig({ brand }: { brand: Brand }) {
               <EmptyState
                 compact
                 title="Niciun set de competitori"
-                text={`${brand.name} nu are încă un set de competitori, așa că paginile Overview și Competiție arată „Sursă neconectată”. Configurează-l: poți porni de la propunerile din Planable și SEOmonitor.`}
+                text={`${brand.name} nu are încă un set de competitori, așa că Overview și Competiție nu au încă comparația cu competitorii. Configurează-l: poți porni de la propunerile din Planable și SEOmonitor.`}
                 action={{ label: 'Configurează competitorii', onClick: open, icon: <PlusIcon size={14} weight="bold" /> }}
               />
             ) : (

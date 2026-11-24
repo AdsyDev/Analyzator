@@ -30,7 +30,8 @@ describe('Rapoarte', () => {
     for (const row of within(paid).getAllByRole('row').slice(1)) {
       expect(within(row).getByText('Fără date')).toBeInTheDocument()
       expect(row).toHaveAttribute('data-status', 'not_connected')
-      expect(row.textContent).toMatch(/Sursă neconectată/)
+      expect(row.textContent).toMatch(/Fără date pentru perioada selectată/)
+      expect(row.textContent).not.toMatch(/Sursă neconectată/)
     }
   })
 

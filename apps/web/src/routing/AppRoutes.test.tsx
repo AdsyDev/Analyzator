@@ -10,6 +10,7 @@ import { createUnconfiguredAuth } from '../auth/createAuthSource'
 import { createSupabaseProviders } from '../data/supabase/providers'
 import type { AppEnvironment } from '../environment'
 import { createPreviewAuth } from '../preview/previewAuth'
+import { expectNoSourceDisconnected, missingNotice } from '../test/missing'
 
 const NOW = new Date('2026-10-06T07:00:00Z')
 
@@ -141,17 +142,19 @@ describe('rute de brand', () => {
 })
 
 describe('placeholder-uri cu texte reale (nu „în curând")', () => {
-  it('Paid Media fără import: „Sursă neconectată", motivul din design și acțiunea „Importă CSV"', async () => {
+  it('Paid Media fără import (decizia AG): mesajul paginii, motivul din design în tooltip și acțiunea „Importă CSV"', async () => {
     setup('/brands/brand-urinal/paid')
-    expect(await screen.findByRole('heading', { name: 'Sursă neconectată' })).toBeInTheDocument()
-    expect(screen.getByText(/Google Ads, Meta Ads și TikTok Ads nu sunt conectate pentru Urinal. Până la conectare nu afișăm cifre, nici estimate./)).toBeInTheDocument()
+    const notice = await missingNotice()
+    expect(notice).toHaveTextContent('Pentru perioada selectată nu avem date pentru Paid Media.')
+    expect(within(notice).getByText('Paid Media')).toHaveAttribute('title', expect.stringMatching(/Google Ads, Meta Ads și TikTok Ads nu sunt conectate pentru Urinal. Până la conectare nu afișăm cifre, nici estimate./))
     expect(screen.getByRole('button', { name: 'Importă CSV' })).toBeInTheDocument()
+    expectNoSourceDisconnected()
   })
 
-  it('Social fără import: motivul menționează Planable și Competiția', async () => {
+  it('Social fără import: motivul (în tooltip) menționează Planable și Competiția', async () => {
     setup('/brands/brand-urinal/social')
-    expect(await screen.findByText(/vin din Planable, care nu e încă conectat/)).toBeInTheDocument()
-    expect(screen.getByText(/vezi Competiție/)).toBeInTheDocument()
+    const notice = await missingNotice()
+    expect(within(notice).getByText('Social')).toHaveAttribute('title', expect.stringMatching(/vin din Planable, care nu e încă conectat.*vezi Competiție/))
   })
 
   it('agency_admin primește „Importă CSV", care duce la Surse (intrarea în flux)', async () => {
@@ -163,7 +166,7 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
 
   it.each(['strategist', 'client_viewer'] as const)('%s nu primește o acțiune de import (nu are acces la Surse)', async (role) => {
     setup('/brands/brand-urinal/paid', { role })
-    await screen.findByRole('heading', { name: 'Sursă neconectată' })
+    await missingNotice()
     expect(screen.queryByRole('button', { name: /Importă|Conectează|Cere conectarea/ })).toBeNull()
   })
 
@@ -300,7 +303,8 @@ describe('izolare între branduri', () => {
 
   it('lista de branduri neconectată (producție): mesaj prietenos, fără detalii tehnice', async () => {
     setup('/brands/brand-urinal/overview', { providers: () => createSupabaseProviders() })
-    expect(await screen.findByText('Lista spațiilor de brand nu este încă disponibilă.')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Spațiile de brand nu sunt disponibile' })).toBeInTheDocument()
+    expect(screen.getByText('Lista spațiilor de brand nu este încă disponibilă.')).toBeInTheDocument()
   })
 
   it('cât timp se încarcă brandurile: schelet, nu un flash de „indisponibil"', async () => {

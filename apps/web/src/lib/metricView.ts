@@ -52,7 +52,7 @@ export interface MetricView {
 }
 
 const EMPTY_TITLES: Partial<Record<MetricStatus, string>> = {
-  not_connected: 'Sursă neconectată',
+  not_connected: 'Fără date pentru perioada selectată',
   unavailable: 'Fără date pentru interval',
   cannot_compute: 'Nu se poate calcula',
   // `partial` cu valoare nulă: zero neconfirmat (spec 2.2).

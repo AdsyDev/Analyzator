@@ -24,7 +24,7 @@ export function socialFiltersFrom(ctx: QueryContext): SocialFilters {
 }
 
 /**
- * Social propriu (spec cap. 17). Poarta paginii e `social.summary`: fără import, „Sursă neconectată" cu
+ * Social propriu (spec cap. 17). Poarta paginii e `social.summary`: fără import, starea „fără sursă” (decizia AG) cu
  * „Importă CSV"; cu import, KPI, performanța conținutului, topic și format, calendar și concurența publică.
  */
 export function SocialPage() {
@@ -46,7 +46,7 @@ function SocialContent({ brand, ctx, canImport }: { brand: Brand; ctx: QueryCont
   if (summary.state.status === 'loading') return <div role="status" aria-label="Se încarcă Social" className="h-64 rounded-xl bg-skeleton" />
   if (summary.state.status === 'failed') return <ProviderProblem result={{ kind: 'error', message: summary.state.message }} onRetry={summary.reload} />
   const result = summary.state.value
-  if (result.kind === 'not_connected') return <ImportGate text={BRAND_MODULES.social?.disconnected?.(brand.name) ?? result.reason} canImport={canImport} />
+  if (result.kind === 'not_connected') return <ImportGate label="Social" text={BRAND_MODULES.social?.disconnected?.(brand.name) ?? result.reason} canImport={canImport} />
   if (result.kind === 'error') return <ProviderProblem result={result} onRetry={summary.reload} />
   const s = result.data
 

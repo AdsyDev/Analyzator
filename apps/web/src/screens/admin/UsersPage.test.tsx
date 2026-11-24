@@ -6,6 +6,7 @@ import { createSupabaseUsers } from '../../data/supabase/adminProviders'
 import { generatePassword } from './UsersPage'
 import { fakeDataClient } from '../../test/fakeDataClient'
 import { pageReady, renderApp, where } from '../../test/renderApp'
+import { missingWith } from '../../test/missing'
 
 const URL = '/admin/users'
 const row = async (name: string) => {
@@ -243,10 +244,10 @@ describe('Administrare → Utilizatori cu providerul real (client fals)', () => 
     ])
   })
 
-  it('fără client (neconfigurat): „Sursă neconectată" cu motiv', async () => {
+  it('fără client (neconfigurat): secțiunile nu apar, pagina le numește cu motivul în tooltip (decizia AG)', async () => {
     renderApp({ route: URL, wrap: (b) => ({ ...b, users: createSupabaseProviders().users }) })
     await pageReady('Utilizatori')
-    expect((await screen.findAllByRole('heading', { name: 'Sursă neconectată' })).length).toBeGreaterThan(0)
+    expect(await missingWith(/./)).toBeInTheDocument()
   })
 })
 

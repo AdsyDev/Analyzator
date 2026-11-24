@@ -16,7 +16,7 @@ export interface BrandModule {
   segment: string
   title: string
   subtitle: (brandName: string) => string
-  /** Sursele de care depinde modulul; când toate lipsesc, modulul afișează „Sursă neconectată". */
+  /** Sursele de care depinde modulul; când toate lipsesc, modulul afișează starea „fără sursă” (decizia AG). */
   sources: readonly SourceProviderId[]
   filters: readonly FilterDef[]
   /**
