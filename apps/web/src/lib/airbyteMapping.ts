@@ -1,7 +1,12 @@
 // Maparea conturilor Airbyte pe site-urile clientului (E-8): propunere după nume și domeniu, confirmată de om.
 // Doar o clasificare pentru formular, nu o metrică; nimic nu se leagă fără confirmarea din ecran.
 
-import type { AirbyteAccount, ClientSpace } from '../contracts'
+// Fără importuri: aceeași logică rulează și în worker (connectors/airbyte/map-core.ts), nu doar în aplicație.
+
+/** Contul văzut de inspecție (forma din `AirbyteAccount`, doar câmpurile folosite). */
+type AirbyteAccount = { id: string; name: string; platform: string }
+/** Site-ul clientului (forma din `ClientSpace`, doar câmpurile folosite). */
+type ClientSpace = { id: string; name: string; domain: string | null; status: string }
 
 /** Cuvinte care nu deosebesc un site de altul (țară, monedă, platformă, formă juridică). */
 const GENERIC = new Set([
@@ -35,33 +40,33 @@ function score(accountName: string, keys: string[]): number {
   return keys.reduce((sum, k) => sum + (own.has(k) || (k.length >= 4 && text.includes(k)) ? k.length : 0), 0)
 }
 
-export type MappingRow = {
-  account: AirbyteAccount
+export type MappingRow<A extends AirbyteAccount = AirbyteAccount> = {
+  account: A
   /** Site-ul propus (potrivire unică); `null` = fără potrivire sau ambiguu. */
   proposed: string | null
   /** Site-urile cu același scor maxim, când sunt mai multe (ambiguu). */
   candidates: string[]
 }
 
-export type MappingProposal = {
-  rows: MappingRow[]
+export type MappingProposal<A extends AirbyteAccount = AirbyteAccount> = {
+  rows: MappingRow<A>[]
   /** Conturile deja legate: `external_account_id` → id-ul site-ului. */
-  linked: Array<{ account: AirbyteAccount; brand_id: string }>
+  linked: Array<{ account: A; brand_id: string }>
 }
 
 /**
  * Propunerea pentru toate conturile nelegate. Doar site-urile active primesc propuneri; un cont legat deja (pe orice
  * site al clientului) nu se mai propune, pentru că un cont aparține unui singur site.
  */
-export function proposeAirbyteMapping(
-  accounts: AirbyteAccount[],
+export function proposeAirbyteMapping<A extends AirbyteAccount>(
+  accounts: A[],
   spaces: Array<Pick<ClientSpace, 'id' | 'name' | 'domain' | 'status'>>,
   clientName: string,
   linkedTo: ReadonlyMap<string, string>,
-): MappingProposal {
+): MappingProposal<A> {
   const active = spaces.filter((s) => s.status === 'active').map((s) => ({ id: s.id, keys: siteKeys(s, clientName) }))
-  const rows: MappingRow[] = []
-  const linked: MappingProposal['linked'] = []
+  const rows: MappingRow<A>[] = []
+  const linked: MappingProposal<A>['linked'] = []
   for (const account of accounts) {
     const brand = linkedTo.get(account.id)
     if (brand) {
@@ -74,7 +79,7 @@ export function proposeAirbyteMapping(
     rows.push({ account, proposed: top.length === 1 ? top[0]! : null, candidates: top.length > 1 ? top : [] })
   }
   // Propunerile întâi, apoi ambiguele, apoi restul; în fiecare grup, după platformă și nume.
-  const rank = (r: MappingRow) => (r.proposed ? 0 : r.candidates.length ? 1 : 2)
+  const rank = (r: MappingRow<A>) => (r.proposed ? 0 : r.candidates.length ? 1 : 2)
   rows.sort((a, b) => rank(a) - rank(b) || a.account.platform.localeCompare(b.account.platform) || a.account.name.localeCompare(b.account.name, 'ro'))
   return { rows, linked }
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AirbyteInspection, Client, TenantConnection } from '../../contracts'
+import type { AirbyteAccount, AirbyteInspection, Client, TenantConnection } from '../../contracts'
 import { Button } from '../../components/ui/Button'
 import { StatusChip } from '../../components/ui/Chip'
 import { useProviders } from '../../data/DataProvidersContext'
@@ -9,7 +9,7 @@ import { formatRange } from '../../lib/format'
 const PLATFORM: Record<string, string> = { meta_ads: 'Meta Ads', google_ads: 'Google Ads', tiktok_ads: 'TikTok Ads' }
 const field = 'h-8 max-w-full rounded-[10px] border border-border-strong bg-surface px-2 text-[12.5px]'
 
-type Loaded = { inspection: AirbyteInspection; proposal: MappingProposal }
+type Loaded = { inspection: AirbyteInspection; proposal: MappingProposal<AirbyteAccount> }
 type RowResult = { ok: true } | { ok: false; message: string }
 
 /**

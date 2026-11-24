@@ -155,6 +155,42 @@ describe('config (supabase)', () => {
     ])
   })
 
+  it('createCompetitorSetVersion: apelează funcția SQL cu data, nota și membrii (nume, domeniu), fără scrieri directe', async () => {
+    const fake = fakeDataClient({ rpc: () => ({ data: [{ competitor_set_id: 'x', version: 1, effective_from: '2025-11-23', member_count: 2 }] }) })
+    const input = { effective_from: '2025-11-23', note: 'Validat', members: [{ name: 'Alfa', domain: 'alfa.ro', listening_keywords: ['Alfa forte'], social_handles: ['alfa.ro'], ads_advertiser_ids: ['AR12345678'] }, { name: 'Beta', domain: null, listening_keywords: [], social_handles: [], ads_advertiser_ids: [] }] }
+    expect(await createSupabaseConfig(fake.client, NOW).createCompetitorSetVersion('b1', input)).toEqual({ kind: 'ready', data: { version: 1, effective_from: '2025-11-23', member_count: 2 } })
+    expect(fake.rpcs).toEqual([{ fn: 'create_competitor_set_version', args: { p_brand_id: 'b1', p_effective_from: '2025-11-23', p_note: 'Validat', p_members: [{ name: 'Alfa', domain: 'alfa.ro', listening_keywords: ['Alfa forte'], social_handles: ['alfa.ro'], ads_advertiser_ids: ['AR12345678'] }, { name: 'Beta', domain: null, listening_keywords: [], social_handles: [], ads_advertiser_ids: [] }] } }])
+    expect(fake.calls).toEqual([])
+  })
+
+  it('createCompetitorSetVersion: mesajul în română al funcției SQL ajunge în interfață; alte erori și forme greșite, mesaj generic', async () => {
+    const past = 'Data de la care se aplică versiunea nu poate fi în trecut (azi este 2026-11-23, Europe/Bucharest); doar prima versiune a setului poate începe în trecut'
+    const input = { effective_from: '2026-11-01', note: null, members: [{ name: 'Alfa', domain: null, listening_keywords: [], social_handles: [], ads_advertiser_ids: [] }] }
+    const refused = fakeDataClient({ rpc: () => ({ error: { code: '22023', message: past } }) })
+    expect(await createSupabaseConfig(refused.client, NOW).createCompetitorSetVersion('b1', input)).toEqual({ kind: 'error', message: past })
+    const internal = fakeDataClient({ rpc: () => ({ error: { code: 'XX000', message: 'relation "x" does not exist' } }) })
+    const r = await createSupabaseConfig(internal.client, NOW).createCompetitorSetVersion('b1', input)
+    expect(r.kind === 'error' && r.message).not.toMatch(/relation/)
+    const odd = fakeDataClient({ rpc: () => ({ data: [{ version: '1' }] }) })
+    expect((await createSupabaseConfig(odd.client, NOW).createCompetitorSetVersion('b1', input)).kind).toBe('error')
+  })
+
+  it('competitorSuggestions: funcția source-credentials, acțiunea competitor_suggestions; răspuns verificat', async () => {
+    const body = {
+      brand_id: 'b1',
+      planable: { outcome: 'ok', message: null, competitors: [{ platform: 'instagram', handle: 'alfa', name: 'Alfa', tracked_from: ['Brand'] }], pages_checked: 1, notes: [] },
+      seomonitor: { outcome: 'not_connected', message: 'Clientul nu are SEOmonitor conectat.', since: '2026-07-26', domains: [] },
+    }
+    const fake = fakeDataClient({ invoke: () => ({ data: body }) })
+    const r = await createSupabaseConfig(fake.client, NOW).competitorSuggestions('b1')
+    expect(fake.invocations).toEqual([{ name: 'source-credentials', body: { action: 'competitor_suggestions', brand_id: 'b1' } }])
+    expect(r).toEqual({ kind: 'ready', data: { planable: { outcome: 'ok', message: null, competitors: body.planable.competitors, notes: [] }, seomonitor: { outcome: 'not_connected', message: body.seomonitor.message, since: '2026-07-26', domains: [] } } })
+    const odd = fakeDataClient({ invoke: () => ({ data: { ...body, planable: { ...body.planable, outcome: 'maybe' } } }) })
+    expect((await createSupabaseConfig(odd.client, NOW).competitorSuggestions('b1')).kind).toBe('error')
+    const refused = fakeDataClient({ invoke: () => ({ error: { context: { json: async () => ({ error: 'Doar agency_admin al clientului poate gestiona sursele.' }) } } }) })
+    expect(await createSupabaseConfig(refused.client, NOW).competitorSuggestions('b1')).toEqual({ kind: 'error', message: 'Doar agency_admin al clientului poate gestiona sursele.' })
+  })
+
   it('aliasurile: „Sursă neconectată" cu motiv (nu există tabel)', async () => {
     const { client } = fakeDataClient()
     expect((await createSupabaseConfig(client, NOW).aliases('b1')).kind).toBe('not_connected')
