@@ -5,6 +5,7 @@ import { cn } from '../lib/cn'
 import { formatDate } from '../lib/format'
 import { CoverageBadge } from './CoverageBadge'
 import { InfoTip } from './ui/InfoTip'
+import { useShowSources } from './SourceVisibility'
 import { coverageStateFor } from '../lib/metricView'
 
 export interface StatCardProps {
@@ -40,6 +41,7 @@ const ICON = { up: ArrowUpRightIcon, down: ArrowDownRightIcon, flat: MinusIcon }
  */
 export function StatCard({ label, definition, valueText, deltaText = null, deltaDirection = null, goodWhen = 'neutral', status, note = null, compareLabel, loading = false, category, sourceLabel = null, dataAsOf = null, detail = null, emptyTitle = 'Fără date pentru interval' }: StatCardProps) {
   const empty = valueText === null
+  const showSources = useShowSources()
   const tone =
     !deltaDirection || deltaDirection === 'flat' || goodWhen === 'neutral' ? 'text-text-2' : (deltaDirection === goodWhen ? 'text-pos-text' : 'text-neg-text')
   const Icon = deltaDirection ? ICON[deltaDirection] : null
@@ -91,7 +93,7 @@ export function StatCard({ label, definition, valueText, deltaText = null, delta
         </div>
       )}
       <div className="mt-auto flex min-w-0 items-center gap-2 whitespace-nowrap border-t border-border pt-2.5 text-[11.5px] text-text-2 max-sm:col-start-2 max-sm:row-start-1 max-sm:mt-0 max-sm:min-h-6 max-sm:border-t-0 max-sm:pt-0">
-        {sourceLabel && <span className="flex-none font-semibold text-text max-sm:hidden">{sourceLabel}</span>}
+        {showSources && sourceLabel && <span className="flex-none font-semibold text-text max-sm:hidden">{sourceLabel}</span>}
         {dataAsOf && (
           <span className="min-w-0 overflow-hidden text-ellipsis max-sm:hidden">
             Date până la <span className="font-mono text-[11px]">{formatDate(dataAsOf)}</span>

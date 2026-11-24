@@ -5,6 +5,7 @@ import { formatDate, formatMetricValue } from '../lib/format'
 import { CoverageBadge } from './CoverageBadge'
 import { DataCard, DataCardList } from './ui/DataCard'
 import { InfoTip } from './ui/InfoTip'
+import { useShowSources } from './SourceVisibility'
 import { useIsPhone } from './ui/useIsPhone'
 import { coveragePercent, coverageStateFor } from '../lib/metricView'
 import { reasonFor } from '../lib/warnings'
@@ -131,6 +132,7 @@ function CellValue({ row, column, best }: { row: ComparisonRow; column: Comparis
 
 export function ComparisonTable({ caption, columns, groups, setVersion, effectiveFrom, dataAsOf, note, loading = false }: ComparisonTableProps) {
   const phone = useIsPhone()
+  const showSources = useShowSources()
   if (loading) {
     return <div role="status" aria-label="Se încarcă comparația" className="h-64 rounded-xl bg-skeleton" />
   }
@@ -178,7 +180,7 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
             <section key={g.name} aria-label={g.name} className="flex flex-col gap-2">
               <h3 className="text-[12.5px] font-semibold text-text">
                 {g.name}
-                {g.source && <span className="ml-2 font-normal text-text-2">Sursă: {g.source}</span>}
+                {showSources && g.source && <span className="ml-2 font-normal text-text-2">Sursă: {g.source}</span>}
               </h3>
               <DataCardList label={`${caption}: ${g.name}`}>
                 {g.rows.map((r) => {
@@ -230,7 +232,7 @@ export function ComparisonTable({ caption, columns, groups, setVersion, effectiv
                   <th scope="colgroup" colSpan={columns.length + 1} className="px-4 py-2 text-left text-[12px] font-semibold text-text">
                     <span className="sticky left-4">
                       {g.name}
-                      {g.source && <span className="ml-2 font-normal text-text-2">Sursă: {g.source}</span>}
+                      {showSources && g.source && <span className="ml-2 font-normal text-text-2">Sursă: {g.source}</span>}
                     </span>
                   </th>
                 </tr>

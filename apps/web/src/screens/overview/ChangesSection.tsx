@@ -3,6 +3,7 @@ import { StatusChip, type ChipTone } from '../../components/ui/Chip'
 import type { AsyncState } from '../../data/useAsync'
 import { formatDate, formatMetricValue, formatRange } from '../../lib/format'
 import { metricView } from '../../lib/metricView'
+import { useShowSources } from '../../components/SourceVisibility'
 import { sourceName } from '../../lib/sources'
 import { Section } from '../shared/Section'
 import { MIN_SIGNAL_PERCENT, changeSignals, type ChangeSignal } from './changes'
@@ -52,7 +53,7 @@ function Card({ kind, tone, title, rows, confirmation, action, empty }: { kind: 
 
 const linkCls = 'text-[13px] font-medium text-accent-text hover:underline'
 
-function signalCard(kind: 'Oportunitate' | 'Risc', s: ChangeSignal | null, onOpen: (s: ChangeSignal) => void, loading: boolean) {
+function signalCard(kind: 'Oportunitate' | 'Risc', s: ChangeSignal | null, onOpen: (s: ChangeSignal) => void, loading: boolean, showSources: boolean) {
   const tone: ChipTone = kind === 'Oportunitate' ? 'pos' : 'neg'
   if (!s) {
     return (
@@ -76,7 +77,7 @@ function signalCard(kind: 'Oportunitate' | 'Risc', s: ChangeSignal | null, onOpe
       title={`${s.definition.label}: ${v.deltaText ?? ''}`.trim()}
       rows={[
         ['Mărime', before ? `${before} → ${v.valueText}` : (v.valueText ?? '—')],
-        ['Sursă', s.item.source ? sourceName(s.item.source) : '—'],
+        ...(showSources ? ([['Sursă', s.item.source ? sourceName(s.item.source) : '—']] as Array<[string, React.ReactNode]>) : []),
         ['Perioadă', <span className="font-mono text-[12px]">{formatRange(s.item.evidence_query.period.start, s.item.evidence_query.period.end)}</span>],
         ...(cmp ? ([['Față de', <span className="font-mono text-[12px]">{formatRange(cmp.start, cmp.end)}</span>]] as Array<[string, React.ReactNode]>) : []),
       ]}
@@ -97,6 +98,7 @@ function signalCard(kind: 'Oportunitate' | 'Risc', s: ChangeSignal | null, onOpe
  */
 export function ChangesSection({ metrics, definitions, insights, onOpenMetric, onOpenEvidence }: Props) {
   const loading = metrics.status === 'loading'
+  const showSources = useShowSources()
   const signals = metrics.status === 'done' ? changeSignals(metrics.value.items, definitions) : { opportunity: null, risk: null }
 
   const latest = insights.status === 'done' && insights.value.kind === 'ready' ? latestPublished(insights.value.data) : null
@@ -129,8 +131,8 @@ export function ChangesSection({ metrics, definitions, insights, onOpenMetric, o
   return (
     <Section id="changes" title="Ce s-a schimbat" description="Trei semnale: cea mai mare variație favorabilă, cea mai mare variație nefavorabilă și următoarea decizie din analiza echipei. Semnalele automate nu sunt concluzii.">
       <ul className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-        {signalCard('Oportunitate', signals.opportunity, onOpenMetric, loading)}
-        {signalCard('Risc', signals.risk, onOpenMetric, loading)}
+        {signalCard('Oportunitate', signals.opportunity, onOpenMetric, loading, showSources)}
+        {signalCard('Risc', signals.risk, onOpenMetric, loading, showSources)}
         {decision}
       </ul>
     </Section>

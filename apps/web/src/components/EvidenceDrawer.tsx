@@ -5,6 +5,7 @@ import { coveragePercent, metricView } from '../lib/metricView'
 import { sourceName } from '../lib/sources'
 import { CoverageBadge } from './CoverageBadge'
 import { EmptyState } from './EmptyState'
+import { useShowSources } from './SourceVisibility'
 import { Button } from './ui/Button'
 import { Dialog } from './ui/Dialog'
 
@@ -37,6 +38,7 @@ function Row({ term, children }: { term: string; children: React.ReactNode }) {
 /** Dovada din spatele unui indicator: definiție, sursă, interval, acoperire, formulă și înregistrări. */
 export function EvidenceDrawer({ open, onClose, page, label, metric, definition, period, evidence, onRetry, connectAction, onCopyHash }: EvidenceDrawerProps) {
   const view = metric ? metricView(metric) : null
+  const showSources = useShowSources()
 
   return (
     <Dialog open={open} onClose={onClose} title="Dovezi" placement="right">
@@ -74,7 +76,7 @@ export function EvidenceDrawer({ open, onClose, page, label, metric, definition,
         )}
 
         <dl className="divide-y divide-border">
-          {metric?.source && <Row term="Sursă">{sourceName(metric.source)}</Row>}
+          {showSources && metric?.source && <Row term="Sursă">{sourceName(metric.source)}</Row>}
           <Row term="Interval">{formatRange(period.from, period.to)}</Row>
           {metric?.data_as_of && <Row term="Date până la"><span className="font-mono text-[12px]">{formatDate(metric.data_as_of)}</span></Row>}
           {metric && (

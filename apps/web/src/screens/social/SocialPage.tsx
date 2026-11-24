@@ -3,6 +3,7 @@ import { SOCIAL_FORMATS, SOCIAL_PLATFORMS } from '../../contracts'
 import { useProviders } from '../../data/DataProvidersContext'
 import { ctxKey } from '../../data/hooks'
 import { useAsync } from '../../data/useAsync'
+import { useShowSources } from '../../components/SourceVisibility'
 import { formatDate, formatDateTime } from '../../lib/format'
 import { useLayout } from '../../routing/AppLayout'
 import { BRAND_MODULES } from '../../routing/modules'
@@ -35,6 +36,7 @@ export function SocialPage() {
 
 function SocialContent({ brand, ctx, canImport }: { brand: Brand; ctx: QueryContext; canImport: boolean }) {
   const providers = useProviders()
+  const showSources = useShowSources()
   const f = socialFiltersFrom(ctx)
   const key = ctxKey(ctx)
   const summary = useAsync(() => providers.social.summary(ctx, f), [providers, key])
@@ -55,7 +57,7 @@ function SocialContent({ brand, ctx, canImport }: { brand: Brand; ctx: QueryCont
       <p className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-border bg-surface px-4 py-3 text-[12.5px] text-text-2 shadow-1">
         <span>Date până la <span className="font-mono text-[12px] text-text">{formatDate(s.data_as_of)}</span></span>
         <span>Importat la <span className="font-mono text-[12px] text-text">{formatDateTime(s.imported_at)}</span></span>
-        <span>Sursă <strong className="font-semibold text-text">Planable</strong></span>
+        {showSources && <span>Sursă <strong className="font-semibold text-text">Planable</strong></span>}
       </p>
       <SocialKpis kpis={s.kpis} ctx={ctx} />
       <PostsSection state={posts.state} onRetry={posts.reload} brandName={brand.name} />

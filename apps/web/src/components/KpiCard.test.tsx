@@ -3,10 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { metric, warning } from '../test/factories'
 import { KpiCard, type KpiCardProps } from './KpiCard'
+import { SourceVisibilityProvider } from './SourceVisibility'
 
-function setup(over: Partial<KpiCardProps> = {}) {
+function setup(over: Partial<KpiCardProps> = {}, { showSources = true } = {}) {
   const onOpen = vi.fn()
-  const utils = render(<KpiCard label="Sesiuni" definition="Numărul de sesiuni GA4 în perioadă." metric={metric()} onOpen={onOpen} compareLabel="față de perioada anterioară" {...over} />)
+  const utils = render(<KpiCard label="Sesiuni" definition="Numărul de sesiuni GA4 în perioadă." metric={metric()} onOpen={onOpen} compareLabel="față de perioada anterioară" {...over} />, {
+    wrapper: ({ children }) => <SourceVisibilityProvider visible={showSources}>{children}</SourceVisibilityProvider>,
+  })
   return { onOpen, ...utils }
 }
 
@@ -18,6 +21,13 @@ describe('KpiCard, stări', () => {
     expect(screen.getByText('Google Analytics 4')).toBeInTheDocument()
     expect(screen.getByText(/Date până la/)).toBeInTheDocument()
     expect(screen.getByText('Complet')).toBeInTheDocument()
+  })
+
+  it('fără drept de a vedea sursele (alt rol decât administratorul agenției): fără numele sursei, restul rămâne', () => {
+    setup({}, { showSources: false })
+    expect(screen.queryByText('Google Analytics 4')).toBeNull()
+    expect(screen.getByText('1.240')).toBeInTheDocument()
+    expect(screen.getByText(/Date până la/)).toBeInTheDocument()
   })
 
   it('emptyReason înlocuiește doar motivul stării goale; o valoare existentă nu e ascunsă', () => {

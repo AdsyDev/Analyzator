@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { Evidence, MetricDefinition, ProviderResult } from '../contracts'
 import { evidenceQuery, metric, warning } from '../test/factories'
 import { EvidenceDrawer, type EvidenceDrawerProps } from './EvidenceDrawer'
+import { SourceVisibilityProvider } from './SourceVisibility'
 
 const definition: MetricDefinition = {
   metric_key: 'ga4_sessions',
@@ -31,7 +32,7 @@ const evidence: Evidence = {
   payload_hash: 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
 }
 
-function setup(over: Partial<EvidenceDrawerProps> = {}) {
+function setup(over: Partial<EvidenceDrawerProps> = {}, { showSources = true } = {}) {
   const onClose = vi.fn()
   render(
     <EvidenceDrawer
@@ -45,6 +46,7 @@ function setup(over: Partial<EvidenceDrawerProps> = {}) {
       evidence={{ kind: 'ready', data: evidence }}
       {...over}
     />,
+    { wrapper: ({ children }) => <SourceVisibilityProvider visible={showSources}>{children}</SourceVisibilityProvider> },
   )
   return { onClose }
 }
@@ -66,6 +68,14 @@ describe('EvidenceDrawer', () => {
     expect(dlg).toHaveTextContent('Numărul de sesiuni GA4 în perioadă; suma zilelor.')
     expect(dlg).toHaveTextContent('v1')
     expect(dlg).toHaveTextContent('docs/metrics/registry.md#ga4_sessions')
+  })
+
+  it('fără drept de a vedea sursele: fără rândul „Sursă”; intervalul și „Date până la” rămân', () => {
+    setup({}, { showSources: false })
+    const dlg = screen.getByRole('dialog', { name: 'Dovezi' })
+    expect(dlg).not.toHaveTextContent('Google Analytics 4')
+    expect(within(dlg).queryByText('Sursă', { selector: 'dt' })).toBeNull()
+    expect(dlg).toHaveTextContent('Date până la')
   })
 
   it('înregistrări: ultimele N din total, lipsa ca „Fără date", „Importat la" și hash', () => {
