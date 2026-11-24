@@ -109,6 +109,13 @@ describe('Overview: compoziția din macheta propunerii', () => {
     expect(items.map((i) => i.querySelector('span')?.textContent)).toEqual(['SEOmonitor', 'Search Console', 'Google Analytics 4', 'Planable'])
     expect(strip).toHaveTextContent('Următoarea actualizare estimată')
   })
+
+  it.each(['client_viewer', 'strategist', 'account'] as const)('%s nu vede starea datelor și nici numele surselor pe carduri', async (role) => {
+    setup({ role })
+    await loaded()
+    expect(screen.queryByRole('region', { name: 'Starea datelor' })).toBeNull()
+    for (const name of ['SEOmonitor', 'Search Console', 'Google Analytics 4', 'Planable']) expect(screen.queryByText(name, { exact: true })).toBeNull()
+  })
 })
 
 describe('Overview: cei șase indicatori', () => {

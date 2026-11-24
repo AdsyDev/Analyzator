@@ -7,6 +7,7 @@ import { coveragePercent, isGoodChange, metricView, type DeltaDirection } from '
 import { sourceName } from '../lib/sources'
 import { sparkPaths } from '../lib/spark'
 import { CoverageBadge } from './CoverageBadge'
+import { useShowSources } from './SourceVisibility'
 import { Button } from './ui/Button'
 import { InfoTip } from './ui/InfoTip'
 
@@ -56,6 +57,7 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
   const view = base && !base.hasValue ? { ...base, emptyReason: emptyReason ?? base.emptyReason, emptyTitle: emptyTitle ?? base.emptyTitle } : base
   const paths = spark ? sparkPaths(spark) : { line: '', area: '' }
   const state = loading ? 'loading' : error ? 'error' : 'ready'
+  const showSources = useShowSources()
 
   // Sub `sm` (telefon), cardul e compact, pe două rânduri: eticheta și acoperirea sus, valoarea, variația și un
   // sparkline mic jos. Sursa, „Date până la" și perioada de comparație rămân în EvidenceDrawer; stările nu se schimbă.
@@ -166,7 +168,7 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
       </div>
 
       <div className="pointer-events-none relative mt-auto flex min-w-0 items-center gap-2 whitespace-nowrap border-t border-border pt-2.5 text-[11.5px] text-text-2 max-sm:col-start-2 max-sm:row-start-1 max-sm:mt-0 max-sm:min-h-6 max-sm:border-t-0 max-sm:pt-0">
-        {metric?.source && <span className="flex-none font-semibold text-text max-sm:hidden">{sourceName(metric.source)}</span>}
+        {showSources && metric?.source && <span className="flex-none font-semibold text-text max-sm:hidden">{sourceName(metric.source)}</span>}
         {metric?.data_as_of && (
           <span className="min-w-0 overflow-hidden text-ellipsis max-sm:hidden">
             Date până la <span className="font-mono text-[11px]">{formatDate(metric.data_as_of)}</span>

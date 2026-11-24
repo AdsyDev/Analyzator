@@ -3,6 +3,7 @@ import { Link, Outlet, useLocation, useMatch, useNavigate, useOutletContext, use
 import { useAuth, useUser } from '../auth/AuthContext'
 import { AppShell } from '../components/AppShell'
 import { ModuleFreshness } from '../components/ModuleFreshness'
+import { SourceVisibilityProvider } from '../components/SourceVisibility'
 import { FilterBar } from '../components/FilterBar'
 import type { Brand, ProviderResult, QueryContext, SessionUser } from '../contracts'
 import type { FilterBarChange } from '../components/FilterBar'
@@ -153,7 +154,8 @@ export function AppLayout() {
     () => (shellBrand ? providers.sources.statuses(shellBrand.id) : Promise.resolve(null)),
     [providers, shellBrand?.id, user.role],
   )
-  // Actualitatea pe sursă e vizibilă și clientului (vederea `source_freshness`); starea conexiunilor, doar agenției.
+  // Actualitatea pe sursă (vederea `source_freshness`) dă clientului „Date până la” din topbar; fâșia pe sursă o vede
+  // doar administratorul agenției. Starea conexiunilor, doar agenției.
   const { state: freshnessState } = useAsync(
     () => (shellBrand ? providers.sources.freshness(shellBrand.id) : Promise.resolve(null)),
     [providers, shellBrand?.id, user.role],
@@ -194,9 +196,10 @@ export function AppLayout() {
     content = <NoAccessPage homeBrandId={homeBrandId} />
   } else {
     const context: LayoutContext = { user, brands, brand: urlBrand, activeBrand: shellBrand, ctx, homeBrandId, changeFilters: change, reloadBrands, selectBrand: onBrandChange, aiPanel: { open: aiOpen, setOpen: setAiOpen, container: aiContainer } }
-    // Starea datelor apare pe fiecare modul de brand care depinde de surse; cât nu se poate citi, nu ocupă loc.
-    // Structura rămâne aceeași cu sau fără fâșie, ca pagina să nu se remonteze (și să nu-și reia cererile) când apare.
-    const showFreshness = module && urlBrand && module.sources.length > 0 && freshnessState.status !== 'failed' && (freshnessState.status === 'loading' || freshness !== null)
+    // Starea datelor apare pe fiecare modul de brand care depinde de surse, doar pentru administratorul agenției
+    // (cererea din 24 nov. 2026); cât nu se poate citi, nu ocupă loc. Structura rămâne aceeași cu sau fără fâșie,
+    // ca pagina să nu se remonteze (și să nu-și reia cererile) când apare.
+    const showFreshness = isAdmin && module && urlBrand && module.sources.length > 0 && freshnessState.status !== 'failed' && (freshnessState.status === 'loading' || freshness !== null)
     content = (
       <div className="flex min-w-0 flex-col gap-5">
         {showFreshness ? <ModuleFreshness sources={module.sources} freshness={freshness} syncedAt={lastRefreshAt} /> : null}
@@ -207,6 +210,7 @@ export function AppLayout() {
   }
 
   return (
+    <SourceVisibilityProvider visible={isAdmin}>
     <AppShell
       user={user}
       brands={brandsResult}
@@ -242,5 +246,6 @@ export function AppLayout() {
     >
       {content}
     </AppShell>
+    </SourceVisibilityProvider>
   )
 }
