@@ -6,10 +6,10 @@ import { pageReady, renderApp } from '../../test/renderApp'
 
 const URINAL = '/brands/brand-urinal/competition'
 
-describe('Concurență', () => {
+describe('Competiție', () => {
   it('matricea arată versiunea setului, data efectivă și grupurile', async () => {
     renderApp({ route: URINAL })
-    await pageReady('Concurență')
+    await pageReady('Competiție')
     const s = (await screen.findByRole('heading', { level: 2, name: 'Matricea comparativă' })).closest('section')!
     const table = await within(s).findByRole('table')
     expect(table).toBeInTheDocument()
@@ -19,23 +19,23 @@ describe('Concurență', () => {
     expect(s).toHaveTextContent(/N\/A/)
   })
 
-  it('tabelul „Unde apare concurența și noi lipsim" se încarcă', async () => {
+  it('tabelul „Unde apare competiția și noi lipsim" se încarcă', async () => {
     renderApp({ route: URINAL })
-    await pageReady('Concurență')
-    const s = (await screen.findByRole('heading', { level: 2, name: /Unde apare concurența/ })).closest('section')!
+    await pageReady('Competiție')
+    const s = (await screen.findByRole('heading', { level: 2, name: /Unde apare competiția/ })).closest('section')!
     expect(await within(s).findAllByRole('row')).not.toHaveLength(0)
   })
 
   it('cu providerul real: „Sursă neconectată" cu motiv, fără date', async () => {
     renderApp({ route: URINAL, wrap: (b) => ({ ...b, competition: createSupabaseProviders().competition }) })
-    await pageReady('Concurență')
+    await pageReady('Competiție')
     expect((await screen.findAllByText(/neconectat/i)).length).toBeGreaterThan(0)
     expect(screen.queryByRole('table', { name: 'Comparație cu competitorii' })).toBeNull()
   })
 
   it('reclamele competitorilor: fără colectare, „Sursă neconectată” cu motivul', async () => {
     renderApp({ route: URINAL, wrap: (b) => ({ ...b, competition: { ...b.competition, ads: async () => notConnected('Reclamele competitorilor nu au fost încă colectate din Google Ads Transparency Center.') } }) })
-    await pageReady('Concurență')
+    await pageReady('Competiție')
     const s = (await screen.findByRole('heading', { level: 2, name: 'Reclamele competitorilor' })).closest('section')!
     expect(await within(s).findByText(/nu au fost încă colectate/)).toBeInTheDocument()
     expect(within(s).queryByRole('table')).toBeNull()
@@ -48,7 +48,7 @@ describe('Concurență', () => {
       source_url: 'https://adstransparency.google.com/advertiser/AR11111/creative/CR1?region=RO',
     }
     renderApp({ route: URINAL, wrap: (b) => ({ ...b, competition: { ...b.competition, ads: async (_ctx, p) => ready({ items: [ad], total: 1, page: p.page, page_size: p.page_size, data_as_of: '2026-10-07' }) } }) })
-    await pageReady('Concurență')
+    await pageReady('Competiție')
     const s = (await screen.findByRole('heading', { level: 2, name: 'Reclamele competitorilor' })).closest('section')!
     const table = await within(s).findByRole('table', { name: 'Reclamele competitorilor' })
     expect(table).toHaveTextContent('Uronova')

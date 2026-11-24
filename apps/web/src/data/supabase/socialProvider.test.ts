@@ -43,7 +43,7 @@ describe('createSupabaseSocial', () => {
     expect(rpcs).toHaveLength(0)
   })
 
-  it('concurența publică vine din Planable Competitors (SQL); fără colectare, „Sursă neconectată”, nu zero', async () => {
+  it('competiția publică vine din Planable Competitors (SQL); fără colectare, „Sursă neconectată”, nu zero', async () => {
     const items = [
       { label: 'C1', name: 'Prostamol', posts_per_week: 1.05, followers: 1010, public_interactions_per_post: 30, as_of: '2026-10-06', status: 'ok', reason: null },
       { label: 'C2', name: 'Uronova', posts_per_week: null, followers: null, public_interactions_per_post: null, as_of: null, status: 'unavailable', reason: 'Niciun profil' },

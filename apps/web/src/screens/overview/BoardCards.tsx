@@ -265,7 +265,7 @@ export function CompetitorsCard({ matrix, onRetry, href }: { matrix: AsyncState<
   else {
     const m = matrix.value.data
     const row = positionRows(m).find((p) => p.dimension === 'ai')?.row
-    if (!row) body = <p className="text-[13px] text-text-2">Matricea de Concurență nu are un indicator AI pentru acest brand.</p>
+    if (!row) body = <p className="text-[13px] text-text-2">Matricea de Competiție nu are un indicator AI pentru acest brand.</p>
     else {
       description = `Brand / ${row.label}. Ce sursa nu oferă rămâne N/A, nu zero.`
       const rows = m.entities.map((e) => ({ e, cell: row.cells[e.id] })).sort((a, b) => (b.cell?.value ?? -1) - (a.cell?.value ?? -1))

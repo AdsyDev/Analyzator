@@ -122,7 +122,7 @@ describe('ComparisonTable', () => {
     expect(within(row).getAllByText('N/A')).toHaveLength(1)
   })
 
-  it('celulă din matricea de Concurență (CompetitionCell): valoare, parțial cu motiv în subsol, N/A cu motiv', () => {
+  it('celulă din matricea de Competiție (CompetitionCell): valoare, parțial cu motiv în subsol, N/A cu motiv', () => {
     const g: ComparisonGroup[] = [
       {
         name: 'SEO',

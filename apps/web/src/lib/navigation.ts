@@ -28,7 +28,7 @@ export const BRAND_NAV: readonly NavItem[] = [
   { segment: 'listening', label: 'Listening', icon: 'Ear' },
   // Jurnalul PV e doar pentru agency_admin (B7-14, brief cap. 6); clientul nu îl vede.
   { segment: 'pharmacovigilance', label: 'Farmacovigilență', icon: 'FirstAidKit', parent: 'listening', roles: ['agency_admin'] },
-  { segment: 'competition', label: 'Concurență', icon: 'Scales' },
+  { segment: 'competition', label: 'Competiție', icon: 'Scales' },
   { segment: 'insights', label: 'Analize și acțiuni', icon: 'Notebook' },
   { segment: 'reports', label: 'Rapoarte', icon: 'FileText' },
   { segment: 'assistant', label: 'AdSy AI', icon: 'Sparkle' },

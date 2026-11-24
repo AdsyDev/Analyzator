@@ -15,7 +15,7 @@ async function main(): Promise<void> {
     for (const e of o.errors.filter((x) => !x.code.startsWith('parser_'))) console.log(`  ${e.code}${e.dimension ? ` [${e.dimension}]` : ''}: ${e.message}`)
     // Mențiunile sărite sunt note, dar schimbă câte mențiuni apar în aplicație: se scriu mereu, pe rețea și motiv.
     for (const e of o.errors.filter((x) => x.dimension === MENTIONS_SKIPPED || x.dimension === MENTIONS_WITHOUT_LINK)) console.log(`  ${e.message}`)
-    // Atribuirea pe competitori: ce apare în Concurență și ce nu, cu motivul.
+    // Atribuirea pe competitori: ce apare în Competiție și ce nu, cu motivul.
     for (const e of o.errors.filter((x) => x.dimension === ATTRIBUTION)) console.log(`  ${e.message}`)
     if (o.status === 'failed') failed++
   }

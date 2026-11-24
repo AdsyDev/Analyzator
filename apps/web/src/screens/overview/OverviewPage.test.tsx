@@ -155,7 +155,7 @@ describe('Overview: cei șase indicatori', () => {
     expect(c.textContent).not.toMatch(/%/)
   })
 
-  it('poziția competitivă e locul brandului în set pe AI, din matricea de Concurență; nu e un scor', async () => {
+  it('poziția competitivă e locul brandului în set pe AI, din matricea de Competiție; nu e un scor', async () => {
     setup()
     await loaded()
     const c = card(NAMES.position)

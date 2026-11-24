@@ -36,7 +36,7 @@ describe('Social cu import', () => {
     renderApp({ route: MINI })
     await open()
     expect(await screen.findByTestId('social-kpis')).toBeInTheDocument()
-    for (const h of ['Performanța conținutului', 'Topic și format', 'Calendar', 'Concurență publică']) expect(await screen.findByRole('heading', { level: 2, name: h })).toBeInTheDocument()
+    for (const h of ['Performanța conținutului', 'Topic și format', 'Calendar', 'Competiție publică']) expect(await screen.findByRole('heading', { level: 2, name: h })).toBeInTheDocument()
     expect(screen.getByText(/Sursă/).closest('p')).toHaveTextContent('Planable')
   })
 
@@ -146,10 +146,10 @@ describe('Social cu import', () => {
     expect(within(s).getAllByText('Sezon rece').length).toBeGreaterThan(0)
   })
 
-  it('concurența publică: valorile lipsă sunt „Fără date", nu zero; fără reach privat', async () => {
+  it('competiția publică: valorile lipsă sunt „Fără date", nu zero; fără reach privat', async () => {
     renderApp({ route: MINI })
     await open()
-    const s = await section('Concurență publică')
+    const s = await section('Competiție publică')
     const table = await within(s).findByRole('table')
     const c3 = within(table).getByRole('rowheader', { name: /Multikinder/ }).closest('tr')!
     expect(within(c3).getAllByText('Fără date')).toHaveLength(3)

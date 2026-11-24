@@ -283,7 +283,7 @@ describe('fixtures Social', () => {
     expect(cal.data.length).toBe(12)
   })
 
-  it('concurența publică: valori lipsă sunt null (nu 0) și numele din setul brandului', async () => {
+  it('competiția publică: valori lipsă sunt null (nu 0) și numele din setul brandului', async () => {
     const r = await make().social.competitors(ctx(MINI))
     if (r.kind !== 'ready') throw new Error('comp')
     expect(r.data.map((c) => c.name)).toEqual(['Kidvitto', 'Junivita', 'Multikinder'])
