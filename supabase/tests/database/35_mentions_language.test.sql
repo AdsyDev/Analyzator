@@ -1,4 +1,4 @@
--- Listening doar în română (deciziile AA). Date SINTETICE, doar aici; textele de test imită mențiunile reale din 23 nov. 2026.
+-- Listening doar în română (deciziile AC). Date SINTETICE, doar aici; textele de test imită mențiunile reale din 23 nov. 2026.
 -- T1 = 1000…0001 · brand 1A = 2000…0011 · admin T1 = 3000…0001 · client T1 (acces 1A) = 3000…0004 · client T2 = 3000…0011
 begin;
 create extension if not exists pgtap with schema extensions;

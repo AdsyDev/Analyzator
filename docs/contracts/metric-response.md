@@ -17,13 +17,13 @@ Un răspuns are forma `{ data, meta }`. `data` e o listă de metrici; fiecare ar
 | `currency` | cod ISO 4217 sau null | Moneda lotului de import (de exemplu `RON`). **Obligatoriu (non-null) când `unit = currency` și `value` nu e null**; null pentru orice altă unitate. Dacă moneda nu se poate stabili (observații fără monedă) sau perioada are monede diferite, metrica e `unavailable`, cu `value` null. |
 | `numerator` | număr sau null | Pentru rate și medii ponderate: numărătorul agregat (de exemplu, clicks). |
 | `denominator` | număr sau null | Numitorul agregat (de exemplu, impressions sau sesiuni). |
-| `comparison_value` | număr sau null | Aceeași metrică pe perioada de comparație. |
+| `comparison_value` | număr sau null | Aceeași metrică pe perioada de comparație efectivă (`evidence_query.comparison_period`; vezi „Zile lipsă la sfârșitul perioadei”). |
 | `absolute_change` | număr sau null | `value − comparison_value`. Pentru `unit = percent` e în **puncte procentuale**. |
 | `relative_change` | număr sau null | `100 × (value − comparison_value) / |comparison_value|`, în procente. Null pe bază zero. |
 | `status` | vezi „Statusuri" | Cea mai gravă condiție aplicabilă. Celelalte condiții apar în `meta.warnings`. |
 | `data_as_of` | dată ISO sau null | Ultima zi cu date pentru metrica asta (sursele diferă între ele). |
 | `coverage` | 0–1 sau null | Zile confirmate / zile din perioadă; 1 sau 0 pentru ultima observație și raportul pe interval. |
-| `evidence_query` | obiect | Referință stabilă: `metric_key`, `version`, `brand_id`, `period`, `comparison_period`. EvidenceDrawer o rezolvă ulterior. |
+| `evidence_query` | obiect | Referință stabilă: `metric_key`, `version`, `brand_id`, `period`, `comparison_period`. `comparison_period` e intervalul folosit efectiv pentru `comparison_value` (poate fi mai scurt decât `meta.comparison_period`, AB). EvidenceDrawer o rezolvă ulterior. |
 
 **Diferență față de spec cap. 26 (decizie 7 oct 2026):** spec-ul pune `data_as_of` și `coverage` doar în `meta`. Brief cap. 4 le pune pe metrică. Le păstrăm în ambele locuri: în `meta` ca rezumat (cea mai veche dată, cea mai mică acoperire) și pe fiecare metrică, pentru că pe Overview sursele au date diferite.
 
@@ -66,6 +66,7 @@ Ordinea = gravitatea; se alege prima condiție îndeplinită.
 | `no_confirmed_data`, `interval_report_missing`, `no_observation`, `duplicate_observations`, `zero_denominator`, `zero_not_confirmed` | warning | Motivul unei valori null |
 | `excluded_rows` | warning | `detail = { reason, count }`, de exemplu `missing_weight`, `outside_period`, `interval_mismatch` |
 | `comparison_unavailable`, `comparison_partial` | warning | Comparația nu e calculabilă sau e parțială |
+| `comparison_matched` | info | (AB) Perioada curentă nu are date până la final, deci comparația ia aceeași porțiune din perioada de referință; `detail = { days, comparison_period }` |
 | `incomplete_period` | info | MTD, YTD sau perioadă care include ziua curentă; `detail = "perioadă incompletă"` |
 | `aggregation_label` | info | Eticheta agregării din registru (de exemplu „medie în perioadă") |
 | `definition_draft` | info | Definiție neconfirmată pe date reale; `detail` = motivul |
@@ -86,6 +87,15 @@ Ordinea = gravitatea; se alege prima condiție îndeplinită.
 | `custom` | perioada anterioară de aceeași lungime | implicit |
 | `mtd` | aceeași porțiune din luna anterioară | perioada e marcată „incompletă” |
 | `yoy` | același interval, cu un an înainte (29 feb. → 28 feb.) | din 10 nov. 2026 (H-1); perioada rămâne una obișnuită, nu „incompletă” |
+
+### Zile lipsă la sfârșitul perioadei (AB, 24 nov 2026)
+
+Când perioada curentă are date doar până la o zi `data_as_of` dinaintea sfârșitului ei (sursa n-a adus încă ultimele zile), comparația se oprește la aceeași poziție în perioada de referință: de la începutul ei, `data_as_of − start + 1` zile. E aceeași regulă ca la MTD (spec 2.3, „aceeași porțiune din perioada de referință”), aplicată pe zilele cu date. Exemplu: perioada 26 oct – 22 nov 2026 cu date până pe 14 nov (20 de zile) se compară cu 28 sept – 17 oct, nu cu 28 sept – 25 oct.
+
+- Se aplică doar agregărilor pe zile (`sum`, `ratio`, `weighted_mean`) și doar când zilele confirmate sunt mai puține decât zilele perioadei. `last_observation` și `interval_report_only` nu se scurtează; nici o perioadă cu goluri doar la mijloc (rămâne `partial`).
+- Perioada afișată, `value`, `coverage` și `status` nu se schimbă: valoarea curentă rămâne `partial`.
+- Intervalul efectiv apare în `evidence_query.comparison_period` și în avertismentul `comparison_matched`; `meta.comparison_period` rămâne cel din contextul cererii.
+- Regula: `metrics.matched_comparison_period(start, end, kind, aggregation, confirmed_days, data_as_of)`. Cine apelează `metrics.compute` citește observațiile comparației pe intervalul întors și îl declară în `comparison.period`; altfel `metrics.compute` refuză cu `22023` (zilele confirmate ale comparației trebuie numărate pe același interval).
 
 `metrics.comparison_period` mai are `ytd` (folosit la îngheț, nu de ecrane). Un tip necunoscut e refuzat cu `22023`. Forma răspunsului
 nu se schimbă: `comparison_period` din `meta` spune intervalul folosit, iar unde sursa nu are date atât de vechi, `comparison_value`,

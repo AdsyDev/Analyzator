@@ -75,7 +75,7 @@ export interface Page<T> {
  * O pagină din feed-ul de mențiuni. `items` și `total` cuprind doar mențiunile cu conținut (link sau text);
  * `without_content` numără, pe aceeași perioadă, sursă și autor, mențiunile pe care sursa le-a trimis fără niciunul
  * (mențiunile web din Planable). Acestea nu au ce afișa și nu pot fi revizuite, dar sunt numărate la „Mențiuni”.
- * `other_language` numără mențiunile cu conținut lăsate deoparte pentru că sunt în altă limbă decât româna (deciziile AA).
+ * `other_language` numără mențiunile cu conținut lăsate deoparte pentru că sunt în altă limbă decât româna (deciziile AC).
  */
 export interface MentionPage extends Page<Mention> {
   without_content: number
@@ -98,7 +98,7 @@ export interface SentimentDistribution {
   without_content: number
   /** Postări din conturile proprii, excluse din distribuție (D-22). */
   owned_excluded: number
-  /** Mențiuni externe cu conținut în altă limbă decât româna, excluse din Listening (deciziile AA). */
+  /** Mențiuni externe cu conținut în altă limbă decât româna, excluse din Listening (deciziile AC). */
   other_language: number
   /** Procente din `total`; `null` când `total` e 0. */
   shares: { positive: number | null; neutral: number | null; negative: number | null }

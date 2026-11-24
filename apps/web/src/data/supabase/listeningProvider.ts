@@ -36,7 +36,7 @@ export function createSupabaseMentions(client: DataClient): MentionsProvider {
       const { data, error } = await client.rpc('brand_mentions', {
         p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to,
         p_sentiment: q.sentiment, p_source: q.source, p_page: q.page, p_page_size: q.page_size, p_author: q.author ?? 'all',
-        // Implicit serverul arată doar româna (deciziile AA); „toate limbile” se cere explicit.
+        // Implicit serverul arată doar româna (deciziile AC); „toate limbile” se cere explicit.
         ...(q.language === 'all' ? { p_language: 'all' } : {}),
       })
       if (error) return failed(rpcError(error))

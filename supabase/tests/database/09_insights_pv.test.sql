@@ -172,7 +172,8 @@ select is((select count(*)::int from public.insight_snapshots where insight_id =
 select is((select (result -> 'metric' ->> 'value')::numeric from public.insight_snapshots where insight_id = pg_temp.id('A')), 70::numeric, 'P2: snapshot = metrics.compute: 7 zile × 10 clicks');
 select is((select (result -> 'metric' ->> 'comparison_value')::numeric from public.insight_snapshots where insight_id = pg_temp.id('A')), 35::numeric, 'P2: comparația = perioada anterioară de aceeași lungime');
 select is((select (result -> 'metric' ->> 'absolute_change')::numeric from public.insight_snapshots where insight_id = pg_temp.id('A')), 35::numeric, 'P2: variația absolută');
-select is((select metric_definition_version from public.insight_snapshots where insight_id = pg_temp.id('A')), 1, 'P2: versiunea definiției e păstrată');
+select is((select metric_definition_version from public.insight_snapshots where insight_id = pg_temp.id('A')),
+  (select version from public.metric_definitions_current where metric_key = 'gsc_clicks'), 'P2: versiunea definiției (cea curentă la publicare) e păstrată');
 select is((select count(*)::int from public.insight_transitions where insight_id = pg_temp.id('A')), 4, 'P2: jurnalul de tranziții are cele 4 evenimente');
 select results_eq(
   $$ select from_status || '>' || to_status from public.insight_transitions where insight_id = pg_temp.id('A') order by id $$,

@@ -18,7 +18,7 @@ const ownedNote = (n: number) => (n > 0 ? ` ${n === 1 ? 'O postare' : `${n} post
 /** Câte mențiuni au venit fără text și fără link: nu au ce revizui, deci nu intră nici în procente, nici la „așteaptă revizuirea”. */
 const noContentNote = (n: number) => (n > 0 ? ` ${n === 1 ? 'O mențiune a venit' : `${formatInteger(n)} mențiuni au venit`} de la sursă fără text și fără link și nu ${n === 1 ? 'poate fi revizuită' : 'pot fi revizuite'}.` : '')
 
-/** Câte mențiuni externe sunt în altă limbă decât româna și nu intră în Listening (deciziile AA). */
+/** Câte mențiuni externe sunt în altă limbă decât româna și nu intră în Listening (deciziile AC). */
 const otherLanguageNote = (n: number) => (n > 0 ? ` ${n === 1 ? 'O mențiune e' : `${formatInteger(n)} mențiuni sunt`} în altă limbă decât româna și nu ${n === 1 ? 'e inclusă' : 'sunt incluse'}.` : '')
 
 export function SentimentSection({ state, onRetry }: { state: AsyncState<ProviderResult<SentimentDistribution>>; onRetry: () => void }) {

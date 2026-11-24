@@ -1,4 +1,4 @@
--- Listening doar în limba română (deciziile AA din docs/decisions.md, cererea din 23 nov. 2026).
+-- Listening doar în limba română (deciziile AC din docs/decisions.md, cererea din 23 nov. 2026).
 --
 -- Planable Listening găsește cuvântul urmărit („Proenzi”) în orice limbă: maghiară, spaniolă, vietnameză, arabă.
 -- Planable nu trimite limba mențiunii (câmpurile primite: platform, publishedAt, url, text, sentiment, author, engagement),
@@ -234,7 +234,7 @@ begin
     raise exception 'Filtru de limbă necunoscut' using errcode = '22023';
   end if;
   -- Conturile proprii nu intră în distribuție (D-22): sentimentul arată ce spun alții despre brand. Implicit, nici
-  -- mențiunile în altă limbă (deciziile AA); ele se numără în `other_language`.
+  -- mențiunile în altă limbă (deciziile AC); ele se numără în `other_language`.
   select count(*) filter (where x.counted and x.sentiment_reviewed_by is not null and x.sentiment in ('positive', 'neutral', 'negative')) as total,
          count(*) filter (where x.counted and x.sentiment_reviewed_by is not null and x.sentiment = 'positive') as positive,
          count(*) filter (where x.counted and x.sentiment_reviewed_by is not null and x.sentiment = 'neutral') as neutral,
