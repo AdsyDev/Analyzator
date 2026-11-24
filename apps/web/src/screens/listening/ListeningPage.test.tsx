@@ -120,6 +120,7 @@ describe('Listening', () => {
       const note = await within(feed()).findByRole('note')
       expect(note).toHaveTextContent('5 mențiuni din perioadă sunt în altă limbă decât româna și nu sunt afișate.')
       expect(note).toHaveTextContent('Pentru verificarea de farmacovigilență, alege „Limbă: Toate limbile”.')
+      expect(note).toHaveTextContent('Mențiunile în altă limbă nu se numără nici la „Mențiuni”.')
       expect(seen.every((l) => l === null)).toBe(true)
       expect(screen.getAllByRole('button', { name: 'Limbă' }).length).toBeGreaterThan(0)
     })
