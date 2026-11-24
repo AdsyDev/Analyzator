@@ -1,4 +1,4 @@
-import { failed, ready, notConnected, type AccessPerson, type CompetitorSetVersion, type ConfigProvider, type InviteStatus, type MappingKind, type NewSeomonitorMapping, type ProviderResult, type Role, type SeomonitorMapping, type UsersProvider } from '../../contracts'
+import { failed, ready, notConnected, type AccessPerson, type CompetitorSetVersion, type CompetitorSuggestions, type ConfigProvider, type CreatedCompetitorSetVersion, type InviteStatus, type MappingKind, type NewSeomonitorMapping, type ProviderResult, type Role, type SeomonitorMapping, type UsersProvider } from '../../contracts'
 import { INVITE_STATUSES, ROLES } from '../../contracts'
 import { addDays, todayBucharest } from '../../lib/period'
 import type { DataClient } from './dataClient'
@@ -179,6 +179,30 @@ export function createSupabaseConfig(client: DataClient, now: () => Date = () =>
       )
     },
 
+    async createCompetitorSetVersion(brandId, input) {
+      const { data, error } = await client.rpc('create_competitor_set_version', {
+        p_brand_id: brandId,
+        p_effective_from: input.effective_from,
+        p_note: input.note,
+        p_members: input.members.map((m) => ({ name: m.name, domain: m.domain, listening_keywords: m.listening_keywords, social_handles: m.social_handles, ads_advertiser_ids: m.ads_advertiser_ids })),
+      })
+      if (error) {
+        // Mesajele funcției SQL sunt în română și afișabile direct (docs/security-tests.md, E4).
+        const known = ['42501', '22023', '23505'].includes(error.code ?? '') && typeof error.message === 'string' && error.message.length <= 300
+        return failed(known ? error.message : QUERY_FAILED)
+      }
+      const row = (Array.isArray(data) ? data[0] : data) as { version?: unknown; effective_from?: unknown; member_count?: unknown } | null
+      if (!row || typeof row.version !== 'number' || typeof row.effective_from !== 'string' || typeof row.member_count !== 'number') return failed(CONTRACT)
+      return ready<CreatedCompetitorSetVersion>({ version: row.version, effective_from: row.effective_from, member_count: row.member_count })
+    },
+
+    async competitorSuggestions(brandId) {
+      const { data, error } = await client.functions.invoke('source-credentials', { body: { action: 'competitor_suggestions', brand_id: brandId } })
+      if (error) return failed(await functionError(error))
+      const parsed = parseCompetitorSuggestions(data)
+      return parsed ? ready(parsed) : failed(CONTRACT)
+    },
+
     // Aliasurile brandului nu au un tabel în schema curentă: nu inventăm o sursă.
     aliases: async () => notConnected('Aliasurile brandului nu au încă un loc în baza de date. Se vor putea vedea aici după ce schema le primește.'),
 
@@ -249,6 +273,38 @@ export function createSupabaseConfig(client: DataClient, now: () => Date = () =>
       const { error } = await client.from('seomonitor_group_mappings').insert(insert)
       if (error) return failed(error.code === '42501' ? 'Doar administratorii agenției pot mapa grupurile SEOmonitor.' : error.code === '23505' ? 'Maparea a fost schimbată între timp. Reîncarcă și încearcă din nou.' : QUERY_FAILED)
       return ready({ effective_from: effective })
+    },
+  }
+}
+
+const SUGGESTION_OUTCOMES: readonly string[] = ['ok', 'not_connected', 'invalid', 'rate_limited', 'provider_error', 'budget_exhausted']
+const isStr = (v: unknown): v is string => typeof v === 'string'
+const isMsg = (v: unknown) => v === null || isStr(v)
+
+/** Verifică forma răspunsului `competitor_suggestions`; orice abatere e o eroare de contract, nu date ghicite. */
+export function parseCompetitorSuggestions(data: unknown): CompetitorSuggestions | null {
+  const d = data as { planable?: Record<string, unknown>; seomonitor?: Record<string, unknown> } | null
+  const p = d?.planable
+  const s = d?.seomonitor
+  if (!p || !s) return null
+  if (!isStr(p.outcome) || !SUGGESTION_OUTCOMES.includes(p.outcome) || !isMsg(p.message) || !Array.isArray(p.competitors) || !Array.isArray(p.notes) || !p.notes.every(isStr)) return null
+  if ((s.outcome !== 'ok' && s.outcome !== 'not_connected') || !isMsg(s.message) || !isStr(s.since) || !Array.isArray(s.domains)) return null
+  const competitors = p.competitors as Array<Record<string, unknown>>
+  if (!competitors.every((c) => isStr(c.platform) && isStr(c.handle) && isStr(c.name) && Array.isArray(c.tracked_from) && c.tracked_from.every(isStr))) return null
+  const domains = s.domains as Array<Record<string, unknown>>
+  if (!domains.every((x) => isStr(x.domain) && typeof x.keywords === 'number' && Number.isFinite(x.keywords))) return null
+  return {
+    planable: {
+      outcome: p.outcome as CompetitorSuggestions['planable']['outcome'],
+      message: p.message as string | null,
+      competitors: competitors.map((c) => ({ platform: c.platform as string, handle: c.handle as string, name: c.name as string, tracked_from: c.tracked_from as string[] })),
+      notes: p.notes as string[],
+    },
+    seomonitor: {
+      outcome: s.outcome,
+      message: s.message as string | null,
+      since: s.since,
+      domains: domains.map((x) => ({ domain: x.domain as string, keywords: x.keywords as number })),
     },
   }
 }

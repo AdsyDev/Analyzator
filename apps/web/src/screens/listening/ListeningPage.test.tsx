@@ -98,7 +98,7 @@ describe('Listening', () => {
     expect(screen.getAllByRole('button', { name: /Autor:\s*Cont propriu/ }).length).toBeGreaterThan(0)
   })
 
-  describe('filtrul „Limbă” (farmacovigilență, deciziile Z)', () => {
+  describe('filtrul „Limbă” (farmacovigilență, deciziile AA)', () => {
     type Wrap = NonNullable<Parameters<typeof renderApp>[0]['wrap']>
     const spy = (seen: Array<string | null | undefined>): Wrap => (b) => ({
       ...b,
@@ -200,7 +200,7 @@ describe('Listening', () => {
       expect(dist).toHaveTextContent(/2 mențiuni așteaptă revizuirea umană/)
     })
 
-    it('mențiunile în altă limbă (deciziile Z): feed-ul și distribuția spun câte au fost lăsate deoparte', async () => {
+    it('mențiunile în altă limbă (deciziile AA): feed-ul și distribuția spun câte au fost lăsate deoparte', async () => {
       const wrap: Wrap = (b) => ({
         ...b,
         mentions: {

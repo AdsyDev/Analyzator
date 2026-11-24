@@ -3,10 +3,12 @@
 // POST { action: "set_token", connection_id, token }  → scrie tokenul în Vault (doar agency_admin)
 // POST { action: "validate", connection_id }           → un singur apel la furnizor; consumă din bugetul zilnic
 // POST { action: "list_accounts", connection_id, kind } → conturile pe care le vede cheia clientului (doar ID și nume)
+// POST { action: "competitor_suggestions", brand_id }   → propuneri pentru setul de competitori (Planable, SEOmonitor)
 //
 // Tokenul nu apare niciodată în răspuns sau în loguri.
 
 import { ALLOWED_HEADERS } from '../_shared/cors.ts'
+import { planableCompetitors, rankDomains } from './competitors.ts'
 import { DISCOVER, DISCOVER_DAILY_LIMIT, discover, type DiscoverKind } from './discover.ts'
 
 export type HandlerEnv = {
@@ -104,11 +106,15 @@ export async function handle(req: Request, deps: HandlerDeps): Promise<Response>
   try {
     const userId = await authenticate(req, deps)
 
-    let body: { action?: unknown; connection_id?: unknown; token?: unknown; kind?: unknown; campaign_id?: unknown }
+    let body: { action?: unknown; connection_id?: unknown; token?: unknown; kind?: unknown; campaign_id?: unknown; brand_id?: unknown }
     try {
       body = (await req.json()) as typeof body
     } catch {
       throw new HttpError(400, 'Corp JSON invalid.')
+    }
+    if (body.action === 'competitor_suggestions') {
+      if (typeof body.brand_id !== 'string' || !UUID.test(body.brand_id)) throw new HttpError(400, 'brand_id invalid.')
+      return json(env, 200, await competitorSuggestions(deps, userId, body.brand_id))
     }
     if (typeof body.connection_id !== 'string' || !UUID.test(body.connection_id)) {
       throw new HttpError(400, 'connection_id invalid.')
@@ -191,8 +197,8 @@ async function loadConnection(deps: HandlerDeps, connectionId: string): Promise<
   return conn
 }
 
-/** Verificare explicită: utilizatorul e agency_admin activ în tenantul conexiunii. */
-async function assertAgencyAdmin(deps: HandlerDeps, userId: string, tenantId: string): Promise<void> {
+/** Verificare explicită: utilizatorul e agency_admin activ în tenantul conexiunii (sau al brandului). */
+async function assertAgencyAdmin(deps: HandlerDeps, userId: string, tenantId: string, notFound = 'Conexiune inexistentă sau inactivă.'): Promise<void> {
   const rows = await rest<Array<{ role: string }>>(
     deps,
     `memberships?select=role,tenants!inner(status)&tenant_id=eq.${tenantId}&user_id=eq.${userId}` +
@@ -204,7 +210,7 @@ async function assertAgencyAdmin(deps: HandlerDeps, userId: string, tenantId: st
     deps,
     `memberships?select=role&tenant_id=eq.${tenantId}&user_id=eq.${userId}&revoked_at=is.null`,
   )
-  if (member.length === 0) throw new HttpError(404, 'Conexiune inexistentă sau inactivă.')
+  if (member.length === 0) throw new HttpError(404, notFound)
   throw new HttpError(403, 'Doar agency_admin al clientului poate gestiona sursele.')
 }
 
@@ -413,4 +419,131 @@ async function listAccounts(deps: HandlerDeps, userId: string, connectionId: str
     truncated: result.ok ? result.truncated : false,
     message: result.ok ? null : result.message,
   }
+}
+
+/** Fereastra în care se caută domeniile concurenților în observațiile SEOmonitor. */
+export const SEOMONITOR_LOOKBACK_DAYS = 120
+/** Plafon de rânduri citite din observații pentru o propunere. */
+const SEOMONITOR_ROW_LIMIT = 10000
+
+/**
+ * Propuneri pentru setul de competitori al unui brand (Configurare → Competitori). Nu scrie nimic în set:
+ * adminul alege și confirmă, iar versiunea se creează prin `create_competitor_set_version` (E4).
+ * - SEOmonitor: domeniile concurenților din `ai_brand_observations` (deja colectate), fără apel la furnizor.
+ * - Planable: profilurile urmărite drept competitori pe paginile workspace-ului brandului (cheia clientului, din Vault).
+ * Fiecare sursă are starea ei: „neconectată”, eroare și listă goală sunt distincte.
+ */
+async function competitorSuggestions(deps: HandlerDeps, userId: string, brandId: string) {
+  const brands = await rest<Array<{ id: string; tenant_id: string; domain: string | null; status: string }>>(
+    deps,
+    `brands?select=id,tenant_id,domain,status&id=eq.${brandId}`,
+  )
+  const brand = brands[0]
+  if (!brand || brand.status !== 'active') throw new HttpError(404, 'Spațiu de brand inexistent sau arhivat.')
+  const tenantId = brand.tenant_id
+  await assertAgencyAdmin(deps, userId, tenantId, 'Spațiu de brand inexistent sau arhivat.')
+
+  // SEOmonitor --------------------------------------------------------------------------------
+  const now = deps.now()
+  const since = utcDay(new Date(now.getTime() - SEOMONITOR_LOOKBACK_DAYS * 86_400_000))
+  const seoConn = await rest<Array<{ id: string }>>(
+    deps,
+    `source_connections?select=id&tenant_id=eq.${tenantId}&provider=eq.seomonitor&status=eq.active&limit=1`,
+  )
+  let seomonitor: { outcome: 'ok' | 'not_connected'; message: string | null; since: string; domains: Array<{ domain: string; keywords: number }> }
+  if (seoConn.length === 0) {
+    seomonitor = { outcome: 'not_connected', message: 'Clientul nu are SEOmonitor conectat.', since, domains: [] }
+  } else {
+    const rows = await rest<Array<{ observed_domain: string; keyword_id: string }>>(
+      deps,
+      `ai_brand_observations?select=observed_domain,keyword_id&tenant_id=eq.${tenantId}&brand_id=eq.${brandId}` +
+        `&is_own_brand=is.false&crawl_at=gte.${since}&order=crawl_at.desc&limit=${SEOMONITOR_ROW_LIMIT}`,
+    )
+    const domains = rankDomains(rows, brand.domain)
+    seomonitor = {
+      outcome: 'ok',
+      message: domains.length === 0 ? 'SEOmonitor nu a raportat concurenți în răspunsurile AI ale brandului în ultimele 120 de zile.' : null,
+      since,
+      domains,
+    }
+  }
+
+  // Planable ----------------------------------------------------------------------------------
+  type PlanableResult = {
+    outcome: 'ok' | 'not_connected' | 'invalid' | 'rate_limited' | 'provider_error' | 'budget_exhausted'
+    message: string | null
+    competitors: Array<{ platform: string; handle: string; name: string; tracked_from: string[] }>
+    pages_checked: number
+    notes: string[]
+  }
+  const planableEmpty = (outcome: PlanableResult['outcome'], message: string): PlanableResult => ({ outcome, message, competitors: [], pages_checked: 0, notes: [] })
+  let planable: PlanableResult
+  const brandConn = await rest<Array<{ id: string; external_account_id: string | null }>>(
+    deps,
+    `source_connections?select=id,external_account_id&tenant_id=eq.${tenantId}&brand_id=eq.${brandId}&provider=eq.planable&status=eq.active&limit=1`,
+  )
+  const tenantConn = await rest<Array<{ id: string; credential_status: string }>>(
+    deps,
+    `source_connections?select=id,credential_status&tenant_id=eq.${tenantId}&brand_id=is.null&provider=eq.planable_account&status=eq.active&limit=1`,
+  )
+  const workspace = brandConn[0]?.external_account_id ?? null
+  const keyConn = tenantConn[0]
+  if (!workspace) {
+    planable = planableEmpty('not_connected', 'Brandul nu are un workspace Planable ales în pagina site-ului.')
+  } else if (!keyConn || keyConn.credential_status === 'missing') {
+    planable = planableEmpty('not_connected', 'Clientul nu are tokenul Planable salvat.')
+  } else {
+    const day = utcDay(now)
+    const used = (await rest<Array<{ calls: number }>>(
+      deps,
+      `provider_api_calls?select=calls&source_connection_id=eq.${keyConn.id}&call_date_utc=eq.${day}&purpose=eq.discover`,
+    )).reduce((sum, r) => sum + r.calls, 0)
+    if (used >= DISCOVER_DAILY_LIMIT) {
+      planable = planableEmpty('budget_exhausted', `Limita de ${DISCOVER_DAILY_LIMIT} apeluri de listare pe zi e atinsă pentru tokenul Planable. Reîncearcă mâine sau completează manual.`)
+    } else {
+      const token = await rest<string>(deps, 'rpc/get_source_token', { method: 'POST', body: JSON.stringify({ p_connection_id: keyConn.id }) })
+      const record = (calls: number) =>
+        rest(deps, 'provider_api_calls', {
+          method: 'POST',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify({ tenant_id: tenantId, brand_id: null, source_connection_id: keyConn.id, call_date_utc: day, purpose: 'discover', calls, actor_user_id: userId }),
+        })
+      // Primul apel se contorizează înainte de a fi făcut (ca la listare); restul, după, cu numărul real.
+      await record(1)
+      const result = await planableCompetitors(token, workspace, deps.fetch)
+      if (result.requests > 1) await record(result.requests - 1)
+      let credentialStatus = keyConn.credential_status
+      if (result.ok || result.reason === 'invalid') {
+        credentialStatus = await rest<string>(deps, 'rpc/record_source_validation', {
+          method: 'POST',
+          body: JSON.stringify({ p_connection_id: keyConn.id, p_ok: result.ok, p_error: result.ok ? null : `HTTP ${result.status}` }),
+        })
+      }
+      planable = result.ok
+        ? {
+            outcome: 'ok',
+            message: result.competitors.length === 0 ? 'Paginile brandului din Planable nu urmăresc niciun competitor (Analytics → Competitors).' : null,
+            competitors: result.competitors,
+            pages_checked: result.pages_checked,
+            notes: result.notes,
+          }
+        : planableEmpty(result.reason, result.message)
+      await rest(deps, 'audit_events', {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          tenant_id: tenantId,
+          brand_id: brandId,
+          actor_user_id: userId,
+          actor_type: 'user',
+          action: 'competitors_suggested',
+          entity_type: 'source_connections',
+          entity_id: keyConn.id,
+          after: { outcome: planable.outcome, competitors: planable.competitors.length, requests: result.requests, credential_status: credentialStatus },
+        }),
+      })
+    }
+  }
+
+  return { brand_id: brandId, planable, seomonitor }
 }

@@ -112,7 +112,7 @@ export const AUTHOR_FILTER: FilterDef = {
 }
 
 /**
- * Limba mențiunilor (deciziile Z): Listening arată implicit doar româna. „Toate limbile” e pentru verificarea de
+ * Limba mențiunilor (deciziile AA): Listening arată implicit doar româna. „Toate limbile” e pentru verificarea de
  * farmacovigilență (o mențiune din altă țară poate descrie un eveniment advers), doar pentru `agency_admin`.
  */
 export const LANGUAGE_FILTER: FilterDef = {

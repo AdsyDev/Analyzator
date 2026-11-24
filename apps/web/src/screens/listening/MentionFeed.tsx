@@ -44,7 +44,7 @@ export function withoutContentNote(n: number): string {
   return `${formatInteger(n)} ${n === 1 ? 'mențiune din perioadă a venit' : 'mențiuni din perioadă au venit'} de la sursă fără text și fără link (de regulă, cele de pe web). ${n === 1 ? 'E numărată' : 'Sunt numărate'} la „Mențiuni”, dar nu ${n === 1 ? 'poate fi afișată sau revizuită' : 'pot fi afișate sau revizuite'}.`
 }
 
-/** Câte mențiuni au fost lăsate deoparte pentru limbă (deciziile Z): Listening arată doar mențiunile în română. */
+/** Câte mențiuni au fost lăsate deoparte pentru limbă (deciziile AA): Listening arată doar mențiunile în română. */
 export function otherLanguageNote(n: number, admin = false): string {
   const base = `${formatInteger(n)} ${n === 1 ? 'mențiune din perioadă e' : 'mențiuni din perioadă sunt'} în altă limbă decât româna și nu ${n === 1 ? 'e afișată' : 'sunt afișate'}. Limba se stabilește din text; mențiunile prea scurte ca să se poată stabili rămân în listă.`
   return admin ? `${base} Pentru verificarea de farmacovigilență, alege „Limbă: Toate limbile”.` : base

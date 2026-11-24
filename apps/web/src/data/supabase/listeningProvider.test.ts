@@ -28,7 +28,7 @@ describe('createSupabaseMentions', () => {
     expect(s2.kind === 'ready' && s2.data.without_content).toBe(0)
   })
 
-  it('mențiunile în altă limbă (deciziile Z) vin numărate separat; un server mai vechi, fără câmp, înseamnă zero', async () => {
+  it('mențiunile în altă limbă (deciziile AA) vin numărate separat; un server mai vechi, fără câmp, înseamnă zero', async () => {
     const fake = fakeDataClient({ rpc: () => ({ data: { items: [mention], total: 1, page: 1, page_size: 20, without_content: 0, other_language: 42 } }) })
     const r = await createSupabaseMentions(fake.client).list(ctx, { sentiment: null, source: null, author: null, page: 1, page_size: 20 })
     expect(r.kind === 'ready' && r.data.other_language).toBe(42)

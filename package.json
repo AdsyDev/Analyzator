@@ -31,6 +31,7 @@
     "collect:planable": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/planable/collect.ts",
     "collect:ads-transparency": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/ads-transparency/collect.ts",
     "collect:airbyte": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/airbyte/collect.ts",
+    "map:airbyte": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/airbyte/map.ts",
     "docs:csv": "node --experimental-strip-types scripts/generate-csv-docs.ts",
     "send:notifications": "node --experimental-strip-types --env-file-if-exists=.env.local scripts/send-notifications.ts",
     "refresh:weekly": "node --experimental-strip-types --env-file-if-exists=.env.local connectors/orchestrator/run.ts",
