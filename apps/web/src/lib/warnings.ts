@@ -4,6 +4,28 @@ import { count } from './runReason'
 import { sourceName } from './sources'
 
 const has = (m: MetricItem, code: string) => m.warnings.some((w) => w.code === code)
+
+const dayOfWeek = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay()
+const lengthInDays = (start: string, end: string) => Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86_400_000) + 1
+const isLastDayOfMonth = (iso: string) => new Date(Date.parse(`${iso}T00:00:00Z`) + 86_400_000).getUTCDate() === 1
+
+/**
+ * Intervalele pentru care conectorul GA4 cere raport de utilizatori activi (`connectors/google/intervals.ts`):
+ * 1, 4 sau 13 săptămâni luni–duminică, sau o lună calendaristică întreagă. Doar forma; dacă raportul există
+ * decide serverul.
+ */
+function isReportedShape(p: { start: string; end: string }): boolean {
+  const weeks = dayOfWeek(p.start) === 1 && dayOfWeek(p.end) === 0 && [7, 28, 91].includes(lengthInDays(p.start, p.end))
+  const month = p.start.endsWith('-01') && p.start.slice(0, 7) === p.end.slice(0, 7) && isLastDayOfMonth(p.end)
+  return weeks || month
+}
+
+/** `interval_report_only`: valoarea există doar ca raport pe exact intervalul cerut (zilele nu se însumează). */
+function intervalReportText(m: MetricItem): string {
+  return isReportedShape(m.evidence_query.period)
+    ? 'Raportul pe aceste săptămâni nu a fost adus încă. Se aduce la colectarea de marți, doar pentru ultimele săptămâni complete; zilele nu se însumează.'
+    : 'Se raportează doar pe săptămâni complete. Alege „Ultima săptămână”, „Ultimele 4 săptămâni” sau „Ultimele 13 săptămâni”; zilele nu se însumează.'
+}
 const pct = (c: number | null) => (c === null ? null : Math.round(c * 100))
 
 /** AB: comparația pe aceeași porțiune din perioada de referință, când perioada curentă nu are date până la final. */
@@ -28,7 +50,7 @@ export function reasonFor(m: MetricItem): string | null {
     case 'unavailable':
       if (has(m, 'query_failed')) return 'Sursa nu a răspuns la interogare. Nu o tratăm ca zero; reîncearcă mai târziu.'
       if (has(m, 'duplicate_observations')) return 'Există observații duplicate pentru aceeași zi, deci valoarea nu se calculează.'
-      if (has(m, 'interval_report_missing')) return 'Lipsește raportul pe intervalul întreg; zilele nu se însumează.'
+      if (has(m, 'interval_report_missing')) return intervalReportText(m)
       if (has(m, 'no_observation')) return 'Nu există nicio observație până la sfârșitul intervalului.'
       if (has(m, 'no_confirmed_data')) return 'Nicio zi din interval nu are date confirmate.'
       return 'Nu există date confirmate pentru interval.'
@@ -66,10 +88,15 @@ const NOTE_TEXT: Record<string, (w: MetricWarning) => string | null> = {
   base_zero: () => 'Baza de comparație e 0.',
 }
 
-/** Note secundare (avertismente care nu sunt motivul principal). Coduri necunoscute se ignoră. */
+/**
+ * Note secundare (avertismente care nu sunt motivul principal). Coduri necunoscute se ignoră. Fără valoare, cardul
+ * are un singur motiv (`reasonFor`): notele despre comparație, întârziere sau acoperire nu explică o cifră care nu
+ * există, deci rămâne doar statutul definiției.
+ */
 export function notesFor(m: MetricItem): string[] {
   const out: string[] = []
   for (const w of m.warnings) {
+    if (m.value === null && w.code !== 'definition_draft') continue
     // Condiția care a devenit status e deja în motivul principal.
     if (w.code === m.status) continue
     // Codurile cu rol de motiv principal nu se repetă ca note.

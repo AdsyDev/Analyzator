@@ -213,7 +213,7 @@ describe('filtre în URL', () => {
     setup('/brands/brand-urinal/traffic?device=mobile&period=7d')
     const group = await screen.findByRole('group', { name: 'Filtre active' })
     expect(within(group).getByText('Device: Mobil')).toBeInTheDocument()
-    expect(within(group).getByText('Ultimele 7 zile')).toBeInTheDocument()
+    expect(within(group).getByText('Ultima săptămână')).toBeInTheDocument()
   })
 
   it('o valoare din afara allowlist-ului e ignorată (nu devine filtru)', async () => {
@@ -231,7 +231,7 @@ describe('filtre în URL', () => {
   it('schimbarea perioadei scrie în URL', async () => {
     setup('/brands/brand-urinal/ai')
     await userEvent.click(await screen.findByRole('button', { name: 'Perioadă' }))
-    await userEvent.click(screen.getByRole('menuitemradio', { name: /Ultimele 7 zile/ }))
+    await userEvent.click(screen.getByRole('menuitemradio', { name: /Ultima săptămână/ }))
     await waitFor(() => expect(where()).toBe('/brands/brand-urinal/ai?period=7d'))
   })
 

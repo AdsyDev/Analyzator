@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { METRIC_STATUSES } from '../contracts'
-import { metric, warning } from '../test/factories'
+import { evidenceQuery, metric, warning } from '../test/factories'
 import { changeDirection, formatAbsoluteChange, formatMetricValue, formatRange, formatRelativeChange } from './format'
 import { coveragePercent, coverageStateFor, isGoodChange, metricView } from './metricView'
 import { sparkPaths } from './spark'
@@ -128,11 +128,41 @@ describe('motive din avertismente', () => {
   it.each([
     ['query_failed', /Sursa nu a răspuns la interogare/],
     ['duplicate_observations', /observații duplicate/],
-    ['interval_report_missing', /raportul pe intervalul întreg/],
+    ['interval_report_missing', /doar pe săptămâni complete/],
     ['no_observation', /nicio observație/],
     ['no_confirmed_data', /Nicio zi din interval/],
   ])('unavailable + %s', (code, text) => {
     expect(reasonFor(metric({ status: 'unavailable', value: null, warnings: [warning(code)] }))).toMatch(text)
+  })
+
+  it('interval_report_missing: pe un interval care nu e pe săptămâni complete, spune ce să alegi', () => {
+    const at = (start: string, end: string) =>
+      reasonFor(metric({ metric_key: 'ga4_active_users', status: 'unavailable', value: null, evidence_query: evidenceQuery({ period: { start, end } }), warnings: [warning('interval_report_missing')] }))
+    // 28 de zile mobile (marți–luni): GA4 nu are raport pe ele.
+    expect(at('2026-10-27', '2026-11-23')).toBe('Se raportează doar pe săptămâni complete. Alege „Ultima săptămână”, „Ultimele 4 săptămâni” sau „Ultimele 13 săptămâni”; zilele nu se însumează.')
+    // Luna curentă până ieri nu e o lună întreagă.
+    expect(at('2026-11-01', '2026-11-23')).toMatch(/doar pe săptămâni complete/)
+    // 1, 4 și 13 săptămâni luni–duminică și o lună întreagă au forma unui raport: lipsește raportul, nu alegerea.
+    for (const [start, end] of [['2026-11-16', '2026-11-22'], ['2026-10-26', '2026-11-22'], ['2026-08-24', '2026-11-22'], ['2026-10-01', '2026-10-31'], ['2027-02-01', '2027-02-28']] as const) {
+      expect(at(start, end)).toMatch(/^Raportul pe aceste săptămâni nu a fost adus încă/)
+    }
+    // Duminică–sâmbătă sau 14 zile nu sunt intervale colectate.
+    expect(at('2026-11-15', '2026-11-21')).toMatch(/doar pe săptămâni complete/)
+    expect(at('2026-11-09', '2026-11-22')).toMatch(/doar pe săptămâni complete/)
+  })
+
+  it('cardul fără valoare are un singur motiv: notele despre comparație, întârziere și acoperire nu se adaugă', () => {
+    const m = metric({
+      metric_key: 'ga4_active_users',
+      status: 'unavailable',
+      value: null,
+      warnings: [warning('interval_report_missing'), warning('comparison_unavailable'), warning('stale'), warning('partial'), warning('incomplete_period', { severity: 'info' })],
+    })
+    expect(notesFor(m)).toEqual([])
+    expect(metricView(m).notes).toEqual([])
+    expect(metricView(m).emptyReason).toMatch(/doar pe săptămâni complete/)
+    // Statutul definiției rămâne vizibil și fără valoare.
+    expect(notesFor(metric({ status: 'unavailable', value: null, warnings: [warning('definition_draft', { severity: 'info', detail: null })] }))).toEqual(['Definiție provizorie.'])
   })
 
   it('unavailable fără cod cunoscut spune doar ce se știe', () => {

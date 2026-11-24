@@ -30,10 +30,10 @@ interface FilterBarProps {
 }
 
 const PRESET_LABELS: Record<PeriodPreset, string> = {
-  '7d': 'Ultimele 7 zile',
-  '28d': 'Ultimele 28 de zile',
+  '7d': 'Ultima săptămână',
+  '28d': 'Ultimele 4 săptămâni',
   month: 'Luna curentă',
-  '90d': 'Ultimele 90 de zile',
+  '90d': 'Ultimele 13 săptămâni',
   '365d': 'Ultimele 365 de zile',
   custom: 'Interval personalizat',
 }

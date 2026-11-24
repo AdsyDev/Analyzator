@@ -1,6 +1,9 @@
 import type { BrandId, IsoDate } from './common'
 
-/** `90d` și `365d` sunt „trimestru” și „an” din propunerea din 10 nov. 2026: intervale mobile, încheiate ieri. */
+/**
+ * Identificatori stabili (apar în URL). `7d`, `28d`, `90d`: ultima săptămână completă și ultimele 4 și 13 săptămâni
+ * complete, luni–duminică (spec cap. 9, decizia AG); `month`: luna curentă până ieri; `365d`: an mobil, încheiat ieri.
+ */
 export const PERIOD_PRESETS = ['7d', '28d', 'month', '90d', '365d', 'custom'] as const
 export type PeriodPreset = (typeof PERIOD_PRESETS)[number]
 

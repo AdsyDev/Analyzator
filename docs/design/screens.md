@@ -44,7 +44,7 @@ Extras din `docs/design/reference/Analyzator.dc.html` (referință vizuală, nu 
 
 - **Sidebar** colapsabil (sticlă; sub 1024 px, sertar deschis din butonul de meniu al topbarului): Overview, AI Visibility, SEO și Search, Trafic și conversii, Paid Media, Social, Listening, Competiție, Analize și acțiuni. Secțiunea **Administrare** (doar agenție): Clienți și site-uri (cu pagina fiecărui site și sursele lui), Utilizatori, Configurare.
 - **Topbar** (sticlă): selector de brand (lista „Spații de brand accesibile", cu categoria; linkul „Clienți și site-uri" doar pentru agenție), titlul paginii, comutator temă, meniul utilizatorului (nume, rol și organizație, email, „Vezi interfața ca" client/agenție doar în previzualizare, „Ieși din cont").
-- **FilterBar**: perioadă (Ultimele 7 zile, Ultimele 28 de zile, Luna curentă, Interval personalizat, cu intervalul afișat), comparație („vs perioada anterioară" implicit, „vs anul trecut"), filtre specifice modulului (Trafic: Device și Canal), chipuri pentru filtrele active și „Resetează filtrele".
+- **FilterBar**: perioadă (Ultima săptămână, Ultimele 4 săptămâni, Luna curentă, Ultimele 13 săptămâni, Ultimele 365 de zile, Interval personalizat, cu intervalul afișat; săptămânile sunt complete, luni–duminică, decizia AG), comparație („vs perioada anterioară" implicit, „vs anul trecut"), filtre specifice modulului (Trafic: Device și Canal), chipuri pentru filtrele active și „Resetează filtrele".
 - **Linia de proveniență**: „Date până la <data>" · „Ultimul refresh <acum 2 ore>".
 - Titlul paginii are o frază-subtitlu per modul (vezi `PAGES` în referință).
 
@@ -157,7 +157,7 @@ EvidenceDrawer (sticlă): pagină, indicator, definiție, valoare, variație, su
 | `/admin/clients`, `/admin/clients/:brandId`, `/admin/users`, `/admin/config` (și redirecționarea `/admin/sources`) | doar `agency_admin` | Spec cap. 28 pune clienții, brandurile, invitațiile, sursele și drepturile la Agency admin; Surse e doar pentru `agency_admin`. Orice alt rol (inclusiv `strategist` și `account`) e redirecționat la `/`, fără să afle dacă pagina există. |
 | orice altceva | autentificat | „Pagina nu există". |
 
-- Brandul și filtrele vin din URL: `period` (`7d`, `28d`, `month`, `custom` cu `from` și `to`), `compare`, plus filtrele din allowlist-ul modulului (Trafic: `device`). Valorile implicite nu se scriu în URL; valorile necunoscute cad pe implicit.
+- Brandul și filtrele vin din URL: `period` (`7d` = ultima săptămână completă, `28d` = ultimele 4 săptămâni complete, `month`, `90d` = ultimele 13 săptămâni complete, `365d`, `custom` cu `from` și `to`; identificatorii au rămas din versiunea pe zile mobile, decizia AG), `compare`, plus filtrele din allowlist-ul modulului (Trafic: `device`). Valorile implicite nu se scriu în URL; valorile necunoscute cad pe implicit.
 - Schimbarea modulului păstrează perioada și comparația, nu și filtrele modulului. Schimbarea brandului păstrează modulul și parametrii comuni.
 - Gărzile din UI sunt comoditate: autoritatea e RLS pe server. Un user client care cunoaște adresa unei pagini de administrare nu o poate folosi, fiindcă datele ei nu sunt expuse lui.
 - În previzualizare, utilizatorul e fictiv, cu rol comutabil din meniul contului („Vezi interfața ca"); la comutare, ecranele se reîncarcă cu datele noului rol.

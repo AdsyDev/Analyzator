@@ -172,7 +172,8 @@ describe('fixtures Paid Media', () => {
   })
 
   it('seria: zilele neimportate sunt null (gol), nu zero', async () => {
-    const s = await make().paid.series(ctx(MINI), { platform: null })
+    // Perioadă încheiată ieri (5 oct.); importul ajunge la 4 oct., deci ultima zi e gol.
+    const s = await make().paid.series(ctx(MINI, { period: { preset: 'custom', from: '2026-09-08', to: '2026-10-05' } }), { platform: null })
     if (s.kind !== 'ready') throw new Error('series')
     expect(s.data.spend).toHaveLength(28)
     expect(s.data.spend.slice(-1)[0]!.value).toBeNull()

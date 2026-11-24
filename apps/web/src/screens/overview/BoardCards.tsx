@@ -54,8 +54,8 @@ function Bar({ label, pct, text, highlight = false }: { label: string; pct: numb
 }
 
 const QUICK_PERIODS = [
-  { preset: '28d', label: '28 zile' },
-  { preset: '90d', label: '90 zile' },
+  { preset: '28d', label: '4 săpt.' },
+  { preset: '90d', label: '13 săpt.' },
 ] as const
 
 /** Comutatorul de perioadă din machetă. Schimbă perioada întregii pagini (aceeași din bara de sus), nu doar graficul. */

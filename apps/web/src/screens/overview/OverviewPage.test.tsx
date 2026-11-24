@@ -192,7 +192,7 @@ describe('Overview: cei șase indicatori', () => {
     await loaded()
     const urinal28 = value()
     await userEvent.click(within(screen.getByRole('region', { name: 'Filtre' })).getByRole('button', { name: 'Perioadă' }))
-    await userEvent.click(screen.getByRole('menuitemradio', { name: /7 zile/ }))
+    await userEvent.click(screen.getByRole('menuitemradio', { name: /Ultima săptămână/ }))
     await waitFor(() => expect(value()).not.toBe(urinal28))
   })
 })
@@ -210,15 +210,15 @@ describe('Overview: cardurile de sub indicatori', () => {
     expect(within(s).getAllByTestId('chart-end-marker')).toHaveLength(2)
   })
 
-  it('comutatorul 28 / 90 zile de pe grafic schimbă perioada întregii pagini, în URL', async () => {
+  it('comutatorul 4 / 13 săptămâni de pe grafic schimbă perioada întregii pagini, în URL', async () => {
     setup({ route: '/brands/brand-minimartieni/overview' })
     await loaded()
     const group = within(section('Evoluția vizibilității AI')).getByRole('group', { name: 'Perioada paginii' })
-    expect(within(group).getByRole('button', { name: '28 zile' })).toHaveAttribute('aria-pressed', 'true')
-    await userEvent.click(within(group).getByRole('button', { name: '90 zile' }))
+    expect(within(group).getByRole('button', { name: '4 săpt.' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(within(group).getByRole('button', { name: '13 săpt.' }))
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/brands/brand-minimartieni/overview?period=90d'))
     await loaded()
-    expect(within(within(section('Evoluția vizibilității AI')).getByRole('group', { name: 'Perioada paginii' })).getByRole('button', { name: '90 zile' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(within(section('Evoluția vizibilității AI')).getByRole('group', { name: 'Perioada paginii' })).getByRole('button', { name: '13 săpt.' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('vizibilitate pe platforme: engine-urile în ordinea valorii; cel fără date rămâne „Fără date”, fără bară', async () => {

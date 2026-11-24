@@ -136,7 +136,8 @@ describe('fixtures: acoperirea stărilor', () => {
   it('stale: data_as_of rămâne în urma perioadei, cu condiția secundară „partial"', async () => {
     const m = (await make().metrics.metrics(ctx('brand-urinal'), ['ga4_key_events'])).items[0]!
     expect(m.status).toBe('stale')
-    expect(m.data_as_of).toBe('2026-10-02')
+    // Perioada implicită se termină duminică 4 oct.; fixture-ul stale rămâne cu 3 zile în urmă.
+    expect(m.data_as_of).toBe('2026-10-01')
     expect(m.warnings.map((w) => w.code)).toContain('partial')
   })
 

@@ -11,7 +11,7 @@ const defs: FilterDef[] = [
 ]
 const base: QueryContext = {
   brandId: 'b1',
-  period: { preset: '28d', from: '2026-09-08', to: '2026-10-05' },
+  period: { preset: '28d', from: '2026-09-07', to: '2026-10-04' },
   comparison: 'previous',
   filters: { device: 'all' },
 }
@@ -26,17 +26,17 @@ function setup(value: QueryContext = base, extra: Partial<React.ComponentProps<t
 describe('FilterBar', () => {
   it('arată perioada și comparația cu intervalele lor reale', () => {
     setup()
-    expect(screen.getByRole('button', { name: 'Perioadă' })).toHaveTextContent('Ultimele 28 de zile')
-    expect(screen.getByRole('button', { name: 'Perioadă' })).toHaveTextContent(/8 sept\.?\s-\s5 oct\.?\s2026/)
-    expect(screen.getByRole('button', { name: 'Comparație' })).toHaveTextContent(/11 aug\.?\s-\s7 sept\.?\s2026/)
+    expect(screen.getByRole('button', { name: 'Perioadă' })).toHaveTextContent('Ultimele 4 săptămâni')
+    expect(screen.getByRole('button', { name: 'Perioadă' })).toHaveTextContent(/7 sept\.?\s-\s4 oct\.?\s2026/)
+    expect(screen.getByRole('button', { name: 'Comparație' })).toHaveTextContent(/10 aug\.?\s-\s6 sept\.?\s2026/)
   })
 
   it('nu ține stare proprie: schimbarea cere onChange, afișajul rămâne la valoarea primită', async () => {
     const { onChange } = setup()
     await userEvent.click(screen.getByRole('button', { name: 'Perioadă' }))
-    await userEvent.click(screen.getByRole('menuitemradio', { name: /Ultimele 7 zile/ }))
-    expect(onChange).toHaveBeenCalledWith({ period: { preset: '7d', from: '2026-09-29', to: '2026-10-05' } })
-    expect(screen.getByRole('button', { name: 'Perioadă' })).toHaveTextContent('Ultimele 28 de zile')
+    await userEvent.click(screen.getByRole('menuitemradio', { name: /Ultima săptămână/ }))
+    expect(onChange).toHaveBeenCalledWith({ period: { preset: '7d', from: '2026-09-28', to: '2026-10-04' } })
+    expect(screen.getByRole('button', { name: 'Perioadă' })).toHaveTextContent('Ultimele 4 săptămâni')
   })
 
   it('meniul se închide cu Esc și restituie focusul', async () => {
@@ -52,7 +52,7 @@ describe('FilterBar', () => {
   it('săgețile mută focusul în meniu', async () => {
     setup()
     await userEvent.click(screen.getByRole('button', { name: 'Perioadă' }))
-    expect(screen.getByRole('menuitemradio', { name: /Ultimele 28 de zile/ })).toHaveFocus()
+    expect(screen.getByRole('menuitemradio', { name: /Ultimele 4 săptămâni/ })).toHaveFocus()
     await userEvent.keyboard('{ArrowDown}')
     expect(screen.getByRole('menuitemradio', { name: /Luna curentă/ })).toHaveFocus()
   })
@@ -92,10 +92,10 @@ describe('FilterBar', () => {
   })
 
   it('chipuri pentru filtrele active, eliminabile, și resetare', async () => {
-    const value: QueryContext = { ...base, comparison: 'year_ago', period: { preset: '7d', from: '2026-09-29', to: '2026-10-05' }, filters: { device: 'mobile' } }
+    const value: QueryContext = { ...base, comparison: 'year_ago', period: { preset: '7d', from: '2026-09-28', to: '2026-10-04' }, filters: { device: 'mobile' } }
     const { onChange, onReset } = setup(value)
     const group = screen.getByRole('group', { name: 'Filtre active' })
-    expect(within(group).getByText('Ultimele 7 zile')).toBeInTheDocument()
+    expect(within(group).getByText('Ultima săptămână')).toBeInTheDocument()
     expect(within(group).getByText('vs anul trecut')).toBeInTheDocument()
     expect(within(group).getByText('Device: Mobil')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Elimină filtrul Device: Mobil' }))
@@ -129,22 +129,22 @@ describe('FilterBar', () => {
     it('rezumatul are perioada, intervalul, comparația și câte filtre sunt active (cât chipurile)', () => {
       setup({ ...base, filters: { device: 'mobile' } })
       const btn = screen.getByRole('button', { name: /^Filtre:/ })
-      expect(btn).toHaveAccessibleName(/Ultimele 28 de zile, 8 sept\.?\s-\s5 oct\.?\s2026, vs perioada anterioară, 1 filtru activ$/)
+      expect(btn).toHaveAccessibleName(/Ultimele 4 săptămâni, 7 sept\.?\s-\s4 oct\.?\s2026, vs perioada anterioară, 1 filtru activ$/)
       expect(btn).toHaveAttribute('aria-haspopup', 'dialog')
       cleanup()
-      setup({ ...base, period: { preset: '7d', from: '2026-09-29', to: '2026-10-05' }, filters: { device: 'mobile' } })
+      setup({ ...base, period: { preset: '7d', from: '2026-09-28', to: '2026-10-04' }, filters: { device: 'mobile' } })
       expect(screen.getByRole('button', { name: /^Filtre:/ })).toHaveAccessibleName(/2 filtre active$/)
     })
 
     it('alegerile sunt o ciornă: „Aplică" trimite o singură schimbare și închide panoul', async () => {
       const { onChange } = setup()
       const sheet = await openSheet()
-      await userEvent.click(within(sheet).getByRole('radio', { name: /Ultimele 7 zile/ }))
+      await userEvent.click(within(sheet).getByRole('radio', { name: /Ultima săptămână/ }))
       await userEvent.click(within(sheet).getByRole('radio', { name: 'Mobil' }))
       expect(onChange).not.toHaveBeenCalled()
       await userEvent.click(within(sheet).getByRole('button', { name: 'Aplică' }))
       expect(onChange).toHaveBeenCalledTimes(1)
-      expect(onChange).toHaveBeenCalledWith({ period: { preset: '7d', from: '2026-09-29', to: '2026-10-05' }, filters: { device: 'mobile' } })
+      expect(onChange).toHaveBeenCalledWith({ period: { preset: '7d', from: '2026-09-28', to: '2026-10-04' }, filters: { device: 'mobile' } })
       expect(screen.queryByRole('dialog')).toBeNull()
     })
 
@@ -159,12 +159,12 @@ describe('FilterBar', () => {
     })
 
     it('„Resetează" readuce valorile implicite în ciornă; „Aplică" le trimite', async () => {
-      const { onChange } = setup({ ...base, period: { preset: '7d', from: '2026-09-29', to: '2026-10-05' }, filters: { device: 'mobile' } })
+      const { onChange } = setup({ ...base, period: { preset: '7d', from: '2026-09-28', to: '2026-10-04' }, filters: { device: 'mobile' } })
       const sheet = await openSheet()
       await userEvent.click(within(sheet).getByRole('button', { name: 'Resetează' }))
       expect(onChange).not.toHaveBeenCalled()
       await userEvent.click(within(sheet).getByRole('button', { name: 'Aplică' }))
-      expect(onChange).toHaveBeenCalledWith({ period: { preset: '28d', from: '2026-09-08', to: '2026-10-05' }, filters: { device: 'all' } })
+      expect(onChange).toHaveBeenCalledWith({ period: { preset: '28d', from: '2026-09-07', to: '2026-10-04' }, filters: { device: 'all' } })
     })
 
     it('interval personalizat inversat: „Aplică" e dezactivat, cu explicație', async () => {
