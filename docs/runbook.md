@@ -239,6 +239,12 @@ Marți dimineața (cron 04:00 UTC = 06:00 vara / 05:00 iarna, ora României), wo
 - Competitorii (Y): cuvintele de tip „competitor” din Planable Listening → `competitor_mentions` și `competitor_trackers` (`source = planable_listening`); atribuirea pe competitor se face în SQL, după `competitor_set_members.listening_keywords` (lista goală = numele competitorului). Un competitor N/A la „Mențiuni” = niciun cuvânt urmărit nu corespunde.
 - Planable Competitors (Y-13): profilurile urmărite pe paginile brandului → `competitor_social_daily` și `competitor_trackers` (`source = planable_competitors`), rularea `planable_competitors`; atribuirea după `competitor_set_members.social_handles` (lista goală = numele competitorului). `access_denied` = add-on-ul Analytics inactiv.
 
+## Seturile de competitori din date (Y-17)
+
+- Actions → **competitor-sets** → Run workflow. `discover` (doar citire): pe fiecare brand, cuvintele Planable de tip „competitor” cu mențiunile din 35 de zile, profilurile Planable Competitors și domeniile SEOmonitor din răspunsurile AI; rezultatul e în rezumatul rulării.
+- `create` cu `sets` = JSON `{ "<slug brand>": { "effective_from": "YYYY-MM-DD", "note": "...", "members": [ { "name", "domain", "listening_keywords", "social_handles", "ads_advertiser_ids" } ] } }`. Fără `apply` doar arată; cu `apply` scrie, cu regulile funcției `create_competitor_set_version`. Local: `npm run competitor-sets -- discover`.
+- Modificările ulterioare se fac din aplicație: Administrare → Configurare → Competitori → „Versiune nouă”.
+
 ## Colectare săptămânală Google Ads Transparency (Y)
 
 - Configurare și reguli: `docs/contracts/ads-transparency.md`; pași pentru agenție: `docs/connectors/ads-transparency.md`.

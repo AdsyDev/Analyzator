@@ -1,0 +1,87 @@
+# Seturile de competitori din datele surselor (decizia Y-17), manual.
+#   discover: doar citește, pe fiecare brand, cuvintele Planable de tip „competitor”, profilurile Planable Competitors și
+#             domeniile SEOmonitor, pentru alegerea competitorilor.
+#   create:   scrie versiunile date în `sets` (JSON), cu regulile funcției create_competitor_set_version; fără `apply`, doar arată.
+#
+# Secrete în environment-ul GitHub ales (implicit „staging"): SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+
+name: competitor-sets
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'discover (doar citire) sau create'
+        type: choice
+        options: [discover, create]
+        default: discover
+      sets:
+        description: 'Pentru create: JSON { "<slug brand>": { "effective_from": "YYYY-MM-DD", "note": "...", "members": [ { "name": "...", "domain": "...", "listening_keywords": [], "social_handles": [], "ads_advertiser_ids": [] } ] } }'
+        type: string
+        default: ''
+      apply:
+        description: 'Pentru create: scrie (altfel doar arată ce ar scrie)'
+        type: boolean
+        default: false
+      environment:
+        description: 'Environment GitHub cu secretele Supabase'
+        type: choice
+        options: [staging]
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: competitor-sets
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Dependențe
+        run: npm ci
+
+      - name: Teste (fără rețea)
+        run: node --experimental-strip-types --test 'connectors/competitor-sets/**/*.test.ts' 'connectors/shared/**/*.test.ts'
+
+      - name: Seturi de competitori
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          COMPETITOR_SETS: ${{ inputs.sets }}
+          MODE: ${{ inputs.mode }}
+          APPLY: ${{ inputs.apply }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Lipsesc secretele SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY."
+            exit 1
+          fi
+          if [ "$MODE" = "create" ] && [ "$APPLY" = "true" ]; then
+            node --experimental-strip-types connectors/competitor-sets/run.ts create --apply | tee out.log
+          else
+            node --experimental-strip-types connectors/competitor-sets/run.ts "$MODE" | tee out.log
+          fi
+
+      - name: Rezumat
+        if: always()
+        run: |
+          {
+            echo "### Seturi de competitori ($MODE): $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo
+            echo '```'
+            [ -f out.log ] && cat out.log || echo "fără output"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          MODE: ${{ inputs.mode }}

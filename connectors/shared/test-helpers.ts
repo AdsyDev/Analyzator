@@ -85,6 +85,14 @@ export class FakeDb implements Db {
     return hit.map((r) => ({ ...r }) as T)
   }
 
+  async delete<T extends Row>(table: string, query: string): Promise<T[]> {
+    this.log.push({ op: 'delete', table, query })
+    const all = this.tables[table] ?? []
+    const hit = all.filter((r) => matches(r, query))
+    this.tables[table] = all.filter((r) => !hit.includes(r))
+    return hit.map((r) => ({ ...r }) as T)
+  }
+
   /** Upsert ca în Postgres: cheie unică pe onConflict; același rând de două ori în același apel → eroare. */
   async upsert<T extends Row>(table: string, rows: Row[], onConflict: string[]): Promise<T[]> {
     this.log.push({ op: 'upsert', table, row: { count: rows.length, onConflict } })
