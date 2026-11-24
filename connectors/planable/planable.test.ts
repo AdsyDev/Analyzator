@@ -634,7 +634,7 @@ describe('raportul de atribuire pe competitori (deciziile Y)', () => {
     const notes = out.find((o) => o.source === 'planable_listening_competitors')!.errors.filter((e) => e.dimension === ATTRIBUTION).map((e) => e.message)
     assert.deepEqual(notes, [
       'Urinal, set v2: cuvântul „prostamol” → C1 Prostamol',
-      'Urinal, set v2: cuvântul „Alt brand” nu corespunde niciunui competitor din set; nu apare în Concurență',
+      'Urinal, set v2: cuvântul „Alt brand” nu corespunde niciunui competitor din set; nu apare în Competiție',
       'Urinal, set v2: C2 Uronova nu are niciun cuvânt urmărit; apare N/A',
     ])
   })

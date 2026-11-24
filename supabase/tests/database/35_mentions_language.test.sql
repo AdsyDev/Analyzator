@@ -101,9 +101,9 @@ select is(pg_temp.dist('total', 'all'), 2, 'L5: cu all, și negativa în spaniol
 select is(pg_temp.dist('other_language', 'all'), 0, 'L5: cu all, nimic exclus pentru limbă');
 select throws_ok($$ select public.brand_mention_sentiment('20000000-0000-0000-0000-000000000011', current_date - 7, current_date, 'xx') $$, '22023', null, 'L5: filtru de limbă necunoscut');
 
--- L6. Indicatorul „Mențiuni” (v2, deciziile AD) urmează aceeași regulă ---------------------------------------------------------
+-- L6. Indicatorul „Mențiuni” (v2, deciziile AE) urmează aceeași regulă ---------------------------------------------------------
 reset role;
-select is((select sum(value)::integer from public.mentions_metric_observations where brand_id = '20000000-0000-0000-0000-000000000011' and date >= current_date - 7), 5, 'L6: mentions_count v2 (deciziile AD) nu numără es, hu și ar: 5 din 8');
+select is((select sum(value)::integer from public.mentions_metric_observations where brand_id = '20000000-0000-0000-0000-000000000011' and date >= current_date - 7), 5, 'L6: mentions_count v2 (deciziile AE) nu numără es, hu și ar: 5 din 8');
 
 -- L7. Izolare și regim E8 ---------------------------------------------------------------------------------------------------------
 select tests.authenticate_as('30000000-0000-0000-0000-000000000011');

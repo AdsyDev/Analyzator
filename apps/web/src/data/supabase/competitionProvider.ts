@@ -14,7 +14,7 @@ const countOrNull = (v: unknown) => v === null || (typeof v === 'number' && Numb
 const DIRECTIONS = ['higher_is_better', 'lower_is_better', 'neutral']
 const rpcError = (e: { code?: string } | null) => (e?.code === '42501' ? 'Nu ai acces la acest spațiu de brand.' : QUERY_FAILED)
 
-/** Concurența din SQL (D-16): aceleași definiții și intervale pentru brand și competitori; N/A cu motiv, nu zero. */
+/** Competiția din SQL (D-16): aceleași definiții și intervale pentru brand și competitori; N/A cu motiv, nu zero. */
 export function createSupabaseCompetition(client: DataClient): CompetitionProvider {
   return {
     async matrix(ctx) {

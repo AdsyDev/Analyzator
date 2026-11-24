@@ -462,7 +462,7 @@ async function competitorSuggestions(deps: HandlerDeps, userId: string, brandId:
     const domains = rankDomains(rows, brand.domain)
     seomonitor = {
       outcome: 'ok',
-      message: domains.length === 0 ? 'SEOmonitor nu a raportat concurenți în răspunsurile AI ale brandului în ultimele 120 de zile.' : null,
+      message: domains.length === 0 ? 'SEOmonitor nu a raportat competitori în răspunsurile AI ale brandului în ultimele 120 de zile.' : null,
       since,
       domains,
     }

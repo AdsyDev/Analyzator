@@ -3,7 +3,7 @@ import type { Page } from './mention'
 import type { MetricDirection, MetricStatus, MetricUnit } from './metric'
 
 /**
- * Concurență (spec cap. 20). Nu există încă un contract de server; tipurile sunt cerințele UI-ului
+ * Competiție (spec cap. 20). Nu există încă un contract de server; tipurile sunt cerințele UI-ului
  * (`docs/design/ui-data-needs.md`). Comparația folosește aceleași definiții, aceleași surse și aceleași
  * intervale pentru brand și competitori; ce sursa nu oferă rămâne N/A, nu zero. C1-C3 sunt sloturi până
  * când numele, domeniile și advertiserii sunt confirmați.
@@ -54,7 +54,7 @@ export interface CompetitionMatrix {
   data_as_of: IsoDate | null
 }
 
-/** „Unde apare concurența și noi lipsim": subiecte în care un competitor e prezent, iar brandul lipsește sau e mai slab. */
+/** „Unde apare competiția și noi lipsim": subiecte în care un competitor e prezent, iar brandul lipsește sau e mai slab. */
 export interface CompetitionGap {
   id: string
   dimension: Exclude<CompetitionDimension, 'social' | 'listening' | 'ads'>

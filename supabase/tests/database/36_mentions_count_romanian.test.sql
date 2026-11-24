@@ -1,4 +1,4 @@
--- „Mențiuni” doar în română: versiunea 2 a mentions_count (deciziile AD). Date SINTETICE, doar aici.
+-- „Mențiuni” doar în română: versiunea 2 a mentions_count (deciziile AE). Date SINTETICE, doar aici.
 -- T1 = 1000…0001 · brand 1A = 2000…0011 · client T1 (acces 1A) = 3000…0004 · client T2 = 3000…0011
 begin;
 create extension if not exists pgtap with schema extensions;
@@ -57,7 +57,7 @@ select is((public.brand_metrics('20000000-0000-0000-0000-000000000011', array['m
 select is((public.brand_metrics('20000000-0000-0000-0000-000000000011', array['mentions_count'], current_date - 7, current_date - 1) -> 'data' -> 0 -> 'evidence_query' ->> 'version')::int, 2,
   'M3: răspunsul poartă versiunea 2 a definiției');
 
--- M4. Matricea de Concurență: brandul pe aceeași bază ca competitorii (toate limbile) -----------------------------------------
+-- M4. Matricea de Competiție: brandul pe aceeași bază ca competitorii (toate limbile) -----------------------------------------
 create function pg_temp.brand_cell(p_row text) returns jsonb language sql as $$
   select r -> 'cells' -> '20000000-0000-0000-0000-000000000011'
   from jsonb_array_elements(public.brand_competition('20000000-0000-0000-0000-000000000011', current_date - 7, current_date - 1) -> 'groups') g,

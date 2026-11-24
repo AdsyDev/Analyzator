@@ -53,7 +53,7 @@ Se colectează advertiserii din versiunea setului în vigoare azi și din versiu
 
 ## În aplicație
 
-- **Matricea de Concurență**, grupul „Reclame Google”: „Reclame afișate” (creative distincte afișate în România cel puțin o zi din perioadă) și „Reclame noi” (prima afișare în perioadă). Brandul e N/A (reclamele proprii sunt în Paid media). Un competitor fără advertiser e N/A cu motiv; un advertiser încă neinterogat face celula parțială; zilele de după ultima colectare la fel.
+- **Matricea de Competiție**, grupul „Reclame Google”: „Reclame afișate” (creative distincte afișate în România cel puțin o zi din perioadă) și „Reclame noi” (prima afișare în perioadă). Brandul e N/A (reclamele proprii sunt în Paid media). Un competitor fără advertiser e N/A cu motiv; un advertiser încă neinterogat face celula parțială; zilele de după ultima colectare la fel.
 - **„Reclamele competitorilor”**: lista paginată pe server (`brand_competitor_ads`), cu competitorul, advertiserul, formatul, intervalul afișării, marcajul „Nouă în perioadă”, intervalul de afișări și linkul spre pagina reclamei din Ads Transparency Center (acolo se vede creația; aplicația nu copiază imagini sau video).
 
 ## De confirmat la prima rulare reală

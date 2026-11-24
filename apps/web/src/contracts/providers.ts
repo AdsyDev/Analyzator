@@ -167,7 +167,7 @@ export interface SocialProvider {
   competitors(ctx: QueryContext): Promise<ProviderResult<SocialCompetitor[]>>
 }
 
-/** Concurență (spec cap. 20): matricea comparativă și tabelul „Unde apare concurența și noi lipsim". */
+/** Competiție (spec cap. 20): matricea comparativă și tabelul „Unde apare competiția și noi lipsim". */
 export interface CompetitionProvider {
   matrix(ctx: QueryContext): Promise<ProviderResult<CompetitionMatrix>>
   gaps(ctx: QueryContext): Promise<ProviderResult<CompetitionGap[]>>

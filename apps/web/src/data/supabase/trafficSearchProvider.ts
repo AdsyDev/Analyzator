@@ -185,7 +185,7 @@ export function createSupabaseSearch(client: DataClient): SearchProvider {
     },
 
     // SEOmonitor nu dă pozițiile organice ale concurenților (doar în AI Search): golurile nu se pot calcula încă.
-    contentGaps: async () => notConnected('Pozițiile organice ale concurenților nu sunt colectate; golurile de conținut apar după adăugarea lor.'),
+    contentGaps: async () => notConnected('Pozițiile organice ale competitorilor nu sunt colectate; golurile de conținut apar după adăugarea lor.'),
 
     // Indexare (L): starea și numărul de URL-uri vin clasificate de `brand_index_status`.
     async indexStatus(brandId) {

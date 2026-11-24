@@ -1,4 +1,4 @@
--- „Mențiuni” doar în română: versiunea 2 a `mentions_count` (deciziile AD din docs/decisions.md, cererea din 24 nov. 2026).
+-- „Mențiuni” doar în română: versiunea 2 a `mentions_count` (deciziile AE din docs/decisions.md, cererea din 24 nov. 2026).
 --
 -- Versiunea 1 numără toate mențiunile publicate în interval, în orice limbă. Versiunea 2 nu le mai numără pe cele clar în
 -- altă limbă decât româna, cu aceeași regulă ca feed-ul și distribuția din Listening (deciziile AC):
@@ -9,7 +9,7 @@
 -- Ca la H-2: aceeași cheie, versiune nouă cu `valid_from`, iar view-ul de observații se înlocuiește. Versiunea 1 rămâne în
 -- registru ca istoric (registrul e imutabil); analizele publicate își păstrează instantaneul cu versiunea 1.
 --
--- Matricea de Concurență: limba mențiunilor competitorilor nu se poate stabili (textul lor nu se păstrează, Y-5). Ca
+-- Matricea de Competiție: limba mențiunilor competitorilor nu se poate stabili (textul lor nu se păstrează, Y-5). Ca
 -- „Mențiuni” și „Share of voice (mențiuni)” să compare același lucru, celula brandului numără acolo toate limbile, cu
 -- starea și acoperirea din registru și cu motivul scris în celulă.
 
@@ -55,9 +55,9 @@ where not metrics.mention_other_language(language, language_detected)
 group by tenant_id, brand_id, (published_at at time zone 'Europe/Bucharest')::date;
 
 comment on view public.mentions_metric_observations is
-  'Observațiile mentions_count (v2, deciziile AD): mențiuni distincte pe zi (data publicării, Europe/Bucharest), fără cele clar în altă limbă decât româna.';
+  'Observațiile mentions_count (v2, deciziile AE): mențiuni distincte pe zi (data publicării, Europe/Bucharest), fără cele clar în altă limbă decât româna.';
 
--- 3. Matricea de Concurență: brandul pe aceeași bază ca competitorii ------------------------------------------------------------
+-- 3. Matricea de Competiție: brandul pe aceeași bază ca competitorii ------------------------------------------------------------
 
 do $$
 declare

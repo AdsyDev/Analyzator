@@ -1,6 +1,6 @@
 # Google Ads Transparency (reclamele competitorilor)
 
-**Ce aduce, pentru fiecare brand:** reclamele advertiserilor configurați pentru competitorii lui, afișate în România, cu formatul, perioada de afișare declarată de Google și linkul spre pagina reclamei. Apar în **Concurență**: rândurile „Reclame Google” din matrice și lista „Reclamele competitorilor”.
+**Ce aduce, pentru fiecare brand:** reclamele advertiserilor configurați pentru competitorii lui, afișate în România, cu formatul, perioada de afișare declarată de Google și linkul spre pagina reclamei. Apar în **Competiție**: rândurile „Reclame Google” din matrice și lista „Reclamele competitorilor”.
 
 **Nu aduce:** buget, clickuri, reach sau performanța reclamelor competitorilor (Google nu le publică și nu le estimăm).
 

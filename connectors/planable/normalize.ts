@@ -412,13 +412,13 @@ export function profileOwners(members: SetMember[], handle: string, displayName:
  * neatribuit și ce competitor nu are nimic. Doar nume de branduri și cuvinte urmărite, nimic despre autori. Nu schimbă statusul.
  */
 export function attributionNotes(o: { brand: string; version: number | null; members: SetMember[]; kind: 'cuvântul' | 'profilul'; items: Array<{ text: string; owners: SetMember[] }> }): string[] {
-  if (o.version === null) return [`${o.brand}: brandul nu are un set de competitori în vigoare; datele nu apar în Concurență până la configurare`]
+  if (o.version === null) return [`${o.brand}: brandul nu are un set de competitori în vigoare; datele nu apar în Competiție până la configurare`]
   const out: string[] = []
   const MAX = 25
   for (const i of o.items.slice(0, MAX)) {
     out.push(i.owners.length
       ? `${o.brand}, set v${o.version}: ${o.kind} „${i.text}” → ${i.owners.map((m) => `${m.label} ${m.name}`).join(', ')}`
-      : `${o.brand}, set v${o.version}: ${o.kind} „${i.text}” nu corespunde niciunui competitor din set; nu apare în Concurență`)
+      : `${o.brand}, set v${o.version}: ${o.kind} „${i.text}” nu corespunde niciunui competitor din set; nu apare în Competiție`)
   }
   if (o.items.length > MAX) out.push(`${o.brand}: încă ${o.items.length - MAX} elemente, nelistate`)
   for (const m of o.members) {

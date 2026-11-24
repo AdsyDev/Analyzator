@@ -7,7 +7,7 @@ const NO_SOURCE = 'Nu există date sociale pentru acest brand: Planable nu a rul
 const CONTRACT = 'Răspunsul serverului nu respectă contractul așteptat. Reîncearcă sau anunță echipa tehnică.'
 const NO_FORMAT_TOPIC = 'Planable nu trimite formatul și subiectul postărilor, deci gruparea pe format și pe subiect nu se poate calcula.'
 const NO_COMPETITORS = 'Profilurile competitorilor nu au fost încă colectate din Planable Competitors. Apar după ce paginile brandului urmăresc competitori în Planable și rulează colectarea.'
-const NO_SET = 'Brandul nu are încă un set de competitori în vigoare; concurența publică apare după configurarea lui.'
+const NO_SET = 'Brandul nu are încă un set de competitori în vigoare; competiția publică apare după configurarea lui.'
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 /** Textele cardurilor (descrieri, nu formule: valorile vin din SQL). */
@@ -110,7 +110,7 @@ export function createSupabaseSocial(client: DataClient): SocialProvider {
       )
     },
     groups: async () => notConnected(NO_FORMAT_TOPIC),
-    // Planable Competitors (deciziile Y): aceleași valori ca rândurile „Social public” din matricea de Concurență.
+    // Planable Competitors (deciziile Y): aceleași valori ca rândurile „Social public” din matricea de Competiție.
     async competitors(ctx) {
       const { data, error } = await client.rpc('brand_social_competitors', { p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to })
       if (error) return failed(error.code === '42501' ? 'Nu ai acces la acest spațiu de brand.' : CONTRACT)

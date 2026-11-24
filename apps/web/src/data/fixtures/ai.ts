@@ -138,7 +138,7 @@ function buildAnswers(brandId: string, to: string): AiAnswerDetail[] {
 
 export const answerPlainText = (a: AiAnswerDetail): string => a.segments.map((s) => (s.kind === 'cite' ? `[${s.n}]` : s.text)).join('')
 
-/** Numărători pe entitate, din răspunsurile generate (pentru matricea de Concurență). */
+/** Numărători pe entitate, din răspunsurile generate (pentru matricea de Competiție). */
 export interface AiEntityRates {
   entities: AiMatrixEntity[]
   total: number
