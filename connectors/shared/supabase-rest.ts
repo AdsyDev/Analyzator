@@ -101,6 +101,12 @@ export class SupabaseRest implements Db {
     return (await this.#request<T[] | null>('PATCH', `${table}?${query}`, patch)) ?? []
   }
 
+  /** Ștergere filtrată; doar pentru unelte administrative (de ex. anularea unei scrieri începute). Nu se reîncearcă. */
+  async delete<T extends Row>(table: string, query: string): Promise<T[]> {
+    if (!query.includes('=eq.')) throw new Error('delete fără filtru eq refuzat')
+    return (await this.#request<T[] | null>('DELETE', `${table}?${query}`)) ?? []
+  }
+
   async upsert<T extends Row>(table: string, rows: Row[], onConflict: string[]): Promise<T[]> {
     if (rows.length === 0) return []
     for (const col of onConflict) {
