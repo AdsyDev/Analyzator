@@ -28,6 +28,25 @@ describe('createSupabaseMentions', () => {
     expect(s2.kind === 'ready' && s2.data.without_content).toBe(0)
   })
 
+  it('mențiunile în altă limbă (deciziile AC) vin numărate separat; un server mai vechi, fără câmp, înseamnă zero', async () => {
+    const fake = fakeDataClient({ rpc: () => ({ data: { items: [mention], total: 1, page: 1, page_size: 20, without_content: 0, other_language: 42 } }) })
+    const r = await createSupabaseMentions(fake.client).list(ctx, { sentiment: null, source: null, author: null, page: 1, page_size: 20 })
+    expect(r.kind === 'ready' && r.data.other_language).toBe(42)
+    // Implicit, limba nu se trimite: serverul aplică „doar română”.
+    expect(fake.rpcs[0]!.args).not.toHaveProperty('p_language')
+    const all = fakeDataClient({ rpc: () => ({ data: { items: [mention], total: 1, page: 1, page_size: 20, without_content: 0, other_language: 0 } }) })
+    await createSupabaseMentions(all.client).list(ctx, { sentiment: null, source: null, author: null, language: 'all', page: 1, page_size: 20 })
+    expect(all.rpcs[0]).toEqual({ fn: 'brand_mentions', args: expect.objectContaining({ p_language: 'all' }) })
+    const older = fakeDataClient({ rpc: () => ({ data: { items: [mention], total: 1, page: 1, page_size: 20 } }) })
+    const o = await createSupabaseMentions(older.client).list(ctx, { sentiment: null, source: null, author: null, page: 1, page_size: 20 })
+    expect(o.kind === 'ready' && o.data.other_language).toBe(0)
+    const dist = { connected: true, total: 2, positive: 1, neutral: 1, negative: 0, unreviewed: 3, owned_excluded: 0, without_content: 0, shares: { positive: 50, neutral: 50, negative: 0 } }
+    const s1 = await createSupabaseMentions(fakeDataClient({ rpc: () => ({ data: { ...dist, other_language: 9 } }) }).client).sentiment(ctx)
+    expect(s1.kind === 'ready' && s1.data.other_language).toBe(9)
+    const s2 = await createSupabaseMentions(fakeDataClient({ rpc: () => ({ data: dist }) }).client).sentiment(ctx)
+    expect(s2.kind === 'ready' && s2.data.other_language).toBe(0)
+  })
+
   it('fără Listening conectat: sentimentul e „Sursă neconectată”, nu zero', async () => {
     const { client } = fakeDataClient({ rpc: () => ({ data: { connected: false, total: 0, positive: 0, neutral: 0, negative: 0, unreviewed: 0, owned_excluded: 0, shares: { positive: null, neutral: null, negative: null } } }) })
     expect((await createSupabaseMentions(client).sentiment(ctx)).kind).toBe('not_connected')

@@ -3,7 +3,7 @@ import { KpiCard } from '../../components/KpiCard'
 import type { AsyncState } from '../../data/useAsync'
 import { formatRange } from '../../lib/format'
 import { sparkPoints } from './sparks'
-import { MISSING_DEFINITION, unregisteredReason, type KpiSlot } from './slots'
+import { MISSING_DEFINITION, UNREGISTERED_TITLE, unregisteredReason, type KpiSlot } from './slots'
 import type { EvidenceTarget } from './EvidenceHost'
 
 interface Props {
@@ -13,13 +13,15 @@ interface Props {
   page: string
   metrics: AsyncState<MetricsBundle>
   definitions: Map<string, MetricDefinition>
+  /** Registrul a răspuns (`useDefinitions().loaded`): o cheie fără definiție e atunci „Indicator nedefinit”. */
+  registryLoaded: boolean
   trends: AsyncState<TrendSeries[]>
   onRetry: () => void
   onOpen: (target: EvidenceTarget) => void
 }
 
 /** Cele 6 KpiCards. Fiecare slot își păstrează starea: lipsa unei definiții sau a unei serii nu blochează cardul. */
-export function KpiGrid({ slots, page, metrics, definitions, trends, onRetry, onOpen }: Props) {
+export function KpiGrid({ slots, page, metrics, definitions, registryLoaded, trends, onRetry, onOpen }: Props) {
   const items = metrics.status === 'done' ? metrics.value.items : []
   return (
     <div className="grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="kpi-grid">
@@ -28,6 +30,7 @@ export function KpiGrid({ slots, page, metrics, definitions, trends, onRetry, on
         const def = definitions.get(slot.key) ?? null
         const label = def?.label ?? slot.label
         const cmp = item?.evidence_query.comparison_period
+        const unregistered = def === null && item?.status === 'not_connected'
         return (
           <KpiCard
             key={slot.key}
@@ -40,7 +43,8 @@ export function KpiGrid({ slots, page, metrics, definitions, trends, onRetry, on
             direction={def?.direction ?? 'neutral'}
             qualifier={def?.aggregation_label ?? null}
             compareLabel={cmp ? `față de ${formatRange(cmp.start, cmp.end)}` : undefined}
-            emptyReason={def === null && item?.status === 'not_connected' ? unregisteredReason(slot) : null}
+            emptyReason={unregistered ? unregisteredReason(slot) : null}
+            emptyTitle={unregistered && registryLoaded ? UNREGISTERED_TITLE : null}
             onOpen={() => item && onOpen({ page, label, query: item.evidence_query, item, definition: def })}
             onRetry={onRetry}
           />

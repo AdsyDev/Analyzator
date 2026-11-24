@@ -40,7 +40,7 @@ function OverviewContent({ brand, ctx, user, aiPanel }: { brand: Brand; ctx: Que
   const key = ctxKey(ctx)
 
   const metrics = useMetrics(ctx, KPI_KEYS)
-  const { byKey } = useDefinitions(TREND_KEYS)
+  const { byKey, loaded: registryLoaded } = useDefinitions(TREND_KEYS)
   const trends = useTrends(ctx, TREND_KEYS)
   const insights = useAsync(() => providers.insights.list(ctx), [providers, key])
   const sentiment = useAsync(() => providers.mentions.sentiment(ctx), [providers, key])
@@ -57,7 +57,7 @@ function OverviewContent({ brand, ctx, user, aiPanel }: { brand: Brand; ctx: Que
     <>
       {/* Grilele urmează lățimea coloanei (@container), nu a ferestrei: sidebarul AdSy AI o îngustează când e deschis. */}
       <div className="@container flex min-w-0 flex-col gap-5">
-        <OverviewKpis brand={brand} search={search} metrics={metrics.state} definitions={byKey} sentiment={sentiment.state} matrix={matrix.state} onRetry={metrics.reload} onOpen={setTarget} />
+        <OverviewKpis brand={brand} search={search} metrics={metrics.state} definitions={byKey} registryLoaded={registryLoaded} sentiment={sentiment.state} matrix={matrix.state} onRetry={metrics.reload} onOpen={setTarget} />
         <div className="grid grid-cols-1 gap-5 @5xl:grid-cols-3">
           <AiTrendCard ctx={ctx} trends={trends.state} label={byKey.get(AI_TREND_KEY)?.label ?? 'AI Share of Voice'} onRetry={trends.reload} href={href('ai')} />
           <PlatformsCard state={engines.state} onRetry={engines.reload} href={href('ai')} />

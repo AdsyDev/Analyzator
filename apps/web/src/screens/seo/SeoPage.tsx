@@ -33,7 +33,7 @@ function SeoContent({ brand, ctx, canManageSources }: { brand: Brand; ctx: Query
   const key = ctxKey(ctx)
 
   const metrics = useMetrics(ctx, SEO_KPI_KEYS)
-  const { byKey } = useDefinitions(SEO_KPI_KEYS)
+  const { byKey, loaded: registryLoaded } = useDefinitions(SEO_KPI_KEYS)
   const sparks = useTrends(ctx, SEO_KPI_KEYS)
   const keywords = useAsync(() => providers.search.keywords(ctx, f), [providers, key])
   const pages = useAsync(() => providers.search.landingPages(ctx), [providers, key])
@@ -41,7 +41,7 @@ function SeoContent({ brand, ctx, canManageSources }: { brand: Brand; ctx: Query
 
   return (
     <div className="flex flex-col gap-5">
-      <KpiGrid slots={SEO_KPI_SLOTS} page="SEO și Search" metrics={metrics.state} definitions={byKey} trends={sparks.state} onRetry={metrics.reload} onOpen={setTarget} />
+      <KpiGrid slots={SEO_KPI_SLOTS} page="SEO și Search" metrics={metrics.state} definitions={byKey} registryLoaded={registryLoaded} trends={sparks.state} onRetry={metrics.reload} onOpen={setTarget} />
       <KeywordTable state={keywords.state} onRetry={keywords.reload} />
       <LandingPages state={pages.state} onRetry={pages.reload} />
       <ContentGaps brandName={brand.name} state={gaps.state} onRetry={gaps.reload} />
