@@ -7,12 +7,16 @@ export const ctxKey = (c: QueryContext): string =>
   [c.brandId, c.period.preset, c.period.from, c.period.to, c.comparison, JSON.stringify(c.filters)].join('|')
 
 /** Definițiile din registru, pe cheie. O cheie fără definiție lipsește din hartă: nu se inventează. */
-export function useDefinitions(keys: readonly string[]): { state: AsyncState<ProviderResult<MetricDefinition[]>>; byKey: Map<string, MetricDefinition> } {
+/**
+ * Definițiile din registru pentru cheile date. `loaded` = registrul a răspuns: o cheie absentă din `byKey` lipsește atunci
+ * din registru (indicator nedefinit), nu doar dintr-o încărcare eșuată sau în curs.
+ */
+export function useDefinitions(keys: readonly string[]): { state: AsyncState<ProviderResult<MetricDefinition[]>>; byKey: Map<string, MetricDefinition>; loaded: boolean } {
   const { metrics } = useProviders()
   const { state } = useAsync(() => metrics.definitions(keys), [metrics, keys.join(',')])
   const byKey = new Map<string, MetricDefinition>()
   if (state.status === 'done' && state.value.kind === 'ready') for (const d of state.value.data) byKey.set(d.metric_key, d)
-  return { state, byKey }
+  return { state, byKey, loaded: state.status === 'done' && state.value.kind === 'ready' }
 }
 
 export function useMetrics(ctx: QueryContext, keys: readonly string[]): { state: AsyncState<MetricsBundle>; reload: () => void } {

@@ -36,6 +36,7 @@ import { PORTFOLIO_PATH, ROLE_LABELS, adminItemsFor, adminPath, brandNavFor, bra
 import { sharedSearch } from '../lib/period'
 import { useTheme } from '../theme/ThemeProvider'
 import { Avatar } from './ui/Avatar'
+import { BrandMark } from './ui/BrandMark'
 import { Menu } from './ui/Menu'
 
 const ICONS: Record<string, Icon> = {
@@ -336,7 +337,7 @@ export function AppShell({ user, brands, brandId, onBrandChange, title, eyebrow,
               triggerClassName="h-10 min-w-0 max-w-[50vw] rounded-[10px] px-2.5 text-[13.5px] font-semibold hover:bg-neutral-soft sm:max-w-none md:h-9"
               trigger={
                 <>
-                  <Avatar name={current?.name ?? '?'} size="sm" tone="lav" />
+                  <BrandMark name={current?.name ?? '?'} domain={current?.domain} size="sm" />
                   <span className="truncate">{current?.name ?? 'Alege brandul'}</span>
                 </>
               }

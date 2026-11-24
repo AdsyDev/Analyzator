@@ -138,10 +138,13 @@ export function AppLayout() {
     () => (dynamic ? { key: dynamic.key, label: dynamic.label, defaultValue: 'all', options: [{ value: 'all', label: dynamic.allLabel }, ...(dynamicOptions ?? []).map((o) => ({ value: o, label: o }))] } : null),
     [dynamic, dynamicOptions],
   )
-  const filterDefs = useMemo<readonly FilterDef[]>(() => [...(module?.filters ?? []), ...(dynamicDef ? [dynamicDef] : [])], [module, dynamicDef])
+  // Filtrele doar pentru agenție intră în context numai pentru `agency_admin`; altfel parametrul din URL nu are efect.
+  const isAdmin = user.role === 'agency_admin'
+  const staticDefs = useMemo<readonly FilterDef[]>(() => [...(module?.filters ?? []), ...(isAdmin ? (module?.adminFilters ?? []) : [])], [module, isAdmin])
+  const filterDefs = useMemo<readonly FilterDef[]>(() => [...staticDefs, ...(dynamicDef ? [dynamicDef] : [])], [staticDefs, dynamicDef])
   const visibleFilterDefs = useMemo<readonly FilterDef[]>(
-    () => (dynamicDef && (!dynamicOptions || dynamicOptions.length === 0) ? (module?.filters ?? []) : filterDefs),
-    [module, dynamicDef, dynamicOptions, filterDefs],
+    () => (dynamicDef && (!dynamicOptions || dynamicOptions.length === 0) ? staticDefs : filterDefs),
+    [staticDefs, dynamicDef, dynamicOptions, filterDefs],
   )
   const { ctx, change, reset } = useQueryContext(urlBrand ? urlBrand.id : null, filterDefs)
 

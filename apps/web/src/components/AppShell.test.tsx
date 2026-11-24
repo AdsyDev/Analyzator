@@ -64,7 +64,7 @@ describe('AppShell', () => {
     setup()
     const nav = screen.getByRole('navigation', { name: 'Module' })
     expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual([
-      'Overview', 'AI Visibility', 'SEO și Search', 'Indexare', 'Trafic și conversii', 'User experience', 'Paid Media', 'Social', 'Listening', 'Farmacovigilență', 'Concurență', 'Analize și acțiuni', 'Rapoarte', 'AdSy AI',
+      'Overview', 'AI Visibility', 'SEO și Search', 'Indexare', 'Trafic și conversii', 'User experience', 'Paid Media', 'Social', 'Listening', 'Farmacovigilență', 'Competiție', 'Analize și acțiuni', 'Rapoarte', 'AdSy AI',
     ])
     expect(within(nav).getByRole('link', { name: 'Farmacovigilență' })).toHaveAttribute('href', '/brands/b1/pharmacovigilance?period=7d')
     const ai = within(nav).getByRole('link', { name: 'AI Visibility' })

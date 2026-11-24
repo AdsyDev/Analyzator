@@ -3,8 +3,8 @@
 **Ce aduce, pentru fiecare brand:**
 - **Social:** pe zi și pe pagină: urmăritori, afișări, reach, interacțiuni, aprecieri, comentarii, distribuiri, vizualizări video. Plus postările publicate, cu metricile lor.
 - **Listening:** mențiunile brandului (Instagram, TikTok, Facebook, X, YouTube, Reddit), cu sentimentul dat de Planable.
-- **Listening pe competitori:** mențiunile cuvintelor de tip **„competitor”**, numărate pe competitor în Concurență (mențiuni și share of voice). Doar rețeaua, linkul, data și sentimentul Planable; fără textul și autorul mențiunii.
-- **Planable Competitors:** profilurile publice ale competitorilor urmărite pe paginile brandului (Instagram, Facebook, YouTube, TikTok, LinkedIn): urmăritori, postări și interacțiuni pe zi. Apar în Concurență („Social public”) și în Social („Concurență publică”).
+- **Listening pe competitori:** mențiunile cuvintelor de tip **„competitor”**, numărate pe competitor în Competiție (mențiuni și share of voice). Doar rețeaua, linkul, data și sentimentul Planable; fără textul și autorul mențiunii.
+- **Planable Competitors:** profilurile publice ale competitorilor urmărite pe paginile brandului (Instagram, Facebook, YouTube, TikTok, LinkedIn): urmăritori, postări și interacțiuni pe zi. Apar în Competiție („Social public”) și în Social („Competiție publică”).
 
 Ultimele 35 de zile se reimportă la fiecare rulare.
 

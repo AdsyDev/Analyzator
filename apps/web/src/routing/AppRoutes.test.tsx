@@ -108,7 +108,7 @@ describe('rute de brand', () => {
     ['seo', 'SEO și Search', /Prezența în Google/],
     ['traffic', 'Trafic și conversii', /Ce se întâmplă după click/],
     ['listening', 'Listening', /sentiment revizuit de echipa AdSymphony/],
-    ['competition', 'Concurență', /setul de competitori/],
+    ['competition', 'Competiție', /setul de competitori/],
     ['insights', 'Analize și acțiuni', /Interpretările echipei AdSymphony/],
   ])('modulul %s are titlul și subtitlul din design', async (segment, title, subtitle) => {
     setup(`/brands/brand-urinal/${segment}`)
@@ -148,10 +148,10 @@ describe('placeholder-uri cu texte reale (nu „în curând")', () => {
     expect(screen.getByRole('button', { name: 'Importă CSV' })).toBeInTheDocument()
   })
 
-  it('Social fără import: motivul menționează Planable și Concurența', async () => {
+  it('Social fără import: motivul menționează Planable și Competiția', async () => {
     setup('/brands/brand-urinal/social')
     expect(await screen.findByText(/vin din Planable, care nu e încă conectat/)).toBeInTheDocument()
-    expect(screen.getByText(/vezi Concurență/)).toBeInTheDocument()
+    expect(screen.getByText(/vezi Competiție/)).toBeInTheDocument()
   })
 
   it('agency_admin primește „Importă CSV", care duce la Surse (intrarea în flux)', async () => {

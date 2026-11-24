@@ -42,7 +42,7 @@ Extras din `docs/design/reference/Analyzator.dc.html` (referință vizuală, nu 
 
 ## Cadrul comun (shell)
 
-- **Sidebar** colapsabil (sticlă; sub 1024 px, sertar deschis din butonul de meniu al topbarului): Overview, AI Visibility, SEO și Search, Trafic și conversii, Paid Media, Social, Listening, Concurență, Analize și acțiuni. Secțiunea **Administrare** (doar agenție): Clienți și site-uri (cu pagina fiecărui site și sursele lui), Utilizatori, Configurare.
+- **Sidebar** colapsabil (sticlă; sub 1024 px, sertar deschis din butonul de meniu al topbarului): Overview, AI Visibility, SEO și Search, Trafic și conversii, Paid Media, Social, Listening, Competiție, Analize și acțiuni. Secțiunea **Administrare** (doar agenție): Clienți și site-uri (cu pagina fiecărui site și sursele lui), Utilizatori, Configurare.
 - **Topbar** (sticlă): selector de brand (lista „Spații de brand accesibile", cu categoria; linkul „Clienți și site-uri" doar pentru agenție), titlul paginii, comutator temă, meniul utilizatorului (nume, rol și organizație, email, „Vezi interfața ca" client/agenție doar în previzualizare, „Ieși din cont").
 - **FilterBar**: perioadă (Ultimele 7 zile, Ultimele 28 de zile, Luna curentă, Interval personalizat, cu intervalul afișat), comparație („vs perioada anterioară" implicit, „vs anul trecut"), filtre specifice modulului (Trafic: Device și Canal), chipuri pentru filtrele active și „Resetează filtrele".
 - **Linia de proveniență**: „Date până la <data>" · „Ultimul refresh <acum 2 ore>".
@@ -63,7 +63,7 @@ Structura de mai jos e cea din propunerea din 10 nov. 2026 („Overview pentru d
 3. Șase carduri, fiecare cu întrebarea la care răspunde, numele exact al metricii și link spre detaliu cu aceleași filtre: Vizibilitate AI (AI Mention Rate), Vizibilitate organică (Visibility SEOmonitor), Conversații relevante (mențiuni + ponderea negativă revizuită, cu numere absolute), Performanță socială (interacțiuni), Trafic pe site (sesiuni), Acțiuni importante (key events). Fiecare deschide EvidenceDrawer.
 4. „Ce s-a schimbat": Oportunitate și Risc (cea mai mare variație favorabilă și nefavorabilă, de cel puțin 5 %, etichetate „semnal automat, neconfirmat") și Decizie (prima acțiune deschisă din ultima analiză publicată). Fiecare cu mărime, sursă, perioadă și confirmare.
 5. „Evoluția brandului": patru grafice pe aceeași perioadă (AI, search, trafic, mențiuni), fiecare cu scara ei.
-6. „Poziția față de competitori": un rând pe AI, SEO și conversații din matricea de Concurență, cu locul în set pe fiecare dimensiune. Fără scor general.
+6. „Poziția față de competitori": un rând pe AI, SEO și conversații din matricea de Competiție, cu locul în set pe fiecare dimensiune. Fără scor general.
 7. „Prioritățile următoare": max 3 acțiuni deschise, cu responsabil, termen și, unde sunt completate, efort și KPI urmărit; „Deschide dovezile".
 8. „Interpretarea AdSymphony": ultima analiză publicată, cu autor, perioadă, data publicării, dovezi, „Limite", „Vezi toate analizele".
 
@@ -105,7 +105,7 @@ Mutat din Trafic (E-1, varianta a): „Comportament" (Microsoft Clarity, pe devi
 
 E-2, varianta a. „Jurnal de farmacovigilență" (marcat la, item, utilizator, notificat, status), cu filtrele Status și Tip. Doar `agency_admin` (B7-14); celelalte roluri sunt redirecționate la Listening, fără cerere spre jurnal. Designul spunea „vizibil agenției și contactelor PV"; rămâne varianta îngustă din B7-14.
 
-## Concurență (`/brands/:id/competition`)
+## Competiție (`/brands/:id/competition`)
 
 Antet cu „Set de competitori v<n>", „Efectiv din <data>", „Date până la <data>"; ComparisonTable mare grupată pe surse (AI, SEO, social public), cu „Sursă: <sursă>" per grup, N/A explicat în notă, cea mai bună valoare marcată.
 
@@ -238,7 +238,7 @@ Ce s-a implementat diferit de designul din `docs/design/reference/` și de ce. N
 |---|---|---|
 | Trend al mențiunilor și topic map | Neimplementate | Fără sursă și fără contract de server; nu inventăm serii. |
 | Analiza competitorilor în Listening | Neimplementată | Listening are date doar pentru brand; competitorii sunt `not_connected` în matrice. |
-| Clic pe celulă în matrice → dovezi | Neimplementat | Celulele de Concurență nu sunt `MetricResponse` și nu au `evidence_query`. |
+| Clic pe celulă în matrice → dovezi | Neimplementat | Celulele de Competiție nu sunt `MetricResponse` și nu au `evidence_query`. |
 | Dimensiuni Presă / Ads / Reviews | Absente | Sunt după lansare. |
 | Filtre Listening | Doar sentiment și sursă | Restul nu au cerință în spec cap. 18. |
 | Sentiment pe fiecare mențiune | „Revizuit de <nume>" sau „Nerevizuit" | Un sentiment neverificat nu se afișează ca neutru. |

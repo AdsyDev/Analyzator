@@ -19,7 +19,7 @@ export interface ComparisonColumn {
 }
 
 /**
- * O celulă: o metrică din provider (`MetricItem`), o valoare din matricea de Concurență (`CompetitionCell`) sau un
+ * O celulă: o metrică din provider (`MetricItem`), o valoare din matricea de Competiție (`CompetitionCell`) sau un
  * motiv explicit pentru care nu există date (de ex. competitorii nu au sursă). Motivul nu e o stare de metrică:
  * nu se fabrică un `MetricItem` pentru ce nu a venit de la server.
  */

@@ -39,7 +39,7 @@ const cell = (value: number | null, unit: MetricUnit, over: Partial<CompetitionC
 })
 
 /**
- * Matricea de Concurență din fixtures, compusă din celelalte seturi (AI, SEO, social, Listening), ca valorile să
+ * Matricea de Competiție din fixtures, compusă din celelalte seturi (AI, SEO, social, Listening), ca valorile să
  * se potrivească cu paginile respective. Calculele de aici sunt stand-in pentru serverul real (doar fixtures);
  * ce sursa nu oferă pentru competitori rămâne N/A cu motiv.
  */

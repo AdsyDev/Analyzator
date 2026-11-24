@@ -21,6 +21,8 @@ export function mentionFiltersFrom(ctx: QueryContext): MentionFilters {
   const src = ctx.filters.source
   const author = ctx.filters.author
   return {
+    // `language` ajunge în context doar pentru agency_admin (filtru de agenție); altfel lipsește.
+    language: ctx.filters.language === 'all' ? 'all' : null,
     sentiment: s === 'unreviewed' || (SENTIMENTS as readonly string[]).includes(s ?? '') ? (s as SentimentFilter) : null,
     source: src && src !== 'all' ? src : null,
     author: author === 'external' || author === 'owned' ? author : null,
@@ -46,15 +48,15 @@ function ListeningContent({ brand, ctx, admin }: { brand: Brand; ctx: QueryConte
   const key = ctxKey(ctx)
 
   const metrics = useMetrics(ctx, LISTENING_KPI_KEYS)
-  const { byKey } = useDefinitions(LISTENING_KPI_KEYS)
+  const { byKey, loaded: registryLoaded } = useDefinitions(LISTENING_KPI_KEYS)
   const sparks = useTrends(ctx, LISTENING_KPI_KEYS)
   const sentiment = useAsync(() => providers.mentions.sentiment(ctx), [providers, key])
 
   return (
     <div className="flex flex-col gap-5">
-      <KpiGrid slots={LISTENING_KPI_SLOTS} page="Listening" metrics={metrics.state} definitions={byKey} trends={sparks.state} onRetry={metrics.reload} onOpen={setTarget} />
+      <KpiGrid slots={LISTENING_KPI_SLOTS} page="Listening" metrics={metrics.state} definitions={byKey} registryLoaded={registryLoaded} trends={sparks.state} onRetry={metrics.reload} onOpen={setTarget} />
       <SentimentSection state={sentiment.state} onRetry={sentiment.reload} />
-      <MentionFeed key={key} brand={brand} ctx={ctx} filters={filters} onChanged={() => {}} />
+      <MentionFeed key={key} brand={brand} ctx={ctx} filters={filters} admin={admin} onChanged={() => {}} />
       {admin && (
         <p className="text-[12.5px] text-text-2">
           Marcajele pentru farmacovigilență, cu starea notificării, sunt în{' '}

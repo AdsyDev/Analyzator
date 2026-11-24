@@ -27,6 +27,8 @@ export interface KpiCardProps {
   compareLabel?: string
   /** Înlocuiește motivul stării goale (de ex. indicator fără definiție în registru); nu schimbă starea. */
   emptyReason?: string | null
+  /** Înlocuiește titlul stării goale (de ex. „Indicator nedefinit”); nu schimbă starea. */
+  emptyTitle?: string | null
   /** Întrebarea la care răspunde cardul în Overview (de ex. „Vizibilitate AI"); eticheta rămâne numele exact al metricii. */
   category?: string
   /** Un rând în plus, deja calculat de server și formatat de apelant (de ex. ponderea negativă revizuită). */
@@ -49,9 +51,9 @@ const DELTA_ICON: Record<DeltaDirection, typeof ArrowUpRightIcon> = {
   flat: MinusIcon,
 }
 
-export function KpiCard({ label, definition, metric, loading = false, error = null, spark, direction = 'higher_is_better', qualifier = null, compareLabel, emptyReason = null, category, extra = null, detail = null, onOpen, onRetry }: KpiCardProps) {
+export function KpiCard({ label, definition, metric, loading = false, error = null, spark, direction = 'higher_is_better', qualifier = null, compareLabel, emptyReason = null, emptyTitle = null, category, extra = null, detail = null, onOpen, onRetry }: KpiCardProps) {
   const base = metric ? metricView(metric) : null
-  const view = base && emptyReason && !base.hasValue ? { ...base, emptyReason } : base
+  const view = base && !base.hasValue ? { ...base, emptyReason: emptyReason ?? base.emptyReason, emptyTitle: emptyTitle ?? base.emptyTitle } : base
   const paths = spark ? sparkPaths(spark) : { line: '', area: '' }
   const state = loading ? 'loading' : error ? 'error' : 'ready'
 

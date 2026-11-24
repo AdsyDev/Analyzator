@@ -7,7 +7,7 @@ import { formatInteger, formatMetricValue, formatRange } from '../../lib/format'
 import { isGoodChange, metricView } from '../../lib/metricView'
 import { brandPath } from '../../lib/navigation'
 import type { EvidenceTarget } from '../shared/EvidenceHost'
-import { MISSING_DEFINITION, unregisteredReason } from '../shared/slots'
+import { MISSING_DEFINITION, UNREGISTERED_TITLE, unregisteredReason } from '../shared/slots'
 import { positionRows } from './position'
 import { OVERVIEW_CARDS } from './slots'
 
@@ -17,6 +17,8 @@ interface Props {
   search: string
   metrics: AsyncState<MetricsBundle>
   definitions: Map<string, MetricDefinition>
+  /** Registrul a răspuns: o cheie fără definiție e atunci „Indicator nedefinit”, nu „Sursă neconectată”. */
+  registryLoaded: boolean
   sentiment: AsyncState<ProviderResult<SentimentDistribution>>
   matrix: AsyncState<ProviderResult<CompetitionMatrix>>
   onRetry: () => void
@@ -46,7 +48,7 @@ export function sentimentLine(s: SentimentDistribution): string {
 const SENTIMENT_LABEL = 'Sentiment pozitiv (mențiuni revizuite)'
 const SENTIMENT_DEFINITION = 'Ponderea mențiunilor cu sentiment pozitiv din mențiunile revizuite de echipă, în perioada selectată. Mențiunile nerevizuite și postările din conturile proprii nu intră.'
 const POSITION_LABEL = 'Locul în setul de competitori (AI)'
-const POSITION_DEFINITION = 'Locul brandului printre competitorii din setul în vigoare, pe primul indicator AI din matricea de Concurență. Entitățile fără valoare nu intră în clasament. Nu e un scor compus.'
+const POSITION_DEFINITION = 'Locul brandului printre competitorii din setul în vigoare, pe primul indicator AI din matricea de Competiție. Entitățile fără valoare nu intră în clasament. Nu e un scor compus.'
 
 /** Starea unui card care citește un provider: încărcare, eroare sau „Sursă neconectată”, înainte de date. */
 function gate<T>(state: AsyncState<ProviderResult<T>>): { data: T } | { tile: { state: 'loading' | 'error' | 'ready'; valueText: null; error?: string; emptyTitle?: string; emptyReason?: string; status?: 'not_connected' | 'unavailable' } } {
@@ -59,10 +61,10 @@ function gate<T>(state: AsyncState<ProviderResult<T>>): { data: T } | { tile: { 
 
 /**
  * Cei șase indicatori din Overview, în ordinea din machetă. Patru sunt metrici din registru (cu numele lor exact și cu
- * dovezi la click); sentimentul și poziția competitivă vin din `brand_mention_sentiment` și din matricea de Concurență.
+ * dovezi la click); sentimentul și poziția competitivă vin din `brand_mention_sentiment` și din matricea de Competiție.
  * Fiecare card își păstrează starea: lipsa unei surse nu le blochează pe celelalte.
  */
-export function OverviewKpis({ brand, search, metrics, definitions, sentiment, matrix, onRetry, onOpen }: Props) {
+export function OverviewKpis({ brand, search, metrics, definitions, registryLoaded, sentiment, matrix, onRetry, onOpen }: Props) {
   const items = metrics.status === 'done' ? metrics.value.items : []
   return (
     <div className="grid grid-cols-2 gap-2.5 sm:gap-3 @3xl:grid-cols-3 @7xl:grid-cols-6" data-testid="kpi-grid">
@@ -98,7 +100,7 @@ export function OverviewKpis({ brand, search, metrics, definitions, sentiment, m
               key={card.key} icon={icon} title={card.category} label={POSITION_LABEL} definition={POSITION_DEFINITION} detail={detail} state="ready" status={row?.rank ? 'ok' : 'unavailable'}
               valueText={row?.rank ? `#${row.rank.place} din ${row.rank.of}` : null}
               sub={row?.rank ? `După ${row.row.label}.` : null}
-              emptyTitle="Fără clasament" emptyReason={row?.rankReason ?? 'Matricea de Concurență nu are un indicator AI.'}
+              emptyTitle="Fără clasament" emptyReason={row?.rankReason ?? 'Matricea de Competiție nu are un indicator AI.'}
             />
           )
         }
@@ -124,7 +126,7 @@ export function OverviewKpis({ brand, search, metrics, definitions, sentiment, m
             deltaGood={view?.deltaDirection ? isGoodChange(def?.direction ?? 'neutral', view.deltaDirection) : null}
             sub={view?.deltaText && cmp ? `față de ${formatRange(cmp.start, cmp.end)}` : null}
             caveat={view?.caveat}
-            emptyTitle={view?.emptyTitle ?? 'Fără date pentru interval'}
+            emptyTitle={registryLoaded && def === null && item?.status === 'not_connected' ? UNREGISTERED_TITLE : (view?.emptyTitle ?? 'Fără date pentru interval')}
             emptyReason={def === null && item?.status === 'not_connected' ? unregisteredReason(card) : (view?.emptyReason ?? null)}
             detail={detail}
             onOpen={item ? () => onOpen({ page: 'Overview', label, query: item.evidence_query, item, definition: def }) : undefined}
