@@ -353,8 +353,9 @@ export function mentionRow(m: Mention, p: Provenance, own: OwnAccounts | null = 
 }
 
 /**
- * Rândul din `competitor_mentions` (deciziile Y): mențiunea unui cuvânt de tip „competitor”. Se păstrează doar rețeaua, linkul,
- * momentul publicării și sentimentul furnizorului; textul și autorul nu (nu sunt despre client și nu servesc unei numărători).
+ * Rândul din `competitor_mentions` (deciziile Y, AF): mențiunea unui cuvânt de tip „competitor”. Se păstrează doar rețeaua, linkul,
+ * momentul publicării, sentimentul furnizorului și limba; textul și autorul nu (nu sunt despre client și nu servesc unei numărători).
+ * Textul pleacă doar în `language_text`, pe care triggerul din baza de date îl clasifică și îl golește înainte de scriere.
  * `builtKey` = cheia construită pentru o mențiune fără link, ca la mențiunile brandului.
  */
 export function competitorMentionRow(m: Mention, keywordId: string, p: Omit<Provenance, 'source_timezone'>, builtKey: string | null = null) {
@@ -369,6 +370,9 @@ export function competitorMentionRow(m: Mention, keywordId: string, p: Omit<Prov
     url: builtKey ? null : m.url.slice(0, 2048),
     published_at: m.publishedAt,
     sentiment: (SENTIMENTS as readonly string[]).includes(s) ? s : 'unknown',
+    // Doar pentru limbă (deciziile AF): un trigger din baza de date o stabilește și golește coloana înainte de scriere.
+    // Textul competitorilor nu se păstrează (Y-5). Fără text, limba rămâne nedeterminată.
+    language_text: m.text && m.text.trim() !== '' ? m.text.slice(0, 20_000) : null,
     source_id: p.source_id,
     sync_run_id: p.sync_run_id,
     collected_at: p.collected_at,

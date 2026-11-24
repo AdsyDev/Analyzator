@@ -57,15 +57,15 @@ select is((public.brand_metrics('20000000-0000-0000-0000-000000000011', array['m
 select is((public.brand_metrics('20000000-0000-0000-0000-000000000011', array['mentions_count'], current_date - 7, current_date - 1) -> 'data' -> 0 -> 'evidence_query' ->> 'version')::int, 2,
   'M3: răspunsul poartă versiunea 2 a definiției');
 
--- M4. Matricea de Competiție: brandul pe aceeași bază ca competitorii (toate limbile) -----------------------------------------
+-- M4. Matricea de Competiție: brandul din registru, doar română (deciziile AF; AE-3 număra toate limbile) ----------------------
 create function pg_temp.brand_cell(p_row text) returns jsonb language sql as $$
   select r -> 'cells' -> '20000000-0000-0000-0000-000000000011'
   from jsonb_array_elements(public.brand_competition('20000000-0000-0000-0000-000000000011', current_date - 7, current_date - 1) -> 'groups') g,
        jsonb_array_elements(g -> 'rows') r
   where g ->> 'dimension' = 'listening' and r ->> 'key' = p_row
 $$;
-select is((pg_temp.brand_cell('mentions_count') ->> 'value')::numeric, 9::numeric, 'M4: în matrice, brandul numără toate limbile (ca la competitori)');
-select ok(pg_temp.brand_cell('mentions_count') ->> 'reason' like '%Toate limbile, ca la competitori%', 'M4: celula spune de ce diferă de Overview');
+select is((pg_temp.brand_cell('mentions_count') ->> 'value')::numeric, 5::numeric, 'M4: în matrice, brandul are aceeași valoare ca „Mențiuni” (doar română, AF)');
+select ok(coalesce(pg_temp.brand_cell('mentions_count') ->> 'reason', '') not like '%Toate limbile%', 'M4: fără nota „toate limbile” din AE-3');
 select is(pg_temp.brand_cell('mentions_count') ->> 'status',
           public.brand_metrics('20000000-0000-0000-0000-000000000011', array['mentions_count'], current_date - 7, current_date - 1) -> 'data' -> 0 ->> 'status',
   'M4: starea rămâne cea din registru');

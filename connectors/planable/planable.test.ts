@@ -448,6 +448,9 @@ describe('Planable: mențiunile competitorilor (deciziile Y)', () => {
     assert.equal(rows.length, 4, 'două cu link, două identice fără link (numerotate), cea cu ftp sărită')
     assert.ok(rows.every((r) => r.keyword_id === 'c1' && r.tenant_id === T1 && r.brand_id === B1 && r.source_id === CONN && r.sync_run_id === c.sync_run_id))
     assert.ok(rows.every((r) => !('text' in r) && !('author_is_owned' in r)), 'fără text și fără autor')
+    // AF: textul pleacă doar în `language_text`, coloana de intrare golită de trigger înainte de scriere (FakeDb nu rulează triggerul).
+    assert.equal(rows.find((r) => r.url === 'https://x.com/p/1')!.language_text, 'Mențiune https://x.com/p/1', 'textul merge doar spre stabilirea limbii')
+    assert.ok(rows.filter((r) => r.url === null).every((r) => r.language_text === null), 'fără text (web), limba rămâne nedeterminată')
     assert.deepEqual(rows.filter((r) => r.url === null).map((r) => String(r.native_id).slice(0, 2)), ['s:', 's:'])
     assert.equal(new Set(rows.map((r) => r.native_id)).size, 4)
     assert.equal(rows.find((r) => r.url === 'https://x.com/p/2')!.sentiment, 'negative')
