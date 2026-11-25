@@ -1,11 +1,9 @@
-import { ArrowDownRightIcon, ArrowUpRightIcon, MinusIcon, PlugsIcon, WarningIcon } from '@phosphor-icons/react'
+import { ArrowDownRightIcon, ArrowUpRightIcon, MinusIcon, PlugsIcon } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 import type { IsoDate, MetricStatus } from '../contracts'
 import { cn } from '../lib/cn'
 import { formatDate } from '../lib/format'
-import { CoverageBadge } from './CoverageBadge'
 import { InfoTip } from './ui/InfoTip'
-import { coverageStateFor } from '../lib/metricView'
 import { useMissingOnPage } from './MissingData'
 
 export interface StatCardProps {
@@ -37,7 +35,7 @@ const ICON = { up: ArrowUpRightIcon, down: ArrowDownRightIcon, flat: MinusIcon }
 
 /**
  * Card pentru indicatori care nu sunt metrici din registru (Paid, Social): date importate, calculate de server.
- * Nu are EvidenceDrawer; arată definiția, valoarea sau lipsa explicată, variația și starea.
+ * Nu are EvidenceDrawer; arată definiția, valoarea sau lipsa explicată și variația (fără badge de acoperire, decizia AI).
  */
 export function StatCard({ label, definition, valueText, deltaText = null, deltaDirection = null, goodWhen = 'neutral', status, note = null, compareLabel, loading = false, category, sourceLabel = null, dataAsOf = null, detail = null, emptyTitle = 'Fără date pentru interval' }: StatCardProps) {
   const empty = valueText === null
@@ -87,25 +85,19 @@ export function StatCard({ label, definition, valueText, deltaText = null, delta
             )}
           </div>
           {compareLabel && deltaText && <span className="text-[12px] leading-tight text-text-2 max-sm:hidden">{compareLabel}</span>}
-          {note && (
-            <p className="flex items-start gap-1.5 text-[12px] leading-snug text-text-2">
-              {status === 'partial' && <WarningIcon size={13} className="mt-px flex-none text-warn-text" aria-hidden="true" />}
-              <span>{note}</span>
-            </p>
+          {note && <p className="text-[12px] leading-snug text-text-2">{note}</p>}
+        </div>
+      )}
+      {(sourceLabel || dataAsOf) && (
+        <div className="mt-auto flex min-w-0 items-center gap-2 whitespace-nowrap border-t border-border pt-2.5 text-[11.5px] text-text-2 max-sm:hidden">
+          {sourceLabel && <span className="flex-none font-semibold text-text">{sourceLabel}</span>}
+          {dataAsOf && (
+            <span className="min-w-0 overflow-hidden text-ellipsis">
+              Date până la <span className="font-mono text-[11px]">{formatDate(dataAsOf)}</span>
+            </span>
           )}
         </div>
       )}
-      <div className="mt-auto flex min-w-0 items-center gap-2 whitespace-nowrap border-t border-border pt-2.5 text-[11.5px] text-text-2 max-sm:col-start-2 max-sm:row-start-1 max-sm:mt-0 max-sm:min-h-6 max-sm:border-t-0 max-sm:pt-0">
-        {sourceLabel && <span className="flex-none font-semibold text-text max-sm:hidden">{sourceLabel}</span>}
-        {dataAsOf && (
-          <span className="min-w-0 overflow-hidden text-ellipsis max-sm:hidden">
-            Date până la <span className="font-mono text-[11px]">{formatDate(dataAsOf)}</span>
-          </span>
-        )}
-        <span className="flex-1 max-sm:hidden" />
-
-        <CoverageBadge state={coverageStateFor(status)} />
-      </div>
     </article>
   )
 }

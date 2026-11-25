@@ -25,6 +25,8 @@ Tipurile din `apps/web/src/contracts/metric.ts` oglindesc `public.metric_definit
 
 Absența valorii se decide după `value`, nu după status: `partial` poate avea `value: null` (zero neconfirmat).
 
+Badge-ul și nota stărilor `partial` / `insufficient_sample` apar în EvidenceDrawer, tabele și matrici; pe cardurile KPI nu (decizia AI).
+
 | `status` | Valoare | Badge | Notă afișată |
 |---|---|---|---|
 | `ok` | da | Complet | Sursă și „Date până la" |
@@ -49,9 +51,9 @@ Sub 1024 px (telefon, tabletă; verificat la 390 px, E-7): sidebarul devine sert
 Sub 640 px, tabelele devin carduri, câte unul pe rând: titlul e prima coloană (sau cea marcată `cardTitle`), iar celelalte coloane apar ca „etichetă: valoare". În tabelul sortabil, sortarea se alege dintr-o listă (coloană și direcție), iar „Carduri / Tabel" păstrează tabelul pentru comparații. Postările din Social au deja propriile carduri, așa că tabelul lor rămâne tabel. Matricele (ComparisonTable, subiecte × competitori) au un card pe metrică sau pe subiect, cu brandul și competitorii unul sub altul. „Fără date", N/A cu motivul, acoperirea și cea mai bună valoare rămân la fel.
 
 ### KpiCard
-Eticheta, `?` cu tooltip de definiție, valoare mare (Sora, cifre tabulare), variație cu săgeată și culoare după `higherIsBetter`, etichetă de comparație, sparkline cu zilele fără date ca întrerupere, rând de proveniență (sursă, „Date până la", CoverageBadge). Se deschide EvidenceDrawer la click/Enter. Stări: `ready`, `loading` (schelet), `partial` (notă galbenă), `stale` (notă gri), `unavailable` (fără date în interval), `not_connected` (cardul nu se desenează; pagina îl numește, decizia AG), `error`, plus `base_zero` și `insufficient_sample`.
+Eticheta, `?` cu tooltip de definiție, valoare mare (Sora, cifre tabulare), variație cu săgeată și culoare după `higherIsBetter`, etichetă de comparație, sparkline cu zilele fără date ca întrerupere, rând de proveniență (sursă, „Date până la"). Fără CoverageBadge și fără nota galbenă de acoperire (decizia AI): acoperirea și motivul stării `partial` / `insufficient_sample` se văd în EvidenceDrawer, care se deschide la click/Enter. Stări: `ready`, `loading` (schelet), `partial` și `insufficient_sample` (valoarea, fără notă pe card), `stale` (notă gri), `base_zero` (notă gri), `unavailable` (fără date în interval), `not_connected` (cardul nu se desenează; pagina îl numește, decizia AG), `error`.
 
-Sub 640 px (telefon, E-7), cardul e compact, pe două rânduri: eticheta, `?` și CoverageBadge sus; valoarea, variația și un sparkline mic jos. Sursa, „Date până la" și perioada de comparație se văd în EvidenceDrawer, care se deschide la atingere. Notele (`partial`, `stale`) și eroarea rămân în card; fără sursă, cardul nu apare (decizia AG). StatCard (Paid, Social) urmează aceeași așezare.
+Sub 640 px (telefon, E-7), cardul e compact, pe două rânduri: eticheta și `?` sus; valoarea, variația și un sparkline mic jos. Sursa, „Date până la" și perioada de comparație se văd în EvidenceDrawer, care se deschide la atingere. Notele gri (`stale`, `base_zero`) și eroarea rămân în card; fără sursă, cardul nu apare (decizia AG). StatCard (Paid, Social) urmează aceeași așezare, tot fără CoverageBadge (decizia AI).
 
 ### ModuleFreshness
 Fâșia „Starea datelor" de deasupra fiecărui modul de brand care depinde de surse (Etapa 2, G-7): pe fiecare sursă, „date până la" și starea (La zi, Întârziat, Fără date); „Sincronizat la" doar unde utilizatorul vede rulările (agenția); „Următoarea actualizare estimată" din programul colectării (`lib/schedule.ts`). O sursă absentă din răspuns apare „Fără date", nu dispare. Stări: încărcare (schelet), fără surse (nimic), fără nicio sursă cu date (fără estimare).

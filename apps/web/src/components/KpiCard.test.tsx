@@ -16,13 +16,13 @@ function setup(over: Partial<KpiCardProps> = {}) {
 }
 
 describe('KpiCard, stări', () => {
-  it('ok: valoare, variație relativă în procente, sursă, „Date până la" și acoperire', () => {
+  it('ok: valoare, variație relativă în procente, sursă și „Date până la", fără badge de acoperire (decizia AI)', () => {
     setup()
     expect(screen.getByText('1.240')).toBeInTheDocument()
     expect(screen.getByText('+12,7 %')).toBeInTheDocument()
     expect(screen.getByText('Google Analytics 4')).toBeInTheDocument()
     expect(screen.getByText(/Date până la/)).toBeInTheDocument()
-    expect(screen.getByText('Complet')).toBeInTheDocument()
+    expect(screen.queryByText('Complet')).toBeNull()
   })
 
   it('emptyReason înlocuiește doar motivul stării goale; o valoare existentă nu e ascunsă', () => {
@@ -38,16 +38,17 @@ describe('KpiCard, stări', () => {
     expect(screen.queryByText('1.240')).toBeNull()
   })
 
-  it('partial: motivul din acoperire (fracție) și procentul în badge', () => {
+  it('partial (decizia AI): valoarea rămâne, fără nota de acoperire și fără badge „Parțial"; detaliul stă în dovezi', () => {
     setup({ metric: metric({ status: 'partial', coverage: 0.82 }) })
-    expect(screen.getByText('Date disponibile pentru 82% din zilele intervalului.')).toBeInTheDocument()
-    expect(screen.getByText('Parțial')).toBeInTheDocument()
-    expect(screen.getByText('82%')).toBeInTheDocument()
+    expect(screen.getByText('1.240')).toBeInTheDocument()
+    expect(screen.queryByText(/Date disponibile pentru/)).toBeNull()
+    expect(screen.queryByText('Parțial')).toBeNull()
+    expect(screen.queryByText('82%')).toBeNull()
   })
 
-  it('partial cu rânduri excluse: spune și asta', () => {
+  it('partial cu rânduri excluse (decizia AI): nota nu apare pe card', () => {
     setup({ metric: metric({ status: 'partial', coverage: 0.9, warnings: [warning('excluded_rows', { detail: { reason: 'missing_weight', count: 2 } })] }) })
-    expect(screen.getByText(/Unele rânduri au fost excluse din calcul/)).toBeInTheDocument()
+    expect(screen.queryByText(/Unele rânduri au fost excluse din calcul/)).toBeNull()
   })
 
   it('partial cu valoare nulă (zero neconfirmat): nu arată 0, ci „Valoare neconfirmată"', () => {
@@ -55,20 +56,20 @@ describe('KpiCard, stări', () => {
     expect(screen.getByText('Valoare neconfirmată')).toBeInTheDocument()
     expect(screen.getByText('Valoarea 0 nu e confirmată: datele acoperă 50% din zilele intervalului.')).toBeInTheDocument()
     expect(screen.queryByText('0')).toBeNull()
-    expect(screen.getByText('Parțial')).toBeInTheDocument()
+    expect(screen.queryByText('Parțial')).toBeNull()
   })
 
-  it('stale: valoarea rămâne, cu data ultimelor date și badge Învechit', () => {
+  it('stale: valoarea rămâne, cu nota gri a ultimelor date, fără badge (decizia AI)', () => {
     setup({ metric: metric({ status: 'stale', data_as_of: '2026-10-02' }) })
     expect(screen.getByText('1.240')).toBeInTheDocument()
     expect(screen.getByText(/Ultimele date sunt din 2 oct\.?\s2026/)).toBeInTheDocument()
-    expect(screen.getByText('Învechit')).toBeInTheDocument()
+    expect(screen.queryByText('Învechit')).toBeNull()
   })
 
-  it('insufficient_sample: valoare marcată cu motivul', () => {
+  it('insufficient_sample (decizia AI): valoarea rămâne, fără nota galbenă pe card', () => {
     setup({ metric: metric({ status: 'insufficient_sample' }) })
     expect(screen.getByText('1.240')).toBeInTheDocument()
-    expect(screen.getByText(/Eșantion mic: sub pragul minim/)).toBeInTheDocument()
+    expect(screen.queryByText(/Eșantion mic: sub pragul minim/)).toBeNull()
   })
 
   it('base_zero: valoare fără variație relativă, cu explicație', () => {

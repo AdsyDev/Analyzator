@@ -563,3 +563,14 @@ Cererea proprietarului produsului, 25 nov. 2026: să ascundem din contul de clie
 | AH-5 | Interfața după migrație | — | Interfața nu mai cere `source_freshness` pentru client; datele de previzualizare (fixtures) întorc tot o listă goală clientului, ca baza de date. |
 | AH-6 | Impact | — | Timp: ~2 ore. O migrație aditivă (două vederi redefinite, aceleași coloane), teste pgTAP și API actualizate. Cost de rulare: neglijabil. Nu e o funcție nouă, ci o restrângere de acces. |
 
+## AI — Cardurile KPI fără nota galbenă de acoperire și fără badge „Parțial / Complet” (2026-11-25)
+
+Cererea proprietarului produsului, 25 nov. 2026: „Vreau să ascundem acele notificări cu galben legat de date și mesajul cu parțial sau complet.” Cardurile din Overview și din module arătau sub sparkline „Date disponibile pentru 89% din zilele intervalului. Variația compară primele 25 de zile din fiecare perioadă.” și, în subsol, pastila „Parțial 89%”.
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| AI-1 | Ce dispare de pe card | (a) doar nota galbenă; (b) nota galbenă și badge-ul | **(b).** `KpiCard`, `KpiTile` (Overview) și `StatCard` (Paid, Social) nu mai afișează `CoverageBadge` (Complet, Parțial, Învechit, Indisponibil) și nici nota galbenă a stărilor `partial` și `insufficient_sample`. |
+| AI-2 | Ce rămâne pe card | — | Valoarea, variația, sursa și „Date până la”, notele gri `stale` („Ultimele date sunt din …”) și `base_zero` (de ce lipsește variația relativă), notele secundare gri din `warnings`, starea fără valoare cu motivul ei (inclusiv „Valoare neconfirmată”) și erorile cu „Reîncearcă” (regula 8). |
+| AI-3 | Unde se vede acoperirea | — | În EvidenceDrawer (click pe card): badge-ul cu procentul și motivul rămân neschimbate. Badge-urile din tabele și matrici (Competiție, AI pe engine și subiect, Experiență pe site, starea surselor din Overview) nu fac parte din cerere și rămân. `StatCard` nu are dovezi: acoperirea Paid/Social nu se mai vede pe card. |
+| AI-4 | Ce nu se schimbă | — | Calculul și contractul: statusul, `coverage` și variația pe aceleași zile (AB) vin la fel de la server. Se schimbă doar afișarea. |
+| AI-5 | Impact | — | Timp: o oră (trei componente, testele KpiCard, documentația). Cost extern: niciunul. |
