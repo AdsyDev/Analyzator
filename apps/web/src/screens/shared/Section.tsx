@@ -1,9 +1,13 @@
 import type { ReactNode } from 'react'
+import { MissingScope } from '../../components/MissingData'
 
 /** Suprafață solidă pentru conținut cu date (sticla e doar pentru sidebar, topbar, drawere, modale, popovere). */
 export function Section({ title, description, action, children, id, plain = false }: { title: string; description?: string; action?: ReactNode; children: ReactNode; id?: string; plain?: boolean }) {
+  // Fără sursă, secțiunea nu se desenează; pagina o numește în mesajul „Pentru perioada selectată…” (decizia AG).
   return (
-    <section aria-labelledby={id} className={plain ? 'flex flex-col gap-3' : 'flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 shadow-1 sm:p-5'}>
+    <MissingScope label={title}>
+      {(hidden) => (
+    <section hidden={hidden} aria-labelledby={id} className={plain ? 'flex flex-col gap-3' : 'flex flex-col gap-4 rounded-xl border border-border bg-surface p-4 shadow-1 sm:p-5'}>
       {/* Pe ecrane înguste, acțiunea (taburi, butoane) coboară sub titlu în loc să-l strivească. */}
       <header className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1 basis-64">
@@ -16,5 +20,7 @@ export function Section({ title, description, action, children, id, plain = fals
       </header>
       {children}
     </section>
+      )}
+    </MissingScope>
   )
 }

@@ -6,6 +6,7 @@ import { createSupabaseProviders } from '../../data/supabase/providers'
 import { fakeDataClient } from '../../test/fakeDataClient'
 import { addDays, todayBucharest } from '../../lib/period'
 import { pageReady, renderApp, where } from '../../test/renderApp'
+import { expectNoSourceDisconnected, missingNotice, missingWith } from '../../test/missing'
 
 const URL = '/admin/config'
 const useBrand = (id: string) => window.localStorage.setItem('az-brand', id)
@@ -117,7 +118,7 @@ describe('Administrare → Configurare (fixtures de previzualizare)', () => {
     expect(within(dialog).getByRole('button', { name: 'Creează versiunea' })).toBeDisabled()
   })
 
-  it('propuneri fără surse: fiecare sursă spune „Sursă neconectată” și de ce, fără liste inventate', async () => {
+  it('propuneri fără surse: fiecare sursă spune că nu e configurată și de ce, fără liste inventate', async () => {
     useBrand('brand-minimartieni')
     renderApp({ route: URL })
     await pageReady('Configurare')
@@ -125,7 +126,7 @@ describe('Administrare → Configurare (fixtures de previzualizare)', () => {
     const dialog = await screen.findByRole('dialog')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Propune din surse' }))
     const box = await within(dialog).findByRole('region', { name: 'Propuneri din surse' })
-    await waitFor(() => expect(within(box).getAllByText('Sursă neconectată.')).toHaveLength(2))
+    await waitFor(() => expect(within(box).getAllByText('Neconfigurat.')).toHaveLength(2))
     expect(box).toHaveTextContent('workspace Planable')
     expect(box).toHaveTextContent('SEOmonitor conectat')
     expect(within(box).queryByRole('button', { name: /^Adaugă / })).toBeNull()
@@ -150,11 +151,13 @@ describe('Administrare → Configurare (fixtures de previzualizare)', () => {
 })
 
 describe('Administrare → Configurare cu providerul real', () => {
-  it('fără client: „Sursă neconectată" pe fiecare secțiune, cu motiv', async () => {
+  it('fără client (decizia AG): secțiunile nu apar; pagina le numește pe toate trei, cu motivul în tooltip', async () => {
     useBrand('brand-urinal')
     renderApp({ route: URL, wrap: (b) => ({ ...b, config: createSupabaseProviders().config }) })
     await pageReady('Configurare')
-    expect((await screen.findAllByRole('heading', { name: 'Sursă neconectată' })).length).toBe(3)
+    const notice = await missingNotice()
+    for (const name of ['Competitori', 'Aliasuri', 'Grupuri SEOmonitor → brand']) await waitFor(() => expect(notice).toHaveTextContent(name))
+    expectNoSourceDisconnected()
   })
 
   it('cu client fals: aliasurile rămân neconectate (nu există tabel), restul vine din baze', async () => {
@@ -169,7 +172,7 @@ describe('Administrare → Configurare cu providerul real', () => {
     renderApp({ route: URL, wrap: (b) => ({ ...b, config: createSupabaseConfig(fake.client) }) })
     await pageReady('Configurare')
     expect(await within(await section('Competitori')).findByText('Alfa')).toBeInTheDocument()
-    expect(await within(await section('Aliasuri')).findByRole('heading', { name: 'Sursă neconectată' })).toBeInTheDocument()
+    expect(await missingWith(/Aliasurile brandului nu au încă un loc/)).toHaveTextContent('Aliasuri')
     expect(await within(await section('Grupuri SEOmonitor → brand')).findByText('Nicio mapare')).toBeInTheDocument()
     for (const c of fake.calls.filter((c) => c.table.startsWith('competitor'))) expect(c.filters.some(([col, , v]) => col === 'brand_id' && v === 'brand-urinal')).toBe(true)
   })

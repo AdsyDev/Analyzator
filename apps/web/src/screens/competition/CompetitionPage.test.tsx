@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { notConnected, ready } from '../../contracts'
 import { createSupabaseProviders } from '../../data/supabase/providers'
 import { pageReady, renderApp } from '../../test/renderApp'
+import { expectNoSourceDisconnected, missingWith } from '../../test/missing'
 
 const URINAL = '/brands/brand-urinal/competition'
 
@@ -26,19 +27,19 @@ describe('Competiție', () => {
     expect(await within(s).findAllByRole('row')).not.toHaveLength(0)
   })
 
-  it('cu providerul real: „Sursă neconectată" cu motiv, fără date', async () => {
+  it('cu providerul real (decizia AG): secțiunile fără sursă nu apar, pagina le numește; fără date', async () => {
     renderApp({ route: URINAL, wrap: (b) => ({ ...b, competition: createSupabaseProviders().competition }) })
     await pageReady('Competiție')
-    expect((await screen.findAllByText(/neconectat/i)).length).toBeGreaterThan(0)
+    expect(await missingWith(/./)).toBeInTheDocument()
     expect(screen.queryByRole('table', { name: 'Comparație cu competitorii' })).toBeNull()
+    expectNoSourceDisconnected()
   })
 
-  it('reclamele competitorilor: fără colectare, „Sursă neconectată” cu motivul', async () => {
+  it('reclamele competitorilor: fără colectare, secțiunea nu apare; pagina o numește, cu motivul în tooltip', async () => {
     renderApp({ route: URINAL, wrap: (b) => ({ ...b, competition: { ...b.competition, ads: async () => notConnected('Reclamele competitorilor nu au fost încă colectate din Google Ads Transparency Center.') } }) })
     await pageReady('Competiție')
-    const s = (await screen.findByRole('heading', { level: 2, name: 'Reclamele competitorilor' })).closest('section')!
-    expect(await within(s).findByText(/nu au fost încă colectate/)).toBeInTheDocument()
-    expect(within(s).queryByRole('table')).toBeNull()
+    expect(await missingWith(/nu au fost încă colectate/)).toHaveTextContent('Reclamele competitorilor')
+    expect(screen.queryByRole('heading', { level: 2, name: 'Reclamele competitorilor' })).toBeNull()
   })
 
   it('reclamele competitorilor: competitorul, intervalul declarat de Google, „Nouă” și linkul spre Ads Transparency', async () => {

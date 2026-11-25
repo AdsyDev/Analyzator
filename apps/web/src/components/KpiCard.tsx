@@ -9,6 +9,7 @@ import { sparkPaths } from '../lib/spark'
 import { CoverageBadge } from './CoverageBadge'
 import { Button } from './ui/Button'
 import { InfoTip } from './ui/InfoTip'
+import { useMissingOnPage } from './MissingData'
 
 export interface KpiCardProps {
   label: string
@@ -56,6 +57,10 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
   const view = base && !base.hasValue ? { ...base, emptyReason: emptyReason ?? base.emptyReason, emptyTitle: emptyTitle ?? base.emptyTitle } : base
   const paths = spark ? sparkPaths(spark) : { line: '', area: '' }
   const state = loading ? 'loading' : error ? 'error' : 'ready'
+  // Fără sursă (și nu un indicator nedefinit, care are titlul lui): cardul nu se desenează, pagina îl numește (decizia AG).
+  const missing = state === 'ready' && metric?.status === 'not_connected' && emptyTitle === null
+  useMissingOnPage(label, missing, view?.emptyReason ?? null)
+  if (missing) return null
 
   // Sub `sm` (telefon), cardul e compact, pe două rânduri: eticheta și acoperirea sus, valoarea, variația și un
   // sparkline mic jos. Sursa, „Date până la" și perioada de comparație rămân în EvidenceDrawer; stările nu se schimbă.

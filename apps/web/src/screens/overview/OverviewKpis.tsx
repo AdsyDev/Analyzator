@@ -17,7 +17,7 @@ interface Props {
   search: string
   metrics: AsyncState<MetricsBundle>
   definitions: Map<string, MetricDefinition>
-  /** Registrul a răspuns: o cheie fără definiție e atunci „Indicator nedefinit”, nu „Sursă neconectată”. */
+  /** Registrul a răspuns: o cheie fără definiție e atunci „Indicator nedefinit”, nu starea „fără sursă” (decizia AG). */
   registryLoaded: boolean
   sentiment: AsyncState<ProviderResult<SentimentDistribution>>
   matrix: AsyncState<ProviderResult<CompetitionMatrix>>
@@ -50,12 +50,12 @@ const SENTIMENT_DEFINITION = 'Ponderea mențiunilor cu sentiment pozitiv din men
 const POSITION_LABEL = 'Locul în setul de competitori (AI)'
 const POSITION_DEFINITION = 'Locul brandului printre competitorii din setul în vigoare, pe primul indicator AI din matricea de Competiție. Entitățile fără valoare nu intră în clasament. Nu e un scor compus.'
 
-/** Starea unui card care citește un provider: încărcare, eroare sau „Sursă neconectată”, înainte de date. */
+/** Starea unui card care citește un provider: încărcare, eroare sau lipsa sursei (cardul dispare, decizia AG), înainte de date. */
 function gate<T>(state: AsyncState<ProviderResult<T>>): { data: T } | { tile: { state: 'loading' | 'error' | 'ready'; valueText: null; error?: string; emptyTitle?: string; emptyReason?: string; status?: 'not_connected' | 'unavailable' } } {
   if (state.status === 'loading') return { tile: { state: 'loading', valueText: null } }
   if (state.status === 'failed') return { tile: { state: 'error', valueText: null, error: state.message } }
   if (state.value.kind === 'error') return { tile: { state: 'error', valueText: null, error: state.value.message } }
-  if (state.value.kind === 'not_connected') return { tile: { state: 'ready', valueText: null, emptyTitle: 'Sursă neconectată', emptyReason: state.value.reason, status: 'not_connected' } }
+  if (state.value.kind === 'not_connected') return { tile: { state: 'ready', valueText: null, emptyReason: state.value.reason, status: 'not_connected' } }
   return { data: state.value.data }
 }
 
@@ -127,6 +127,7 @@ export function OverviewKpis({ brand, search, metrics, definitions, registryLoad
             sub={view?.deltaText && cmp ? `față de ${formatRange(cmp.start, cmp.end)}` : null}
             caveat={view?.caveat}
             emptyTitle={registryLoaded && def === null && item?.status === 'not_connected' ? UNREGISTERED_TITLE : (view?.emptyTitle ?? 'Fără date pentru interval')}
+            keepWhenMissing={registryLoaded && def === null && item?.status === 'not_connected'}
             emptyReason={def === null && item?.status === 'not_connected' ? unregisteredReason(card) : (view?.emptyReason ?? null)}
             detail={detail}
             onOpen={item ? () => onOpen({ page: 'Overview', label, query: item.evidence_query, item, definition: def }) : undefined}

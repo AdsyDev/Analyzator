@@ -6,6 +6,7 @@ import { formatDate } from '../lib/format'
 import { CoverageBadge } from './CoverageBadge'
 import { InfoTip } from './ui/InfoTip'
 import { coverageStateFor } from '../lib/metricView'
+import { useMissingOnPage } from './MissingData'
 
 export interface StatCardProps {
   label: string
@@ -28,7 +29,7 @@ export interface StatCardProps {
   sourceLabel?: string | null
   dataAsOf?: IsoDate | null
   detail?: ReactNode
-  /** Titlul stării fără valoare; implicit lipsa datelor în interval, „Sursă neconectată" când sursa lipsește. */
+  /** Titlul stării fără valoare; implicit lipsa datelor în interval. Fără sursă, cardul nu se desenează (decizia AG). */
   emptyTitle?: string
 }
 
@@ -43,6 +44,10 @@ export function StatCard({ label, definition, valueText, deltaText = null, delta
   const tone =
     !deltaDirection || deltaDirection === 'flat' || goodWhen === 'neutral' ? 'text-text-2' : (deltaDirection === goodWhen ? 'text-pos-text' : 'text-neg-text')
   const Icon = deltaDirection ? ICON[deltaDirection] : null
+  // Fără sursă: cardul nu se desenează, pagina îl numește (decizia AG).
+  const missing = !loading && status === 'not_connected'
+  useMissingOnPage(label, missing, note)
+  if (missing) return null
 
   return (
     // Sub `sm` (telefon), compact ca KpiCard: eticheta și starea sus, valoarea și variația jos.

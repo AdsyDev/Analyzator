@@ -133,7 +133,7 @@ function IndicatorTable({ title, keys, items, byKey }: { title: string; keys: re
                 <th scope="row" className="px-4 py-2 text-left font-medium">{byKey.get(key)?.label ?? key}</th>
                 <td className="px-4 py-2 text-right tabular-nums">{v?.hasValue ? v.valueText : <span className="text-text-3">Fără date</span>}</td>
                 <td className="px-4 py-2 text-right tabular-nums">{v?.deltaText ?? <span className="text-text-3">N/A</span>}</td>
-                <td className="px-4 py-2 text-[12.5px] text-text-2">{m ? stateText(m) : 'Sursă neconectată'}</td>
+                <td className="px-4 py-2 text-[12.5px] text-text-2">{m ? stateText(m) : 'Fără date'}</td>
               </tr>
             )
           })}

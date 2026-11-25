@@ -2,7 +2,7 @@ import type { KpiSlot } from '../shared/slots'
 
 /**
  * KPI-urile din spec cap. 16. `ga4_engagement_rate` nu e în registru: nu se calculează în UI din sesiuni cu
- * implicare și sesiuni (regula 4); cardul rămâne „Sursă neconectată", cu sursa numită, până intră în registru.
+ * implicare și sesiuni (regula 4); cardul rămâne starea „fără sursă” (decizia AG), cu sursa numită, până intră în registru.
  */
 export const TRAFFIC_KPI_SLOTS: readonly KpiSlot[] = [
   { key: 'ga4_sessions', label: 'Sesiuni' },

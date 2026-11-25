@@ -2,7 +2,7 @@ import type { KpiSlot } from '../shared/slots'
 
 /**
  * KPI-urile din spec cap. 18 care sunt metrici. Cheile `listening_*` nu sunt încă în registru: cardurile rămân
- * „Sursă neconectată", fără definiție inventată. Distribuția sentimentului și lista vin din `MentionsProvider`.
+ * starea „fără sursă” (decizia AG), fără definiție inventată. Distribuția sentimentului și lista vin din `MentionsProvider`.
  */
 export const LISTENING_KPI_SLOTS: readonly KpiSlot[] = [
   { key: 'listening_mentions', label: 'Mențiuni eligibile', sources: ['planable'] },

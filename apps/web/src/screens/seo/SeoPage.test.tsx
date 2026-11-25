@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { failed } from '../../contracts'
 import { createSupabaseProviders } from '../../data/supabase/providers'
 import { pageReady, renderApp, where } from '../../test/renderApp'
+import { expectNoSourceDisconnected, missingNotice, missingWith } from '../../test/missing'
 
 const section = (name: string) => screen.getByRole('heading', { level: 2, name }).closest('section')!
 const ROUTE = '/brands/brand-urinal/seo'
@@ -11,12 +12,13 @@ const open = () => pageReady('SEO și Search')
 const kwRows = () => within(within(section('Keywords urmărite')).getByRole('table')).getAllByRole('row').slice(1)
 
 describe('SEO și Search: KPI din registru', () => {
-  it('cele 6 carduri, cu etichetele din registru când există definiția', async () => {
+  it('cardurile cu sursă, cu etichetele din registru; cel fără sursă e numit în mesajul paginii (decizia AG)', async () => {
     renderApp({ route: ROUTE })
     await open()
     const grid = screen.getByTestId('kpi-grid')
-    expect(within(grid).getAllByRole('article')).toHaveLength(6)
-    for (const n of ['Clicks (Search Console)', 'Impressions (Search Console)', 'CTR (Search Console)', 'Visibility SEOmonitor (ultima observație)', 'Keywords în Top 3', 'Keywords în Top 10']) {
+    expect(within(grid).getAllByRole('article')).toHaveLength(5)
+    expect(await missingNotice()).toHaveTextContent('Visibility SEOmonitor (ultima observație)')
+    for (const n of ['Clicks (Search Console)', 'Impressions (Search Console)', 'CTR (Search Console)', 'Keywords în Top 3', 'Keywords în Top 10']) {
       expect(within(grid).getByRole('article', { name: n })).toBeInTheDocument()
     }
   })
@@ -26,12 +28,10 @@ describe('SEO și Search: KPI din registru', () => {
     await open()
     expect(screen.getByRole('article', { name: 'CTR (Search Console)' })).toHaveAttribute('data-status', 'partial')
     expect(screen.getByRole('article', { name: 'Impressions (Search Console)' })).toHaveAttribute('data-status', 'stale')
-    const vis = screen.getByRole('article', { name: 'Visibility SEOmonitor (ultima observație)' })
-    expect(vis).toHaveAttribute('data-status', 'not_connected')
-    expect(within(vis).getByText('Sursă neconectată')).toBeInTheDocument()
-    await userEvent.click(within(vis).getByRole('button', { name: 'Ce înseamnă indicatorul' }))
-    expect(within(vis).getByRole('tooltip')).toHaveTextContent('Ultima valoare de visibility raportată de SEOmonitor')
-    expect(within(vis).getByText('ultima observație')).toBeInTheDocument()
+    // Fără sursă: cardul nu apare; pagina îl numește, cu motivul în tooltip (decizia AG).
+    expect(screen.queryByRole('article', { name: 'Visibility SEOmonitor (ultima observație)' })).toBeNull()
+    expect(await missingWith(/SEOmonitor/)).toHaveTextContent('Visibility SEOmonitor (ultima observație)')
+    expectNoSourceDisconnected()
   })
 
   it('CTR-ul e în procente, iar variația lui în puncte procentuale', async () => {
@@ -204,7 +204,7 @@ describe('SEO și Search: izolarea secțiunilor și providerul real', () => {
   it('cu providerul real (neconectat), listele explică lipsa sursei', async () => {
     renderApp({ route: ROUTE, wrap: (b) => ({ ...b, search: createSupabaseProviders().search }) })
     await open()
-    await waitFor(() => expect(screen.getAllByText('Datele de search nu sunt încă disponibile pentru acest brand.')).toHaveLength(3))
+    expect(await missingWith('Datele de search nu sunt încă disponibile pentru acest brand.')).toBeInTheDocument()
     expect(screen.queryByRole('table')).toBeNull()
   })
 

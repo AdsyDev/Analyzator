@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { failed, ready, type DataProviders } from '../../contracts'
 import { createSupabaseProviders } from '../../data/supabase/providers'
 import { pageReady, renderApp, where } from '../../test/renderApp'
+import { missingWith } from '../../test/missing'
 
 const section = (name: string) => screen.getByRole('heading', { level: 2, name }).closest('section')!
 const ROUTE = '/brands/brand-urinal/ai'
@@ -376,7 +377,7 @@ describe('AI Visibility: izolarea secțiunilor și providerul real', () => {
   it('cu providerul real (neconectat), fiecare secțiune explică lipsa sursei, fără date inventate', async () => {
     renderApp({ route: ROUTE, wrap: (b) => ({ ...b, ai: createSupabaseProviders().ai }) })
     await open()
-    await waitFor(() => expect(screen.getAllByText('Datele AI Visibility nu sunt încă disponibile pentru acest brand.')).toHaveLength(5))
+    expect(await missingWith('Datele AI Visibility nu sunt încă disponibile pentru acest brand.')).toBeInTheDocument()
     expect(screen.queryByRole('table')).toBeNull()
     expect(screen.queryByText(/supabase|stack/i)).toBeNull()
   })

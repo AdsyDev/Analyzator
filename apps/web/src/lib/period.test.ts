@@ -33,7 +33,7 @@ describe('aritmetică de date', () => {
   })
 })
 
-describe('săptămâni complete (AG)', () => {
+describe('săptămâni complete (AH)', () => {
   // Marți 24 nov. 2026, 10:00 în București.
   const TUE = new Date('2026-11-24T08:00:00Z')
   it('marți: ultima săptămână completă se termină duminica de acum două zile', () => {

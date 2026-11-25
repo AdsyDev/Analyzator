@@ -1,7 +1,8 @@
-import { MagnifyingGlassIcon, PlugsIcon, ProhibitIcon, WarningCircleIcon } from '@phosphor-icons/react'
+import { MagnifyingGlassIcon, ProhibitIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { useNavigate } from 'react-router-dom'
 import type { ProviderResult } from '../contracts'
 import { EmptyState } from '../components/EmptyState'
+import { MissingData } from '../components/MissingData'
 import type { AdminModule } from './modules'
 
 export function NotFoundPage() {
@@ -41,7 +42,7 @@ export function NoBrandsPage() {
 
 export function ProviderProblem({ result, onRetry }: { result: Exclude<ProviderResult<unknown>, { kind: 'ready' }>; onRetry?: () => void }) {
   return result.kind === 'not_connected' ? (
-    <EmptyState icon={<PlugsIcon size={36} weight="thin" />} title="Sursă neconectată" text={result.reason} />
+    <MissingData reason={result.reason} />
   ) : (
     <EmptyState
       icon={<WarningCircleIcon size={36} weight="thin" />}

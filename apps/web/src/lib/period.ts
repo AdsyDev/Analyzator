@@ -41,7 +41,7 @@ export function lastCompleteDay(now: Date = new Date()): IsoDate {
 }
 
 /**
- * Duminica ultimei săptămâni complete (luni–duminică) pe care colectarea săptămânală a adus-o deja (decizia AG).
+ * Duminica ultimei săptămâni complete (luni–duminică) pe care colectarea săptămânală a adus-o deja (decizia AH).
  * Colectarea rulează marțea pentru săptămâna anterioară (spec cap. 9), deci săptămâna se schimbă marțea: luni,
  * ultima săptămână completă afișată e încă cea dinainte. Aceeași duminică folosește conectorul GA4 pentru
  * utilizatorii activi (`connectors/google/intervals.ts`, cea mai recentă duminică dinaintea zilei colectării).
