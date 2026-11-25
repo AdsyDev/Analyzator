@@ -174,9 +174,6 @@ export function AppLayout() {
     return { dataAsOf: dates[0] ?? fresh[0] ?? null, lastRefreshAt: imports[imports.length - 1] ?? null }
   }, [sourcesState, freshness])
 
-  // Clientul (`client_viewer`) nu vede nimic despre sincronizare: nici fâșia „Starea datelor", nici „Date până la · Ultimul refresh" din topbar.
-  const showSyncInfo = isAgencyRole(user.role)
-
   const title = module?.title ?? adminModule?.title ?? (siteMatch ? 'Site și surse' : isPortfolio ? 'Portofoliu' : 'Analyzator')
   const subtitle = module?.subtitle(shellBrand?.name ?? '') ?? adminModule?.subtitle(shellBrand?.name ?? null) ?? (siteMatch ? 'Detaliile site-ului, sursele lui de date și istoricul sincronizărilor.' : isPortfolio ? 'Toate brandurile la care ai acces, pe aceeași perioadă, cu indicatorii din Overview.' : undefined)
   useEffect(() => {
