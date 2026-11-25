@@ -12,6 +12,7 @@ import { KpiGrid } from '../shared/KpiGrid'
 import { LISTENING_KPI_KEYS, LISTENING_KPI_SLOTS } from './slots'
 import { MentionFeed, type MentionFilters } from './MentionFeed'
 import { SentimentSection } from './SentimentSection'
+import { AutoSentimentCard, AutoSentimentPanel, CompetitionListening, EngagementCard, MentionsPerDay, TopicsSection, TopVoices } from './OverviewSections'
 
 const SENTIMENTS: readonly Sentiment[] = ['positive', 'neutral', 'negative']
 
@@ -30,9 +31,10 @@ export function mentionFiltersFrom(ctx: QueryContext): MentionFilters {
 }
 
 /**
- * Listening (spec cap. 18): KPI (neconectate până intră în registru), distribuția sentimentului și feed-ul de
- * mențiuni cu marcare pentru farmacovigilență. Jurnalul PV are submeniul lui (Farmacovigilență, E-2), doar pentru
- * `agency_admin`.
+ * Listening (spec cap. 18, deciziile AH): rândul de indicatori (Mențiuni din registru, interacțiunile și sentimentul automat),
+ * mențiunile pe zi și pe rețea, vocile principale, distribuția sentimentului (revizuită, cu cea automată alături), competiția,
+ * topicurile și feed-ul cu marcare pentru farmacovigilență. Tot ce nu e în registru vine calculat de `brand_listening_overview`.
+ * Jurnalul PV are submeniul lui (Farmacovigilență, E-2), doar pentru `agency_admin`.
  */
 export function ListeningPage() {
   const { brand, ctx, user } = useLayout()
@@ -51,11 +53,22 @@ function ListeningContent({ brand, ctx, admin }: { brand: Brand; ctx: QueryConte
   const { byKey, loaded: registryLoaded } = useDefinitions(LISTENING_KPI_KEYS)
   const sparks = useTrends(ctx, LISTENING_KPI_KEYS)
   const sentiment = useAsync(() => providers.mentions.sentiment(ctx), [providers, key])
+  const overview = useAsync(() => providers.mentions.overview(ctx), [providers, key])
 
   return (
     <div className="flex flex-col gap-5">
-      <KpiGrid slots={LISTENING_KPI_SLOTS} page="Listening" metrics={metrics.state} definitions={byKey} registryLoaded={registryLoaded} trends={sparks.state} onRetry={metrics.reload} onOpen={setTarget} />
-      <SentimentSection state={sentiment.state} onRetry={sentiment.reload} />
+      <div className="grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <KpiGrid className="contents" slots={LISTENING_KPI_SLOTS} page="Listening" metrics={metrics.state} definitions={byKey} registryLoaded={registryLoaded} trends={sparks.state} onRetry={metrics.reload} onOpen={setTarget} />
+        <EngagementCard state={overview.state} />
+        <AutoSentimentCard state={overview.state} />
+      </div>
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <MentionsPerDay state={overview.state} onRetry={overview.reload} />
+        <TopVoices state={overview.state} onRetry={overview.reload} />
+      </div>
+      <SentimentSection state={sentiment.state} onRetry={sentiment.reload} auto={<AutoSentimentPanel state={overview.state} />} />
+      <CompetitionListening state={overview.state} onRetry={overview.reload} competitionPath={`${brandPath(brand.id, 'competition')}${sharedSearch(params)}`} />
+      <TopicsSection state={overview.state} onRetry={overview.reload} />
       <MentionFeed key={key} brand={brand} ctx={ctx} filters={filters} admin={admin} onChanged={() => {}} />
       {admin && (
         <p className="text-[12.5px] text-text-2">

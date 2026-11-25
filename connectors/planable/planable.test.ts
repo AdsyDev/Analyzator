@@ -128,12 +128,13 @@ describe('normalizare Planable', () => {
     assert.ok(!id().startsWith('h:'), 'nu se poate confunda cu o cheie din URL')
   })
 
-  test('rândul unei mențiuni fără link: url și text NULL, niciun câmp inventat, numele autorului nesalvat', () => {
+  test('rândul unei mențiuni fără link: url și text NULL, niciun câmp inventat; autorul cum îl trimite sursa (AH)', () => {
     const m = parsed({ platform: 'web', url: '', text: null, author: { name: 'Site de știri', username: null, profileImageUrl: null } })
     const key = builtMentionNativeId(builtMentionIdentity(m), 1)
     const row = mentionRow(m, { tenant_id: T1, brand_id: B1, source_id: 'c', sync_run_id: 'r', collected_at: '2026-10-08T05:00:00.000Z', payload_hash: 'a'.repeat(64), timezone: 'Europe/Bucharest' } as never, null, key)
     assert.deepEqual([row.native_id, row.url, row.text, row.source_name, row.sentiment], [key, null, null, 'web', 'positive'])
-    assert.ok(!JSON.stringify(row).includes('Site de știri'))
+    assert.deepEqual([row.author_name, row.author_username, row.engagement], ['Site de știri', null, 10], 'username gol → NULL, nu text inventat')
+    assert.ok(!('profileImageUrl' in row) && !JSON.stringify(row).includes('profileImageUrl'), 'poza de profil nu se păstrează')
     // Cu link, rândul rămâne cel dinainte.
     assert.equal(mentionRow(parsed({}), {} as never).url, 'https://x.com/a/1')
   })
@@ -158,7 +159,7 @@ describe('collectPlanable', () => {
     const { db } = setup({ credential: null })
     const f = routes()
     const out = await collectPlanable({ db, fetch: f.fetch, sleep: noSleep().sleep, now: () => NOW })
-    assert.deepEqual(out.map((o) => [o.source, o.status]), [['planable_analytics', 'not_connected'], ['planable_listening', 'not_connected'], ['planable_listening_competitors', 'not_connected'], ['planable_competitors', 'not_connected']])
+    assert.deepEqual(out.map((o) => [o.source, o.status]), [['planable_analytics', 'not_connected'], ['planable_listening', 'not_connected'], ['planable_listening_competitors', 'not_connected'], ['planable_listening_topics', 'not_connected'], ['planable_competitors', 'not_connected']])
     assert.equal(db.tables.sync_runs!.length, 0)
     assert.equal(f.calls.length, 0)
   })
@@ -174,7 +175,7 @@ describe('collectPlanable', () => {
     const { db, validations } = setup()
     const f = routes()
     const out = await collectPlanable({ db, fetch: f.fetch, sleep: noSleep().sleep, now: () => NOW })
-    assert.deepEqual(out.map((o) => [o.source, o.status]), [['planable_analytics', 'succeeded'], ['planable_listening', 'succeeded'], ['planable_listening_competitors', 'not_connected'], ['planable_competitors', 'not_connected']])
+    assert.deepEqual(out.map((o) => [o.source, o.status]), [['planable_analytics', 'succeeded'], ['planable_listening', 'succeeded'], ['planable_listening_competitors', 'not_connected'], ['planable_listening_topics', 'not_connected'], ['planable_competitors', 'not_connected']])
 
     const daily = db.tables.social_daily!
     assert.deepEqual(daily.map((r) => [r.date, r.followers]).sort(), [['2026-10-06', 5010], ['2026-10-07', 5020]])
@@ -226,7 +227,10 @@ describe('collectPlanable', () => {
     assert.equal(by('https://ig.test/ext'), false)
     assert.equal(by('https://tt.test/x'), false, 'același nume pe altă platformă nu e contul propriu')
     assert.equal(by('https://ig.test/none'), null)
-    assert.ok(db.tables.mentions!.every((m) => !('author' in m) && !JSON.stringify(m).includes('Ana Popescu')), 'numele autorilor nu se salvează')
+    const ana = db.tables.mentions!.find((m) => m.url === 'https://ig.test/ext')!
+    assert.deepEqual([ana.author_name, ana.author_username], ['Ana Popescu', 'ana.p'], 'autorul se păstrează (deciziile AH)')
+    const none = db.tables.mentions!.find((m) => m.url === 'https://ig.test/none')!
+    assert.deepEqual([none.author_name, none.author_username], [null, null], 'fără autor în payload: NULL, nu un nume inventat')
   })
 
   test('mențiunile sărite: o notă pe rețea și motiv, cu numărul lor; cele valide se scriu, statusul rămâne succeeded', async () => {
@@ -285,7 +289,8 @@ describe('collectPlanable', () => {
       }
       assert.equal(new Set(rows.map((r) => r.native_id)).size, 3)
       assert.deepEqual(rows.map((r) => r.sentiment).sort(), ['negative', 'neutral', 'neutral'])
-      assert.ok(!JSON.stringify(db.tables.mentions).includes('ziar.test'), 'numele autorului nu se salvează')
+      assert.deepEqual(rows.map((r) => r.author_name).sort(), ['blog.test', 'ziar.test', 'ziar.test'], 'autorul (site-ul) se păstrează (deciziile AH)')
+      assert.ok(rows.every((r) => r.author_username === null && r.engagement === 0), 'username gol → NULL; interacțiunile 0 raportate rămân 0')
       assert.deepEqual(l.errors.map((e) => [e.code, e.dimension, e.message]), [['parser_note', MENTIONS_WITHOUT_LINK, '3 mențiuni scrise din web fără link de la sursă (3 și fără text); cheia e construită din rețea, autor și dată']])
       assert.ok(!JSON.stringify(l.errors).includes('ziar.test'))
     })
@@ -372,7 +377,7 @@ describe('collectPlanable', () => {
   test('401 la /workspaces: tokenul se marchează invalid, ambele rulări eșuează', async () => {
     const { db, validations } = setup()
     const out = await collectPlanable({ db, fetch: routes({ '/api/v1/workspaces': json({ error: { code: 'UNAUTHORIZED', message: 'x' } }, 401) }).fetch, sleep: noSleep().sleep, now: () => NOW })
-    assert.deepEqual(out.map((o) => [o.source, o.status, o.errors[0]?.code]), [['planable_analytics', 'failed', 'access_denied'], ['planable_listening', 'failed', 'access_denied'], ['planable_listening_competitors', 'failed', 'access_denied'], ['planable_competitors', 'failed', 'access_denied']])
+    assert.deepEqual(out.map((o) => [o.source, o.status, o.errors[0]?.code]), [['planable_analytics', 'failed', 'access_denied'], ['planable_listening', 'failed', 'access_denied'], ['planable_listening_competitors', 'failed', 'access_denied'], ['planable_listening_topics', 'failed', 'access_denied'], ['planable_competitors', 'failed', 'access_denied']])
     assert.deepEqual(validations.map((v) => v.p_ok), [false])
   })
 
@@ -487,17 +492,18 @@ describe('Planable: mențiunile competitorilor (deciziile Y)', () => {
     assert.deepEqual([t.covered_from, t.covered_to, t.complete], ['2026-08-20', '2026-10-07', true], 'zero mențiuni, dar cuvânt citit complet')
   })
 
-  test('API-ul ignoră parametrul `type`: brandul nu primește cuvintele competitorilor și invers', async () => {
-    const { db } = setup({ tables: { competitor_mentions: [], competitor_trackers: [] } })
-    const all = json({ data: [{ keywordId: 'k1', text: 'Urinal', type: 'brand' }, { keywordId: 'c1', text: 'Prostamol', type: 'COMPETITOR' }, { keywordId: 't1', text: 'prostată', type: 'topic' }] })
+  test('API-ul ignoră parametrul `type`: fiecare tip de cuvânt ajunge doar în tabelul lui (brand, competitor, topic)', async () => {
+    const { db } = setup({ tables: { competitor_mentions: [], competitor_trackers: [], topic_mentions: [], listening_trackers: [] } })
+    const all = json({ data: [{ keywordId: 'k1', text: 'Urinal', type: 'brand' }, { keywordId: 'c1', text: 'Prostamol', type: 'COMPETITOR' }, { keywordId: 't1', text: 'prostată', type: 'Topic' }] })
     const f = routes({
       '/api/v1/keywords': all,
       '/api/v1/keywords/c1/mentions': json({ data: [mention('https://x.com/c/1')], pagination: { nextCursor: null, total: 1 } }),
+      '/api/v1/keywords/t1/mentions': json({ data: [mention('https://x.com/t/1', 'negative')], pagination: { nextCursor: null, total: 1 } }),
     })
     await collectPlanable({ db, fetch: f.fetch, sleep: noSleep().sleep, now: () => NOW })
-    assert.ok(!f.calls.some((c) => c.url.includes('/keywords/t1/')), 'cuvintele de tip topic nu se citesc')
     assert.deepEqual(db.tables.mentions!.map((m) => m.url).sort(), ['https://x.com/a/1', 'https://x.com/b/1'])
     assert.deepEqual(db.tables.competitor_mentions!.map((m) => [m.keyword_id, m.url]), [['c1', 'https://x.com/c/1']])
+    assert.deepEqual(db.tables.topic_mentions!.map((m) => [m.keyword_id, m.url, m.sentiment, m.engagement]), [['t1', 'https://x.com/t/1', 'negative', 10]])
   })
 
   test('workspace fără cuvinte de tip „competitor”: not_connected, fără sync_run', async () => {
@@ -507,6 +513,55 @@ describe('Planable: mențiunile competitorilor (deciziile Y)', () => {
     assert.equal(c.status, 'not_connected')
     assert.match(c.reason ?? '', /competitor/)
     assert.equal(db.tables.sync_runs!.filter((r) => r.source === 'planable_listening_competitors').length, 0)
+  })
+
+  test('topicuri (AH): mențiunile fără text și fără autor, limba trimisă doar spre trigger, topicul citit cu zilele acoperite', async () => {
+    const { db } = setup({ tables: { topic_mentions: [], listening_trackers: [] } })
+    const out = await collectPlanable({
+      db,
+      fetch: routes({
+        '/api/v1/keywords': (url) => (url.searchParams.get('type') === 'topic' ? json({ data: [{ keywordId: 't1', text: ' dureri articulare ', type: 'topic' }] }) : json({ data: [{ keywordId: 'k1', text: 'Urinal', type: 'brand' }] })),
+        '/api/v1/keywords/t1/mentions': json({ data: [mention('https://x.com/t/1'), { platform: 'web', publishedAt: '2026-10-05T08:00:00Z', engagement: 'mult', sentiment: 'neutral', url: '', text: '', author: { name: 'Ana Popescu', username: '' } }], pagination: { nextCursor: null, total: 2 } }),
+      }).fetch,
+      sleep: noSleep().sleep,
+      now: () => NOW,
+    })
+    const t = out.find((o) => o.source === 'planable_listening_topics')!
+    assert.equal(t.status, 'succeeded')
+    assert.equal(t.rows_written, 3, 'două mențiuni și un topic citit')
+    const rows = db.tables.topic_mentions!
+    assert.deepEqual(rows.map((r) => [r.url, r.engagement]).sort(), [[null, null], ['https://x.com/t/1', 10]], 'interacțiuni într-o formă necunoscută → NULL, nu 0')
+    assert.ok(rows.every((r) => !('text' in r) && !('author_name' in r)), 'fără text și fără autor')
+    assert.ok(!JSON.stringify(rows).includes('Ana Popescu'))
+    assert.deepEqual(rows.map((r) => r.language_text).sort(), ['Mențiune https://x.com/t/1', null], 'textul pleacă doar spre trigger (coloana se golește în baza de date)')
+    const tr = db.tables.listening_trackers!.filter((r) => r.kind === 'topic')
+    assert.deepEqual(tr.map((r) => [r.keyword_id, r.label, r.covered_from, r.covered_to, r.complete]), [['t1', 'dureri articulare', '2026-09-03', '2026-10-07', true]])
+  })
+
+  test('workspace fără topicuri: not_connected, fără sync_run', async () => {
+    const { db } = setup()
+    const out = await collectPlanable({ db, fetch: routes().fetch, sleep: noSleep().sleep, now: () => NOW })
+    const t = out.find((o) => o.source === 'planable_listening_topics')!
+    assert.equal(t.status, 'not_connected')
+    assert.match(t.reason ?? '', /topic/)
+    assert.equal(db.tables.sync_runs!.filter((r) => r.source === 'planable_listening_topics').length, 0)
+  })
+
+  test('acoperirea cuvintelor brandului (AH): citit complet → complete; o pagină eșuată → incomplet; nu intră în rows_written', async () => {
+    const { db } = setup({ tables: { listening_trackers: [] } })
+    const out = await collectPlanable({
+      db,
+      fetch: routes({
+        '/api/v1/keywords': json({ data: [{ keywordId: 'k1', text: 'Urinal', type: 'brand' }, { keywordId: 'k2', text: 'Urinal Akut', type: 'brand' }] }),
+        '/api/v1/keywords/k2/mentions': json({ message: 'eroare' }, 500),
+      }).fetch,
+      sleep: noSleep().sleep,
+      now: () => NOW,
+    })
+    const l = out.find((o) => o.source === 'planable_listening')!
+    assert.equal(l.rows_written, 2, 'doar mențiunile')
+    const tr = db.tables.listening_trackers!.filter((r) => r.kind === 'brand').map((r) => [r.keyword_id, r.label, r.covered_from, r.covered_to, r.complete])
+    assert.deepEqual(tr.sort(), [['k1', 'Urinal', '2026-09-03', '2026-10-07', true], ['k2', 'Urinal Akut', '2026-09-03', '2026-10-07', false]])
   })
 
   test('coveredFrom: continuitate, pauză, prima rulare', () => {

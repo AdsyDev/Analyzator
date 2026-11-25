@@ -98,6 +98,7 @@ const insights: InsightsProvider = {
 const mentions: MentionsProvider = {
   list: async () => notConnected('Sursa de Listening nu este conectată pentru acest brand.'),
   sentiment: async () => notConnected('Sursa de Listening nu este conectată pentru acest brand.'),
+  overview: async () => notConnected('Sursa de Listening nu este conectată pentru acest brand.'),
   sources: async () => notConnected('Sursa de Listening nu este conectată pentru acest brand.'),
   pvLog: async () => notConnected('Jurnalul de farmacovigilență nu este încă disponibil.'),
   pvPreview: async () => notConnected('Marcarea pentru farmacovigilență nu este încă disponibilă.'),

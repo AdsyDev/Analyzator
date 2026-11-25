@@ -1,4 +1,5 @@
-import type { BrandId, IsoDateTime } from './common'
+import type { BrandId, IsoDate, IsoDateTime } from './common'
+import type { CompetitionCell } from './competition'
 
 export type Sentiment = 'positive' | 'neutral' | 'negative'
 
@@ -117,4 +118,106 @@ export interface PvLogEntry {
   notified: boolean
   notified_to: string[]
   status: PvStatus
+}
+
+/**
+ * Sentimentul dat AUTOMAT de sursă (Planable), neverificat de un om (deciziile AH). Se arată separat de distribuția revizuită
+ * și etichetat ca atare; nu o înlocuiește. `total` = mențiunile cu sentiment pozitiv, neutru sau negativ; `unknown` = cele
+ * fără sentiment de la sursă. Procentele și `net` (100 × (pozitive − negative) / total) vin calculate de server.
+ */
+export interface AutoSentiment {
+  total: number
+  positive: number
+  neutral: number
+  negative: number
+  unknown: number
+  /** Postări din conturile proprii, lăsate deoparte (D-22). */
+  owned_excluded: number
+  shares: { positive: number | null; neutral: number | null; negative: number | null }
+  net: number | null
+}
+
+/** O rețea din Listening: mențiunile ei în perioadă, ponderea și seria pe zile (aceleași zile ca `ListeningOverview.days`). */
+export interface ListeningPlatform {
+  platform: string
+  mentions: number
+  share: number | null
+  /** `null` = zi necitită sau citită incomplet de colectare (lipsă), nu zero. */
+  values: Array<number | null>
+}
+
+/** Interacțiunile mențiunilor, cum le raportează sursa. `value: null` = nicio mențiune cu interacțiuni raportate (nu zero). */
+export interface ListeningEngagement {
+  value: number | null
+  mentions_with_value: number
+  mentions: number
+  comparison: { start: IsoDate; end: IsoDate; value: number | null }
+  change: { relative_change: number | null; absolute_change: number | null; base_zero: boolean }
+}
+
+/** O voce principală: un autor extern (nume și username, cum le trimite sursa) cu mențiunile și interacțiunile lui. */
+export interface TopVoice {
+  name: string | null
+  username: string | null
+  platform: string
+  mentions: number
+  engagement: number | null
+}
+
+/** Un topic urmărit în Planable Listening (cuvânt de tip „topic”), citit cel puțin o zi din perioadă. */
+export interface ListeningTopic {
+  id: string
+  label: string
+  mentions: number
+  status: 'ok' | 'partial'
+  /** Fracția zilelor din perioadă citite pentru topic (0-1). */
+  coverage: number
+  reason: string | null
+  engagement: number | null
+  sentiment: Omit<AutoSentiment, 'owned_excluded'>
+  platforms: Array<{ platform: string; mentions: number }>
+}
+
+/** Brandul sau un competitor, în comparația din Listening. `mentions` și `share_of_voice` sunt celulele matricei de Competiție. */
+export interface ListeningCompetitionEntity {
+  id: string
+  name: string
+  /** C1, C2… pentru competitori; numele pentru brand. */
+  label: string
+  kind: 'brand' | 'competitor'
+  mentions: CompetitionCell | null
+  share_of_voice: CompetitionCell | null
+  sentiment: AutoSentiment | null
+  /** Competitorul are cel puțin un cuvânt Planable de tip „competitor” atribuit; brandul e mereu `true`. */
+  tracked: boolean
+}
+
+export interface ListeningCompetition {
+  set_version: number
+  effective_from: IsoDate
+  entities: ListeningCompetitionEntity[]
+  /** Pe rețea: mențiunile fiecărei entități (`counts[entity.id]`) și cota brandului, doar când share of voice-ul are valoare. */
+  platforms: Array<{ platform: string; counts: Record<string, number>; total: number; brand_share: number | null }>
+}
+
+/**
+ * Tot ce arată ecranul Listening în afară de feed și de distribuția revizuită (deciziile AH), calculat de server. Volumul
+ * folosește regula indicatorului „Mențiuni” (fără mențiunile clar în altă limbă); sentimentul automat și vocile, doar autorii externi.
+ */
+export interface ListeningOverview {
+  days: IsoDate[]
+  total: number
+  /** Mențiunile pe zi; `null` = zi necitită de colectare, nu zero. */
+  series: Array<number | null>
+  platforms: ListeningPlatform[]
+  engagement: ListeningEngagement
+  auto_sentiment: AutoSentiment
+  top_voices: TopVoice[]
+  /** Câte mențiuni externe sunt și câte au autor: explică o listă de voci goală (de ex. mențiuni colectate înainte de AH). */
+  voices_basis: { external: number; with_author: number }
+  topics: ListeningTopic[]
+  /** Brandul are cel puțin un topic urmărit (în orice perioadă). */
+  topics_tracked: boolean
+  /** `null` = brandul nu are set de competitori în vigoare la sfârșitul perioadei. */
+  competition: ListeningCompetition | null
 }

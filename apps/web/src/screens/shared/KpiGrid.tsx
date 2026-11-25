@@ -18,13 +18,15 @@ interface Props {
   trends: AsyncState<TrendSeries[]>
   onRetry: () => void
   onOpen: (target: EvidenceTarget) => void
+  /** Clasele grilei; `contents` pune cardurile direct în grila apelantului (de ex. lângă carduri care nu sunt metrici). */
+  className?: string
 }
 
 /** Cele 6 KpiCards. Fiecare slot își păstrează starea: lipsa unei definiții sau a unei serii nu blochează cardul. */
-export function KpiGrid({ slots, page, metrics, definitions, registryLoaded, trends, onRetry, onOpen }: Props) {
+export function KpiGrid({ slots, page, metrics, definitions, registryLoaded, trends, onRetry, onOpen, className = 'grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-3' }: Props) {
   const items = metrics.status === 'done' ? metrics.value.items : []
   return (
-    <div className="grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-2 xl:grid-cols-3" data-testid="kpi-grid">
+    <div className={className} data-testid="kpi-grid">
       {slots.map((slot) => {
         const item = items.find((i) => i.metric_key === slot.key) ?? null
         const def = definitions.get(slot.key) ?? null

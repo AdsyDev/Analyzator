@@ -87,8 +87,10 @@ API-ul Planable e nou și câteva lucruri nu sunt clare din documentație: dacă
 | `not_connected`: „token Planable neconfigurat” | Lipsește tokenul clientului | Pasul 2. |
 | `access_denied` pe ambele rulări | Token expirat sau șters; tokenul e marcat refuzat | Token nou, „Rotește tokenul”. |
 | `workspace_not_found` | ID-ul workspace-ului e greșit sau tokenul nu are acces la el | Verifică ID-ul (pasul 3) și workspace-urile tokenului (pasul 1). |
-| Listening `not_connected`: „niciun cuvânt de tip brand” | Workspace-ul nu urmărește cuvinte de tip „brand” | Adaugă cuvintele în Planable Listening. Cele de tip „topic” nu se colectează; cele de tip „competitor” au rularea lor. |
+| Listening `not_connected`: „niciun cuvânt de tip brand” | Workspace-ul nu urmărește cuvinte de tip „brand” | Adaugă cuvintele în Planable Listening. Cele de tip „topic” și cele de tip „competitor” au rulările lor. |
 | `planable_listening_competitors` `not_connected` | Workspace-ul nu urmărește cuvinte de tip „competitor” | „Competitorii în Listening”, pasul 1. |
+| `planable_listening_topics` `not_connected` | Workspace-ul nu urmărește cuvinte de tip „topic” | Adaugă în Planable Listening temele urmărite (de exemplu „dureri articulare”) ca tip „Topic”; apar în Listening → Topicuri după următoarea colectare. |
+| Listening: „Voci principale” goală, cu mesajul despre 25 nov. | Mențiunile din perioadă au fost colectate înainte ca autorii să fie păstrați | Rulează planable-weekly; ultimele 35 de zile se rescriu cu autorii. |
 | `planable_competitors` `not_connected` | Nicio pagină a brandului nu urmărește competitori | „Competitorii în Planable Competitors”, pasul 1. |
 | `planable_competitors` `access_denied` | Add-on-ul Analytics e inactiv sau tokenul nu vede pagina | Verifică abonamentul Planable și accesul tokenului. |
 | Competitor „N/A” la Social public | Niciun profil urmărit nu corespunde numelui lui | „Competitorii în Planable Competitors”, pasul 2. |

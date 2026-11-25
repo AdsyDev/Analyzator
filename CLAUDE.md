@@ -9,7 +9,7 @@ Platformă de analiză pentru clienții AdSymphony (pilot: trei branduri STADA).
 3. **Fără acces cross-tenant.** Orice query din worker cu service role verifică explicit `tenant_id` (și `brand_id` unde e cazul). RLS pe toate tabelele expuse.
 4. **Fără formule de metrici în UI.** Formulele trăiesc în SQL (view-uri, funcții) sau în registrul de metrici (`docs/metrics`).
 5. **Fără schimbare de schemă fără migration** în `supabase/migrations`.
-6. **Nivelul C nu se construiește înainte de 26 octombrie 2026** (inclusiv AdSy AI). Fără funcții noi după 16 octombrie; cererile de scop se notează cu impact în timp și cost.
+6. *(Eliminată pe 25 nov. 2026, la cererea proprietarului produsului. Numărul rămâne, ca trimiterile din cod și documente la regulile 7–9 să fie valabile.)*
 7. **Limba interfeței este româna**, cu termenii de marketing uzuali în engleză; tooltipurile explică fiecare KPI.
 8. **`null`, `0` și eroare sunt trei stări distincte.** Nu se deduc câmpuri lipsente; zero nu înlocuiește lipsa.
 9. **Toate datele calendaristice în Europe/Bucharest** în UI și la calculul perioadelor; ISO în API.

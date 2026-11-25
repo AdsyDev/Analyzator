@@ -15,6 +15,8 @@ export const SOURCE_ANALYTICS = 'planable_analytics'
 export const SOURCE_LISTENING = 'planable_listening'
 /** Mențiunile cuvintelor de tip „competitor” (deciziile Y): sync_run separat, scrise în competitor_mentions. */
 export const SOURCE_LISTENING_COMPETITORS = 'planable_listening_competitors'
+/** Mențiunile cuvintelor de tip „topic” (deciziile AH): sync_run separat, scrise în topic_mentions. */
+export const SOURCE_LISTENING_TOPICS = 'planable_listening_topics'
 /** Planable Competitors (deciziile Y): profilurile publice urmărite pe paginile brandului → competitor_social_daily. */
 export const SOURCE_COMPETITORS = 'planable_competitors'
 /** Sursele din competitor_trackers: cuvintele de tip „competitor” și profilurile din Planable Competitors. */
