@@ -38,7 +38,7 @@ Sursa: specificația OpenAPI 3.1 publică, `https://api.planable.io/api/v1/opena
 | `GET /pages/{id}/competitors/metrics?startDate&endDate` | urmăritorii pe zi, pentru pagina proprie și profiluri → `competitor_social_daily.followers` |
 | `GET /pages/{id}/competitors/comparison?startDate&endDate` | cu fereastra unei zile: postările și interacțiunile zilei → `posts`, `engagement` |
 
-Cuvintele de tip `topic` au rularea lor din 25 nov. 2026 (`planable_listening_topics`, deciziile AH), la fel cele de tip `competitor` (`planable_listening_competitors`); mențiunile din `mentions` sunt doar ale brandului. Tipul se verifică și local (fără diferență de majuscule): dacă API-ul ar ignora parametrul `type`, un cuvânt de tip `competitor` sau `topic` nu ajunge la brand, iar fiecare tip ajunge doar în tabelul lui.
+Cuvintele de tip `topic` au rularea lor din 25 nov. 2026 (`planable_listening_topics`, deciziile AI), la fel cele de tip `competitor` (`planable_listening_competitors`); mențiunile din `mentions` sunt doar ale brandului. Tipul se verifică și local (fără diferență de majuscule): dacă API-ul ar ignora parametrul `type`, un cuvânt de tip `competitor` sau `topic` nu ajunge la brand, iar fiecare tip ajunge doar în tabelul lui.
 
 ## Competitorii în Listening (deciziile Y, 23 nov. 2026)
 
@@ -48,13 +48,13 @@ Cuvintele de tip `topic` au rularea lor din 25 nov. 2026 (`planable_listening_to
 - **Atribuirea:** un cuvânt aparține competitorului din setul în vigoare a cărui listă `listening_keywords` îl conține (fără diferență de majuscule); lista goală înseamnă numele competitorului. Validarea din `create_competitor_set_version` nu permite același cuvânt la doi competitori.
 - **Rularea:** `sync_run` `planable_listening_competitors`, aceeași fereastră de 35 de zile. Fără cuvinte de tip `competitor`: `not_connected`, fără `sync_run`.
 
-## Topicurile în Listening (deciziile AH, 25 nov. 2026)
+## Topicurile în Listening (deciziile AI, 25 nov. 2026)
 
 - **`topic_mentions`**, cheia (tenant, brand, `keyword_id`, `native_id`): mențiunile cuvintelor de tip `topic` (de exemplu „dureri articulare”), ca la competitori: rețeaua, linkul, momentul, sentimentul Planable, interacțiunile și limba (textul trece doar prin `language_text`, golit de trigger). Fără text și fără autor.
 - **`listening_trackers`** (`kind = topic`): fiecare topic citit, cu `label`, zilele acoperite și `complete`. Rularea: `sync_run` `planable_listening_topics`, aceeași fereastră de 35 de zile. Fără cuvinte de tip `topic`: `not_connected`, fără `sync_run`.
 - **Acoperirea cuvintelor brandului:** rularea `planable_listening` scrie și ea `listening_trackers` (`kind = brand`), după mențiuni; rândurile nu intră în `rows_written`. O zi e confirmată când cel puțin un cuvânt „brand” a citit-o și toate cuvintele care au citit-o au fost complete: în graficul „Mențiuni pe zi”, o zi confirmată fără mențiuni e 0, una neconfirmată e lipsă.
 
-## În aplicație: `brand_listening_overview` (deciziile AH)
+## În aplicație: `brand_listening_overview` (deciziile AI)
 
 RPC INVOKER (E8), `(p_brand_id, p_start, p_end)`, perioada de cel mult 401 zile. Întoarce, pentru ecranul Listening:
 
@@ -109,7 +109,7 @@ Aceleași tabele și chei ca importul CSV (`docs/contracts/csv-planable-analytic
 
 **Cont propriu (D-22):** `author.name` / `author.username` ale mențiunii se compară cu numele paginilor workspace-ului (`GET /pages`, aceeași platformă) și dau `author_is_owned`.
 
-**Autorul și interacțiunile (deciziile AH, 25 nov. 2026):** la mențiunile brandului se păstrează și `author_name` / `author_username` (curățate, max. 256 de caractere; gol → NULL), pentru „Voci principale” și feed. Revine asupra D-22: autorii pot fi persoane fizice, deci sunt date personale, citite doar cu acces la brand (RLS neschimbat). Poza de profil nu se păstrează. `engagement` → `mentions.engagement` doar când e un număr întreg nenegativ; altfel NULL (nu zero). La competitori și topicuri, autorul tot nu se păstrează.
+**Autorul și interacțiunile (deciziile AI, 25 nov. 2026):** la mențiunile brandului se păstrează și `author_name` / `author_username` (curățate, max. 256 de caractere; gol → NULL), pentru „Voci principale” și feed. Revine asupra D-22: autorii pot fi persoane fizice, deci sunt date personale, citite doar cu acces la brand (RLS neschimbat). Poza de profil nu se păstrează. `engagement` → `mentions.engagement` doar când e un număr întreg nenegativ; altfel NULL (nu zero). La competitori și topicuri, autorul tot nu se păstrează.
 
 **Mențiuni fără link (deciziile R, 11 nov. 2026):** Planable trimite mențiunile de pe web fără `url` și fără `text` (confirmat la rularea reală: au `author.name`, `engagement`, `platform`, `publishedAt`, `sentiment`). O mențiune fără link, cu `publishedAt` valid, se scrie cu `url` NULL și `native_id` = `s:` + primele 32 de caractere hex din SHA-256 peste rețea, autor (nume și username, litere mici), momentul publicării (ISO, UTC), hash-ul textului (dacă există) și numărul de ordine printre mențiunile identice (1, 2, …). Autorul intră doar în hash. Aceeași mențiune găsită de două cuvinte urmărite se scrie o dată: pe fiecare identitate rămâne cea mai lungă listă dintre cuvinte. Fiecare rețea primește o notă `parser_note` cu `dimension = mentions_without_link`: „1068 mențiuni scrise din web fără link de la sursă (1068 și fără text); cheia e construită din rețea, autor și dată”. În aplicație, mențiunile fără link și fără text sunt numărate la „Mențiuni”, dar feed-ul nu le afișează și nu intră la revizuire.
 
@@ -136,4 +136,4 @@ Fiecare grup are și o a doua notă, cu **numele câmpurilor** pe care le aveau 
 4. Limitele reale de apeluri.
 5. `type` la cuvinte: confirmat în specificația din 23 nov. (`brand`, `topic`, `competitor`); de văzut doar că API-ul respectă filtrul (codul filtrează și local).
 6. Planable Competitors: că `id` din `/competitors/metrics` și `/comparison` e `scrapedPageId` (codul cade pe handle dacă nu), că `startDate`/`endDate` au prioritate față de `range`, și ce înseamnă `posts` și `totalEngagement` pe fereastra unei zile (presupunem: postările publicate în zi și interacțiunile lor).
-7. Forma lui `engagement` la mențiuni: număr (cum arată specificația) sau obiect. Un obiect devine NULL, fără notă; de verificat în `mentions.engagement` după prima rulare cu AH.
+7. Forma lui `engagement` la mențiuni: număr (cum arată specificația) sau obiect. Un obiect devine NULL, fără notă; de verificat în `mentions.engagement` după prima rulare cu AI.

@@ -1,4 +1,4 @@
--- Listening după modelul Planable (deciziile AH din docs/decisions.md, cererea din 25 nov. 2026: „Fă A și B”, apoi topicurile
+-- Listening după modelul Planable (deciziile AI din docs/decisions.md, cererea din 25 nov. 2026: „Fă A și B”, apoi topicurile
 -- și „Top voices”).
 --
 -- 1. `mentions` păstrează acum autorul (nume și username, cum le trimite sursa) și interacțiunile mențiunii. Revine asupra
@@ -20,9 +20,9 @@ alter table public.mentions
   add column author_username text check (length(author_username) between 1 and 256),
   add column engagement bigint check (engagement >= 0);
 comment on column public.mentions.author_name is
-  'Numele autorului, cum îl trimite sursa (deciziile AH). Poate fi o persoană fizică: dată personală, citită doar cu acces la brand.';
+  'Numele autorului, cum îl trimite sursa (deciziile AI). Poate fi o persoană fizică: dată personală, citită doar cu acces la brand.';
 comment on column public.mentions.author_username is
-  'Username-ul autorului, cum îl trimite sursa (deciziile AH). NULL când sursa nu îl dă.';
+  'Username-ul autorului, cum îl trimite sursa (deciziile AI). NULL când sursa nu îl dă.';
 comment on column public.mentions.engagement is
   'Interacțiunile mențiunii raportate de sursă (Planable `engagement`). NULL = sursa nu le dă; nu înseamnă zero.';
 
@@ -389,7 +389,7 @@ $$;
 revoke all on function public.brand_listening_overview(uuid, date, date) from public, anon;
 grant execute on function public.brand_listening_overview(uuid, date, date) to authenticated, service_role;
 comment on function public.brand_listening_overview(uuid, date, date) is
-  'Ecranul Listening (deciziile AH): seria pe zi și rețea, interacțiunile, sentimentul automat Planable, vocile principale, topicurile '
+  'Ecranul Listening (deciziile AI): seria pe zi și rețea, interacțiunile, sentimentul automat Planable, vocile principale, topicurile '
   'și comparația cu competitorii. SECURITY INVOKER; verifică has_brand_access (E8).';
 
 -- 5. Feed-ul: autorul mențiunii, cum îl trimite sursa (numele, altfel username-ul). Până acum era mereu NULL (D-22). --------------

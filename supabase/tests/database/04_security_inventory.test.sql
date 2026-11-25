@@ -104,7 +104,7 @@ select is_empty(
 -- O funcție nouă în public trebuie adăugată explicit în lista de mai jos, după revizuire.
 -- E10 (23 oct 2026): find_user_for_invite, grant_invited_access, tenant_people_for, doar service_role (funcția server `users`).
 -- E-5 (23 oct 2026): tenant_people_for și grant_invited_access înlocuite (temporary_password, auditul user_created); aceleași nume.
--- AH (25 nov 2026): brand_listening_overview, aceeași poartă E8 (SECURITY INVOKER, has_brand_access în corp).
+-- AI (25 nov 2026): brand_listening_overview, aceeași poartă E8 (SECURITY INVOKER, has_brand_access în corp).
 -- Y (23 nov 2026): brand_competitor_ads și brand_social_competitors, aceeași poartă E8 (SECURITY INVOKER, has_brand_access în corp prin ai_check).
 -- M (12 nov 2026): brand_ai_settings, aceeași poartă E8.
 -- L (11 nov 2026): brand_index_status, aceeași poartă E8.

@@ -121,7 +121,7 @@ export interface PvLogEntry {
 }
 
 /**
- * Sentimentul dat AUTOMAT de sursă (Planable), neverificat de un om (deciziile AH). Se arată separat de distribuția revizuită
+ * Sentimentul dat AUTOMAT de sursă (Planable), neverificat de un om (deciziile AI). Se arată separat de distribuția revizuită
  * și etichetat ca atare; nu o înlocuiește. `total` = mențiunile cu sentiment pozitiv, neutru sau negativ; `unknown` = cele
  * fără sentiment de la sursă. Procentele și `net` (100 × (pozitive − negative) / total) vin calculate de server.
  */
@@ -201,7 +201,7 @@ export interface ListeningCompetition {
 }
 
 /**
- * Tot ce arată ecranul Listening în afară de feed și de distribuția revizuită (deciziile AH), calculat de server. Volumul
+ * Tot ce arată ecranul Listening în afară de feed și de distribuția revizuită (deciziile AI), calculat de server. Volumul
  * folosește regula indicatorului „Mențiuni” (fără mențiunile clar în altă limbă); sentimentul automat și vocile, doar autorii externi.
  */
 export interface ListeningOverview {
@@ -213,7 +213,7 @@ export interface ListeningOverview {
   engagement: ListeningEngagement
   auto_sentiment: AutoSentiment
   top_voices: TopVoice[]
-  /** Câte mențiuni externe sunt și câte au autor: explică o listă de voci goală (de ex. mențiuni colectate înainte de AH). */
+  /** Câte mențiuni externe sunt și câte au autor: explică o listă de voci goală (de ex. mențiuni colectate înainte de AI). */
   voices_basis: { external: number; with_author: number }
   topics: ListeningTopic[]
   /** Brandul are cel puțin un topic urmărit (în orice perioadă). */

@@ -168,7 +168,8 @@ export function createSupabaseSources(client: DataClient, now: () => Date = () =
         return deriveStatuses(connections, runs, batches)
       }),
 
-    // Vederea `source_freshness` trece prin RLS pentru orice utilizator cu acces la brand; Planable Analytics apare ca `planable`.
+    // Vederea `source_freshness` întoarce rânduri doar rolurilor de agenție cu acces la brand (decizia AH); clientul primește o
+    // listă goală. Planable Analytics apare ca `planable`.
     freshness: (brandId) =>
       guarded(async () => {
         const { data, error } = await client.from('source_freshness').select('source, data_as_of, freshness').eq('brand_id', brandId)

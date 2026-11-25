@@ -128,7 +128,7 @@ describe('normalizare Planable', () => {
     assert.ok(!id().startsWith('h:'), 'nu se poate confunda cu o cheie din URL')
   })
 
-  test('rândul unei mențiuni fără link: url și text NULL, niciun câmp inventat; autorul cum îl trimite sursa (AH)', () => {
+  test('rândul unei mențiuni fără link: url și text NULL, niciun câmp inventat; autorul cum îl trimite sursa (AI)', () => {
     const m = parsed({ platform: 'web', url: '', text: null, author: { name: 'Site de știri', username: null, profileImageUrl: null } })
     const key = builtMentionNativeId(builtMentionIdentity(m), 1)
     const row = mentionRow(m, { tenant_id: T1, brand_id: B1, source_id: 'c', sync_run_id: 'r', collected_at: '2026-10-08T05:00:00.000Z', payload_hash: 'a'.repeat(64), timezone: 'Europe/Bucharest' } as never, null, key)
@@ -228,7 +228,7 @@ describe('collectPlanable', () => {
     assert.equal(by('https://tt.test/x'), false, 'același nume pe altă platformă nu e contul propriu')
     assert.equal(by('https://ig.test/none'), null)
     const ana = db.tables.mentions!.find((m) => m.url === 'https://ig.test/ext')!
-    assert.deepEqual([ana.author_name, ana.author_username], ['Ana Popescu', 'ana.p'], 'autorul se păstrează (deciziile AH)')
+    assert.deepEqual([ana.author_name, ana.author_username], ['Ana Popescu', 'ana.p'], 'autorul se păstrează (deciziile AI)')
     const none = db.tables.mentions!.find((m) => m.url === 'https://ig.test/none')!
     assert.deepEqual([none.author_name, none.author_username], [null, null], 'fără autor în payload: NULL, nu un nume inventat')
   })
@@ -289,7 +289,7 @@ describe('collectPlanable', () => {
       }
       assert.equal(new Set(rows.map((r) => r.native_id)).size, 3)
       assert.deepEqual(rows.map((r) => r.sentiment).sort(), ['negative', 'neutral', 'neutral'])
-      assert.deepEqual(rows.map((r) => r.author_name).sort(), ['blog.test', 'ziar.test', 'ziar.test'], 'autorul (site-ul) se păstrează (deciziile AH)')
+      assert.deepEqual(rows.map((r) => r.author_name).sort(), ['blog.test', 'ziar.test', 'ziar.test'], 'autorul (site-ul) se păstrează (deciziile AI)')
       assert.ok(rows.every((r) => r.author_username === null && r.engagement === 0), 'username gol → NULL; interacțiunile 0 raportate rămân 0')
       assert.deepEqual(l.errors.map((e) => [e.code, e.dimension, e.message]), [['parser_note', MENTIONS_WITHOUT_LINK, '3 mențiuni scrise din web fără link de la sursă (3 și fără text); cheia e construită din rețea, autor și dată']])
       assert.ok(!JSON.stringify(l.errors).includes('ziar.test'))
@@ -515,7 +515,7 @@ describe('Planable: mențiunile competitorilor (deciziile Y)', () => {
     assert.equal(db.tables.sync_runs!.filter((r) => r.source === 'planable_listening_competitors').length, 0)
   })
 
-  test('topicuri (AH): mențiunile fără text și fără autor, limba trimisă doar spre trigger, topicul citit cu zilele acoperite', async () => {
+  test('topicuri (AI): mențiunile fără text și fără autor, limba trimisă doar spre trigger, topicul citit cu zilele acoperite', async () => {
     const { db } = setup({ tables: { topic_mentions: [], listening_trackers: [] } })
     const out = await collectPlanable({
       db,
@@ -547,7 +547,7 @@ describe('Planable: mențiunile competitorilor (deciziile Y)', () => {
     assert.equal(db.tables.sync_runs!.filter((r) => r.source === 'planable_listening_topics').length, 0)
   })
 
-  test('acoperirea cuvintelor brandului (AH): citit complet → complete; o pagină eșuată → incomplet; nu intră în rows_written', async () => {
+  test('acoperirea cuvintelor brandului (AI): citit complet → complete; o pagină eșuată → incomplet; nu intră în rows_written', async () => {
     const { db } = setup({ tables: { listening_trackers: [] } })
     const out = await collectPlanable({
       db,

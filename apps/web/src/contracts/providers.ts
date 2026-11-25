@@ -61,7 +61,7 @@ export interface InsightsProvider {
 export interface MentionsProvider {
   list(ctx: QueryContext, query: MentionQuery): Promise<ProviderResult<MentionPage>>
   sentiment(ctx: QueryContext): Promise<ProviderResult<SentimentDistribution>>
-  /** Volumul, rețelele, interacțiunile, sentimentul automat, vocile, topicurile și competiția din Listening (deciziile AH). */
+  /** Volumul, rețelele, interacțiunile, sentimentul automat, vocile, topicurile și competiția din Listening (deciziile AI). */
   overview(ctx: QueryContext): Promise<ProviderResult<ListeningOverview>>
   /** Sursele distincte ale mențiunilor, pentru filtrul de sursă. */
   sources(brandId: BrandId): Promise<ProviderResult<string[]>>

@@ -428,7 +428,7 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
     const withoutLink = new Map<string, Unlinked[]>()
     // Mențiunile sărite, numărate pe rețea și motiv: o notă pe grup, nu una pe mențiune.
     const skipped = new Map<string, SkippedGroup>()
-    // Ce cuvinte s-au citit complet și ce zile acoperă (deciziile AH): o zi citită fără mențiuni e zero real în graficul pe zile.
+    // Ce cuvinte s-au citit complet și ce zile acoperă (deciziile AI): o zi citită fără mențiuni e zero real în graficul pe zile.
     const previousTrackers = new Map(
       (await db.select<{ keyword_id: string; covered_from: string; covered_to: string }>(
         'listening_trackers',
@@ -675,7 +675,7 @@ async function runCompetitorListening(deps: PlanableDeps, client: PlanableClient
 }
 
 /**
- * Mențiunile cuvintelor de tip „topic” (deciziile AH) → `topic_mentions`, pe cuvânt, și `listening_trackers` (`kind = topic`: ce
+ * Mențiunile cuvintelor de tip „topic” (deciziile AI) → `topic_mentions`, pe cuvânt, și `listening_trackers` (`kind = topic`: ce
  * topicuri s-au citit și ce zile acoperă). Fără text și fără autor, ca la competitori. Un workspace fără topicuri nu e o rulare
  * eșuată: `not_connected`, fără sync_run.
  */

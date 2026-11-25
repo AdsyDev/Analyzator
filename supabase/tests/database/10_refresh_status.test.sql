@@ -1,4 +1,4 @@
--- Statusul surselor, acoperirea cu zile lipsă, actualitatea pentru client și alertele de refresh. Date SINTETICE, doar aici.
+-- Statusul surselor, acoperirea cu zile lipsă, actualitatea (doar agenția) și alertele de refresh. Date SINTETICE, doar aici.
 -- brand 1A = 2000…0011 · 1B = …0012 (T1) · 2A = …0021 (T2)
 -- admin T1 = 3000…01 · strategist T1 (acces 1A) = …02 · account T1 (acces 1B) = …03 · client T1 (acces 1A) = …04
 -- client fără acces = …05 · admin T2 = …11
@@ -150,13 +150,19 @@ select is_empty($$ select 1 from public.source_status where tenant_id = '1000000
 select is_empty($$ select 1 from public.source_dataset_days where tenant_id = '10000000-0000-0000-0000-000000000001' $$, 'R2: nici zilele cu date');
 reset role;
 
--- actualitatea pentru client: doar data și o explicație
+-- actualitatea: doar agenția (AH). Clientul nu vede nici „date până la”, nici zilele cu date.
 select tests.authenticate_as('30000000-0000-0000-0000-000000000004');
-select is((select freshness from public.source_freshness where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'meta_ads'), 'current', 'F1: clientul vede că datele Meta sunt la zi');
+select is_empty($$ select 1 from public.source_freshness $$, 'AH: clientul cu acces nu vede actualitatea datelor');
+select is_empty($$ select 1 from public.source_dataset_days $$, 'AH: clientul cu acces nu vede zilele cu date');
+select is_empty($$ select 1 from public.source_freshness where brand_id = '20000000-0000-0000-0000-000000000011' $$, 'AH: nici filtrând direct pe brandul lui');
+reset role;
+select tests.authenticate_as('30000000-0000-0000-0000-000000000002');
+select is((select freshness from public.source_freshness where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'meta_ads'), 'current', 'F1: agenția vede că datele Meta sunt la zi');
 select is((select freshness from public.source_freshness where brand_id = '20000000-0000-0000-0000-000000000011' and source = 'ga4'), 'no_data', 'F1: fără date: no_data (sursă neconectată sau neimportată), nu zero');
 select ok(not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'source_freshness'
-  and column_name in ('last_run_status', 'last_run_error_count', 'credential_status', 'reason', 'connected')), 'F1: view-ul clientului nu expune erori sau conexiuni');
+  and column_name in ('last_run_status', 'last_run_error_count', 'credential_status', 'reason', 'connected')), 'F1: view-ul nu expune erori sau conexiuni');
 select is((select count(distinct brand_id)::int from public.source_freshness), 1, 'F1: doar brandul la care are acces');
+select ok(exists (select 1 from public.source_dataset_days where brand_id = '20000000-0000-0000-0000-000000000011'), 'AH: agenția vede în continuare zilele cu date');
 reset role;
 
 -- ===== Istoricul sincronizărilor ========================================================================================================================

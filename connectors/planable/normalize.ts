@@ -59,7 +59,7 @@ export const MentionSchema = z
   .object({
     platform: z.string(), publishedAt: z.string(), url: z.string(), text: z.string().nullable().optional(), sentiment: z.string().nullable().optional(),
     // Documentat (OpenAPI 2026-10-12): author { name, username, profileImageUrl }. Numele și username-ul se salvează la mențiunile
-    // brandului (deciziile AH, „Voci principale”) și servesc la „cont propriu”; poza de profil nu se păstrează.
+    // brandului (deciziile AI, „Voci principale”) și servesc la „cont propriu”; poza de profil nu se păstrează.
     author: z.object({ name: z.string().nullable().optional(), username: z.string().nullable().optional() }).passthrough().nullable().optional(),
     // Interacțiunile mențiunii, cum le raportează Planable. Forma se verifică la scriere (`mentionEngagement`), nu la parsare.
     engagement: z.unknown().optional(),
@@ -355,7 +355,7 @@ const authorField = (v: string | null | undefined): string | null => {
 
 /**
  * `builtKey` = cheia construită, pentru o mențiune fără link; altfel cheia e hash-ul URL-ului. Autorul (nume și username) se
- * păstrează din 25 nov. 2026 (deciziile AH, revin asupra D-22): poate fi o persoană fizică, deci e dată personală, citită doar cu
+ * păstrează din 25 nov. 2026 (deciziile AI, revin asupra D-22): poate fi o persoană fizică, deci e dată personală, citită doar cu
  * acces la brand.
  */
 export function mentionRow(m: Mention, p: Provenance, own: OwnAccounts | null = null, builtKey: string | null = null) {
@@ -407,7 +407,7 @@ export function competitorMentionRow(m: Mention, keywordId: string, p: Omit<Prov
 }
 
 /**
- * Rândul din `topic_mentions` (deciziile AH): mențiunea unui cuvânt de tip „topic”. Ca la competitori: rețeaua, linkul, momentul,
+ * Rândul din `topic_mentions` (deciziile AI): mențiunea unui cuvânt de tip „topic”. Ca la competitori: rețeaua, linkul, momentul,
  * sentimentul furnizorului, interacțiunile și limba; textul și autorul nu se păstrează (textul pleacă doar în `language_text`,
  * pe care triggerul îl clasifică și îl golește).
  */

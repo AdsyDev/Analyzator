@@ -1,4 +1,4 @@
--- Ecranul Listening (deciziile AH): brand_listening_overview, topicurile și acoperirea cuvintelor. Date SINTETICE, doar aici.
+-- Ecranul Listening (deciziile AI): brand_listening_overview, topicurile și acoperirea cuvintelor. Date SINTETICE, doar aici.
 -- T1 = 1000…0001 · brand 1A = 2000…0011 · strategist T1 (acces 1A) = 3000…0002 · client T1 (acces 1A) = 3000…0004
 -- client T1 fără acces = 3000…0005 · strategist T2 = 3000…0012
 begin;
@@ -7,7 +7,7 @@ select * from no_plan();
 
 -- Setul de competitori: Competitor 1 (cuvântul = numele) și Competitor 2 (cuvântul „comp2”, neurmărit în Planable).
 select tests.authenticate_as('30000000-0000-0000-0000-000000000002');
-select lives_ok($$ select * from public.create_competitor_set_version('20000000-0000-0000-0000-000000000011', current_date, 'AH',
+select lives_ok($$ select * from public.create_competitor_set_version('20000000-0000-0000-0000-000000000011', current_date, 'AI',
     '[{"name":"Competitor 1","domain":"competitor1.test"},{"name":"Competitor 2","domain":"competitor2.test","listening_keywords":["comp2"]}]') $$,
   'set de competitori');
 reset role;

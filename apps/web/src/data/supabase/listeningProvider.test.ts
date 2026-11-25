@@ -21,7 +21,7 @@ const overviewRow = {
   competition: null,
 }
 
-describe('createSupabaseMentions.overview (deciziile AH)', () => {
+describe('createSupabaseMentions.overview (deciziile AI)', () => {
   it('citește brand_listening_overview cu perioada; `connected` nu ajunge în UI; lipsa (null) rămâne null', async () => {
     const fake = fakeDataClient({ rpc: () => ({ data: overviewRow }) })
     const r = await createSupabaseMentions(fake.client).overview(ctx)

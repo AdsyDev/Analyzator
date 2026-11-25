@@ -31,7 +31,7 @@ export function mentionFiltersFrom(ctx: QueryContext): MentionFilters {
 }
 
 /**
- * Listening (spec cap. 18, deciziile AH): rândul de indicatori (Mențiuni din registru, interacțiunile și sentimentul automat),
+ * Listening (spec cap. 18, deciziile AI): rândul de indicatori (Mențiuni din registru, interacțiunile și sentimentul automat),
  * mențiunile pe zi și pe rețea, vocile principale, distribuția sentimentului (revizuită, cu cea automată alături), competiția,
  * topicurile și feed-ul cu marcare pentru farmacovigilență. Tot ce nu e în registru vine calculat de `brand_listening_overview`.
  * Jurnalul PV are submeniul lui (Farmacovigilență, E-2), doar pentru `agency_admin`.

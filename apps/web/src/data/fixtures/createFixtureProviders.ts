@@ -495,6 +495,8 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
     freshness: async (brandId) => {
       const denied = guard<never>(brandId)
       if (denied) return denied
+      // Ca în baza de date (decizia AH): vederea întoarce o listă goală clientului, nu o eroare.
+      if (!isAgencyRole(getRole())) return ready([])
       return ready(
         (statusesFile[brandId] ?? [])
           .filter((s) => s.provider !== 'csv_import' && s.provider !== 'airbyte')

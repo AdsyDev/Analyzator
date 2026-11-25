@@ -7,7 +7,7 @@ select * from no_plan();
 
 -- R1. Toate cele 37 de politici de date folosesc noua funcție (21 din D-20, paid_budgets din J-4, index_urls și index_inspections din L,
 -- cele trei tabele AdSy AI din M, documentele și fragmentele lor din P, răspunsurile și comentariile clientului din S, cele patru tabele
--- ale competitorilor din Y, listening_trackers și topic_mentions din AH); nicio politică de date
+-- ale competitorilor din Y, listening_trackers și topic_mentions din AI); nicio politică de date
 -- nu mai apelează has_brand_access pe rând.
 select is(
   (select count(*)::integer from pg_policies where schemaname = 'public' and cmd = 'SELECT' and qual like '%accessible_brand_ids()%'),

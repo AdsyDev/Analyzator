@@ -6,7 +6,7 @@ import { pageReady, renderApp, where } from '../../test/renderApp'
 const URINAL = '/brands/brand-urinal/listening'
 
 describe('Listening', () => {
-  it('rândul de sus (AH): „Mențiuni” din registru, „Interacțiuni” fără valori inventate și „Sentiment automat” etichetat', async () => {
+  it('rândul de sus (AI): „Mențiuni” din registru, „Interacțiuni” fără valori inventate și „Sentiment automat” etichetat', async () => {
     renderApp({ route: URINAL })
     await pageReady('Listening')
     const mentions = await screen.findByRole('article', { name: /^Mențiuni/ })
@@ -51,7 +51,7 @@ describe('Listening', () => {
     expect(await within(sec).findByText('mama_de_trei')).toBeInTheDocument()
   })
 
-  it('vocile: mențiuni externe fără autor (colectate înainte de AH) → mesaj, nu listă inventată', async () => {
+  it('vocile: mențiuni externe fără autor (colectate înainte de AI) → mesaj, nu listă inventată', async () => {
     renderApp({
       route: URINAL,
       wrap: (b) => ({

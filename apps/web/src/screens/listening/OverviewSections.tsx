@@ -50,7 +50,7 @@ export function SentimentBar({ s, label, className = 'h-2.5' }: { s: Pick<AutoSe
   )
 }
 
-/** Eticheta care spune de unde vine sentimentul: automat, din Planable, neverificat (deciziile AH, B). */
+/** Eticheta care spune de unde vine sentimentul: automat, din Planable, neverificat (deciziile AI, B). */
 export function AutoChip() {
   return (
     <span title="Sentiment dat automat de Planable, neverificat de un om din echipa AdSymphony">
@@ -198,7 +198,7 @@ export function MentionsPerDay({ state, onRetry }: { state: AsyncState<ProviderR
 
 const initials = (s: string) => s.replace(/^@/, '').split(/[\s._-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?'
 
-/** „Voci principale”: autorii externi cu cele mai multe mențiuni în perioadă (deciziile AH). */
+/** „Voci principale”: autorii externi cu cele mai multe mențiuni în perioadă (deciziile AI). */
 export function TopVoices({ state, onRetry }: { state: AsyncState<ProviderResult<ListeningOverview>>; onRetry: () => void }) {
   return (
     <Section id="top-voices" title="Voci principale" description="Autorii externi cu cele mai multe mențiuni în perioadă, apoi cu cele mai multe interacțiuni. Conturile proprii ale brandului nu apar.">
@@ -400,7 +400,7 @@ function TopicRow({ t }: { t: ListeningTopic }) {
   )
 }
 
-/** Topicurile urmărite în Planable Listening (cuvinte de tip „topic”), cu volumul, sentimentul automat și rețelele (deciziile AH). */
+/** Topicurile urmărite în Planable Listening (cuvinte de tip „topic”), cu volumul, sentimentul automat și rețelele (deciziile AI). */
 export function TopicsSection({ state, onRetry }: { state: AsyncState<ProviderResult<ListeningOverview>>; onRetry: () => void }) {
   return (
     <Section id="topics" title="Topicuri" description="Conversațiile despre temele urmărite în Planable (de exemplu „dureri articulare”), fără să fie despre brand. Sentimentul e cel automat, despre temă, nu despre brand.">
