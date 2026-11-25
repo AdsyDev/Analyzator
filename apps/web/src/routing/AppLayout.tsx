@@ -150,14 +150,18 @@ export function AppLayout() {
   )
   const { ctx, change, reset } = useQueryContext(urlBrand ? urlBrand.id : null, filterDefs)
 
+  // Clientul (`client_viewer`) nu vede nimic despre sincronizare: nici fâșia „Starea datelor", nici „Date până la · Ultimul refresh"
+  // din topbar. Vederile din API (`source_freshness`, `source_dataset_days`) îi întorc oricum liste goale (decizia AH), deci nici nu le cerem.
+  const showSyncInfo = isAgencyRole(user.role)
+
   // „Date până la" și „Ultimul refresh" din starea surselor brandului curent (doar pentru un brand permis).
   const { state: sourcesState } = useAsync(
     () => (shellBrand ? providers.sources.statuses(shellBrand.id) : Promise.resolve(null)),
     [providers, shellBrand?.id, user.role],
   )
-  // Actualitatea pe sursă e vizibilă și clientului (vederea `source_freshness`); starea conexiunilor, doar agenției.
+  // Actualitatea pe sursă (vederea `source_freshness`) și starea conexiunilor sunt doar ale agenției (decizia AH).
   const { state: freshnessState } = useAsync(
-    () => (shellBrand ? providers.sources.freshness(shellBrand.id) : Promise.resolve(null)),
+    () => (shellBrand && showSyncInfo ? providers.sources.freshness(shellBrand.id) : Promise.resolve(null)),
     [providers, shellBrand?.id, user.role],
   )
   const freshness = freshnessState.status === 'done' && freshnessState.value?.kind === 'ready' ? freshnessState.value.data : null
@@ -167,12 +171,8 @@ export function AppLayout() {
     const live = sourcesState.value.data.filter((s) => s.state !== 'not_connected')
     const dates = live.map((s) => s.data_as_of).filter((d): d is string => !!d).sort()
     const imports = live.map((s) => s.imported_at).filter((d): d is string => !!d).sort()
-    // Clientul nu vede conexiunile, deci „Date până la" îi vine din actualitatea surselor.
     return { dataAsOf: dates[0] ?? fresh[0] ?? null, lastRefreshAt: imports[imports.length - 1] ?? null }
   }, [sourcesState, freshness])
-
-  // Clientul (`client_viewer`) nu vede nimic despre sincronizare: nici fâșia „Starea datelor", nici „Date până la · Ultimul refresh" din topbar.
-  const showSyncInfo = isAgencyRole(user.role)
 
   const title = module?.title ?? adminModule?.title ?? (siteMatch ? 'Site și surse' : isPortfolio ? 'Portofoliu' : 'Analyzator')
   const subtitle = module?.subtitle(shellBrand?.name ?? '') ?? adminModule?.subtitle(shellBrand?.name ?? null) ?? (siteMatch ? 'Detaliile site-ului, sursele lui de date și istoricul sincronizărilor.' : isPortfolio ? 'Toate brandurile la care ai acces, pe aceeași perioadă, cu indicatorii din Overview.' : undefined)

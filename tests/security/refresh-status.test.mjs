@@ -1,5 +1,5 @@
 // Statusul surselor, actualitatea, istoricul și alertele de refresh prin API-ul real (PostgREST). Supabase local.
-// Obiective: clientul vede doar actualitatea datelor (fără erori, conexiuni sau istoric); agenția vede doar brandurile ei;
+// Obiective: clientul nu vede nimic despre sincronizare (nici actualitatea datelor, AH); agenția vede doar brandurile ei;
 // alte tenanți nu văd nimic; alertele și contactele sunt ale agency_admin. Date sintetice, doar aici.
 // Vezi docs/security-tests.md (secțiunea G).
 import { test, describe, before } from 'node:test'
@@ -40,12 +40,12 @@ describe('G1. source_status și sync_history (agenția)', () => {
     assert.deepEqual((await get(`sync_history?select=id&id=eq.${RUN}`, U.admin2)).json, [])
   })
 
-  test('clientul (cu și fără acces) nu vede statusul, istoricul sau zilele cu date', async () => {
+  test('clientul (cu și fără acces) nu vede statusul, istoricul, actualitatea sau zilele cu date', async () => {
     for (const user of [U.client1, U.clientNone]) {
-      for (const view of ['source_status', 'sync_history']) assert.deepEqual((await get(`${view}?select=*`, user)).json, [], `${user} ${view}`)
+      for (const view of ['source_status', 'sync_history', 'source_freshness', 'source_dataset_days']) {
+        assert.deepEqual((await get(`${view}?select=*`, user)).json, [], `${user} ${view}`)
+      }
     }
-    assert.deepEqual((await get('source_status?select=*', U.clientNone)).json, [])
-    assert.deepEqual((await get('source_dataset_days?select=*', U.clientNone)).json, [])
   })
 
   test('view-urile nu se pot scrie și nu expun coloane de conexiune clientului', async () => {
@@ -53,17 +53,19 @@ describe('G1. source_status și sync_history (agenția)', () => {
       const post = await rest(view, { method: 'POST', token: userToken(U.admin1), body: {}, headers: { Prefer: 'return=representation' } })
       assert.ok(denied(post) || post.status >= 400, `${view}: ${post.status}`)
     }
-    const fresh = (await get('source_freshness?select=*', U.client1)).json
+    const fresh = (await get('source_freshness?select=*', U.strat1)).json
     assert.ok(fresh.length > 0)
     assert.deepEqual(Object.keys(fresh[0]).sort(), ['brand_id', 'data_as_of', 'freshness', 'grace_days', 'source', 'tenant_id'])
   })
 })
 
-describe('G2. source_freshness (clientul)', () => {
-  test('clientul cu acces vede doar brandul lui; fără acces / alt tenant: nimic', async () => {
-    const rows = (await get('source_freshness?select=brand_id,source,freshness', U.client1)).json
+describe('G2. source_freshness (doar agenția, AH)', () => {
+  test('agenția vede doar brandul ei; clientul cu acces, clientul fără acces și alt tenant: nimic', async () => {
+    const rows = (await get('source_freshness?select=brand_id,source,freshness', U.strat1)).json
     assert.deepEqual([...new Set(rows.map((r) => r.brand_id))], [B1A])
     assert.ok(rows.every((r) => ['no_data', 'current', 'delayed'].includes(r.freshness)))
+    assert.deepEqual((await get(`source_freshness?select=*&brand_id=eq.${B1A}`, U.client1)).json, [])
+    assert.deepEqual((await get(`source_dataset_days?select=*&brand_id=eq.${B1A}`, U.client1)).json, [])
     assert.deepEqual((await get('source_freshness?select=*', U.clientNone)).json, [])
     assert.deepEqual((await get(`source_freshness?select=*&brand_id=eq.${B1A}`, U.admin2)).json, [])
     assert.ok((await get(`source_freshness?select=brand_id&brand_id=eq.${B2A}`, U.admin2)).json.length > 0)
