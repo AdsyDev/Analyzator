@@ -29,13 +29,13 @@ export interface SourceStatusInfo {
 }
 
 /**
- * Actualitatea datelor unei surse, așa cum o poate vedea și clientul (vederea `source_freshness`, spec cap. 27):
- * doar „date până la" și dacă sunt la zi. Fără conexiuni, erori sau credențiale.
+ * Actualitatea datelor unei surse (vederea `source_freshness`): doar „date până la" și dacă sunt la zi. Fără conexiuni,
+ * erori sau credențiale. Doar rolurile de agenție o primesc; clientul primește o listă goală (decizia AH).
  */
 export type FreshnessState = 'no_data' | 'current' | 'delayed'
 export interface SourceFreshness {
   provider: SourceProviderId
-  /** Ultima zi cu date reale; `null` = nicio zi (sursă neconectată sau fără date, clientul nu le poate deosebi). */
+  /** Ultima zi cu date reale; `null` = nicio zi (sursă neconectată sau fără date). */
   data_as_of: IsoDate | null
   freshness: FreshnessState
 }
