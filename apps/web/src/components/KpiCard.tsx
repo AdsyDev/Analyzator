@@ -1,12 +1,11 @@
-import { ArrowDownRightIcon, ArrowUpRightIcon, ClockIcon, MinusIcon, PlugsIcon, WarningCircleIcon, WarningIcon } from '@phosphor-icons/react'
+import { ArrowDownRightIcon, ArrowUpRightIcon, ClockIcon, MinusIcon, PlugsIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
-import type { MetricDirection, MetricItem, TrendPoint } from '../contracts'
+import type { MetricDirection, MetricItem, MetricStatus, TrendPoint } from '../contracts'
 import { formatDate } from '../lib/format'
 import { cn } from '../lib/cn'
-import { coveragePercent, isGoodChange, metricView, type DeltaDirection } from '../lib/metricView'
+import { isGoodChange, metricView, type DeltaDirection } from '../lib/metricView'
 import { sourceName } from '../lib/sources'
 import { sparkPaths } from '../lib/spark'
-import { CoverageBadge } from './CoverageBadge'
 import { Button } from './ui/Button'
 import { InfoTip } from './ui/InfoTip'
 import { useMissingOnPage } from './MissingData'
@@ -52,17 +51,22 @@ const DELTA_ICON: Record<DeltaDirection, typeof ArrowUpRightIcon> = {
   flat: MinusIcon,
 }
 
+/** Stările a căror notă rămâne pe card (decizia AH); restul se văd în EvidenceDrawer. */
+const CARD_CAVEAT: readonly MetricStatus[] = ['stale', 'base_zero']
+
 export function KpiCard({ label, definition, metric, loading = false, error = null, spark, direction = 'higher_is_better', qualifier = null, compareLabel, emptyReason = null, emptyTitle = null, category, extra = null, detail = null, onOpen, onRetry }: KpiCardProps) {
   const base = metric ? metricView(metric) : null
   const view = base && !base.hasValue ? { ...base, emptyReason: emptyReason ?? base.emptyReason, emptyTitle: emptyTitle ?? base.emptyTitle } : base
   const paths = spark ? sparkPaths(spark) : { line: '', area: '' }
   const state = loading ? 'loading' : error ? 'error' : 'ready'
+  // Pe card rămân doar notele gri (învechit, bază zero); acoperirea parțială și eșantionul mic stau în EvidenceDrawer (decizia AH).
+  const caveat = metric && CARD_CAVEAT.includes(metric.status) ? view?.caveat ?? null : null
   // Fără sursă (și nu un indicator nedefinit, care are titlul lui): cardul nu se desenează, pagina îl numește (decizia AG).
   const missing = state === 'ready' && metric?.status === 'not_connected' && emptyTitle === null
   useMissingOnPage(label, missing, view?.emptyReason ?? null)
   if (missing) return null
 
-  // Sub `sm` (telefon), cardul e compact, pe două rânduri: eticheta și acoperirea sus, valoarea, variația și un
+  // Sub `sm` (telefon), cardul e compact, pe două rânduri: eticheta sus, valoarea, variația și un
   // sparkline mic jos. Sursa, „Date până la" și perioada de comparație rămân în EvidenceDrawer; stările nu se schimbă.
   return (
     <article
@@ -151,15 +155,10 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
                 <path d={paths.line} vectorEffect="non-scaling-stroke" className="fill-none stroke-accent" strokeWidth="1.75" strokeLinejoin="round" strokeLinecap="round" />
               </svg>
             )}
-            {view.caveat && (
-              <div
-                className={cn(
-                  'flex items-start gap-1.5 text-[12px] leading-snug max-sm:col-span-2',
-                  metric?.status === 'stale' || metric?.status === 'base_zero' ? 'text-text-2' : 'text-warn-text',
-                )}
-              >
-                {metric?.status === 'stale' ? <ClockIcon size={13} className="mt-px flex-none" aria-hidden="true" /> : <WarningIcon size={13} className="mt-px flex-none" aria-hidden="true" />}
-                <span>{view.caveat}</span>
+            {caveat && (
+              <div className="flex items-start gap-1.5 text-[12px] leading-snug text-text-2 max-sm:col-span-2">
+                {metric?.status === 'stale' && <ClockIcon size={13} className="mt-px flex-none" aria-hidden="true" />}
+                <span>{caveat}</span>
               </div>
             )}
             {view.notes.map((n) => (
@@ -170,15 +169,13 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
         )}
       </div>
 
-      <div className="pointer-events-none relative mt-auto flex min-w-0 items-center gap-2 whitespace-nowrap border-t border-border pt-2.5 text-[11.5px] text-text-2 max-sm:col-start-2 max-sm:row-start-1 max-sm:mt-0 max-sm:min-h-6 max-sm:border-t-0 max-sm:pt-0">
-        {metric?.source && <span className="flex-none font-semibold text-text max-sm:hidden">{sourceName(metric.source)}</span>}
+      <div className="pointer-events-none relative mt-auto flex min-w-0 items-center gap-2 whitespace-nowrap border-t border-border pt-2.5 text-[11.5px] text-text-2 max-sm:hidden">
+        {metric?.source && <span className="flex-none font-semibold text-text">{sourceName(metric.source)}</span>}
         {metric?.data_as_of && (
-          <span className="min-w-0 overflow-hidden text-ellipsis max-sm:hidden">
+          <span className="min-w-0 overflow-hidden text-ellipsis">
             Date până la <span className="font-mono text-[11px]">{formatDate(metric.data_as_of)}</span>
           </span>
         )}
-        <span className="flex-1 max-sm:hidden" />
-        {state === 'ready' && view && <CoverageBadge state={view.coverage} pct={coveragePercent(metric?.coverage ?? null)} />}
       </div>
     </article>
   )

@@ -550,3 +550,14 @@ Cererea proprietarului produsului, 24 nov. 2026: „Nu vreau să mai văd nicăi
 | AG-4 | Implementare | — | `components/MissingData.tsx`: mesajul paginii în `AppShell`; cutiile sunt `MissingScope`; `ProviderProblem` (stare `not_connected`) și graficul de trend raportează lipsa, `Resolved` raportează conținutul cu date. Ascunderea e cu atributul `hidden`, ca raportarea să nu oscileze. |
 | AG-5 | Impact | — | Timp: aproximativ jumătate de zi (componentele comune, textele, 40 de teste actualizate). Cost extern: niciunul. |
 
+## AH — Cardurile KPI fără nota galbenă de acoperire și fără badge „Parțial / Complet” (2026-11-25)
+
+Cererea proprietarului produsului, 25 nov. 2026: „Vreau să ascundem acele notificări cu galben legat de date și mesajul cu parțial sau complet.” Cardurile din Overview și din module arătau sub sparkline „Date disponibile pentru 89% din zilele intervalului. Variația compară primele 25 de zile din fiecare perioadă.” și, în subsol, pastila „Parțial 89%”.
+
+| # | Decizie | Opțiuni | Alegere și motiv |
+|---|---|---|---|
+| AH-1 | Ce dispare de pe card | (a) doar nota galbenă; (b) nota galbenă și badge-ul | **(b).** `KpiCard`, `KpiTile` (Overview) și `StatCard` (Paid, Social) nu mai afișează `CoverageBadge` (Complet, Parțial, Învechit, Indisponibil) și nici nota galbenă a stărilor `partial` și `insufficient_sample`. |
+| AH-2 | Ce rămâne pe card | — | Valoarea, variația, sursa și „Date până la”, notele gri `stale` („Ultimele date sunt din …”) și `base_zero` (de ce lipsește variația relativă), notele secundare gri din `warnings`, starea fără valoare cu motivul ei (inclusiv „Valoare neconfirmată”) și erorile cu „Reîncearcă” (regula 8). |
+| AH-3 | Unde se vede acoperirea | — | În EvidenceDrawer (click pe card): badge-ul cu procentul și motivul rămân neschimbate. Badge-urile din tabele și matrici (Competiție, AI pe engine și subiect, Experiență pe site, starea surselor din Overview) nu fac parte din cerere și rămân. `StatCard` nu are dovezi: acoperirea Paid/Social nu se mai vede pe card. |
+| AH-4 | Ce nu se schimbă | — | Calculul și contractul: statusul, `coverage` și variația pe aceleași zile (AB) vin la fel de la server. Se schimbă doar afișarea. |
+| AH-5 | Impact | — | Timp: o oră (trei componente, testele KpiCard, documentația). Cost extern: niciunul. |
