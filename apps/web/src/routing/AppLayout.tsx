@@ -6,7 +6,7 @@ import { AppShell } from '../components/AppShell'
 import { EmptyState } from '../components/EmptyState'
 import { ModuleFreshness } from '../components/ModuleFreshness'
 import { FilterBar } from '../components/FilterBar'
-import type { Brand, ProviderResult, QueryContext, SessionUser } from '../contracts'
+import { isAgencyRole, type Brand, type ProviderResult, type QueryContext, type SessionUser } from '../contracts'
 import type { FilterBarChange } from '../components/FilterBar'
 import type { FilterDef } from '../lib/period'
 import { useProviders } from '../data/DataProvidersContext'
@@ -171,6 +171,9 @@ export function AppLayout() {
     return { dataAsOf: dates[0] ?? fresh[0] ?? null, lastRefreshAt: imports[imports.length - 1] ?? null }
   }, [sourcesState, freshness])
 
+  // Clientul (`client_viewer`) nu vede nimic despre sincronizare: nici fâșia „Starea datelor", nici „Date până la · Ultimul refresh" din topbar.
+  const showSyncInfo = isAgencyRole(user.role)
+
   const title = module?.title ?? adminModule?.title ?? (siteMatch ? 'Site și surse' : isPortfolio ? 'Portofoliu' : 'Analyzator')
   const subtitle = module?.subtitle(shellBrand?.name ?? '') ?? adminModule?.subtitle(shellBrand?.name ?? null) ?? (siteMatch ? 'Detaliile site-ului, sursele lui de date și istoricul sincronizărilor.' : isPortfolio ? 'Toate brandurile la care ai acces, pe aceeași perioadă, cu indicatorii din Overview.' : undefined)
   useEffect(() => {
@@ -201,7 +204,8 @@ export function AppLayout() {
     const context: LayoutContext = { user, brands, brand: urlBrand, activeBrand: shellBrand, ctx, homeBrandId, changeFilters: change, reloadBrands, selectBrand: onBrandChange, aiPanel: { open: aiOpen, setOpen: setAiOpen, container: aiContainer } }
     // Starea datelor apare pe fiecare modul de brand care depinde de surse; cât nu se poate citi, nu ocupă loc.
     // Structura rămâne aceeași cu sau fără fâșie, ca pagina să nu se remonteze (și să nu-și reia cererile) când apare.
-    const showFreshness = module && urlBrand && module.sources.length > 0 && freshnessState.status !== 'failed' && (freshnessState.status === 'loading' || freshness !== null)
+    // Informațiile despre sincronizare (date până la, stare pe sursă, următoarea actualizare) sunt doar pentru agenție.
+    const showFreshness = showSyncInfo && module && urlBrand && module.sources.length > 0 && freshnessState.status !== 'failed' && (freshnessState.status === 'loading' || freshness !== null)
     content = (
       <div className="flex min-w-0 flex-col gap-5">
         {showFreshness ? <ModuleFreshness sources={module.sources} freshness={freshness} syncedAt={lastRefreshAt} /> : null}
@@ -239,8 +243,8 @@ export function AppLayout() {
       }
       rightPanel={module?.assistantPanel && urlBrand && aiOpen ? { ref: setAiContainer, onClose: () => setAiOpen(false) } : undefined}
       subtitle={subtitle || undefined}
-      dataAsOf={dataAsOf}
-      lastRefreshAt={lastRefreshAt}
+      dataAsOf={showSyncInfo ? dataAsOf : null}
+      lastRefreshAt={showSyncInfo ? lastRefreshAt : null}
       onSignOut={() => void signOut()}
       roleSwitcher={preview ? { role: user.role, onChange: preview.setRole } : undefined}
       filterBar={module && !module.noPeriod && ctx && urlBrand ? <FilterBar value={ctx} onChange={change} onReset={reset} filterDefs={visibleFilterDefs} /> : undefined}
