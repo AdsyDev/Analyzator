@@ -35,7 +35,7 @@ const ICON = { up: ArrowUpRightIcon, down: ArrowDownRightIcon, flat: MinusIcon }
 
 /**
  * Card pentru indicatori care nu sunt metrici din registru (Paid, Social): date importate, calculate de server.
- * Nu are EvidenceDrawer; arată definiția, valoarea sau lipsa explicată și variația (fără badge de acoperire, decizia AH).
+ * Nu are EvidenceDrawer; arată definiția, valoarea sau lipsa explicată și variația (fără badge de acoperire, decizia AI).
  */
 export function StatCard({ label, definition, valueText, deltaText = null, deltaDirection = null, goodWhen = 'neutral', status, note = null, compareLabel, loading = false, category, sourceLabel = null, dataAsOf = null, detail = null, emptyTitle = 'Fără date pentru interval' }: StatCardProps) {
   const empty = valueText === null

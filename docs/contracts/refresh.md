@@ -19,9 +19,9 @@ Fără funcții noi în `public` (garda A10/A11): statusul se citește din view-
 | View | Cine | Conținut |
 |---|---|---|
 | `source_status` | agenția (`agency_admin`, `strategist`, `account`) cu acces la brand | per brand × 9 surse: `state`, `reason`, `connected`, `credential_status`, ultima rulare (`last_run_at`, `last_run_status`, `last_run_rows`, `last_run_error_count`), `last_success_at`, `data_as_of`, `grace_days`, `covered_days`, `expected_days` (35), `coverage` |
-| `source_freshness` | oricine are acces la brand, inclusiv clientul | `data_as_of`, `grace_days`, `freshness`: `no_data` · `current` · `delayed`. Fără erori, conexiuni sau costuri |
+| `source_freshness` | agenția cu acces la brand; clientul primește o listă goală (decizia AH) | `data_as_of`, `grace_days`, `freshness`: `no_data` · `current` · `delayed`. Fără erori, conexiuni sau costuri |
 | `sync_history` | agenția | istoricul `sync_runs`: perioadă, rânduri, `error_count`, `error_codes`, `duration_seconds`, `coverage` |
-| `source_dataset_days` | cine are acces la brand | zilele cu date reale per sursă (baza `data_as_of` și a acoperirii) |
+| `source_dataset_days` | agenția cu acces la brand; clientul primește o listă goală (decizia AH) | zilele cu date reale per sursă (baza `data_as_of` și a acoperirii) |
 
 ### `state` (agenția)
 

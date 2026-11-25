@@ -22,7 +22,7 @@ export interface KpiTileProps {
   deltaGood?: boolean | null
   /** Rândul de sub valoare: cu ce se compară sau din ce e compusă cifra. */
   sub?: string | null
-  /** Nota stării; pe card se arată doar la `stale` și `base_zero` (decizia AH), restul stă în dovezi. */
+  /** Nota stării; pe card se arată doar la `stale` și `base_zero` (decizia AI), restul stă în dovezi. */
   caveat?: string | null
   state: 'loading' | 'error' | 'ready'
   status?: MetricStatus
@@ -43,7 +43,7 @@ const DELTA_ICON = { up: ArrowUpRightIcon, down: ArrowDownRightIcon, flat: Minus
 
 /**
  * Indicator compact pentru primul rând din Overview (macheta din propunere): pictogramă, nume, valoare și variație.
- * Aceleași reguli ca la KpiCard: o valoare lipsă e explicată, nu înlocuită cu zero; acoperirea parțială stă în dovezi (AH);
+ * Aceleași reguli ca la KpiCard: o valoare lipsă e explicată, nu înlocuită cu zero; acoperirea parțială stă în dovezi (decizia AI);
  * tot cardul deschide dovezile, iar definiția stă în tooltip.
  */
 export function KpiTile({ icon: Glyph, title, label, definition, valueText, deltaText, deltaDirection, deltaGood = null, sub, caveat, state, status, error, emptyTitle, emptyReason, onOpen, onRetry, detail, keepWhenMissing = false }: KpiTileProps) {

@@ -51,7 +51,7 @@ const DELTA_ICON: Record<DeltaDirection, typeof ArrowUpRightIcon> = {
   flat: MinusIcon,
 }
 
-/** Stările a căror notă rămâne pe card (decizia AH); restul se văd în EvidenceDrawer. */
+/** Stările a căror notă rămâne pe card (decizia AI); restul se văd în EvidenceDrawer. */
 const CARD_CAVEAT: readonly MetricStatus[] = ['stale', 'base_zero']
 
 export function KpiCard({ label, definition, metric, loading = false, error = null, spark, direction = 'higher_is_better', qualifier = null, compareLabel, emptyReason = null, emptyTitle = null, category, extra = null, detail = null, onOpen, onRetry }: KpiCardProps) {
@@ -59,7 +59,7 @@ export function KpiCard({ label, definition, metric, loading = false, error = nu
   const view = base && !base.hasValue ? { ...base, emptyReason: emptyReason ?? base.emptyReason, emptyTitle: emptyTitle ?? base.emptyTitle } : base
   const paths = spark ? sparkPaths(spark) : { line: '', area: '' }
   const state = loading ? 'loading' : error ? 'error' : 'ready'
-  // Pe card rămân doar notele gri (învechit, bază zero); acoperirea parțială și eșantionul mic stau în EvidenceDrawer (decizia AH).
+  // Pe card rămân doar notele gri (învechit, bază zero); acoperirea parțială și eșantionul mic stau în EvidenceDrawer (decizia AI).
   const caveat = metric && CARD_CAVEAT.includes(metric.status) ? view?.caveat ?? null : null
   // Fără sursă (și nu un indicator nedefinit, care are titlul lui): cardul nu se desenează, pagina îl numește (decizia AG).
   const missing = state === 'ready' && metric?.status === 'not_connected' && emptyTitle === null
