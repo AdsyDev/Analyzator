@@ -6,7 +6,7 @@ import { AppShell } from '../components/AppShell'
 import { EmptyState } from '../components/EmptyState'
 import { ModuleFreshness } from '../components/ModuleFreshness'
 import { FilterBar } from '../components/FilterBar'
-import type { Brand, ProviderResult, QueryContext, SessionUser } from '../contracts'
+import { isAgencyRole, type Brand, type ProviderResult, type QueryContext, type SessionUser } from '../contracts'
 import type { FilterBarChange } from '../components/FilterBar'
 import type { FilterDef } from '../lib/period'
 import { useProviders } from '../data/DataProvidersContext'
@@ -150,14 +150,18 @@ export function AppLayout() {
   )
   const { ctx, change, reset } = useQueryContext(urlBrand ? urlBrand.id : null, filterDefs)
 
+  // Clientul (`client_viewer`) nu vede nimic despre sincronizare: nici fâșia „Starea datelor", nici „Date până la · Ultimul refresh"
+  // din topbar. Vederile din API (`source_freshness`, `source_dataset_days`) îi întorc oricum liste goale (decizia AH), deci nici nu le cerem.
+  const showSyncInfo = isAgencyRole(user.role)
+
   // „Date până la" și „Ultimul refresh" din starea surselor brandului curent (doar pentru un brand permis).
   const { state: sourcesState } = useAsync(
     () => (shellBrand ? providers.sources.statuses(shellBrand.id) : Promise.resolve(null)),
     [providers, shellBrand?.id, user.role],
   )
-  // Actualitatea pe sursă e vizibilă și clientului (vederea `source_freshness`); starea conexiunilor, doar agenției.
+  // Actualitatea pe sursă (vederea `source_freshness`) și starea conexiunilor sunt doar ale agenției (decizia AH).
   const { state: freshnessState } = useAsync(
-    () => (shellBrand ? providers.sources.freshness(shellBrand.id) : Promise.resolve(null)),
+    () => (shellBrand && showSyncInfo ? providers.sources.freshness(shellBrand.id) : Promise.resolve(null)),
     [providers, shellBrand?.id, user.role],
   )
   const freshness = freshnessState.status === 'done' && freshnessState.value?.kind === 'ready' ? freshnessState.value.data : null
@@ -167,7 +171,6 @@ export function AppLayout() {
     const live = sourcesState.value.data.filter((s) => s.state !== 'not_connected')
     const dates = live.map((s) => s.data_as_of).filter((d): d is string => !!d).sort()
     const imports = live.map((s) => s.imported_at).filter((d): d is string => !!d).sort()
-    // Clientul nu vede conexiunile, deci „Date până la" îi vine din actualitatea surselor.
     return { dataAsOf: dates[0] ?? fresh[0] ?? null, lastRefreshAt: imports[imports.length - 1] ?? null }
   }, [sourcesState, freshness])
 
@@ -201,7 +204,8 @@ export function AppLayout() {
     const context: LayoutContext = { user, brands, brand: urlBrand, activeBrand: shellBrand, ctx, homeBrandId, changeFilters: change, reloadBrands, selectBrand: onBrandChange, aiPanel: { open: aiOpen, setOpen: setAiOpen, container: aiContainer } }
     // Starea datelor apare pe fiecare modul de brand care depinde de surse; cât nu se poate citi, nu ocupă loc.
     // Structura rămâne aceeași cu sau fără fâșie, ca pagina să nu se remonteze (și să nu-și reia cererile) când apare.
-    const showFreshness = module && urlBrand && module.sources.length > 0 && freshnessState.status !== 'failed' && (freshnessState.status === 'loading' || freshness !== null)
+    // Informațiile despre sincronizare (date până la, stare pe sursă, următoarea actualizare) sunt doar pentru agenție.
+    const showFreshness = showSyncInfo && module && urlBrand && module.sources.length > 0 && freshnessState.status !== 'failed' && (freshnessState.status === 'loading' || freshness !== null)
     content = (
       <div className="flex min-w-0 flex-col gap-5">
         {showFreshness ? <ModuleFreshness sources={module.sources} freshness={freshness} syncedAt={lastRefreshAt} /> : null}
@@ -239,8 +243,8 @@ export function AppLayout() {
       }
       rightPanel={module?.assistantPanel && urlBrand && aiOpen ? { ref: setAiContainer, onClose: () => setAiOpen(false) } : undefined}
       subtitle={subtitle || undefined}
-      dataAsOf={dataAsOf}
-      lastRefreshAt={lastRefreshAt}
+      dataAsOf={showSyncInfo ? dataAsOf : null}
+      lastRefreshAt={showSyncInfo ? lastRefreshAt : null}
       onSignOut={() => void signOut()}
       roleSwitcher={preview ? { role: user.role, onChange: preview.setRole } : undefined}
       filterBar={module && !module.noPeriod && ctx && urlBrand ? <FilterBar value={ctx} onChange={change} onReset={reset} filterDefs={visibleFilterDefs} /> : undefined}

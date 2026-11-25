@@ -113,6 +113,15 @@ describe('Overview: compoziția din macheta propunerii', () => {
     expect(items.map((i) => i.querySelector('span')?.textContent)).toEqual(['SEOmonitor', 'Search Console', 'Google Analytics 4', 'Planable'])
     expect(strip).toHaveTextContent('Următoarea actualizare estimată')
   })
+
+  it('clientul nu vede nimic despre sincronizare: nici starea datelor, nici „Date până la” sau „Ultimul refresh” din topbar', async () => {
+    setup({ role: 'client_viewer' })
+    await loaded()
+    expect(screen.queryByRole('region', { name: 'Starea datelor' })).toBeNull()
+    expect(screen.queryByText(/Următoarea actualizare estimată/)).toBeNull()
+    expect(screen.queryByText(/Ultimul refresh/)).toBeNull()
+    expect(screen.queryByText(/Date până la/)).toBeNull()
+  })
 })
 
 describe('Overview: cei șase indicatori', () => {

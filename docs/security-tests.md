@@ -422,8 +422,8 @@ Ultima rulare: 7 oct 2026, 13/13 mutații prinse.
 
 | ID | Vector | Rezultat așteptat |
 |---|---|---|
-| G1 | `source_status`, `sync_history`, `source_dataset_days` citite de strategist, account, admin, admin T2, client cu și fără acces; scriere în view-uri | agenția vede doar brandurile ei; clientul și alt tenant: gol; scrierea refuzată |
-| G2 | `source_freshness` pentru client (brandul lui), client fără acces, alt tenant; coloanele expuse | doar `tenant_id, brand_id, source, data_as_of, grace_days, freshness`; fără erori sau conexiuni |
+| G1 | `source_status`, `sync_history`, `source_freshness`, `source_dataset_days` citite de strategist, account, admin, admin T2, client cu și fără acces; scriere în view-uri | agenția vede doar brandurile ei; clientul (cu sau fără acces) și alt tenant: gol; scrierea refuzată |
+| G2 | `source_freshness` pentru agenție (brandul ei), client cu acces, client fără acces, alt tenant; coloanele expuse | agenția: doar `tenant_id, brand_id, source, data_as_of, grace_days, freshness`, fără erori sau conexiuni; clientul și alt tenant: gol (decizia AH) |
 | G3 | `alert_contacts` și `ops_notifications` de non-admin, client, admin T2; modificarea cozii de utilizatori | refuzat / gol; coada rămâne `pending` |
 
 **Neverificat (B8):** rularea orchestratorului pe conectorii reali cu surse reale (doar adaptoare cu conexiuni lipsă și runneri simulați); trimiterea reală a alertelor prin Resend; comportamentul cu zeci de branduri (view-ul `source_status` face câte un lateral join pe sursă și brand; neprofilat); ora de vară pentru cron.
