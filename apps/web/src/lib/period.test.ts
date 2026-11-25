@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, comparisonRange, serverPeriodKind, daysBetween, isValidIsoDate, lastCompleteDay, parseQueryContext, periodEndingAt, resolvePeriod, sharedSearch, todayBucharest, writeQueryContext, type FilterDef } from './period'
+import { addDays, comparisonRange, serverPeriodKind, daysBetween, isValidIsoDate, lastCompleteDay, lastCompleteWeekEnd, parseQueryContext, periodEndingAt, resolvePeriod, sharedSearch, todayBucharest, writeQueryContext, type FilterDef } from './period'
 
 // 6 oct. 2026, 10:00 în București (UTC+3 vara) -> azi = 2026-10-06, ultima zi completă = 2026-10-05.
 const NOW = new Date('2026-10-06T07:00:00Z')
@@ -33,20 +33,45 @@ describe('aritmetică de date', () => {
   })
 })
 
+describe('săptămâni complete (AI)', () => {
+  // Marți 24 nov. 2026, 10:00 în București.
+  const TUE = new Date('2026-11-24T08:00:00Z')
+  it('marți: ultima săptămână completă se termină duminica de acum două zile', () => {
+    expect(lastCompleteWeekEnd(TUE)).toBe('2026-11-22')
+  })
+  it('săptămâna se schimbă marțea, odată cu colectarea: luni rămâne cea dinainte', () => {
+    expect(lastCompleteWeekEnd(new Date('2026-11-23T08:00:00Z'))).toBe('2026-11-15') // luni
+    expect(lastCompleteWeekEnd(new Date('2026-11-22T08:00:00Z'))).toBe('2026-11-15') // duminică
+    expect(lastCompleteWeekEnd(new Date('2026-11-30T08:00:00Z'))).toBe('2026-11-22') // lunea următoare
+    expect(lastCompleteWeekEnd(new Date('2026-11-29T21:59:00Z'))).toBe('2026-11-22') // duminică 23:59 în București
+    expect(lastCompleteWeekEnd(new Date('2026-11-30T22:00:00Z'))).toBe('2026-11-29') // marți 00:00 în București
+  })
+  it('1, 4 și 13 săptămâni luni–duminică: exact intervalele GA4 de utilizatori activi', () => {
+    expect(resolvePeriod('7d', TUE)).toEqual({ preset: '7d', from: '2026-11-16', to: '2026-11-22' })
+    expect(resolvePeriod('28d', TUE)).toEqual({ preset: '28d', from: '2026-10-26', to: '2026-11-22' })
+    expect(resolvePeriod('90d', TUE)).toEqual({ preset: '90d', from: '2026-08-24', to: '2026-11-22' })
+    // Comparația: perioada anterioară de aceeași lungime, tot luni–duminică (ca `previousPeriod` din conector).
+    expect(comparisonRange(resolvePeriod('7d', TUE), 'previous')).toEqual({ from: '2026-11-09', to: '2026-11-15' })
+    expect(comparisonRange(resolvePeriod('28d', TUE), 'previous')).toEqual({ from: '2026-09-28', to: '2026-10-25' })
+    expect(comparisonRange(resolvePeriod('90d', TUE), 'previous')).toEqual({ from: '2026-05-25', to: '2026-08-23' })
+  })
+})
+
 describe('resolvePeriod', () => {
-  it('7 zile, 28 de zile, luna curentă, încheiate ieri', () => {
-    expect(resolvePeriod('7d', NOW)).toEqual({ preset: '7d', from: '2026-09-29', to: '2026-10-05' })
-    expect(resolvePeriod('28d', NOW)).toEqual({ preset: '28d', from: '2026-09-08', to: '2026-10-05' })
+  it('săptămâni complete; luna curentă și anul, încheiate ieri', () => {
+    // NOW = marți 6 oct.: ultima săptămână completă e 28 sept.–4 oct.
+    expect(resolvePeriod('7d', NOW)).toEqual({ preset: '7d', from: '2026-09-28', to: '2026-10-04' })
+    expect(resolvePeriod('28d', NOW)).toEqual({ preset: '28d', from: '2026-09-07', to: '2026-10-04' })
     expect(resolvePeriod('month', NOW)).toEqual({ preset: 'month', from: '2026-10-01', to: '2026-10-05' })
-    // „Trimestru” și „an”: intervale mobile de 90 și 365 de zile, încheiate ieri; pe server sunt `custom`.
-    expect(resolvePeriod('90d', NOW)).toEqual({ preset: '90d', from: '2026-07-08', to: '2026-10-05' })
+    // 13 săptămâni (91 de zile); „an”: 365 de zile mobile, încheiate ieri; pe server sunt `custom`.
+    expect(resolvePeriod('90d', NOW)).toEqual({ preset: '90d', from: '2026-07-06', to: '2026-10-04' })
     expect(resolvePeriod('365d', NOW)).toEqual({ preset: '365d', from: '2025-10-06', to: '2026-10-05' })
     expect(serverPeriodKind('90d')).toBe('custom')
     // Comparația cu anul trecut are tipul ei pe server, indiferent de interval (inclusiv luna curentă).
     expect(serverPeriodKind('28d', 'year_ago')).toBe('yoy')
     expect(serverPeriodKind('month', 'year_ago')).toBe('yoy')
     expect(serverPeriodKind('month', 'previous')).toBe('mtd')
-    expect(comparisonRange(resolvePeriod('90d', NOW), 'previous')).toEqual({ from: '2026-04-09', to: '2026-07-07' })
+    expect(comparisonRange(resolvePeriod('90d', NOW), 'previous')).toEqual({ from: '2026-04-06', to: '2026-07-05' })
   })
   it('interval personalizat valid', () => {
     expect(resolvePeriod('custom', NOW, { from: '2026-07-01', to: '2026-09-30' })).toEqual({ preset: 'custom', from: '2026-07-01', to: '2026-09-30' })

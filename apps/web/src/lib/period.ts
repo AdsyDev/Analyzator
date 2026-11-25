@@ -40,17 +40,33 @@ export function lastCompleteDay(now: Date = new Date()): IsoDate {
   return addDays(todayBucharest(now), -1)
 }
 
+/**
+ * Duminica ultimei săptămâni complete (luni–duminică) pe care colectarea săptămânală a adus-o deja (decizia AI).
+ * Colectarea rulează marțea pentru săptămâna anterioară (spec cap. 9), deci săptămâna se schimbă marțea: luni,
+ * ultima săptămână completă afișată e încă cea dinainte. Aceeași duminică folosește conectorul GA4 pentru
+ * utilizatorii activi (`connectors/google/intervals.ts`, cea mai recentă duminică dinaintea zilei colectării).
+ */
+export function lastCompleteWeekEnd(now: Date = new Date()): IsoDate {
+  const ref = addDays(todayBucharest(now), -2)
+  return addDays(ref, -toUtc(ref).getUTCDay())
+}
+
+/**
+ * `7d`, `28d` și `90d` sunt identificatori istorici (URL): înseamnă ultima săptămână completă și ultimele 4 și
+ * 13 săptămâni complete (spec cap. 9), nu zile mobile. „Luna curentă” și „365 de zile” se termină ieri.
+ */
 export function resolvePeriod(preset: PeriodPreset, now: Date = new Date(), custom?: { from: string | null; to: string | null }): PeriodSelection {
   const end = lastCompleteDay(now)
   if (preset === 'custom' && custom && isValidIsoDate(custom.from) && isValidIsoDate(custom.to) && custom.from <= custom.to && custom.to <= end) {
     return { preset: 'custom', from: custom.from, to: custom.to }
   }
-  if (preset === '7d') return { preset, from: addDays(end, -6), to: end }
   if (preset === 'month') return { preset, from: `${end.slice(0, 8)}01`, to: end }
-  if (preset === '90d') return { preset, from: addDays(end, -89), to: end }
   if (preset === '365d') return { preset, from: addDays(end, -364), to: end }
+  const sunday = lastCompleteWeekEnd(now)
+  if (preset === '7d') return { preset, from: addDays(sunday, -6), to: sunday }
+  if (preset === '90d') return { preset, from: addDays(sunday, -90), to: sunday }
   // '28d', precum și un `custom` invalid, revin la implicit.
-  return { preset: '28d', from: addDays(end, -27), to: end }
+  return { preset: '28d', from: addDays(sunday, -27), to: sunday }
 }
 
 function shiftYear(iso: IsoDate, years: number): IsoDate {

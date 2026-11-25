@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { failed } from '../../contracts'
 import { createSupabaseProviders } from '../../data/supabase/providers'
+import { addDays, lastCompleteDay } from '../../lib/period'
 import { pageReady, renderApp, where } from '../../test/renderApp'
 import { expectNoSourceDisconnected, missingNotice, missingWith } from '../../test/missing'
 
@@ -172,7 +173,9 @@ describe('Paid Media cu import', () => {
   })
 
   it('evoluție: spend și conversii în grafice separate, cu gol pentru zilele neimportate', async () => {
-    renderApp({ route: MINI })
+    // Perioadă încheiată ieri: importul fixture-ului se oprește înainte, deci zilele de la final sunt goluri.
+    const to = lastCompleteDay()
+    renderApp({ route: `${MINI}?period=custom&from=${addDays(to, -27)}&to=${to}` })
     await open()
     const s = await waitForSection('Evoluție')
     const figs = await within(s).findAllByRole('figure')

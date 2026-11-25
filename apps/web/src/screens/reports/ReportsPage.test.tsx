@@ -89,6 +89,6 @@ describe('Rapoarte', () => {
     renderApp({ route: `${ROUTE}?period=7d` })
     await open()
     expect(where()).toBe(`${ROUTE}?period=7d`)
-    expect(within(screen.getByRole('region', { name: 'Filtre' })).getByRole('button', { name: 'Perioadă' })).toHaveTextContent(/7 zile/)
+    expect(within(screen.getByRole('region', { name: 'Filtre' })).getByRole('button', { name: 'Perioadă' })).toHaveTextContent(/Ultima săptămână/)
   })
 })
