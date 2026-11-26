@@ -6,6 +6,54 @@ import { createSupabaseInsights, createSupabaseMentions } from './listeningProvi
 const ctx: QueryContext = { brandId: 'b1', period: { preset: '28d', from: '2026-09-10', to: '2026-10-07' }, comparison: 'previous', filters: {} }
 const mention = { id: 'h:1', brand_id: 'b1', source_name: 'instagram', author: null, published_at: '2026-10-05T12:00:00Z', text: 'bun', url: 'https://x.test/1', sentiment: null, reviewed_by: null, pv_flag: null }
 
+const overviewRow = {
+  connected: true,
+  days: ['2026-10-06', '2026-10-07'],
+  total: 3,
+  series: [null, 3],
+  platforms: [{ platform: 'instagram', mentions: 3, share: 100, values: [null, 3] }],
+  engagement: { value: null, mentions_with_value: 0, mentions: 3, comparison: { start: '2026-10-04', end: '2026-10-05', value: null }, change: { relative_change: null, absolute_change: null, base_zero: false } },
+  auto_sentiment: { total: 2, positive: 1, neutral: 1, negative: 0, unknown: 1, owned_excluded: 0, shares: { positive: 50, neutral: 50, negative: 0 }, net: 50 },
+  top_voices: [],
+  voices_basis: { external: 3, with_author: 0 },
+  topics: [],
+  topics_tracked: false,
+  competition: null,
+}
+
+describe('createSupabaseMentions.overview (deciziile AI)', () => {
+  it('citește brand_listening_overview cu perioada; `connected` nu ajunge în UI; lipsa (null) rămâne null', async () => {
+    const fake = fakeDataClient({ rpc: () => ({ data: overviewRow }) })
+    const r = await createSupabaseMentions(fake.client).overview(ctx)
+    expect(fake.rpcs[0]).toEqual({ fn: 'brand_listening_overview', args: { p_brand_id: 'b1', p_start: '2026-09-10', p_end: '2026-10-07' } })
+    expect(r.kind).toBe('ready')
+    if (r.kind !== 'ready') return
+    expect(r.data).not.toHaveProperty('connected')
+    expect([r.data.series, r.data.engagement.value]).toEqual([[null, 3], null])
+  })
+
+  it('fără Listening conectat: not_connected, nu zero', async () => {
+    const r = await createSupabaseMentions(fakeDataClient({ rpc: () => ({ data: { ...overviewRow, connected: false } }) }).client).overview(ctx)
+    expect(r.kind).toBe('not_connected')
+  })
+
+  it.each([
+    ['seria are altă lungime decât zilele', { series: [3] }],
+    ['un număr vine ca text', { total: '3' }],
+    ['o rețea fără serie', { platforms: [{ platform: 'x', mentions: 1, share: 100 }] }],
+    ['sentimentul automat lipsește', { auto_sentiment: null }],
+    ['competiția nu are entități', { competition: { set_version: 1 } }],
+  ])('contract încălcat (%s): eroare, nu date parțiale', async (_name, patch) => {
+    const r = await createSupabaseMentions(fakeDataClient({ rpc: () => ({ data: { ...overviewRow, ...patch } }) }).client).overview(ctx)
+    expect(r.kind).toBe('error')
+  })
+
+  it('acces refuzat de server: mesajul de acces', async () => {
+    const r = await createSupabaseMentions(fakeDataClient({ rpc: () => ({ data: null, error: { code: '42501', message: 'x' } }) }).client).overview(ctx)
+    expect(r.kind === 'error' && r.message).toBe('Nu ai acces la acest spațiu de brand.')
+  })
+})
+
 describe('createSupabaseMentions', () => {
   it('lista vine din brand_mentions cu filtrele și paginarea din UI', async () => {
     const { client, rpcs } = fakeDataClient({ rpc: () => ({ data: { items: [mention], total: 1, page: 1, page_size: 20 } }) })

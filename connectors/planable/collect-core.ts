@@ -3,7 +3,8 @@
 // (external_account_id = workspace-ul). Contract: docs/contracts/planable.md.
 //
 // Fără token (lipsă sau invalid), conexiunile brandurilor clientului raportează `not_connected`: fără sync_run, fără cereri.
-// Fiecare brand are două sync_runs: planable_analytics și planable_listening. Eșecul unui brand nu le oprește pe celelalte.
+// Fiecare brand are până la cinci sync_runs: planable_analytics, planable_listening, planable_listening_competitors,
+// planable_listening_topics și planable_competitors. Eșecul unui brand nu le oprește pe celelalte.
 
 import { getSourceToken, loadActiveConnections, recordProviderCalls, utcDay } from '../shared/connections.ts'
 import { CallBudget, type FetchLike, type Sleep } from '../shared/http-budget.ts'
@@ -26,6 +27,7 @@ import {
   SOURCE_COMPETITORS,
   SOURCE_LISTENING,
   SOURCE_LISTENING_COMPETITORS,
+  SOURCE_LISTENING_TOPICS,
   TRACKER_SOURCE_COMPETITORS,
   TRACKER_SOURCE_LISTENING,
   COMPETITOR_PLATFORMS,
@@ -47,6 +49,7 @@ import {
   CompetitorSeriesSchema,
   TrackedCompetitorsSchema,
   competitorMentionRow,
+  topicMentionRow,
   coveredFrom,
   attributionNotes,
   keywordOwners,
@@ -67,7 +70,7 @@ import {
   type Post,
 } from './normalize.ts'
 
-export type PlanableSource = typeof SOURCE_ANALYTICS | typeof SOURCE_LISTENING | typeof SOURCE_LISTENING_COMPETITORS | typeof SOURCE_COMPETITORS
+export type PlanableSource = typeof SOURCE_ANALYTICS | typeof SOURCE_LISTENING | typeof SOURCE_LISTENING_COMPETITORS | typeof SOURCE_LISTENING_TOPICS | typeof SOURCE_COMPETITORS
 
 export type PlanableDeps = { db: Db; fetch?: FetchLike; sleep?: Sleep; now?: () => Date }
 
@@ -88,6 +91,8 @@ export const KEYS = {
   social_posts: ['tenant_id', 'brand_id', 'platform', 'account_id', 'post_id', 'snapshot_date', 'metrics_scope'],
   mentions: ['tenant_id', 'brand_id', 'native_id'],
   competitor_mentions: ['tenant_id', 'brand_id', 'keyword_id', 'native_id'],
+  topic_mentions: ['tenant_id', 'brand_id', 'keyword_id', 'native_id'],
+  listening_trackers: ['tenant_id', 'brand_id', 'kind', 'keyword_id'],
   competitor_trackers: ['tenant_id', 'brand_id', 'source', 'external_id'],
   competitor_social_daily: ['tenant_id', 'brand_id', 'platform', 'profile_id', 'date'],
 } as const
@@ -205,7 +210,7 @@ export async function collectPlanable(deps: PlanableDeps): Promise<PlanableOutco
   const byTenant = new Map<string, Array<BrandConnection & { brand_id: string }>>()
   const outcomes: PlanableOutcome[] = []
   const notConnected = (c: BrandConnection, reason: string) => {
-    for (const source of [SOURCE_ANALYTICS, SOURCE_LISTENING, SOURCE_LISTENING_COMPETITORS, SOURCE_COMPETITORS] as const) {
+    for (const source of [SOURCE_ANALYTICS, SOURCE_LISTENING, SOURCE_LISTENING_COMPETITORS, SOURCE_LISTENING_TOPICS, SOURCE_COMPETITORS] as const) {
       outcomes.push({ tenant_id: c.tenant_id, brand_id: c.brand_id, connection_id: c.id, source, status: 'not_connected', sync_run_id: null, rows_written: 0, errors: [], reason })
     }
   }
@@ -260,6 +265,7 @@ async function collectTenant(deps: PlanableDeps, credentialId: string, list: Arr
       out.push(await runAnalytics(deps, client, conn, tz, workspaceError, now))
       out.push(await runListening(deps, client, conn, tz, workspaceError, now))
       out.push(await runCompetitorListening(deps, client, conn, tz, workspaceError, now))
+      out.push(await runTopicListening(deps, client, conn, tz, workspaceError, now))
       out.push(await runCompetitorProfiles(deps, client, conn, tz, workspaceError, now))
     } finally {
       const calls = client.budget.used - before
@@ -422,20 +428,32 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
     const withoutLink = new Map<string, Unlinked[]>()
     // Mențiunile sărite, numărate pe rețea și motiv: o notă pe grup, nu una pe mențiune.
     const skipped = new Map<string, SkippedGroup>()
+    // Ce cuvinte s-au citit complet și ce zile acoperă (deciziile AI): o zi citită fără mențiuni e zero real în graficul pe zile.
+    const previousTrackers = new Map(
+      (await db.select<{ keyword_id: string; covered_from: string; covered_to: string }>(
+        'listening_trackers',
+        `select=keyword_id,covered_from,covered_to&tenant_id=eq.${scope.tenant_id}&brand_id=eq.${scope.brand_id}&kind=eq.brand`,
+      )).map((t) => [t.keyword_id, t]),
+    )
+    const trackers: Row[] = []
     for (const k of keywords.data.data) {
       const ofKeyword = new Map<string, Unlinked[]>()
       let cursor: number | undefined
-      for (let page = 0; page < PLANABLE_MAX_PAGES; page++) {
+      let complete = true
+      let page = 0
+      for (; page < PLANABLE_MAX_PAGES; page++) {
         const r = await client.get(`/keywords/${encodeURIComponent(k.keywordId)}/mentions`, {
           workspaceId: conn.external_account_id, startDate: `${window.start}T00:00:00.000Z`, endDate: `${window.end}T23:59:59.999Z`, sortBy: 'recency', limit: PLANABLE_MENTIONS_PAGE_SIZE, cursor,
         })
         if (!r.ok) {
           errors.push(httpError(r, `mentions:${k.keywordId}`))
+          complete = false
           break
         }
         const parsed = MentionsSchema.safeParse(r.payload)
         if (!parsed.success) {
           errors.push({ code: 'invalid_payload', status: null, dimension: `mentions:${k.keywordId}`, message: 'Forma răspunsului de mențiuni s-a schimbat.' })
+          complete = false
           break
         }
         for (const m of parsed.data.data as Mention[]) {
@@ -464,7 +482,16 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
         if (next === null || next === cursor || parsed.data.data.length === 0) break
         cursor = next
       }
+      if (page === PLANABLE_MAX_PAGES) complete = false
       for (const [identity, same] of ofKeyword) if (same.length > (withoutLink.get(identity)?.length ?? 0)) withoutLink.set(identity, same)
+      const label = k.text.trim().slice(0, 200)
+      if (label !== '' && k.keywordId.length <= 128) {
+        trackers.push({
+          ...scope, kind: 'brand', keyword_id: k.keywordId, label,
+          covered_from: coveredFrom(previousTrackers.get(k.keywordId), window.start), covered_to: window.end,
+          complete, last_seen_at: collectedAt, source_id: conn.id, sync_run_id: handle.id,
+        })
+      }
     }
 
     // Cheia construită: identitatea plus numărul de ordine printre mențiunile identice. Ordinea lor e fixată după sentiment,
@@ -495,11 +522,85 @@ async function runListening(deps: PlanableDeps, client: PlanableClient, conn: Br
     const locked = mentions.filter((m) => reviewed.has(m.native_id as string)).map(({ sentiment: _s, ...rest }) => rest)
     rows += await upsertScoped(db, 'mentions', KEYS.mentions, free, scope)
     rows += await upsertScoped(db, 'mentions', KEYS.mentions, locked, scope)
+    // După mențiuni: o zi apare citită doar după ce mențiunile ei sunt scrise. Rândurile de acoperire nu intră în `rows_written`.
+    await upsertScoped(db, 'listening_trackers', KEYS.listening_trackers, trackers, scope)
     return await finish(deps, handle, conn, SOURCE_LISTENING, errors, rows, false, now)
   } catch (err) {
     errors.push({ code: 'exception', status: null, message: (err as Error).message })
     return await finish(deps, handle, conn, SOURCE_LISTENING, errors, rows, true, now)
   }
+}
+
+/** O mențiune citită pentru un cuvânt: `builtKey` = cheia construită pentru o mențiune fără link (altfel cheia e din URL). */
+type KeywordMention = { m: Mention; payloadHash: string; builtKey: string | null }
+
+/**
+ * Mențiunile unui cuvânt urmărit (de tip „competitor” sau „topic”), pe toată fereastra, cu paginarea pe cursor. Mențiunile sărite
+ * se numără în `skipped` (pe rețea și motiv), erorile intră în `errors`. Mențiunile fără link primesc cheia construită din
+ * identitate și numărul de ordine printre cele identice, ca la brand (deciziile R). `complete` = toate paginile citite fără eroare.
+ */
+async function readKeywordMentions(
+  client: PlanableClient,
+  workspaceId: string,
+  window: { start: string; end: string },
+  keywordId: string,
+  skipped: Map<string, SkippedGroup>,
+  errors: SyncRunError[],
+): Promise<{ mentions: KeywordMention[]; complete: boolean }> {
+  const out: KeywordMention[] = []
+  let complete = true
+  const withoutLink = new Map<string, Array<{ m: Mention; payloadHash: string }>>()
+  let cursor: number | undefined
+  let page = 0
+  for (; page < PLANABLE_MAX_PAGES; page++) {
+    const r = await client.get(`/keywords/${encodeURIComponent(keywordId)}/mentions`, {
+      workspaceId, startDate: `${window.start}T00:00:00.000Z`, endDate: `${window.end}T23:59:59.999Z`, sortBy: 'recency', limit: PLANABLE_MENTIONS_PAGE_SIZE, cursor,
+    })
+    if (!r.ok) {
+      errors.push(httpError(r, `mentions:${keywordId}`))
+      complete = false
+      break
+    }
+    const p = MentionsSchema.safeParse(r.payload)
+    if (!p.success) {
+      errors.push({ code: 'invalid_payload', status: null, dimension: `mentions:${keywordId}`, message: 'Forma răspunsului de mențiuni s-a schimbat.' })
+      complete = false
+      break
+    }
+    for (const m of p.data.data as Mention[]) {
+      const reasons = mentionSkipReasons(m)
+      if (reasons.length > 0) {
+        const platform = m.platform.trim().toLowerCase().replace(/[^\p{L}\p{N}_ .-]+/gu, '_').slice(0, 64)
+        const key = `${platform || 'rețea necunoscută'}|${reasons.join('+')}`
+        const group = skipped.get(key) ?? { count: 0, filled: new Map(), empty: new Map(), links: new Map() }
+        group.count++
+        const shape = mentionFieldShape(m as Record<string, unknown>)
+        for (const kind of ['filled', 'empty', 'links'] as const) for (const name of new Set(shape[kind])) group[kind].set(name, (group[kind].get(name) ?? 0) + 1)
+        skipped.set(key, group)
+        continue
+      }
+      if (hasNoLink(m)) {
+        const identity = builtMentionIdentity(m)
+        const same = withoutLink.get(identity) ?? []
+        same.push({ m, payloadHash: r.payloadHash })
+        withoutLink.set(identity, same)
+        continue
+      }
+      out.push({ m, payloadHash: r.payloadHash, builtKey: null })
+    }
+    const next = p.data.pagination.nextCursor
+    if (next === null || next === cursor || p.data.data.length === 0) break
+    cursor = next
+  }
+  if (page === PLANABLE_MAX_PAGES) {
+    errors.push({ code: 'pagination_stalled', status: null, dimension: `mentions:${keywordId}`, message: `Paginarea nu s-a terminat după ${PLANABLE_MAX_PAGES} pagini.` })
+    complete = false
+  }
+  for (const [identity, same] of withoutLink) {
+    const ordered = [...same].sort((a, b) => (a.m.sentiment ?? '').localeCompare(b.m.sentiment ?? ''))
+    ordered.forEach(({ m, payloadHash }, i) => out.push({ m, payloadHash, builtKey: builtMentionNativeId(identity, i + 1) }))
+  }
+  return { mentions: out, complete }
 }
 
 /**
@@ -543,59 +644,9 @@ async function runCompetitorListening(deps: PlanableDeps, client: PlanableClient
         errors.push({ code: 'parser_note', status: null, dimension: `keywords:${k.keywordId}`, message: 'cuvânt de tip „competitor” fără text sau mai lung de 200 de caractere; sărit' })
         continue
       }
-      let complete = true
-      // Mențiunile fără link, pe identitate, în cuvântul curent: identicele primesc numere de ordine (ca la brand, deciziile R).
-      const withoutLink = new Map<string, Array<{ m: Mention; payloadHash: string }>>()
-      let cursor: number | undefined
-      let page = 0
-      for (; page < PLANABLE_MAX_PAGES; page++) {
-        const r = await client.get(`/keywords/${encodeURIComponent(k.keywordId)}/mentions`, {
-          workspaceId: conn.external_account_id, startDate: `${window.start}T00:00:00.000Z`, endDate: `${window.end}T23:59:59.999Z`, sortBy: 'recency', limit: PLANABLE_MENTIONS_PAGE_SIZE, cursor,
-        })
-        if (!r.ok) {
-          errors.push(httpError(r, `mentions:${k.keywordId}`))
-          complete = false
-          break
-        }
-        const p = MentionsSchema.safeParse(r.payload)
-        if (!p.success) {
-          errors.push({ code: 'invalid_payload', status: null, dimension: `mentions:${k.keywordId}`, message: 'Forma răspunsului de mențiuni s-a schimbat.' })
-          complete = false
-          break
-        }
-        for (const m of p.data.data as Mention[]) {
-          const reasons = mentionSkipReasons(m)
-          if (reasons.length > 0) {
-            const platform = m.platform.trim().toLowerCase().replace(/[^\p{L}\p{N}_ .-]+/gu, '_').slice(0, 64)
-            const key = `${platform || 'rețea necunoscută'}|${reasons.join('+')}`
-            const group = skipped.get(key) ?? { count: 0, filled: new Map(), empty: new Map(), links: new Map() }
-            group.count++
-            const shape = mentionFieldShape(m as Record<string, unknown>)
-            for (const kind of ['filled', 'empty', 'links'] as const) for (const name of new Set(shape[kind])) group[kind].set(name, (group[kind].get(name) ?? 0) + 1)
-            skipped.set(key, group)
-            continue
-          }
-          if (hasNoLink(m)) {
-            const identity = builtMentionIdentity(m)
-            const same = withoutLink.get(identity) ?? []
-            same.push({ m, payloadHash: r.payloadHash })
-            withoutLink.set(identity, same)
-            continue
-          }
-          mentions.push(competitorMentionRow(m, k.keywordId, { ...provenance, payload_hash: r.payloadHash }))
-        }
-        const next = p.data.pagination.nextCursor
-        if (next === null || next === cursor || p.data.data.length === 0) break
-        cursor = next
-      }
-      if (page === PLANABLE_MAX_PAGES) {
-        errors.push({ code: 'pagination_stalled', status: null, dimension: `mentions:${k.keywordId}`, message: `Paginarea nu s-a terminat după ${PLANABLE_MAX_PAGES} pagini.` })
-        complete = false
-      }
-      for (const [identity, same] of withoutLink) {
-        const ordered = [...same].sort((a, b) => (a.m.sentiment ?? '').localeCompare(b.m.sentiment ?? ''))
-        ordered.forEach(({ m, payloadHash }, i) => mentions.push(competitorMentionRow(m, k.keywordId, { ...provenance, payload_hash: payloadHash }, builtMentionNativeId(identity, i + 1))))
-      }
+      const read = await readKeywordMentions(client, conn.external_account_id, window, k.keywordId, skipped, errors)
+      const complete = read.complete
+      for (const x of read.mentions) mentions.push(competitorMentionRow(x.m, k.keywordId, { ...provenance, payload_hash: x.payloadHash }, x.builtKey))
       trackers.push({
         ...scope,
         source: TRACKER_SOURCE_LISTENING,
@@ -620,6 +671,66 @@ async function runCompetitorListening(deps: PlanableDeps, client: PlanableClient
   } catch (err) {
     errors.push({ code: 'exception', status: null, message: (err as Error).message })
     return await finish(deps, handle, conn, SOURCE_LISTENING_COMPETITORS, errors, rows, true, now)
+  }
+}
+
+/**
+ * Mențiunile cuvintelor de tip „topic” (deciziile AI) → `topic_mentions`, pe cuvânt, și `listening_trackers` (`kind = topic`: ce
+ * topicuri s-au citit și ce zile acoperă). Fără text și fără autor, ca la competitori. Un workspace fără topicuri nu e o rulare
+ * eșuată: `not_connected`, fără sync_run.
+ */
+async function runTopicListening(deps: PlanableDeps, client: PlanableClient, conn: BrandConnection & { brand_id: string }, tz: string, workspaceError: SyncRunError | null, now: () => Date): Promise<PlanableOutcome> {
+  const { db } = deps
+  const window = lookbackWindow(now(), tz, PLANABLE_LOOKBACK_DAYS)
+  const scope = scopeOf(conn)
+  const kw = workspaceError ? null : await client.get('/keywords', { workspaceId: conn.external_account_id, type: 'topic' })
+  const parsed = kw?.ok ? KeywordsSchema.safeParse(kw.payload) : null
+  // Filtrul pe tip se repetă local: dacă API-ul ignoră parametrul, cuvintele brandului sau ale competitorilor nu devin topicuri.
+  const keywords = parsed?.success ? parsed.data.data.filter((k) => k.type.toLowerCase() === 'topic') : null
+  if (keywords && keywords.length === 0) {
+    return { tenant_id: conn.tenant_id, brand_id: conn.brand_id, connection_id: conn.id, source: SOURCE_LISTENING_TOPICS, status: 'not_connected', sync_run_id: null, rows_written: 0, errors: [], reason: 'niciun cuvânt de tip „topic” urmărit în Planable Listening' }
+  }
+  const handle = await startSyncRun(db, { ...scope, source: SOURCE_LISTENING_TOPICS, source_connection_id: conn.id, period_start: window.start, period_end: window.end }, now)
+  const errors: SyncRunError[] = []
+  let rows = 0
+  try {
+    if (workspaceError) return await finish(deps, handle, conn, SOURCE_LISTENING_TOPICS, [workspaceError], 0, true, now)
+    if (kw && !kw.ok) return await finish(deps, handle, conn, SOURCE_LISTENING_TOPICS, [httpError(kw, 'keywords:topic')], 0, true, now)
+    if (!keywords) return await finish(deps, handle, conn, SOURCE_LISTENING_TOPICS, [{ code: 'invalid_payload', status: null, dimension: 'keywords:topic', message: 'Forma răspunsului /keywords s-a schimbat.' }], 0, true, now)
+
+    const collectedAt = now().toISOString()
+    const provenance = { ...scope, source_id: conn.id, sync_run_id: handle.id, collected_at: collectedAt }
+    const previous = new Map(
+      (await db.select<{ keyword_id: string; covered_from: string; covered_to: string }>(
+        'listening_trackers',
+        `select=keyword_id,covered_from,covered_to&tenant_id=eq.${scope.tenant_id}&brand_id=eq.${scope.brand_id}&kind=eq.topic`,
+      )).map((t) => [t.keyword_id, t]),
+    )
+    const mentions: Row[] = []
+    const trackers: Row[] = []
+    const skipped = new Map<string, SkippedGroup>()
+    for (const k of keywords) {
+      const label = k.text.trim()
+      if (label === '' || label.length > 200 || k.keywordId.length > 128) {
+        errors.push({ code: 'parser_note', status: null, dimension: `keywords:${k.keywordId.slice(0, 128)}`, message: 'cuvânt de tip „topic” fără text sau mai lung de 200 de caractere; sărit' })
+        continue
+      }
+      const read = await readKeywordMentions(client, conn.external_account_id, window, k.keywordId, skipped, errors)
+      for (const x of read.mentions) mentions.push(topicMentionRow(x.m, k.keywordId, { ...provenance, payload_hash: x.payloadHash }, x.builtKey))
+      trackers.push({
+        ...scope, kind: 'topic', keyword_id: k.keywordId, label,
+        covered_from: coveredFrom(previous.get(k.keywordId), window.start), covered_to: window.end,
+        complete: read.complete, last_seen_at: collectedAt, source_id: conn.id, sync_run_id: handle.id,
+      })
+    }
+    errors.push(...skippedMentionNotes(skipped))
+    // Întâi mențiunile, apoi ce s-a citit: un topic apare acoperit doar după ce mențiunile lui sunt scrise.
+    rows += await upsertScoped(db, 'topic_mentions', KEYS.topic_mentions, mentions, scope)
+    rows += await upsertScoped(db, 'listening_trackers', KEYS.listening_trackers, trackers, scope)
+    return await finish(deps, handle, conn, SOURCE_LISTENING_TOPICS, errors, rows, false, now)
+  } catch (err) {
+    errors.push({ code: 'exception', status: null, message: (err as Error).message })
+    return await finish(deps, handle, conn, SOURCE_LISTENING_TOPICS, errors, rows, true, now)
   }
 }
 

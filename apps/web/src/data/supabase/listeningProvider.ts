@@ -5,6 +5,7 @@ import {
   ready,
   type Insight,
   type InsightsProvider,
+  type ListeningOverview,
   type Mention,
   type MentionPage,
   type MentionsProvider,
@@ -27,6 +28,32 @@ const PV_STATUS: Record<string, PvFlag['status']> = { open: 'pending', notified:
 async function currentUser(client: DataClient): Promise<string | null> {
   const { data } = await client.auth.getSession()
   return data.session?.user.id ?? null
+}
+
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+const isNumOrNull = (v: unknown) => v === null || isNum(v)
+
+/**
+ * Forma răspunsului `brand_listening_overview`: seriile au câte o valoare pe zi, numerele sunt numere sau `null` (lipsă), nu
+ * text. Un răspuns care nu respectă forma e eroare de contract, nu date parțiale.
+ */
+function isOverview(d: unknown): d is ListeningOverview & { connected?: boolean } {
+  if (!d || typeof d !== 'object') return false
+  const o = d as Record<string, unknown>
+  const days = o.days
+  if (!Array.isArray(days) || !days.every((x) => typeof x === 'string')) return false
+  const n = days.length
+  const series = (v: unknown) => Array.isArray(v) && v.length === n && v.every(isNumOrNull)
+  if (!isNum(o.total) || !series(o.series)) return false
+  if (!Array.isArray(o.platforms) || !o.platforms.every((p) => p && typeof p.platform === 'string' && isNum(p.mentions) && series(p.values))) return false
+  const s = o.auto_sentiment as Record<string, unknown> | null
+  if (!s || !isNum(s.total) || !isNum(s.positive) || !isNum(s.neutral) || !isNum(s.negative) || !isNumOrNull(s.net)) return false
+  const e = o.engagement as Record<string, unknown> | null
+  if (!e || !isNumOrNull(e.value) || !isNum(e.mentions_with_value)) return false
+  if (!Array.isArray(o.top_voices) || !Array.isArray(o.topics)) return false
+  const c = o.competition as Record<string, unknown> | null
+  if (c !== null && (typeof c !== 'object' || !Array.isArray(c.entities) || !Array.isArray(c.platforms))) return false
+  return true
 }
 
 /** Listening (mențiuni și farmacovigilență) prin sesiunea utilizatorului: RPC INVOKER și tabele cu RLS (D-13). */
@@ -67,6 +94,16 @@ export function createSupabaseMentions(client: DataClient): MentionsProvider {
         without_content: typeof dist.without_content === 'number' ? dist.without_content : 0,
         other_language: typeof dist.other_language === 'number' ? dist.other_language : 0,
       } as SentimentDistribution)
+    },
+
+    async overview(ctx) {
+      const { data, error } = await client.rpc('brand_listening_overview', { p_brand_id: ctx.brandId, p_start: ctx.period.from, p_end: ctx.period.to })
+      if (error) return failed(rpcError(error))
+      const d = data as (ListeningOverview & { connected?: boolean }) | null
+      if (!isOverview(d)) return failed(CONTRACT)
+      if (d.connected === false) return notConnected(NO_LISTENING)
+      const { connected: _c, ...overview } = d
+      return ready(overview as ListeningOverview)
     },
 
     async sources(brandId) {

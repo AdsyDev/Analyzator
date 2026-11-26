@@ -6,25 +6,132 @@ import { pageReady, renderApp, where } from '../../test/renderApp'
 const URINAL = '/brands/brand-urinal/listening'
 
 describe('Listening', () => {
-  it('KPI-urile fără registru sunt „Indicator nedefinit", nu „Sursă neconectată" și nici zero', async () => {
+  it('rândul de sus (AI): „Mențiuni” din registru, „Interacțiuni” fără valori inventate și „Sentiment automat” etichetat', async () => {
     renderApp({ route: URINAL })
     await pageReady('Listening')
-    for (const n of ['Mențiuni eligibile', 'Listening SoV', 'Pondere mențiuni negative']) {
-      const card = await screen.findByRole('article', { name: n })
-      expect(card).toHaveAttribute('data-status', 'not_connected')
-      expect(await within(card).findByText('Indicator nedefinit')).toBeInTheDocument()
-      expect(within(card).queryByText('Sursă neconectată')).toBeNull()
-      expect(card).toHaveTextContent('Indicatorul vine din Planable, dar nu are încă definiție în registrul de metrici')
-      expect(within(card).queryByText(/^\d/)).toBeNull()
-    }
+    const mentions = await screen.findByRole('article', { name: /^Mențiuni/ })
+    await waitFor(() => expect(mentions).not.toHaveAttribute('data-status', 'not_connected'))
+    expect(screen.queryByRole('article', { name: 'Listening SoV' })).toBeNull()
+    expect(screen.queryByText('Indicator nedefinit')).toBeNull()
+    // Fixtures nu au interacțiuni: lipsă explicată, nu zero.
+    const eng = await screen.findByRole('article', { name: 'Interacțiuni' })
+    expect(await within(eng).findByText('Fără interacțiuni raportate')).toBeInTheDocument()
+    expect(within(eng).queryByText(/^0$/)).toBeNull()
+    const auto = await screen.findByRole('article', { name: 'Sentiment automat' })
+    expect(within(auto).getByText('Automat · Planable')).toBeInTheDocument()
+    expect(await within(auto).findByText('pozitiv')).toBeInTheDocument()
+    expect(within(auto).getByRole('img', { name: /^Sentiment automat: Pozitiv/ })).toBeInTheDocument()
   })
 
-  it('distribuția numără doar mențiunile revizuite și spune câte așteaptă', async () => {
+  it('distribuția numără doar mențiunile revizuite și spune câte așteaptă; sentimentul automat stă alături, separat (B)', async () => {
     renderApp({ route: URINAL })
     await pageReady('Listening')
     const s = (await screen.findByRole('heading', { level: 2, name: 'Distribuția sentimentului' })).closest('section')!
     expect(await within(s).findByText(/2 mențiuni așteaptă revizuirea umană/)).toBeInTheDocument()
-    expect(within(s).getByRole('img', { name: /Pozitiv .*Neutru .*Negativ/ })).toBeInTheDocument()
+    expect(within(s).getByRole('img', { name: /^Distribuția sentimentului: Pozitiv .*Neutru .*Negativ/ })).toBeInTheDocument()
+    const auto = await within(s).findByRole('group', { name: 'Sentiment automat Planable' })
+    expect(within(auto).getByText(/Neverificat de un om/)).toBeInTheDocument()
+    expect(within(auto).getByText('Automat · Planable')).toBeInTheDocument()
+  })
+
+  it('mențiuni pe zi: totalul, apoi seria pe rețea; ponderea fiecărei rețele', async () => {
+    renderApp({ route: `${URINAL}?period=28d` })
+    await pageReady('Listening')
+    const sec = (await screen.findByRole('heading', { level: 2, name: 'Mențiuni pe zi' })).closest('section')!
+    const list = await within(sec).findByRole('list', { name: 'Mențiuni pe rețea' })
+    expect(within(list).getAllByRole('listitem').length).toBeGreaterThan(0)
+    await userEvent.click(within(sec).getByRole('tab', { name: 'Pe rețea' }))
+    expect(within(sec).getByRole('tab', { name: 'Pe rețea' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('vocile principale: autorii externi, fără conturile proprii; fără autori, explicația colectării', async () => {
+    renderApp({ route: `${URINAL}?period=28d` })
+    await pageReady('Listening')
+    const sec = (await screen.findByRole('heading', { level: 2, name: 'Voci principale' })).closest('section')!
+    expect(await within(sec).findByText('mama_de_trei')).toBeInTheDocument()
+  })
+
+  it('vocile: mențiuni externe fără autor (colectate înainte de AI) → mesaj, nu listă inventată', async () => {
+    renderApp({
+      route: URINAL,
+      wrap: (b) => ({
+        ...b,
+        mentions: {
+          ...b.mentions,
+          overview: async (ctx) => {
+            const r = await b.mentions.overview(ctx)
+            return r.kind === 'ready' ? { kind: 'ready' as const, data: { ...r.data, top_voices: [], voices_basis: { external: 12, with_author: 0 } } } : r
+          },
+        },
+      }),
+    })
+    await pageReady('Listening')
+    const sec = (await screen.findByRole('heading', { level: 2, name: 'Voci principale' })).closest('section')!
+    expect(await within(sec).findByText(/Autorii mențiunilor se păstrează din 25 nov. 2026/)).toBeInTheDocument()
+  })
+
+  it('competiția: brandul și competitorii, cu share of voice, sentiment automat și împărțirea pe rețea; N/A cu motiv', async () => {
+    renderApp({
+      route: URINAL,
+      wrap: (b) => ({
+        ...b,
+        mentions: {
+          ...b.mentions,
+          overview: async (ctx) => {
+            const r = await b.mentions.overview(ctx)
+            if (r.kind !== 'ready' || !r.data.competition) return r
+            const c = r.data.competition
+            const [brand, first, ...rest] = c.entities
+            const na = { value: null, unit: 'count' as const, status: 'unavailable' as const, coverage: null, reason: 'Niciun cuvânt de tip „competitor” corespunde.' }
+            return { kind: 'ready' as const, data: { ...r.data, competition: { ...c, entities: [brand!, { ...first!, mentions: na, share_of_voice: { ...na, unit: 'percent' as const }, tracked: false }, ...rest] } } }
+          },
+        },
+      }),
+    })
+    await pageReady('Listening')
+    const sec = (await screen.findByRole('heading', { level: 2, name: 'Competiție în Listening' })).closest('section')!
+    const table = await within(sec).findByRole('table', { name: /Mențiuni, share of voice și sentiment automat/ })
+    expect(within(sec).getByText('Tu')).toBeInTheDocument()
+    const na = within(table).getAllByText('N/A')
+    expect(na[0]).toHaveAttribute('title', 'Niciun cuvânt de tip „competitor” corespunde.')
+    expect(within(table).getByText('Fără cuvânt urmărit în Planable')).toBeInTheDocument()
+    expect(within(sec).queryByRole('img', { name: /^Share of voice:/ })).toBeNull()
+    expect(within(sec).getByRole('table', { name: /pe rețea/ })).toBeInTheDocument()
+    expect(within(sec).getByRole('link', { name: 'Competiție' })).toHaveAttribute('href', expect.stringContaining('/brands/brand-urinal/competition'))
+  })
+
+  it('topicurile: fără topic urmărit, secțiunea nu se desenează și pagina o numește (AG); cu topicuri, volumul și sentimentul', async () => {
+    renderApp({ route: URINAL })
+    await pageReady('Listening')
+    await screen.findByRole('heading', { level: 2, name: 'Mențiuni pe zi' })
+    await screen.findByRole('table', { name: /Mențiuni, share of voice/ })
+    await waitFor(() => expect(screen.getAllByRole('status').some((e) => /nu avem date pentru.*Topicuri/.test(e.textContent ?? ''))).toBe(true))
+    expect(screen.getByRole('heading', { level: 2, name: 'Topicuri', hidden: true }).closest('section')).toHaveAttribute('hidden')
+  })
+
+  it('topicurile cu date: eticheta, mențiunile și acoperirea parțială', async () => {
+    renderApp({
+      route: URINAL,
+      wrap: (b) => ({
+        ...b,
+        mentions: {
+          ...b.mentions,
+          overview: async (ctx) => {
+            const r = await b.mentions.overview(ctx)
+            if (r.kind !== 'ready') return r
+            const sentiment = { total: 10, positive: 6, neutral: 3, negative: 1, unknown: 0, shares: { positive: 60, neutral: 30, negative: 10 }, net: 50 }
+            const topic = { id: 't1', label: 'dureri articulare', mentions: 43, status: 'partial' as const, coverage: 0.5, reason: 'Topicul e colectat doar pentru 01.11.2026 – 14.11.2026.', engagement: 2378, sentiment, platforms: [{ platform: 'facebook', mentions: 30 }] }
+            return { kind: 'ready' as const, data: { ...r.data, topics_tracked: true, topics: [topic] } }
+          },
+        },
+      }),
+    })
+    await pageReady('Listening')
+    const sec = (await screen.findByRole('heading', { level: 2, name: 'Topicuri' })).closest('section')!
+    expect(await within(sec).findByText('dureri articulare')).toBeInTheDocument()
+    expect(within(sec).getByText('43 mențiuni')).toBeInTheDocument()
+    expect(within(sec).getByText('Parțial')).toBeInTheDocument()
+    expect(within(sec).getByText(/2.378 interacțiuni/)).toBeInTheDocument()
   })
 
   it('feed: sentiment „Nerevizuit" vs revizuit de cineva; filtrul din URL îl restrânge', async () => {

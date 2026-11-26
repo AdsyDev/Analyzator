@@ -4,7 +4,7 @@ import type { Brand, CompetitorSet } from './brand'
 import type { CompetitionGap, CompetitionMatrix, CompetitorAdsPage } from './competition'
 import type { BrandId, ProviderResult, TenantId } from './common'
 import type { ActionTransition, Insight, InsightDraft, InsightTransition, NewAction, NewRecommendation, ClientResponseKind } from './insight'
-import type { MentionPage, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnapshot, SentimentDistribution } from './mention'
+import type { ListeningOverview, MentionPage, MentionQuery, Page, PvFlag, PvItemRef, PvLogEntry, PvSnapshot, SentimentDistribution } from './mention'
 import type { Evidence, EvidenceQuery, MetricDefinition, MetricsBundle, TrendSeries } from './metric'
 import type { QueryContext } from './period'
 import type { NewPaidBudget, PaidBudget, PaidFilters, PaidRow, PaidSeries, PaidSummary } from './paid'
@@ -61,6 +61,8 @@ export interface InsightsProvider {
 export interface MentionsProvider {
   list(ctx: QueryContext, query: MentionQuery): Promise<ProviderResult<MentionPage>>
   sentiment(ctx: QueryContext): Promise<ProviderResult<SentimentDistribution>>
+  /** Volumul, rețelele, interacțiunile, sentimentul automat, vocile, topicurile și competiția din Listening (deciziile AI). */
+  overview(ctx: QueryContext): Promise<ProviderResult<ListeningOverview>>
   /** Sursele distincte ale mențiunilor, pentru filtrul de sursă. */
   sources(brandId: BrandId): Promise<ProviderResult<string[]>>
   /** Doar `agency_admin` (brief cap. 6, spec cap. 28); ceilalți primesc eroare de acces. */

@@ -49,6 +49,7 @@ import { createAssistantFixtures } from './assistant'
 import { createSearchFixtures } from './search'
 import { createSocialFixtures } from './social'
 import { createTrafficFixtures } from './traffic'
+import { fixtureListeningOverview, type FixtureSet } from './listening'
 import { FIXTURE_DEFINITIONS, fixtureEvidence, fixtureMetrics, fixtureTrends } from './metrics'
 
 export interface FixtureOptions {
@@ -412,6 +413,13 @@ export function createFixtureProviders(options: FixtureOptions = {}): DataProvid
         owned_excluded: inRange.length - all.length,
         shares: { positive: share(count('positive')), neutral: share(count('neutral')), negative: share(count('negative')) },
       })
+    },
+    overview: async (ctx) => {
+      const denied = guard<never>(ctx.brandId)
+      if (denied) return denied
+      const brand = brandsFile.brands.find((b) => b.id === ctx.brandId)
+      const set = (brandsFile.competitor_sets as Record<string, FixtureSet | undefined>)[ctx.brandId]
+      return ready(fixtureListeningOverview(ctx, mentionsFor(ctx.brandId), brand?.name ?? ctx.brandId, set))
     },
     pvLog: async (ctx) => {
       const denied = guard<never>(ctx.brandId)

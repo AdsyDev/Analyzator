@@ -19,6 +19,7 @@ const REGISTRY_SOURCE_NAMES: Record<string, string> = {
   planable_listening: 'Planable Listening',
   planable_analytics: 'Planable Analytics',
   planable_listening_competitors: 'Planable Listening (competitori)',
+  planable_listening_topics: 'Planable Listening (topicuri)',
   planable_competitors: 'Planable Competitors',
   ads_transparency: 'Google Ads Transparency',
 }
@@ -45,7 +46,7 @@ export const PROVIDER_DESCRIPTIONS: Record<SourceProviderId, string> = {
 
 /** Sursele din `sync_runs` care aparțin fiecărui card (Planable scrie separat Analytics și Listening). */
 const RUN_SOURCES: Partial<Record<SourceProviderId, readonly string[]>> = {
-  planable: ['planable', 'planable_analytics', 'planable_listening', 'planable_listening_competitors', 'planable_competitors'],
+  planable: ['planable', 'planable_analytics', 'planable_listening', 'planable_listening_competitors', 'planable_listening_topics', 'planable_competitors'],
 }
 export const runSourcesFor = (provider: SourceProviderId): readonly string[] => RUN_SOURCES[provider] ?? [provider]
 

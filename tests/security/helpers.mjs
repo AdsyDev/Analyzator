@@ -37,6 +37,7 @@ export const TABLES = [
   'pv_contacts', 'pv_flags', 'pv_flag_events', 'pv_notifications',
   'alert_contacts', 'ops_notifications',
   'competitor_trackers', 'competitor_mentions', 'competitor_ads', 'competitor_social_daily',
+  'listening_trackers', 'topic_mentions',
 ]
 export const CLARITY_1A = '50000000-0000-0000-0000-000000000031'
 export const CLARITY_2A = '50000000-0000-0000-0000-000000000032'

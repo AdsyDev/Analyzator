@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { ProviderResult, Sentiment, SentimentDistribution } from '../../contracts'
 import { EmptyState } from '../../components/EmptyState'
 import type { AsyncState } from '../../data/useAsync'
@@ -21,9 +22,12 @@ const noContentNote = (n: number) => (n > 0 ? ` ${n === 1 ? 'O mențiune a venit
 /** Câte mențiuni externe sunt în altă limbă decât româna și nu intră în Listening (deciziile AC). */
 const otherLanguageNote = (n: number) => (n > 0 ? ` ${n === 1 ? 'O mențiune e' : `${formatInteger(n)} mențiuni sunt`} în altă limbă decât româna și nu ${n === 1 ? 'e inclusă' : 'sunt incluse'}.` : '')
 
-export function SentimentSection({ state, onRetry }: { state: AsyncState<ProviderResult<SentimentDistribution>>; onRetry: () => void }) {
+export function SentimentSection({ state, onRetry, auto = null }: { state: AsyncState<ProviderResult<SentimentDistribution>>; onRetry: () => void; auto?: ReactNode }) {
   return (
-    <Section id="sentiment" title="Distribuția sentimentului" description="Fiecare sentiment e verificat de un om din echipa AdSymphony; mențiunile încă nerevizuite, postările din conturile proprii ale brandului și mențiunile în altă limbă decât româna nu sunt incluse în procente.">
+    <Section id="sentiment" title="Distribuția sentimentului" description="Stânga: sentimentul verificat de un om din echipa AdSymphony; mențiunile încă nerevizuite, postările din conturile proprii ale brandului și mențiunile în altă limbă decât româna nu sunt incluse în procente. Dreapta: sentimentul dat automat de Planable, neverificat, pentru comparație.">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="flex flex-col gap-3">
+      <h3 className="font-display text-[14px] font-semibold">Revizuit de echipă</h3>
       <Resolved state={state} onRetry={onRetry} loadingLabel="Se încarcă distribuția" skeletonClass="h-28">
         {(d) =>
           d.total === 0 ? (
@@ -63,6 +67,9 @@ export function SentimentSection({ state, onRetry }: { state: AsyncState<Provide
           )
         }
       </Resolved>
+      </div>
+      {auto}
+      </div>
     </Section>
   )
 }
